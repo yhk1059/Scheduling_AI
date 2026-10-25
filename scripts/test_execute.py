@@ -543,6 +543,22 @@ class TestInvokeClaude:
 # _execute_single_step timeout
 # ---------------------------------------------------------------------------
 
+class TestExecuteSingleStepElapsed:
+    def test_reports_actual_elapsed_seconds(self, executor, capsys):
+        def slow_complete(step, preamble):
+            import time
+            time.sleep(1.1)
+            index = executor._read_json(executor._index_file)
+            index["steps"][2].update(status="completed", summary="done")
+            executor._write_json(executor._index_file, index)
+            return {}
+        executor._invoke_claude = slow_complete
+        executor._commit_step = MagicMock()
+
+        assert executor._execute_single_step({"step": 2, "name": "ui"}, "") is True
+        assert "✓ Step 2: ui [1s]" in capsys.readouterr().out
+
+
 class TestExecuteSingleStepTimeout:
     def test_timeout_is_retried_then_recorded_as_error(self, executor):
         executor._invoke_claude = MagicMock(return_value={"timedOut": True})
