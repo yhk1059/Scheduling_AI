@@ -10,6 +10,7 @@ import argparse
 import contextlib
 import json
 import os
+import signal
 import subprocess
 import sys
 import threading
@@ -247,16 +248,20 @@ class StepExecutor:
             sys.exit(1)
 
         prompt = preamble + step_file.read_text()
+        # 새 세션(프로세스 그룹)으로 띄워, 타임아웃 시 Claude가 띄운 자식 프로세스까지 함께 종료한다.
+        proc = subprocess.Popen(
+            ["claude", "-p", "--dangerously-skip-permissions", "--output-format", "json", prompt],
+            cwd=self._root, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+            start_new_session=True,
+        )
         try:
-            result = subprocess.run(
-                ["claude", "-p", "--dangerously-skip-permissions", "--output-format", "json", prompt],
-                cwd=self._root, capture_output=True, text=True, timeout=self.CLAUDE_TIMEOUT,
-            )
-            exit_code, stdout, stderr, timed_out = result.returncode, result.stdout, result.stderr, False
-        except subprocess.TimeoutExpired as e:
-            def _text(v):
-                return v.decode(errors="replace") if isinstance(v, bytes) else (v or "")
-            exit_code, stdout, stderr, timed_out = None, _text(e.stdout), _text(e.stderr), True
+            stdout, stderr = proc.communicate(timeout=self.CLAUDE_TIMEOUT)
+            exit_code, timed_out = proc.returncode, False
+        except subprocess.TimeoutExpired:
+            with contextlib.suppress(ProcessLookupError):
+                os.killpg(proc.pid, signal.SIGKILL)
+            stdout, stderr = proc.communicate()
+            exit_code, timed_out = None, True
             print(f"\n  WARN: Claude가 {self.CLAUDE_TIMEOUT}초 내에 끝나지 않아 중단됨 (timeout)")
 
         if exit_code not in (0, None):

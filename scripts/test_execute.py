@@ -479,16 +479,21 @@ class TestExecuteSingleStepFailure:
 # _invoke_claude (mocked)
 # ---------------------------------------------------------------------------
 
+def _fake_popen(stdout="{}", stderr="", returncode=0):
+    proc = MagicMock(pid=12345, returncode=returncode)
+    proc.communicate.return_value = (stdout, stderr)
+    return proc
+
+
 class TestInvokeClaude:
     def test_invokes_claude_with_correct_args(self, executor):
-        mock_result = MagicMock(returncode=0, stdout='{"result": "ok"}', stderr="")
         step = {"step": 2, "name": "ui"}
         preamble = "PREAMBLE\n"
 
-        with patch("subprocess.run", return_value=mock_result) as mock_run:
+        with patch("subprocess.Popen", return_value=_fake_popen('{"result": "ok"}')) as mock_popen:
             output = executor._invoke_claude(step, preamble)
 
-        cmd = mock_run.call_args[0][0]
+        cmd = mock_popen.call_args[0][0]
         assert cmd[0] == "claude"
         assert "-p" in cmd
         assert "--dangerously-skip-permissions" in cmd
@@ -496,11 +501,18 @@ class TestInvokeClaude:
         assert "PREAMBLE" in cmd[-1]
         assert "UI를 구현하세요" in cmd[-1]
 
-    def test_saves_output_json(self, executor):
-        mock_result = MagicMock(returncode=0, stdout='{"ok": true}', stderr="")
+    def test_runs_in_new_session(self, executor):
         step = {"step": 2, "name": "ui"}
 
-        with patch("subprocess.run", return_value=mock_result):
+        with patch("subprocess.Popen", return_value=_fake_popen()) as mock_popen:
+            executor._invoke_claude(step, "preamble")
+
+        assert mock_popen.call_args[1]["start_new_session"] is True
+
+    def test_saves_output_json(self, executor):
+        step = {"step": 2, "name": "ui"}
+
+        with patch("subprocess.Popen", return_value=_fake_popen('{"ok": true}')):
             executor._invoke_claude(step, "preamble")
 
         output_file = executor._phase_dir / "step2-output.json"
@@ -517,26 +529,57 @@ class TestInvokeClaude:
         assert exc_info.value.code == 1
 
     def test_timeout_is_1800(self, executor):
-        mock_result = MagicMock(returncode=0, stdout="{}", stderr="")
         step = {"step": 2, "name": "ui"}
+        proc = _fake_popen()
 
-        with patch("subprocess.run", return_value=mock_result) as mock_run:
+        with patch("subprocess.Popen", return_value=proc):
             executor._invoke_claude(step, "preamble")
 
-        assert mock_run.call_args[1]["timeout"] == 1800
+        assert proc.communicate.call_args_list[0][1]["timeout"] == 1800
 
-    def test_timeout_returns_output_instead_of_raising(self, executor):
+    def test_timeout_kills_process_group_and_returns_output(self, executor):
         step = {"step": 2, "name": "ui"}
-        exc = subprocess.TimeoutExpired(cmd="claude", timeout=1800, output=b"partial", stderr=None)
+        proc = _fake_popen()
+        proc.communicate.side_effect = [
+            subprocess.TimeoutExpired(cmd="claude", timeout=1800),
+            ("partial", ""),
+        ]
 
-        with patch("subprocess.run", side_effect=exc):
+        with patch("subprocess.Popen", return_value=proc), patch("os.killpg") as mock_killpg:
             output = executor._invoke_claude(step, "preamble")
 
+        mock_killpg.assert_called_once_with(12345, ex.signal.SIGKILL)
         assert output["timedOut"] is True
         assert output["exitCode"] is None
         assert output["stdout"] == "partial"
         data = json.loads((executor._phase_dir / "step2-output.json").read_text())
         assert data["timedOut"] is True
+
+    def test_timeout_kills_real_grandchild(self, executor, tmp_path, monkeypatch):
+        """실제 프로세스: claude가 띄운 백그라운드 자식도 타임아웃 시 종료되어야 한다."""
+        pid_file = tmp_path / "child.pid"
+        bin_dir = tmp_path / "bin"
+        bin_dir.mkdir()
+        fake = bin_dir / "claude"
+        fake.write_text(f"#!/bin/sh\nsleep 60 &\necho $! > {pid_file}\nwait\n")
+        fake.chmod(0o755)
+        monkeypatch.setenv("PATH", f"{bin_dir}{os.pathsep}{os.environ['PATH']}")
+        monkeypatch.setattr(ex.StepExecutor, "CLAUDE_TIMEOUT", 1)
+
+        output = executor._invoke_claude({"step": 2, "name": "ui"}, "preamble")
+
+        assert output["timedOut"] is True
+        child_pid = int(pid_file.read_text())
+        for _ in range(20):
+            try:
+                os.kill(child_pid, 0)
+            except ProcessLookupError:
+                break
+            import time
+            time.sleep(0.1)
+        else:
+            os.kill(child_pid, 9)
+            pytest.fail(f"grandchild {child_pid} survived timeout")
 
 
 # ---------------------------------------------------------------------------
