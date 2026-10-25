@@ -525,6 +525,41 @@ class TestInvokeClaude:
 
         assert mock_run.call_args[1]["timeout"] == 1800
 
+    def test_timeout_returns_output_instead_of_raising(self, executor):
+        step = {"step": 2, "name": "ui"}
+        exc = subprocess.TimeoutExpired(cmd="claude", timeout=1800, output=b"partial", stderr=None)
+
+        with patch("subprocess.run", side_effect=exc):
+            output = executor._invoke_claude(step, "preamble")
+
+        assert output["timedOut"] is True
+        assert output["exitCode"] is None
+        assert output["stdout"] == "partial"
+        data = json.loads((executor._phase_dir / "step2-output.json").read_text())
+        assert data["timedOut"] is True
+
+
+# ---------------------------------------------------------------------------
+# _execute_single_step timeout
+# ---------------------------------------------------------------------------
+
+class TestExecuteSingleStepTimeout:
+    def test_timeout_is_retried_then_recorded_as_error(self, executor):
+        executor._invoke_claude = MagicMock(return_value={"timedOut": True})
+        executor._commit_failure = MagicMock()
+        executor._update_top_index = MagicMock()
+
+        with pytest.raises(SystemExit) as exc_info:
+            executor._execute_single_step({"step": 2, "name": "ui"}, "")
+
+        assert exc_info.value.code == 1
+        assert executor._invoke_claude.call_count == ex.StepExecutor.MAX_RETRIES
+        retry_preamble = executor._invoke_claude.call_args_list[1][0][1]
+        assert "timeout" in retry_preamble
+        step = executor._read_json(executor._index_file)["steps"][2]
+        assert step["status"] == "error"
+        assert "timeout" in step["error_message"]
+
 
 # ---------------------------------------------------------------------------
 # progress_indicator (= 이전 Spinner)

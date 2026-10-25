@@ -54,6 +54,7 @@ class StepExecutor:
     """Phase 디렉토리 안의 step들을 순차 실행하는 하네스."""
 
     MAX_RETRIES = 3
+    CLAUDE_TIMEOUT = 1800
     FEAT_MSG = "feat({phase}): step {num} — {name}"
     CHORE_MSG = "chore({phase}): step {num} output"
     FAIL_MSG = "chore({phase}): step {num} failed"
@@ -246,20 +247,27 @@ class StepExecutor:
             sys.exit(1)
 
         prompt = preamble + step_file.read_text()
-        result = subprocess.run(
-            ["claude", "-p", "--dangerously-skip-permissions", "--output-format", "json", prompt],
-            cwd=self._root, capture_output=True, text=True, timeout=1800,
-        )
+        try:
+            result = subprocess.run(
+                ["claude", "-p", "--dangerously-skip-permissions", "--output-format", "json", prompt],
+                cwd=self._root, capture_output=True, text=True, timeout=self.CLAUDE_TIMEOUT,
+            )
+            exit_code, stdout, stderr, timed_out = result.returncode, result.stdout, result.stderr, False
+        except subprocess.TimeoutExpired as e:
+            def _text(v):
+                return v.decode(errors="replace") if isinstance(v, bytes) else (v or "")
+            exit_code, stdout, stderr, timed_out = None, _text(e.stdout), _text(e.stderr), True
+            print(f"\n  WARN: Claude가 {self.CLAUDE_TIMEOUT}초 내에 끝나지 않아 중단됨 (timeout)")
 
-        if result.returncode != 0:
-            print(f"\n  WARN: Claude가 비정상 종료됨 (code {result.returncode})")
-            if result.stderr:
-                print(f"  stderr: {result.stderr[:500]}")
+        if exit_code not in (0, None):
+            print(f"\n  WARN: Claude가 비정상 종료됨 (code {exit_code})")
+            if stderr:
+                print(f"  stderr: {stderr[:500]}")
 
         output = {
             "step": step_num, "name": step_name,
-            "exitCode": result.returncode,
-            "stdout": result.stdout, "stderr": result.stderr,
+            "exitCode": exit_code, "timedOut": timed_out,
+            "stdout": stdout, "stderr": stderr,
         }
         out_path = self._phase_dir / f"step{step_num}-output.json"
         with open(out_path, "w") as f:
@@ -317,7 +325,7 @@ class StepExecutor:
                 tag += f" [retry {attempt}/{self.MAX_RETRIES}]"
 
             with progress_indicator(tag) as pi:
-                self._invoke_claude(step, preamble)
+                output = self._invoke_claude(step, preamble)
                 elapsed = int(pi.elapsed)
 
             index = self._read_json(self._index_file)
@@ -344,9 +352,13 @@ class StepExecutor:
                 self._update_top_index("blocked")
                 sys.exit(2)
 
+            default_err = (
+                f"Claude 세션이 {self.CLAUDE_TIMEOUT}초 내에 끝나지 않아 중단됨 (timeout). 작업 범위를 줄이거나 오래 걸리는 명령을 피하라."
+                if output.get("timedOut") else "Step did not update status"
+            )
             err_msg = next(
-                (s.get("error_message", "Step did not update status") for s in index["steps"] if s["step"] == step_num),
-                "Step did not update status",
+                (s.get("error_message", default_err) for s in index["steps"] if s["step"] == step_num),
+                default_err,
             )
 
             if attempt < self.MAX_RETRIES:
