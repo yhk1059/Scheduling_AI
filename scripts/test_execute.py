@@ -245,9 +245,10 @@ class TestBuildPreamble:
         result = executor._build_preamble("", ctx)
         assert "이전 Step 산출물" in result
 
-    def test_includes_commit_example(self, executor):
+    def test_forbids_commit(self, executor):
         result = executor._build_preamble("", "")
-        assert "feat(mvp):" in result
+        assert "git commit을 하지 마라" in result
+        assert "feat(mvp):" not in result
 
     def test_includes_rules(self, executor):
         result = executor._build_preamble("", "")
