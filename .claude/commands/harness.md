@@ -147,5 +147,5 @@ execute.py가 자동으로 처리하는 것:
 
 에러 복구:
 
-- **error 발생 시**: `phases/{task-name}/index.json`에서 해당 step의 `status`를 `"pending"`으로 바꾸고 `error_message`를 삭제한 뒤 재실행한다.
+- **error 발생 시**: 실패한 step의 코드 변경은 커밋되지 않고 작업 트리에 남는다 (메타데이터만 `chore(...): step N failed`로 커밋). `git status`로 확인해 이어서 쓸지 버릴지 정한 뒤, `phases/{task-name}/index.json`에서 해당 step의 `status`를 `"pending"`으로 바꾸고 `error_message`를 삭제한 뒤 재실행한다.
 - **blocked 발생 시**: `blocked_reason`에 적힌 사유를 해결한 뒤, `status`를 `"pending"`으로 바꾸고 `blocked_reason`을 삭제한 뒤 재실행한다.

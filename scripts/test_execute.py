@@ -421,6 +421,61 @@ class TestCommitStep:
 
 
 # ---------------------------------------------------------------------------
+# _commit_failure (real git)
+# ---------------------------------------------------------------------------
+
+class TestCommitFailure:
+    def _git(self, cwd, *args):
+        return subprocess.run(["git", *args], cwd=cwd, capture_output=True, text=True, check=True)
+
+    def test_commits_only_metadata(self, executor, tmp_project, top_index):
+        self._git(tmp_project, "init", "-q")
+        self._git(tmp_project, "-c", "user.name=t", "-c", "user.email=t@t", "add", "-A")
+        self._git(tmp_project, "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-qm", "init")
+        (tmp_project / "partial.py").write_text("broken")
+        (tmp_project / "CLAUDE.md").write_text("modified")
+        executor._write_json(executor._index_file, {"steps": [{"step": 2, "status": "error"}]})
+        executor._write_json(top_index, {"phases": [{"dir": "0-mvp", "status": "error"}]})
+
+        with patch.dict(os.environ, {"GIT_AUTHOR_NAME": "t", "GIT_AUTHOR_EMAIL": "t@t",
+                                     "GIT_COMMITTER_NAME": "t", "GIT_COMMITTER_EMAIL": "t@t"}):
+            executor._commit_failure(2)
+
+        log = self._git(tmp_project, "log", "-1", "--format=%s", "--name-only").stdout
+        assert "chore(mvp): step 2 failed" in log
+        assert "phases/0-mvp/index.json" in log
+        assert "phases/index.json" in log
+        assert "partial.py" not in log
+        assert "CLAUDE.md" not in log
+        status = self._git(tmp_project, "status", "--porcelain").stdout
+        assert "?? partial.py" in status
+        assert " M CLAUDE.md" in status
+
+
+# ---------------------------------------------------------------------------
+# _execute_single_step 최종 실패
+# ---------------------------------------------------------------------------
+
+class TestExecuteSingleStepFailure:
+    def test_final_failure_does_not_commit_code(self, executor):
+        executor._invoke_claude = MagicMock(return_value={})
+        executor._commit_step = MagicMock()
+        executor._commit_failure = MagicMock()
+        executor._update_top_index = MagicMock()
+
+        with pytest.raises(SystemExit) as exc_info:
+            executor._execute_single_step({"step": 2, "name": "ui"}, "")
+
+        assert exc_info.value.code == 1
+        assert executor._invoke_claude.call_count == ex.StepExecutor.MAX_RETRIES
+        executor._commit_step.assert_not_called()
+        executor._commit_failure.assert_called_once_with(2)
+        executor._update_top_index.assert_called_once_with("error")
+        step = executor._read_json(executor._index_file)["steps"][2]
+        assert step["status"] == "error"
+
+
+# ---------------------------------------------------------------------------
 # _invoke_claude (mocked)
 # ---------------------------------------------------------------------------
 

@@ -56,6 +56,7 @@ class StepExecutor:
     MAX_RETRIES = 3
     FEAT_MSG = "feat({phase}): step {num} — {name}"
     CHORE_MSG = "chore({phase}): step {num} output"
+    FAIL_MSG = "chore({phase}): step {num} failed"
     TZ = timezone(timedelta(hours=9))
 
     def __init__(self, phase_dir_name: str, *, auto_push: bool = False):
@@ -155,6 +156,20 @@ class StepExecutor:
             r = self._run_git("commit", "-m", msg)
             if r.returncode != 0:
                 print(f"  WARN: housekeeping 커밋 실패: {r.stderr.strip()}")
+
+    def _commit_failure(self, step_num: int):
+        """실패 시 메타데이터만 커밋한다. 코드 변경은 검토를 위해 작업 트리에 남긴다."""
+        paths = [f"phases/{self._phase_dir_name}/index.json"]
+        if self._top_index_file.exists():
+            paths.append("phases/index.json")
+
+        self._run_git("add", "--", *paths)
+        msg = self.FAIL_MSG.format(phase=self._phase_name, num=step_num)
+        r = self._run_git("commit", "-m", msg, "--", *paths)
+        if r.returncode == 0:
+            print(f"  Commit: {msg}")
+        else:
+            print(f"  WARN: 실패 메타데이터 커밋 실패: {r.stderr.strip()}")
 
     # --- top-level index ---
 
@@ -349,10 +364,11 @@ class StepExecutor:
                         s["error_message"] = f"[{self.MAX_RETRIES}회 시도 후 실패] {err_msg}"
                         s["failed_at"] = ts
                 self._write_json(self._index_file, index)
-                self._commit_step(step_num, step_name)
+                self._update_top_index("error")
+                self._commit_failure(step_num)
                 print(f"  ✗ Step {step_num}: {step_name} failed after {self.MAX_RETRIES} attempts [{elapsed}s]")
                 print(f"    Error: {err_msg}")
-                self._update_top_index("error")
+                print(f"    코드 변경은 커밋하지 않고 작업 트리에 남겼습니다 (git status로 확인).")
                 sys.exit(1)
 
         return False  # unreachable
