@@ -130,9 +130,20 @@ class TestTddGuard:
         "docs/README.md",
         "next.config.ts",
         "scripts/execute.py",
+        "components/ScheduleGrid.tsx",
+        "app/steps/ward.tsx",
+        "lib/api.ts",
     ])
     def test_allows_exempt_files(self, work_dir, name):
         assert not _denied(_run_tdd_guard(str(work_dir / name)))
+
+    @pytest.mark.parametrize("name", [
+        "lib/roster-import.ts",
+        "lib/csv.ts",
+        "lib/store.ts",
+    ])
+    def test_denies_lib_pure_functions_without_test(self, work_dir, name):
+        assert _denied(_run_tdd_guard(str(work_dir / name)))
 
     def test_allows_missing_file_path(self):
         assert not _denied(_run_tdd_guard(""))

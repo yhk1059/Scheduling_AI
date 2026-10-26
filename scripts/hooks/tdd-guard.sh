@@ -39,6 +39,13 @@ case "$FILE_PATH" in
     ;;
 esac
 
+# UI 컴포넌트와 fetch 래퍼는 TDD 대상이 아님 (build/lint/수동 저니로 검증) — 허용
+case "$FILE_PATH" in
+  */components/*|*/app/*|*/lib/api.ts)
+    exit 0
+    ;;
+esac
+
 # lib/ 또는 소스 파일이면 테스트 파일 존재 여부 확인
 case "$FILE_PATH" in
   *.ts|*.tsx|*.js|*.jsx)
