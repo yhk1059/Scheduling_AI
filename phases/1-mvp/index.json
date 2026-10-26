@@ -101,7 +101,10 @@
     {
       "step": 12,
       "name": "ui-schedule",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-10-26T20:08:16+0900",
+      "summary": "lib/csv.ts(toScheduleCsv: BOM·CRLF, 1행 이름·연차·요일(공휴일은 '수(공휴일)')·D/E/N/O·주말근무, 2행 날짜, 간호사 행 근무+stats 합계, 하단 D/E/N 날짜별 합계, RFC 4180 이스케이프, '= + - @' 앞 ' 접두) + csv.test.ts 8개(31일 달 포함); lib/store.ts에 Code 타입·setResult(버전 유지)·setFixed(같은 칸 기존 고정(번역 포함) 교체, id fix-{nurse}-{day}, source_text '수동 고정: 이름 11/5 D', bump)·clearFixed·confirm(result.assignments→confirmed) + test 4개(vitest 54); components/ScheduleStep.tsx(④: [생성]=api.solve(store 전체, previous는 확정본 있을 때만), '푸는 중…'+스피너, 응답 input_version 불일치면 버림, 오류 배너+다시 시도, infeasible '해가 없습니다'/timeout '시간 안에 풀지 못했습니다' 표시(마지막 해 유지), 요약 지표(해 상태·최적 아닐 수 있음·확정됨 배지, 희망 반영 n/m, soft 위반 주의색, 이전 대비 변경 칸), 근무표 그리드(150/44/30px×일/34px×4 inline gridTemplateColumns, overflow-x-auto, 일·공휴일 빨강/토 청록 헤더, 주말 열 배경, 셀 button aria-label '{이름} {월}월 {일}일 {코드}', 자물쇠 SVG, diff 칸 inset #D97706, soft 위반 칸 주의색 점+title, 개인별 D/E/N/O 합계·하단 날짜별 D/E/N 합계), 셀 클릭→D/E/N/O 고정·고정 해제·취소 편집 바 → setFixed 후 현재 결과를 previous로 자동 재풀이, 개인별 통계 표(주말·공휴일·최대 연속·희망 반영률·편차), [확정]·[CSV 다운로드](근무표-YYYY-MM.csv)); RulesStep Spinner export, AppShell 4단계 연결; 수동 저니(Playwright·시스템 Chrome, LLM 미사용): 생성·셀 30×28px·고정 후 재풀이(변경 2칸, 자물쇠)·고정 해제 버튼·확정·CSV(BOM, 20행)·infeasible/timeout(mock) 확인",
+      "completed_at": "2026-10-26T20:13:37+0900"
     },
     {
       "step": 13,
