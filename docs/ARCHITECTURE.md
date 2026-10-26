@@ -16,6 +16,7 @@ lib/
 api/index.py          # Vercel Python 함수 진입점 (import만 함)
 backend/              # FastAPI 앱 (무상태)
 ├── routes.py         # HTTP 계층, solver와 llm 오케스트레이션
+├── env.py            # .env.local 로더 (로컬 전용)
 ├── domain/           # models.py (Pydantic, 단일 기준), constants.py (상한, 시간, 가중치)
 ├── solver/           # CP-SAT: model, hard, soft, stats, conflicts — llm을 import하지 않음
 ├── llm/              # client, translator, explainer, prompts, pseudonym — solver를 import하지 않음
@@ -32,10 +33,13 @@ scripts/              # harness 전용 (앱 코드를 두지 않음)
   - 입력 검증
   - 솔버 입력
   - TS 타입
+- **LLM 호출 방식**: Anthropic SDK의 tool use로 구조화 출력을 받는다. `tool_choice`로 tool 호출을 강제하고, 스트리밍은 쓰지 않는다. 프롬프트는 `backend/llm/prompts.py`의 상수다.
 - **LLM 출력 검증**: Pydantic 검증과 참조 무결성 검사를 거친 뒤에만 쓴다. 실패하면 오류를 넣어 최대 2회 재시도한다. 결과는 항상 "제안"이고, 사람이 [적용]하거나 서버가 재풀이로 검증해야 반영된다.
 - **결정적 대체 경로**: explain이 실패해도 충돌 제약의 `source_text`와 [이번 달만 끄기]로 진행할 수 있다.
 - **가명 처리**: LLM 호출 전에 간호사 이름을 `N01` 같은 가명으로 바꾸고, 응답에서 되돌린다.
 - **수동 조정**: 칸 수정은 "고정 배정" 제약이 된다. 솔버 경로는 하나다.
+- **제약 단일 표현**: 필요 인원 폼도 템플릿 1(`daily_coverage`) 제약을 만든다. 별도의 staffing 필드는 없다. 모든 제약은 `enabled` 플래그를 가지며, [이번 달만 끄기]는 `enabled=false`로 처리한다.
+- **로컬 env**: `backend/env.py`가 `.env.local`을 읽는다(이미 설정된 env는 덮어쓰지 않음). 로컬 uvicorn과 eval에서 쓰고, Vercel에서는 프로젝트 env를 쓴다.
 
 ## 데이터 흐름
 ```
@@ -55,7 +59,7 @@ POST /api/py/translate
   res: { status: "ok", constraints } | { status: "clarify", question } | { status: "unsupported", reason }
 
 POST /api/py/solve          # LLM을 쓰지 않음
-  req: { nurses, period, holidays, staffing, constraints, carry_over?, previous?, input_version }
+  req: { nurses, period, holidays, constraints, carry_over?, previous?, input_version }
   res: { status: "ok", result: { assignments, summary, stats, soft_violations, diff?, optimal } }
      | { status: "infeasible", conflicts } | { status: "timeout" }
 
@@ -94,6 +98,16 @@ POST /api/py/explain
   - localStorage를 쓸 수 없으면 메모리로 동작한다.
 - **서버**: 무상태다. 매 요청에 필요한 상태를 통째로 받는다. DB와 세션은 없다.
 - **stale 처리**: 상태가 바뀔 때마다 `input_version`을 증가시키고, 응답의 버전이 현재와 다르면 stale로 표시한다.
+
+## 기술 스택과 쓰지 않는 것
+| 영역 | 사용 | 쓰지 않는 것 |
+|---|---|---|
+| 프론트 | Next.js 16 App Router, TS strict, Tailwind 4, Zustand + persist | Redux, React Query, UI 컴포넌트 라이브러리, 차트 라이브러리 |
+| 백엔드 | Python 3.12, FastAPI, Pydantic v2, ortools, anthropic (`requirements.txt` 고정) | LangChain, 에이전트 프레임워크, ORM, DB. **런타임 Python 의존성 추가 금지**(번들 한도, ADR-007) |
+| LLM | Claude tool use | 스트리밍, RAG, 벡터 DB, 멀티 에이전트 |
+| 테스트 | pytest(솔버는 실제로 돌리고 LLM은 mock), vitest(`lib/` 순수 함수) | 컴포넌트/E2E 테스트 프레임워크 |
+| 관측 | stdout 구조화 로그(JSON 한 줄: `request_id`, 엔드포인트, 소요 시간, LLM 재시도 횟수, 토큰 수). 키와 이름 원문은 남기지 않는다 | 모니터링 도구 |
+| 배포 | Vercel | Docker, 별도 CI |
 
 ## 환경
 - 로컬
