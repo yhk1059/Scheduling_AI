@@ -9,7 +9,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "uv run pytest backend/tests scripts/test_hooks.py"
+    "test": "uv run pytest backend/tests scripts/test_hooks.py",
+    "gen:types": "uv run python -m backend.gen_types"
   },
   "dependencies": {
     "next": "16.4.3",
@@ -24,6 +25,7 @@
     "concurrently": "^10.0.6",
     "eslint": "^9",
     "eslint-config-next": "16.4.3",
+    "json-schema-to-typescript": "^16.0.0",
     "tailwindcss": "^4",
     "typescript": "^5"
   }
