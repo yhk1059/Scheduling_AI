@@ -2,6 +2,7 @@
 
 import { useAppStore } from "@/lib/store";
 
+import RulesStep from "./RulesStep";
 import Stepper from "./Stepper";
 import { ui } from "./ui";
 import WardStep from "./WardStep";
@@ -52,6 +53,10 @@ export default function AppShell() {
 
         {step === 1 ? (
           <WardStep />
+        ) : step === 2 ? (
+          <RulesStep key="ward" scope="ward" />
+        ) : step === 3 ? (
+          <RulesStep key="month" scope="month" />
         ) : (
           <section className={ui.card}>
             <h1 className="text-[22px] font-semibold text-[#1B1B18]">준비 중</h1>
