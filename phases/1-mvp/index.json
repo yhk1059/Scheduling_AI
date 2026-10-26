@@ -13,7 +13,10 @@
     {
       "step": 1,
       "name": "solver-hard",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-10-26T19:18:06+0900",
+      "summary": "backend/solver/model.py(ModelContext·build_model·solve: 기본 제약, enabled hard 제약마다 리터럴+OnlyEnforceIf, AddAssumptions, ok/infeasible(conflicts=[])/timeout), backend/solver/hard.py(템플릿 1~9 add_<type>, ADDERS, 이월 상수와 대상 월을 잇는 연속 계열 검사), 테스트 backend/tests/test_solver_hard.py(22개)",
+      "completed_at": "2026-10-26T19:21:05+0900"
     },
     {
       "step": 2,
