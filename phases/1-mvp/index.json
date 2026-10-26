@@ -117,7 +117,10 @@
     {
       "step": 14,
       "name": "ui-landing",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-10-26T20:20:54+0900",
+      "summary": "app/page.tsx 정적 랜딩(API 호출 없음, ○ static): 첫 화면 좌측 텍스트(랜딩 h1·가치 제안·[데모 시작] Primary h-11→/app·GitHub Secondary)+우측 components/LandingPreview.tsx(client, inert: 기존 ConstraintCard 2개(N-OFF·숙련도 믹스)와 ScheduleStep의 ScheduleGrid(export로 변경)를 ward-15 앞 5명×11/1~7 샘플로 정적 렌더, 자물쇠 1칸), 섹션 py-[72px] border-t·mono 청록 머리말: 01 문제(PRD 페인 포인트 4개)·02 동작 방식(3단계)·03 데모(빌드 시점 existsSync(public/demo.gif)면 이미지, 없으면 '데모 영상 준비 중' 상자)·04 설계 요약(LLM 번역·설명/CP-SAT 계산/검증 장치 + eval/results.md 3회차 값 그대로: 44개·스키마 유효율·status·F1·완전 일치 100.0%·재시도 0.00·지연 1.95/2.76초·실행 이력), 푸터 GitHub 링크(상단 상수 REPO_URL=https://github.com/jha0313/harness_framework 한 곳); 안티패턴 grep 0건, 수동 확인(Playwright: 렌더·콘솔 오류 0·/api/py 요청 0·[데모 시작]→/app); build·lint·vitest 57·pytest 208 통과",
+      "completed_at": "2026-10-26T20:23:39+0900"
     },
     {
       "step": 15,
