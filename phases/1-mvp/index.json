@@ -77,7 +77,10 @@
     {
       "step": 9,
       "name": "eval-run",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-10-26T19:47:54+0900",
+      "summary": "실제 Claude API(claude-sonnet-5-5)로 eval 전체 3회 실행: 1회차 전부 400(모델이 강제 tool_choice 거절) → backend/llm/client.py tool_choice를 auto+disable_parallel_tool_use로 바꿔(test_llm_translator 단언 먼저 갱신) 2회차 F1 97.9%·완전 일치 97.7%(m16 '데이만'에 E/N 기피 추가) → prompts.py에 'X만은 X 희망 하나만' 지시 추가 후 3회차 최종 제약 F1 100%·완전 일치율 100%·status 정확도 100%, eval/results.md 상단 실행 이력 표, dataset expected 무변경, pytest 208 통과",
+      "completed_at": "2026-10-26T19:53:09+0900"
     },
     {
       "step": 10,
