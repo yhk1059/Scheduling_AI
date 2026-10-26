@@ -3,6 +3,8 @@
 ## 디렉토리 구조
 ```
 app/                  # Next.js 페이지 (UI 세부는 UI_GUIDE 확정 후)
+├── page.tsx          # 랜딩 (/) — 정적, API 호출 없음
+└── app/page.tsx      # 앱 (/app) — 스테퍼 4개
 components/           # UI 컴포넌트
 lib/
 ├── store.ts          # Zustand + persist(localStorage) — 유일한 저장소
