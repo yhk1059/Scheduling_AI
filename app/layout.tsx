@@ -1,0 +1,33 @@
+import type { Metadata } from "next";
+import { IBM_Plex_Mono, IBM_Plex_Sans_KR } from "next/font/google";
+import "./globals.css";
+
+const plexSansKr = IBM_Plex_Sans_KR({
+  variable: "--font-plex-sans-kr",
+  weight: ["400", "500", "600"],
+  subsets: ["latin"],
+});
+
+const plexMono = IBM_Plex_Mono({
+  variable: "--font-plex-mono",
+  weight: ["400", "500", "600"],
+  subsets: ["latin"],
+});
+
+export const metadata: Metadata = {
+  title: "간호사 근무표",
+  description: "LLM + CP-SAT 간호사 근무표 프로토타입",
+};
+
+export default function RootLayout({ children }: LayoutProps<"/">) {
+  return (
+    <html
+      lang="ko"
+      className={`${plexSansKr.variable} ${plexMono.variable} h-full antialiased`}
+    >
+      <body className="min-h-full flex flex-col bg-[#F6F6F3] font-sans text-[#1B1B18]">
+        {children}
+      </body>
+    </html>
+  );
+}

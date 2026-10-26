@@ -4,7 +4,9 @@
 """
 
 import json
+import shutil
 import subprocess
+import tempfile
 from pathlib import Path
 
 import pytest
@@ -69,3 +71,79 @@ class TestPreToolUseAllows:
     ])
     def test_allowed(self, command):
         assert _run_pre_tool_use(command) == 0
+
+
+TDD_GUARD = SETTINGS.parent.parent / "scripts" / "hooks" / "tdd-guard.sh"
+
+
+def _run_tdd_guard(file_path: str) -> str:
+    payload = json.dumps({"tool_input": {"file_path": file_path}})
+    r = subprocess.run(["bash", str(TDD_GUARD)],
+                       input=payload, capture_output=True, text=True)
+    assert r.returncode == 0
+    return r.stdout
+
+
+def _denied(stdout: str) -> bool:
+    if not stdout.strip():
+        return False
+    return json.loads(stdout)["hookSpecificOutput"]["permissionDecision"] == "deny"
+
+
+@pytest.fixture
+def work_dir():
+    # pytest tmp_path는 경로에 "test"가 들어가 가드의 *test* 예외에 걸리므로 별도 디렉터리를 쓴다.
+    d = Path(tempfile.mkdtemp(prefix="guard-"))
+    yield d
+    shutil.rmtree(d)
+
+
+class TestTddGuard:
+    def test_registered_for_edit_write(self):
+        hooks = json.loads(SETTINGS.read_text(encoding="utf-8"))["hooks"]["PreToolUse"]
+        entry = next(h for h in hooks if h["matcher"] == "Edit|Write")
+        assert entry["hooks"][0]["command"] == "$CLAUDE_PROJECT_DIR/scripts/hooks/tdd-guard.sh"
+
+    def test_denies_source_without_test(self, work_dir):
+        src = work_dir / "src" / "lib" / "foo.ts"
+        src.parent.mkdir(parents=True)
+        assert _denied(_run_tdd_guard(str(src)))
+
+    def test_allows_source_with_sibling_test(self, work_dir):
+        d = work_dir / "src" / "lib"
+        d.mkdir(parents=True)
+        (d / "foo.test.ts").write_text("")
+        assert not _denied(_run_tdd_guard(str(d / "foo.ts")))
+
+    def test_allows_source_with_dunder_tests(self, work_dir):
+        d = work_dir / "src" / "lib"
+        (d / "__tests__").mkdir(parents=True)
+        (d / "__tests__" / "foo.test.ts").write_text("")
+        assert not _denied(_run_tdd_guard(str(d / "foo.ts")))
+
+    @pytest.mark.parametrize("name", [
+        "src/lib/foo.test.ts",
+        "src/types/thumbnail.ts",
+        "src/app/page.tsx",
+        "src/app/layout.tsx",
+        "package.json",
+        "docs/README.md",
+        "next.config.ts",
+        "scripts/execute.py",
+        "components/ScheduleGrid.tsx",
+        "app/steps/ward.tsx",
+        "lib/api.ts",
+    ])
+    def test_allows_exempt_files(self, work_dir, name):
+        assert not _denied(_run_tdd_guard(str(work_dir / name)))
+
+    @pytest.mark.parametrize("name", [
+        "lib/roster-import.ts",
+        "lib/csv.ts",
+        "lib/store.ts",
+    ])
+    def test_denies_lib_pure_functions_without_test(self, work_dir, name):
+        assert _denied(_run_tdd_guard(str(work_dir / name)))
+
+    def test_allows_missing_file_path(self):
+        assert not _denied(_run_tdd_guard(""))
