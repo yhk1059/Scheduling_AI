@@ -9,11 +9,19 @@ export const STORAGE_KEY = "nurse-scheduler";
 const STORAGE_VERSION = 1;
 const COVERAGE_SOURCE_TEXT = "필요 인원 설정";
 const COVERAGE_WEIGHT = 10; // backend/domain/constants.py DEFAULT_WEIGHT
+// backend/llm/translator.py _weight와 같은 규칙: soft는 템플릿 기본값(없으면 DEFAULT_WEIGHT), hard는 1
+const SOFT_WEIGHTS: Record<string, number> = { shift_preference: 10, night_fairness: 5, weekend_fairness: 5 };
+const ALWAYS_HARD = ["leave", "fixed_assignment"];
 
 export type Step = 1 | 2 | 3 | 4;
 export type Shift = "D" | "E" | "N";
 export type DayKind = "weekday" | "weekend";
 export type Assignments = ScheduleResult["assignments"];
+export type Hardness = "hard" | "soft";
+export interface CardPatch {
+  hardness?: Hardness;
+  params?: ConstraintSpec["params"];
+}
 
 interface Data {
   step: Step;
@@ -39,6 +47,9 @@ export interface AppState extends Data {
   setCoverage: (shift: Shift, dayKind: DayKind, min: number, max: number) => void;
   addPendingCards: (cards: ConstraintSpec[]) => void;
   applyCard: (id: string) => void;
+  /** 대기 카드는 그대로, 적용된 제약은 inputVersion을 올리며 바꾼다. */
+  updateCard: (id: string, patch: CardPatch) => void;
+  removeCard: (id: string) => void;
   orphanConstraintIds: () => string[];
   loadSample: () => void;
   dismissResetNotice: () => void;
@@ -76,6 +87,19 @@ function upsert(list: ConstraintSpec[], card: ConstraintSpec): ConstraintSpec[] 
   const key = replaceKey(card);
   const i = list.findIndex((c) => replaceKey(c) === key);
   return i === -1 ? [...list, card] : list.map((c, j) => (j === i ? card : c));
+}
+
+/** card가 적용되면 대체할 기존 제약(같은 type·scope·대상, 다른 id). */
+export function findReplaced(constraints: ConstraintSpec[], card: ConstraintSpec): ConstraintSpec | undefined {
+  const key = replaceKey(card);
+  return constraints.find((c) => c.id !== card.id && replaceKey(c) === key);
+}
+
+function patched(c: ConstraintSpec, patch: CardPatch): ConstraintSpec {
+  const next = { ...c, ...(patch.params !== undefined && { params: patch.params }) } as ConstraintSpec;
+  if (patch.hardness === undefined || ALWAYS_HARD.includes(c.type)) return next;
+  const weight = patch.hardness === "soft" ? (SOFT_WEIGHTS[c.type] ?? COVERAGE_WEIGHT) : 1;
+  return { ...next, hardness: patch.hardness, weight };
 }
 
 function isData(v: unknown): v is Data {
@@ -180,6 +204,22 @@ export function createAppStore(getStorage: () => Storage, now: Date = new Date()
             const card = pendingCards.find((c) => c.id === id);
             if (!card) return;
             bump({ pendingCards: pendingCards.filter((c) => c.id !== id), constraints: upsert(constraints, card) });
+          },
+          updateCard: (id, patch) => {
+            const { pendingCards, constraints } = get();
+            if (pendingCards.some((c) => c.id === id)) {
+              set({ pendingCards: pendingCards.map((c) => (c.id === id ? patched(c, patch) : c)) });
+            } else if (constraints.some((c) => c.id === id)) {
+              bump({ constraints: constraints.map((c) => (c.id === id ? patched(c, patch) : c)) });
+            }
+          },
+          removeCard: (id) => {
+            const { pendingCards, constraints } = get();
+            if (pendingCards.some((c) => c.id === id)) {
+              set({ pendingCards: pendingCards.filter((c) => c.id !== id) });
+            } else if (constraints.some((c) => c.id === id)) {
+              bump({ constraints: constraints.filter((c) => c.id !== id) });
+            }
           },
           orphanConstraintIds: () => {
             const ids = new Set(get().nurses.map((n) => n.id));

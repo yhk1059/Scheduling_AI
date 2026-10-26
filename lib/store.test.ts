@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import sample from "./samples/ward-15.json";
-import { createAppStore, STORAGE_KEY } from "./store";
+import { createAppStore, findReplaced, STORAGE_KEY } from "./store";
 import type { ConstraintSpec, Nurse } from "./types.gen";
 
 class MemoryStorage implements Storage {
@@ -126,6 +126,80 @@ describe("applyCard", () => {
     store.getState().applyCard("w");
     store.getState().applyCard("m");
     expect(store.getState().constraints.map((c) => c.id)).toEqual(["w", "m"]);
+  });
+});
+
+describe("findReplaced", () => {
+  it("같은 type·scope·대상의 다른 제약을 찾는다", () => {
+    const existing = [
+      card({ id: "a", type: "leave", scope: "month", params: { nurse_id: "n01", days: [3] } }),
+      card({ id: "b", type: "max_consecutive_work", params: { days: 5 } }),
+    ];
+    expect(findReplaced(existing, card({ id: "c", type: "leave", scope: "month", params: { nurse_id: "n01", days: [9] } }))?.id).toBe("a");
+    expect(findReplaced(existing, card({ id: "d", type: "leave", scope: "month", params: { nurse_id: "n02", days: [9] } }))).toBeUndefined();
+    expect(findReplaced(existing, card({ id: "e", type: "max_consecutive_work", scope: "month", params: { days: 4 } }))).toBeUndefined();
+    expect(findReplaced(existing, existing[1])).toBeUndefined();
+  });
+});
+
+describe("updateCard", () => {
+  it("대기 카드는 inputVersion 없이 바꾸고, 적용된 제약은 inputVersion을 올린다", () => {
+    const store = fresh();
+    store.getState().addPendingCards([
+      card({ id: "p", type: "max_consecutive_work", params: { days: 5 } }),
+      card({ id: "q", type: "min_days_off", params: { days: 8 } }),
+    ]);
+    store.getState().applyCard("q");
+    const v = store.getState().inputVersion;
+
+    store.getState().updateCard("p", { params: { days: 4 } });
+    expect(store.getState().pendingCards[0].params).toEqual({ days: 4 });
+    expect(store.getState().inputVersion).toBe(v);
+
+    store.getState().updateCard("q", { params: { days: 9 } });
+    expect(store.getState().constraints[0].params).toEqual({ days: 9 });
+    expect(store.getState().inputVersion).toBe(v + 1);
+  });
+
+  it("hardness를 바꾸면 weight를 템플릿 기본값으로 맞춘다", () => {
+    const store = fresh();
+    store.getState().addPendingCards([
+      card({ id: "p", type: "max_consecutive_work", params: { days: 5 } }),
+      card({ id: "f", type: "night_fairness", hardness: "soft", weight: 5, params: {} }),
+    ]);
+    store.getState().updateCard("p", { hardness: "soft" });
+    expect(store.getState().pendingCards[0]).toMatchObject({ hardness: "soft", weight: 10 });
+    store.getState().updateCard("f", { hardness: "hard" });
+    expect(store.getState().pendingCards[1]).toMatchObject({ hardness: "hard", weight: 1 });
+    store.getState().updateCard("f", { hardness: "soft" });
+    expect(store.getState().pendingCards[1]).toMatchObject({ hardness: "soft", weight: 5 });
+  });
+
+  it("휴가와 고정 배정은 항상 hard다", () => {
+    const store = fresh();
+    store.getState().addPendingCards([
+      card({ id: "l", type: "leave", scope: "month", params: { nurse_id: "n01", days: [3] } }),
+    ]);
+    store.getState().updateCard("l", { hardness: "soft", params: { nurse_id: "n01", days: [3, 4] } });
+    expect(store.getState().pendingCards[0]).toMatchObject({ hardness: "hard", params: { days: [3, 4] } });
+  });
+});
+
+describe("removeCard", () => {
+  it("대기 카드는 inputVersion 없이, 적용된 제약은 inputVersion을 올리며 지운다", () => {
+    const store = fresh();
+    store.getState().addPendingCards([
+      card({ id: "p", type: "max_consecutive_work", params: { days: 5 } }),
+      card({ id: "q", type: "min_days_off", params: { days: 8 } }),
+    ]);
+    store.getState().applyCard("q");
+    const v = store.getState().inputVersion;
+    store.getState().removeCard("p");
+    expect(store.getState().pendingCards).toEqual([]);
+    expect(store.getState().inputVersion).toBe(v);
+    store.getState().removeCard("q");
+    expect(store.getState().constraints).toEqual([]);
+    expect(store.getState().inputVersion).toBe(v + 1);
   });
 });
 
