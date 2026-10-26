@@ -5,7 +5,10 @@
     {
       "step": 0,
       "name": "domain-schema",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-10-26T19:14:29+0900",
+      "summary": "backend/domain/constants.py(상한·시간·가중치), backend/domain/models.py(Nurse, Period, 템플릿 12개 ConstraintSpec discriminated union, ScheduleRequest 참조 무결성, ScheduleResult, SolveResponse/TranslateRequest·Response/ExplainRequest·Response, ErrorBody), backend/gen_types.py → lib/types.gen.ts(npm run gen:types), 샘플 lib/samples/ward-15.json(15명·2026-11·daily_coverage 6개), 테스트 backend/tests/test_domain.py·test_gen_types.py",
+      "completed_at": "2026-10-26T19:18:03+0900"
     },
     {
       "step": 1,
@@ -82,5 +85,6 @@
       "name": "readme",
       "status": "pending"
     }
-  ]
+  ],
+  "created_at": "2026-10-26T19:14:29+0900"
 }
