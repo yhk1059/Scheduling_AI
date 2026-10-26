@@ -93,7 +93,10 @@
     {
       "step": 11,
       "name": "ui-rules-requests",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-10-26T20:02:52+0900",
+      "summary": "lib/store.ts에 findReplaced(같은 type·scope·대상의 기존 제약)·updateCard(대기 카드는 inputVersion 유지, 적용된 제약은 +1, hardness 변경 시 weight를 translator 규칙(soft=템플릿 기본값/hard=1)으로 맞춤, 휴가·고정은 항상 hard)·removeCard 추가 + test 6개(vitest 42); components/RulesStep.tsx(scope ward/month 공용: 자연어 입력 바·1000자 초과 시 비활성+글자 수, [해석]→api.translate(context nurses·period·holidays·today), '해석 중…'+스피너, ok→pendingCards, clarify 질문·unsupported 안내, 오류 토스트+[다시 시도], 대기/적용 카드 그리드(cov-* 제외), ③ 전월 이월 붙여넣기(parseCarryOver 경고·셀 오류, 비우기), [이전]/[다음], ④ 진입 시 고아 제약 있으면 차단 안내, 미적용 카드 안내); components/ConstraintCard.tsx(템플릿 한국어 이름, hard/soft 토글(aria-pressed, 휴가·고정 비활성), 원문 인용, mono 해석 결과(예 'n03 이영희 · 11/15~11/17 · O'), 적용 대기/적용됨 배지, 대기: 삭제·적용 / 적용됨: 수정·삭제, '기존 규칙 대체', 명단 밖 nurse_id 경고 SVG, 수정 폼(숫자·날짜 목록 '15-17, 20'·근무 코드 select·희망/기피·주말만) 검증 후 저장); ui.ts에 h-8 버튼·배지 클래스; AppShell 2·3단계 연결; 수동 저니(Playwright·시스템 Chrome, 실제 API 1회 200, 나머지 mock): 1000자 비활성·503 토스트·다시 시도·적용·수정 bump·대체 표시·고아 차단·clarify/unsupported·이월 오류 확인",
+      "completed_at": "2026-10-26T20:08:10+0900"
     },
     {
       "step": 12,
