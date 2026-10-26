@@ -647,7 +647,7 @@ function LockIcon() {
   );
 }
 
-function ScheduleGrid({
+export function ScheduleGrid({
   rows,
   result,
   month,
