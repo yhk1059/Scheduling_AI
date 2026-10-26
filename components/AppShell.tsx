@@ -3,6 +3,7 @@
 import { useAppStore } from "@/lib/store";
 
 import RulesStep from "./RulesStep";
+import ScheduleStep from "./ScheduleStep";
 import Stepper from "./Stepper";
 import { ui } from "./ui";
 import WardStep from "./WardStep";
@@ -58,10 +59,7 @@ export default function AppShell() {
         ) : step === 3 ? (
           <RulesStep key="month" scope="month" />
         ) : (
-          <section className={ui.card}>
-            <h1 className="text-[22px] font-semibold text-[#1B1B18]">준비 중</h1>
-            <p className="mt-2 text-sm leading-relaxed text-[#3D3D38]">이 단계 화면은 아직 만들지 않았어요.</p>
-          </section>
+          <ScheduleStep />
         )}
       </main>
     </div>

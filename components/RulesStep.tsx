@@ -184,7 +184,7 @@ export default function RulesStep({ scope }: { scope: "ward" | "month" }) {
   );
 }
 
-function Spinner() {
+export function Spinner() {
   return (
     <svg aria-hidden="true" viewBox="0 0 14 14" className="size-3.5 animate-spin" fill="none" stroke="currentColor" strokeWidth={1.6}>
       <path d="M7 1.5A5.5 5.5 0 1 1 1.5 7" strokeLinecap="round" />
