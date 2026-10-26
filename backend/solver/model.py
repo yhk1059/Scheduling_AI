@@ -9,7 +9,7 @@ from dataclasses import dataclass, field
 
 from ortools.sat.python import cp_model
 
-from backend.domain.constants import CONFLICT_TIME_LIMIT_S, SOLVE_TIME_LIMIT_S
+from backend.domain.constants import CONFLICT_TIME_LIMIT_S, DIFF_WEIGHT, SOLVE_TIME_LIMIT_S
 from backend.domain.models import ScheduleRequest, SolveInfeasible, SolveOk, SolveTimeout
 from backend.solver import hard, soft, stats
 from backend.solver.conflicts import find_conflicts
@@ -77,6 +77,9 @@ def build_model(request: ScheduleRequest) -> ModelContext:
         lit = model.new_bool_var(f"hard_{c.id}")
         ctx.hard_literals[c.id] = lit
         hard.ADDERS[c.type](ctx, c, lit)
+
+    for nid, d, before in stats.common_cells(request):
+        ctx.objective_terms.append(DIFF_WEIGHT * x[nid, d, before].Not())
     return ctx
 
 

@@ -6,6 +6,7 @@ from typing import Any
 from backend.domain.constants import FAIRNESS_TOLERANCE
 from backend.domain.models import (
     Assignments,
+    DiffCell,
     NurseStats,
     ScheduleRequest,
     ScheduleResult,
@@ -35,6 +36,27 @@ def preference_days(request: ScheduleRequest, c: Any) -> list[int]:
     p = c.params
     days = p.days if p.days is not None else range(1, request.period.days + 1)
     return sorted({d for d in days if not p.weekends_only or is_weekend(request, d)})
+
+
+def common_cells(request: ScheduleRequest) -> list[tuple[str, int, str]]:
+    """previous와 현재 요청에 공통인 (nurse_id, 날짜, 이전 근무). 새/빠진 간호사, 범위 밖 날짜는 무시."""
+    ids = {n.id for n in request.nurses}
+    return [
+        (nid, d, before)
+        for nid, row in (request.previous or {}).items()
+        if nid in ids
+        for d, before in enumerate(row[: request.period.days], start=1)
+    ]
+
+
+def _diff(request: ScheduleRequest, assignments: Assignments) -> list[DiffCell] | None:
+    if request.previous is None:
+        return None
+    return [
+        DiffCell(nurse_id=nid, day=d, before=before, after=assignments[nid][d - 1])
+        for nid, d, before in common_cells(request)
+        if assignments[nid][d - 1] != before
+    ]
 
 
 def _runs(seq: list[str], pred, offset: int) -> list[tuple[int, int]]:
@@ -171,5 +193,6 @@ def compute_result(request: ScheduleRequest, assignments: Assignments, optimal: 
         summary=summary,
         stats=stats,
         soft_violations=violations,
+        diff=_diff(request, assignments),
         optimal=optimal,
     )
