@@ -45,7 +45,10 @@
     {
       "step": 5,
       "name": "llm-translator",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-10-26T19:33:16+0900",
+      "summary": "backend/env.py(load_local_env: KEY=VALUE·주석·따옴표, 기존 env 보존), backend/llm/client.py(LLMClient Protocol·ToolCallResult·AnthropicClient: ANTHROPIC_MODEL/DEFAULT_MODEL, tool_choice 강제, max_tokens·timeout, 401/403→LLMConfigError, 429/5xx/529/timeout/연결→LLMUnavailableError, LLMInvalidOutputError 정의), backend/llm/pseudonym.py(성명·유일 이름(2자 이상)→nurse.id, 긴 것부터, restore는 id 경계 매칭), backend/llm/prompts.py(TRANSLATE_SYSTEM, TRANSLATE_TOOL submit_constraints: ConstraintSpec 멤버에서 create_model로 만든 Draft union(type·hardness?·params·source_text) + clarification_question·unsupported_reason, discriminator/title 제거), backend/llm/translator.py(translate: 가명 처리+context(가명 명단·월·주말/공휴일·오늘) → 검증(TranslatorOutput, ConstraintSpec, 참조 무결성) → 실패 시 assistant/user 턴으로 오류 전달해 최대 LLM_MAX_RETRIES회 재시도 → 참조 오류면 Clarify, 아니면 LLMInvalidOutputError; id uuid8·scope·enabled, weight soft=DEFAULT_SOFT_WEIGHTS(없으면 DEFAULT_WEIGHT)/hard=1, source_text·질문 이름 복원), 테스트 test_env.py(3)·test_pseudonym.py(7)·test_llm_translator.py(26, mock 클라이언트·실제 SDK 예외 클래스)",
+      "completed_at": "2026-10-26T19:37:14+0900"
     },
     {
       "step": 6,
