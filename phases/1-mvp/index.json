@@ -53,7 +53,10 @@
     {
       "step": 6,
       "name": "llm-explainer",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-10-26T19:37:16+0900",
+      "summary": "backend/llm/prompts.py(EXPLAIN_SYSTEM: 원문 기반 2~4문장 설명, conflicts id만 참조, fixed_assignment는 disable, leave는 마지막 수단, update는 같은 템플릿 params만; EXPLAIN_TOOL submit_explanation: ExplainerOutput(text, proposals[ProposalDraft(title, description, changes[ConstraintChange])])에서 생성), backend/llm/explainer.py(explain: 충돌 제약(id·type·hardness·params·가명 source_text)+병동 요약(인원·월·주말/공휴일) → 스키마 위반·tool 없음·max_tokens면 최대 LLM_MAX_RETRIES회 재시도 후 LLMInvalidOutputError → conflicts 밖 id 참조·템플릿/참조 무결성 실패·빈 update 제안 제거, update params는 원 params와 병합해 전체 값으로 정규화 → MAX_PROPOSALS로 자름, text·title·description 이름 복원, 솔버 import 없음; fallback_explanation: source_text 나열 또는 빈 conflicts 안내), 테스트 test_llm_explainer.py(16, mock 클라이언트)",
+      "completed_at": "2026-10-26T19:39:16+0900"
     },
     {
       "step": 7,
