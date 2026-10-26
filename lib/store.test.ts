@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import sample from "./samples/ward-15.json";
 import { createAppStore, findReplaced, STORAGE_KEY } from "./store";
-import type { ConstraintSpec, Nurse } from "./types.gen";
+import type { ConstraintSpec, Nurse, ScheduleResult } from "./types.gen";
 
 class MemoryStorage implements Storage {
   data = new Map<string, string>();
@@ -235,6 +235,63 @@ describe("orphanConstraintIds", () => {
     expect(store.getState().orphanConstraintIds()).toEqual(["gone"]);
     store.getState().setNurses(nurses.slice(1));
     expect(store.getState().orphanConstraintIds()).toEqual(["ok", "gone"]);
+  });
+});
+
+describe("근무표 결과와 수동 고정", () => {
+  const result = {
+    assignments: { n01: ["D", "E"], n02: ["N", "O"] },
+    summary: { preferences_total: 0, preferences_met: 0, soft_violation_count: 0 },
+    stats: {},
+    soft_violations: [],
+    diff: null,
+    optimal: true,
+  } as unknown as ScheduleResult;
+
+  it("setResult는 inputVersion을 바꾸지 않고, confirm은 현재 배정을 확정본으로 저장한다", () => {
+    const store = fresh();
+    store.getState().confirm();
+    expect(store.getState().confirmed).toBeNull();
+    store.getState().setResult(result);
+    store.getState().confirm();
+    expect(store.getState().result).toEqual(result);
+    expect(store.getState().confirmed).toEqual(result.assignments);
+    expect(store.getState().inputVersion).toBe(0);
+  });
+
+  it("setFixed는 같은 칸의 기존 고정을 교체하고 inputVersion을 올린다", () => {
+    const store = fresh();
+    store.getState().setNurses(nurses);
+    store.getState().setFixed("n01", 5, "D");
+    store.getState().setFixed("n01", 6, "E");
+    store.getState().setFixed("n01", 5, "N");
+    const fixed = store.getState().constraints.filter((c) => c.type === "fixed_assignment");
+    expect(fixed.map((c) => c.params)).toEqual([
+      { nurse_id: "n01", day: 6, shift: "E" },
+      { nurse_id: "n01", day: 5, shift: "N" },
+    ]);
+    expect(fixed[1]).toMatchObject({ scope: "month", hardness: "hard", enabled: true, source_text: "수동 고정: 이영희 11/5 N" });
+    expect(store.getState().inputVersion).toBe(4);
+  });
+
+  it("setFixed는 번역으로 만든 같은 칸의 고정 배정도 교체한다", () => {
+    const store = fresh();
+    store.getState().setNurses(nurses);
+    store.setState({
+      constraints: [card({ id: "x", type: "fixed_assignment", scope: "month", params: { nurse_id: "n01", day: 5, shift: "E" } })],
+    });
+    store.getState().setFixed("n01", 5, "D");
+    expect(store.getState().constraints.map((c) => c.params)).toEqual([{ nurse_id: "n01", day: 5, shift: "D" }]);
+  });
+
+  it("clearFixed는 그 칸의 고정 배정만 지운다", () => {
+    const store = fresh();
+    store.getState().setNurses(nurses);
+    store.getState().setFixed("n01", 5, "D");
+    store.getState().setFixed("n02", 5, "D");
+    store.getState().clearFixed("n01", 5);
+    expect(store.getState().constraints.map((c) => c.params)).toEqual([{ nurse_id: "n02", day: 5, shift: "D" }]);
+    expect(store.getState().inputVersion).toBe(4);
   });
 });
 

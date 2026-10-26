@@ -18,6 +18,7 @@ export type Shift = "D" | "E" | "N";
 export type DayKind = "weekday" | "weekend";
 export type Assignments = ScheduleResult["assignments"];
 export type Hardness = "hard" | "soft";
+export type Code = "D" | "E" | "N" | "O";
 export interface CardPatch {
   hardness?: Hardness;
   params?: ConstraintSpec["params"];
@@ -51,6 +52,11 @@ export interface AppState extends Data {
   updateCard: (id: string, patch: CardPatch) => void;
   removeCard: (id: string) => void;
   orphanConstraintIds: () => string[];
+  setResult: (result: ScheduleResult) => void;
+  /** 그 칸의 기존 고정 배정을 지우고 수동 고정 제약을 추가한다. */
+  setFixed: (nurseId: string, day: number, shift: Code) => void;
+  clearFixed: (nurseId: string, day: number) => void;
+  confirm: () => void;
   loadSample: () => void;
   dismissResetNotice: () => void;
 }
@@ -100,6 +106,10 @@ function patched(c: ConstraintSpec, patch: CardPatch): ConstraintSpec {
   if (patch.hardness === undefined || ALWAYS_HARD.includes(c.type)) return next;
   const weight = patch.hardness === "soft" ? (SOFT_WEIGHTS[c.type] ?? COVERAGE_WEIGHT) : 1;
   return { ...next, hardness: patch.hardness, weight };
+}
+
+function isFixedCell(c: ConstraintSpec, nurseId: string, day: number): boolean {
+  return c.type === "fixed_assignment" && c.params.nurse_id === nurseId && c.params.day === day;
 }
 
 function isData(v: unknown): v is Data {
@@ -229,6 +239,32 @@ export function createAppStore(getStorage: () => Storage, now: Date = new Date()
                 return p.nurse_id !== undefined && !ids.has(p.nurse_id);
               })
               .map((c) => c.id);
+          },
+          setResult: (result) => set({ result }),
+          setFixed: (nurseId, day, shift) => {
+            const { constraints, nurses, period } = get();
+            const name = nurses.find((n) => n.id === nurseId)?.name ?? nurseId;
+            bump({
+              constraints: [
+                ...constraints.filter((c) => !isFixedCell(c, nurseId, day)),
+                {
+                  id: `fix-${nurseId}-${day}`,
+                  type: "fixed_assignment",
+                  scope: "month",
+                  hardness: "hard",
+                  weight: 1,
+                  source_text: `수동 고정: ${name} ${period.month}/${day} ${shift}`,
+                  enabled: true,
+                  params: { nurse_id: nurseId, day, shift },
+                },
+              ],
+            });
+          },
+          clearFixed: (nurseId, day) =>
+            bump({ constraints: get().constraints.filter((c) => !isFixedCell(c, nurseId, day)) }),
+          confirm: () => {
+            const { result } = get();
+            if (result) set({ confirmed: result.assignments });
           },
           loadSample: () =>
             bump({
