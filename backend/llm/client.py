@@ -1,4 +1,4 @@
-"""LLM 클라이언트. tool 호출을 강제하고 SDK 예외를 도메인 예외로 바꾼다. 키 값은 로그·예외에 넣지 않는다."""
+"""LLM 클라이언트. tool 호출을 요청하고(강제 tool_choice는 모델이 거절해 auto + 프롬프트 지시) SDK 예외를 도메인 예외로 바꾼다. 키 값은 로그·예외에 넣지 않는다."""
 
 import os
 from dataclasses import dataclass
@@ -49,7 +49,7 @@ class AnthropicClient:
                 system=system,
                 messages=messages,
                 tools=[tool],
-                tool_choice={"type": "tool", "name": tool["name"]},
+                tool_choice={"type": "auto", "disable_parallel_tool_use": True},
                 timeout=LLM_TIMEOUT_S,
             )
         except (anthropic.AuthenticationError, anthropic.PermissionDeniedError) as e:
