@@ -19,6 +19,15 @@
             "command": "cmd=$(python3 -c \"import json,sys; print(json.load(sys.stdin).get('tool_input',{}).get('command',''))\"); if printf '%s' \"$cmd\" | grep -qiE -e '(^|[^[:alnum:]_.-])rm[[:space:]]([^;&|]*[[:space:]])?-[a-z]*(r[a-z]*f|f[a-z]*r)' -e '(^|[^[:alnum:]_.-])rm[[:space:]]([^;&|]*[[:space:]])?(-[a-z]*r[a-z]*|--recursive)[[:space:]]([^;&|]*[[:space:]])?(-[a-z]*f[a-z]*|--force)([[:space:]]|$)' -e '(^|[^[:alnum:]_.-])rm[[:space:]]([^;&|]*[[:space:]])?(-[a-z]*f[a-z]*|--force)[[:space:]]([^;&|]*[[:space:]])?(-[a-z]*r[a-z]*|--recursive)([[:space:]]|$)' -e '(^|[^[:alnum:]_.-])git[[:space:]]([^;&|]*[[:space:]])?push[[:space:]]([^;&|]*[[:space:]])?(--force|-[a-z]*f[a-z]*([[:space:]]|$)|[+][^[:space:]])' -e '(^|[^[:alnum:]_.-])git[[:space:]]([^;&|]*[[:space:]])?reset[[:space:]]([^;&|]*[[:space:]])?--hard' -e 'drop[[:space:]]+table'; then echo 'BLOCKED: 위험한 명령어가 감지되었습니다.' >&2; exit 2; fi"
           }
         ]
+      },
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$CLAUDE_PROJECT_DIR/scripts/hooks/tdd-guard.sh"
+          }
+        ]
       }
     ]
   }
