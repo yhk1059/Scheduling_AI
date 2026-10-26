@@ -61,7 +61,10 @@
     {
       "step": 7,
       "name": "api-routes",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-10-26T19:39:18+0900",
+      "summary": "backend/routes.py(health·/solve·/translate·/explain, 모든 응답 input_version 반환, get_llm_client 의존성 주입, lifespan에서 load_local_env; 본문은 의존성 _body에서 413 상한(nurses·constraints·text, context/request 중첩 포함)을 Pydantic보다 먼저 검사 후 검증해 LLM 키 확인보다 먼저 판정; /explain 오케스트레이션: explain 실패(Invalid/Unavailable)면 fallback_explanation+fallback=True, 제안마다 changes 적용(disable→enabled=False, update→params/hardness 재검증) 후 solve(time_limit=min(PROPOSAL_VERIFY_TIME_LIMIT_S, 남은 예산), analyze_conflicts=False)로 SolveOk만 verified_summary 채워 남김, 총 예산 3초×MAX_PROPOSALS 초과 시 중단; http 미들웨어 하나에서 ApiError/ValidationError/LLM 예외→ErrorBody(413·422·502·503·500 CONFIG_ERROR/INTERNAL, request_id uuid4, 스택은 logger만) 변환과 stdout JSON 한 줄 로그(request_id·path·status·duration_ms, LLM이면 _MeteredClient로 llm_retries·input/output_tokens, 원문·이름·키 없음)), solver.model.solve에 analyze_conflicts 인자 추가(제안 검증에서 충돌 분석 생략), 0-spike(solver/demo.py, solve-demo, test_spike.py) 삭제, 테스트 test_routes.py(27개)·test_solver_conflicts 1개 추가",
+      "completed_at": "2026-10-26T19:43:53+0900"
     },
     {
       "step": 8,
