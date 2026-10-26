@@ -1,0 +1,86 @@
+{
+  "project": "nurse-scheduler",
+  "phase": "1-mvp",
+  "steps": [
+    {
+      "step": 0,
+      "name": "domain-schema",
+      "status": "pending"
+    },
+    {
+      "step": 1,
+      "name": "solver-hard",
+      "status": "pending"
+    },
+    {
+      "step": 2,
+      "name": "solver-soft-stats",
+      "status": "pending"
+    },
+    {
+      "step": 3,
+      "name": "solver-conflicts",
+      "status": "pending"
+    },
+    {
+      "step": 4,
+      "name": "solver-reschedule",
+      "status": "pending"
+    },
+    {
+      "step": 5,
+      "name": "llm-translator",
+      "status": "pending"
+    },
+    {
+      "step": 6,
+      "name": "llm-explainer",
+      "status": "pending"
+    },
+    {
+      "step": 7,
+      "name": "api-routes",
+      "status": "pending"
+    },
+    {
+      "step": 8,
+      "name": "eval-harness",
+      "status": "pending"
+    },
+    {
+      "step": 9,
+      "name": "eval-run",
+      "status": "pending"
+    },
+    {
+      "step": 10,
+      "name": "ui-shell-ward",
+      "status": "pending"
+    },
+    {
+      "step": 11,
+      "name": "ui-rules-requests",
+      "status": "pending"
+    },
+    {
+      "step": 12,
+      "name": "ui-schedule",
+      "status": "pending"
+    },
+    {
+      "step": 13,
+      "name": "ui-conflicts-changes",
+      "status": "pending"
+    },
+    {
+      "step": 14,
+      "name": "ui-landing",
+      "status": "pending"
+    },
+    {
+      "step": 15,
+      "name": "readme",
+      "status": "pending"
+    }
+  ]
+}
