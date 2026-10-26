@@ -1,16 +1,18 @@
 """CP-SAT 모델 골격. 기본 제약과 hard 제약(리터럴 + OnlyEnforceIf), soft 페널티를 건다.
 
 solve()는 hard 리터럴을 참으로 고정해 푼다. assumptions로 두면 presolve가 리터럴을 고정하지 못해
-LP 하한이 약해지고(공정성 최적 증명이 시간 제한까지 감) 느려진다. unsat core는 충돌 분석에서 따로 구한다.
+LP 하한이 약해지고(공정성 최적 증명이 시간 제한까지 감) 느려진다. INFEASIBLE이면 conflicts.find_conflicts가
+assumptions로 unsat core를 따로 구한다.
 """
 
 from dataclasses import dataclass, field
 
 from ortools.sat.python import cp_model
 
-from backend.domain.constants import SOLVE_TIME_LIMIT_S
+from backend.domain.constants import CONFLICT_TIME_LIMIT_S, SOLVE_TIME_LIMIT_S
 from backend.domain.models import ScheduleRequest, SolveInfeasible, SolveOk, SolveTimeout
 from backend.solver import hard, soft, stats
+from backend.solver.conflicts import find_conflicts
 from backend.solver.stats import TOGGLEABLE  # hard → soft 토글이 가능한 템플릿 1~7
 
 SHIFTS = ("D", "E", "N", "O")
@@ -99,7 +101,8 @@ def solve(request: ScheduleRequest, time_limit_s: float = SOLVE_TIME_LIMIT_S) ->
         result = stats.compute_result(request, assignments, optimal=status == cp_model.OPTIMAL)
         return SolveOk(status="ok", input_version=version, result=result)
     if status == cp_model.INFEASIBLE:
-        return SolveInfeasible(status="infeasible", input_version=version, conflicts=[])
+        conflicts = find_conflicts(request, CONFLICT_TIME_LIMIT_S)
+        return SolveInfeasible(status="infeasible", input_version=version, conflicts=conflicts or [])
     if status == cp_model.UNKNOWN:
         return SolveTimeout(status="timeout", input_version=version)
     raise RuntimeError(f"CP-SAT 상태 {solver.status_name(status)}")

@@ -246,7 +246,8 @@ def test_leave_and_fixed_on_same_cell_is_infeasible():
                                con("fx", "fixed_assignment", {"nurse_id": "n1", "day": 5, "shift": "D"})])
     res = solve(req)
     assert isinstance(res, SolveInfeasible)
-    assert res.conflicts == [] and res.input_version == req.input_version
+    assert {c.constraint_id for c in res.conflicts} == {"lv", "fx"}
+    assert res.input_version == req.input_version
 
 
 def test_disabled_constraint_is_ignored():
