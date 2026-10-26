@@ -106,3 +106,16 @@ def test_infeasible_solve_with_analysis_within_time_budget():
     res = solve(req)
     assert isinstance(res, SolveInfeasible)
     assert time.perf_counter() - start < SOLVE_TIME_LIMIT_S + CONFLICT_TIME_LIMIT_S
+
+
+def test_solve_can_skip_conflict_analysis(monkeypatch):
+    """제안 검증용 재풀이는 충돌 분석 시간을 쓰지 않는다."""
+
+    def fail(*a, **k):
+        raise AssertionError("find_conflicts가 호출되면 안 된다")
+
+    monkeypatch.setattr(solver_model, "find_conflicts", fail)
+    req = request(constraints=[fixed("f1", "n1", 5, "D"), fixed("f2", "n1", 5, "N")])
+    res = solve(req, analyze_conflicts=False)
+    assert isinstance(res, SolveInfeasible)
+    assert res.conflicts == []

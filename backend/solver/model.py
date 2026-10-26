@@ -83,7 +83,9 @@ def build_model(request: ScheduleRequest) -> ModelContext:
     return ctx
 
 
-def solve(request: ScheduleRequest, time_limit_s: float = SOLVE_TIME_LIMIT_S) -> SolveOk | SolveInfeasible | SolveTimeout:
+def solve(
+    request: ScheduleRequest, time_limit_s: float = SOLVE_TIME_LIMIT_S, analyze_conflicts: bool = True
+) -> SolveOk | SolveInfeasible | SolveTimeout:
     ctx = build_model(request)
     ctx.model.add_bool_and(list(ctx.hard_literals.values()))
     if ctx.objective_terms:
@@ -104,7 +106,7 @@ def solve(request: ScheduleRequest, time_limit_s: float = SOLVE_TIME_LIMIT_S) ->
         result = stats.compute_result(request, assignments, optimal=status == cp_model.OPTIMAL)
         return SolveOk(status="ok", input_version=version, result=result)
     if status == cp_model.INFEASIBLE:
-        conflicts = find_conflicts(request, CONFLICT_TIME_LIMIT_S)
+        conflicts = find_conflicts(request, CONFLICT_TIME_LIMIT_S) if analyze_conflicts else None
         return SolveInfeasible(status="infeasible", input_version=version, conflicts=conflicts or [])
     if status == cp_model.UNKNOWN:
         return SolveTimeout(status="timeout", input_version=version)
