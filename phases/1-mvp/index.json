@@ -69,7 +69,10 @@
     {
       "step": 8,
       "name": "eval-harness",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-10-26T19:43:58+0900",
+      "summary": "eval/dataset.jsonl 44개(ward 규칙 16: 템플릿 1~7·11·12, 복합 문장 4·구어/오타 포함 / hard·soft 판정 4 / month 요청 17: 휴가·고정·희망/기피, '15~17일'·'다음 주 수요일'·'3주차'·'이번 주 목~토'·'매주 금요일'·'주말마다'·'마지막 날'·이름만 호칭 / clarify 4: 명단 밖·모호·대상 월 밖·날짜 없음 / unsupported 3, 모두 ward-15 샘플 2026-11, 일부 holidays 덮어쓰기), eval/run.py(--dry-run: ConstraintSpec+ScheduleRequest 참조 무결성·id 중복·status/scope/today·ok↔constraints 일관성 검증, 실패 시 exit 1; 실행 모드: load_local_env→키 없으면 exit 2→AnthropicClient로 translate, 미터 래퍼로 재시도·토큰 측정(translator 무변경); 채점: type·hardness·params(Pydantic 기본값 채움, 리스트 정렬) 다중집합 매칭; 지표: 스키마 유효율·status 정확도·제약 P/R/F1(micro)·완전 일치율·clarify/unsupported 정확도·평균 재시도·평균/p95 지연·토큰 합계 → eval/results.md(지표 표, 실패 케이스 기대 vs 실제, 실행 시각, 모델)), 테스트 backend/tests/test_eval_runner.py(22개: 채점·데이터셋 검증·mock 2케이스 집계·results.md·CLI exit 0/2)",
+      "completed_at": "2026-10-26T19:47:51+0900"
     },
     {
       "step": 9,
