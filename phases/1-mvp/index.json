@@ -109,7 +109,10 @@
     {
       "step": 13,
       "name": "ui-conflicts-changes",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-10-26T20:13:44+0900",
+      "summary": "lib/store.ts에 resultVersion(setResult 시점 inputVersion, persist)·setEnabled(bump)·applyChanges(disable→enabled=false, update→params·hardness 교체(weight 규칙 유지), 한 번 bump) + test 3개(vitest 57); components/ScheduleStep.tsx: infeasible이면 자동 api.explain('원인을 분석하는 중…'), 해 없음 패널(border #E8B4AE·해 없음/시간 초과 배지, 설명 텍스트, fallback이면 '자동 설명을 만들지 못해 충돌 규칙만 표시합니다', verified_summary 있는 제안만 제안 카드(검증됨 배지·'재풀이 결과 · 해 있음 · 희망 반영 n/m'·[무시]·[수락]→applyChanges 후 자동 재풀이), 충돌 규칙 목록(원문·해석·[이번 달만 끄기]→enabled=false 후 재풀이, 제안 0개·fallback에도 표시), conflicts 비었거나 timeout이면 안내 + hard 제약 전체 끄기/다시 켜기 토글); 확정본 있으면 월중 변경 입력 바(translate scope month → ConstraintCard 대기 카드, onApplied로 previous=확정본 재풀이), 확정본 이후 모든 재풀이(셀 고정 포함)는 previous=확정본, '확정본 대비 n명, m칸 변경' 배너(#FDF0DC/#F1D3A8)·diff 칸 하이라이트·'초안' 배지, [확정]으로 교체; stale: 표시 중인 결과/패널 버전≠inputVersion이면 '입력이 바뀌었어요. 다시 생성하세요' 배지 + [다시 생성]; solve·explain·translate 오류는 api.ts 문구 토스트 + [다시 시도](자동 재시도 없음), 요청 중 생성·확정·CSV·셀·수락·끄기·적용 비활성; ConstraintCard에 onApplied·busy prop, RulesStep today export; 수동 저니(Playwright·시스템 Chrome): 실제 API explain 1회(휴가 8건 → 설명+검증된 제안 3개 → 수락 → 해결)·translate 1회(최지훈 병가 → 적용 → 2명 2칸 변경 하이라이트·초안 → 확정), mock으로 503 토스트→다시 시도·fallback 문구·미검증 제안 숨김·이번 달만 끄기 해결·빈 conflicts/timeout 끄기 목록·stale 배지·500 토스트 자동 재시도 없음·요청 중 비활성 확인",
+      "completed_at": "2026-10-26T20:20:48+0900"
     },
     {
       "step": 14,
