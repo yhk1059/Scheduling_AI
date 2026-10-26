@@ -10,6 +10,7 @@ import argparse
 import contextlib
 import json
 import os
+import re
 import signal
 import subprocess
 import sys
@@ -56,6 +57,8 @@ class StepExecutor:
 
     MAX_RETRIES = 3
     CLAUDE_TIMEOUT = 1800
+    AC_TIMEOUT = 900
+    AC_OUTPUT_TAIL = 2000
     FEAT_MSG = "feat({phase}): step {num} — {name}"
     CHORE_MSG = "chore({phase}): step {num} output"
     FAIL_MSG = "chore({phase}): step {num} failed"
@@ -280,6 +283,46 @@ class StepExecutor:
 
         return output
 
+    # --- AC 재검증 ---
+
+    @staticmethod
+    def _extract_ac_commands(step_md: str) -> list:
+        """'## Acceptance Criteria' 섹션의 첫 ```bash 블록에서 명령 줄을 뽑는다 (빈 줄·주석 줄 제외)."""
+        section = re.search(r"^## Acceptance Criteria\s*$(.*?)(?=^## |\Z)", step_md, re.M | re.S)
+        if not section:
+            return []
+        block = re.search(r"^```bash\s*$(.*?)^```", section.group(1), re.M | re.S)
+        if not block:
+            return []
+        lines = (l.strip() for l in block.group(1).splitlines())
+        return [l for l in lines if l and not l.startswith("#")]
+
+    def _verify_ac(self, step_num: int) -> Optional[str]:
+        """step의 AC 명령을 실행기가 직접 다시 돌린다. 통과하면 None, 실패하면 에러 메시지."""
+        step_md = (self._phase_dir / f"step{step_num}.md").read_text()
+        commands = self._extract_ac_commands(step_md)
+        if not commands:
+            print(f"  WARN: step{step_num}.md에 AC 블록이 없어 재검증을 건너뜁니다.")
+            return None
+
+        # 줄마다 따로 실행한다. 이유: bash -e는 `a && b`에서 a의 실패로 멈추지 않는다.
+        for cmd in commands:
+            proc = subprocess.Popen(
+                ["bash", "-c", cmd], cwd=self._root, text=True,
+                stdout=subprocess.PIPE, stderr=subprocess.STDOUT, start_new_session=True,
+            )
+            try:
+                out, _ = proc.communicate(timeout=self.AC_TIMEOUT)
+            except subprocess.TimeoutExpired:
+                with contextlib.suppress(ProcessLookupError):
+                    os.killpg(proc.pid, signal.SIGKILL)
+                proc.communicate()
+                return f"AC 재검증 실패: `{cmd}` 가 {self.AC_TIMEOUT}초 내에 끝나지 않음 (timeout)"
+            if proc.returncode != 0:
+                tail = out[-self.AC_OUTPUT_TAIL:]
+                return f"AC 재검증 실패: `{cmd}` (exit {proc.returncode})\n\n```\n{tail}\n```"
+        return None
+
     # --- 헤더 & 검증 ---
 
     def _print_header(self):
@@ -337,7 +380,12 @@ class StepExecutor:
             status = next((s.get("status", "pending") for s in index["steps"] if s["step"] == step_num), "pending")
             ts = self._stamp()
 
-            if status == "completed":
+            # Claude의 자기 보고를 믿지 않고 실행기가 AC를 다시 돌려 확인한다.
+            ac_error = self._verify_ac(step_num) if status == "completed" else None
+            if ac_error:
+                print(f"  ✗ Step {step_num}: completed로 보고됐지만 AC 재검증 실패")
+
+            if status == "completed" and not ac_error:
                 for s in index["steps"]:
                     if s["step"] == step_num:
                         s["completed_at"] = ts
@@ -361,7 +409,7 @@ class StepExecutor:
                 f"Claude 세션이 {self.CLAUDE_TIMEOUT}초 내에 끝나지 않아 중단됨 (timeout). 작업 범위를 줄이거나 오래 걸리는 명령을 피하라."
                 if output.get("timedOut") else "Step did not update status"
             )
-            err_msg = next(
+            err_msg = ac_error or next(
                 (s.get("error_message", default_err) for s in index["steps"] if s["step"] == step_num),
                 default_err,
             )

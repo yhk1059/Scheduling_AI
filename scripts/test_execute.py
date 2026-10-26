@@ -476,6 +476,169 @@ class TestExecuteSingleStepFailure:
 
 
 # ---------------------------------------------------------------------------
+# _extract_ac_commands
+# ---------------------------------------------------------------------------
+
+STEP_MD_WITH_AC = textwrap.dedent("""\
+    # Step 2: UI
+
+    ## 작업
+
+    ```bash
+    echo not-ac
+    ```
+
+    ## Acceptance Criteria
+
+    ```bash
+    uv run pytest backend/tests -q        # 전체 통과
+
+    # 주석만 있는 줄
+    npm run build && npm run lint
+    ```
+
+    `test_x.py`는 최소한 다음을 검증한다.
+
+    ## 검증 절차
+
+    ```bash
+    echo also-not-ac
+    ```
+    """)
+
+
+class TestExtractAcCommands:
+    def test_extracts_commands_from_ac_block(self):
+        cmds = ex.StepExecutor._extract_ac_commands(STEP_MD_WITH_AC)
+        assert cmds == [
+            "uv run pytest backend/tests -q        # 전체 통과",
+            "npm run build && npm run lint",
+        ]
+
+    def test_ignores_blocks_outside_ac_section(self):
+        cmds = ex.StepExecutor._extract_ac_commands(STEP_MD_WITH_AC)
+        assert not any("not-ac" in c for c in cmds)
+
+    def test_no_ac_section_returns_empty(self):
+        assert ex.StepExecutor._extract_ac_commands("# Step\n\n## 작업\n\n```bash\nls\n```\n") == []
+
+    def test_ac_section_without_block_returns_empty(self):
+        md = "## Acceptance Criteria\n\n설명만 있음\n\n## 검증 절차\n\n```bash\nls\n```\n"
+        assert ex.StepExecutor._extract_ac_commands(md) == []
+
+
+# ---------------------------------------------------------------------------
+# _verify_ac (real subprocess)
+# ---------------------------------------------------------------------------
+
+def _write_ac(phase_dir, *cmds):
+    body = "\n".join(cmds)
+    (phase_dir / "step2.md").write_text(f"# Step 2\n\n## Acceptance Criteria\n\n```bash\n{body}\n```\n")
+
+
+class TestVerifyAc:
+    def test_all_pass_returns_none(self, executor, phase_dir):
+        _write_ac(phase_dir, "true", "echo ok")
+        assert executor._verify_ac(2) is None
+
+    def test_runs_in_project_root(self, executor, phase_dir):
+        _write_ac(phase_dir, "test -f CLAUDE.md")
+        assert executor._verify_ac(2) is None
+
+    def test_failure_reports_command_and_output(self, executor, phase_dir):
+        _write_ac(phase_dir, "true", "echo BOOM >&2; exit 3")
+        err = executor._verify_ac(2)
+        assert "AC 재검증 실패" in err
+        assert "exit 3" in err
+        assert "BOOM" in err
+
+    def test_stops_at_first_failure(self, executor, phase_dir, tmp_project):
+        _write_ac(phase_dir, "false", "touch ran.txt")
+        assert executor._verify_ac(2) is not None
+        assert not (tmp_project / "ran.txt").exists()
+
+    def test_detects_failure_in_and_chain(self, executor, phase_dir):
+        _write_ac(phase_dir, "false && true", "true")
+        assert executor._verify_ac(2) is not None
+
+    def test_output_tail_is_truncated(self, executor, phase_dir, monkeypatch):
+        monkeypatch.setattr(ex.StepExecutor, "AC_OUTPUT_TAIL", 50)
+        _write_ac(phase_dir, "printf 'A%.0s' $(seq 500); echo END; false")
+        err = executor._verify_ac(2)
+        assert "END" in err
+        assert "A" * 100 not in err
+
+    def test_timeout_reports_error(self, executor, phase_dir, monkeypatch):
+        monkeypatch.setattr(ex.StepExecutor, "AC_TIMEOUT", 1)
+        _write_ac(phase_dir, "sleep 30")
+        err = executor._verify_ac(2)
+        assert "timeout" in err
+
+    def test_no_ac_block_warns_and_passes(self, executor, capsys):
+        assert executor._verify_ac(2) is None
+        assert "AC 블록이 없어" in capsys.readouterr().out
+
+
+# ---------------------------------------------------------------------------
+# _execute_single_step AC 재검증
+# ---------------------------------------------------------------------------
+
+class TestExecuteSingleStepAcVerify:
+    def _claude_marks_completed(self, executor):
+        def fake(step, preamble):
+            index = executor._read_json(executor._index_file)
+            index["steps"][2].update(status="completed", summary="done")
+            executor._write_json(executor._index_file, index)
+            return {}
+        return MagicMock(side_effect=fake)
+
+    def test_ac_pass_commits(self, executor, phase_dir):
+        _write_ac(phase_dir, "true")
+        executor._invoke_claude = self._claude_marks_completed(executor)
+        executor._commit_step = MagicMock()
+
+        assert executor._execute_single_step({"step": 2, "name": "ui"}, "") is True
+        executor._commit_step.assert_called_once_with(2, "ui")
+        step = executor._read_json(executor._index_file)["steps"][2]
+        assert step["status"] == "completed"
+        assert "completed_at" in step
+
+    def test_ac_fail_retries_with_ac_error_then_errors(self, executor, phase_dir):
+        _write_ac(phase_dir, "echo AC_OUT; false")
+        executor._invoke_claude = self._claude_marks_completed(executor)
+        executor._commit_step = MagicMock()
+        executor._commit_failure = MagicMock()
+        executor._update_top_index = MagicMock()
+
+        with pytest.raises(SystemExit) as exc_info:
+            executor._execute_single_step({"step": 2, "name": "ui"}, "")
+
+        assert exc_info.value.code == 1
+        assert executor._invoke_claude.call_count == ex.StepExecutor.MAX_RETRIES
+        retry_preamble = executor._invoke_claude.call_args_list[1][0][1]
+        assert "AC_OUT" in retry_preamble
+        executor._commit_step.assert_not_called()
+        step = executor._read_json(executor._index_file)["steps"][2]
+        assert step["status"] == "error"
+        assert "AC 재검증 실패" in step["error_message"]
+        assert "completed_at" not in step
+
+    def test_ac_fail_then_pass_commits_once(self, executor, phase_dir, tmp_project):
+        _write_ac(phase_dir, "test -f fixed.txt")
+        marks = self._claude_marks_completed(executor)
+        def fake(step, preamble):
+            if marks.call_count == 1:
+                (tmp_project / "fixed.txt").write_text("")
+            return marks(step, preamble)
+        executor._invoke_claude = MagicMock(side_effect=fake)
+        executor._commit_step = MagicMock()
+
+        assert executor._execute_single_step({"step": 2, "name": "ui"}, "") is True
+        assert executor._invoke_claude.call_count == 2
+        executor._commit_step.assert_called_once_with(2, "ui")
+
+
+# ---------------------------------------------------------------------------
 # _invoke_claude (mocked)
 # ---------------------------------------------------------------------------
 
