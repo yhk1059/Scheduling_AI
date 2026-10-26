@@ -3,7 +3,7 @@ import { create } from "zustand";
 import { persist, type PersistStorage, type StorageValue } from "zustand/middleware";
 
 import sample from "./samples/ward-15.json";
-import type { CarryOverRow, ConstraintSpec, Nurse, Period, ScheduleResult } from "./types.gen";
+import type { CarryOverRow, ConstraintChange, ConstraintSpec, Nurse, Period, ScheduleResult } from "./types.gen";
 
 export const STORAGE_KEY = "nurse-scheduler";
 const STORAGE_VERSION = 1;
@@ -35,6 +35,8 @@ interface Data {
   result: ScheduleResult | null;
   confirmed: Assignments | null;
   inputVersion: number;
+  /** result를 만든 요청의 inputVersion. 현재와 다르면 stale. */
+  resultVersion: number | null;
 }
 
 export interface AppState extends Data {
@@ -52,7 +54,11 @@ export interface AppState extends Data {
   updateCard: (id: string, patch: CardPatch) => void;
   removeCard: (id: string) => void;
   orphanConstraintIds: () => string[];
+  /** 응답 버전이 현재와 같을 때만 부른다. resultVersion = 지금의 inputVersion. */
   setResult: (result: ScheduleResult) => void;
+  setEnabled: (id: string, enabled: boolean) => void;
+  /** 검증된 제안의 변경: disable → enabled=false, update → params·hardness 교체. */
+  applyChanges: (changes: ConstraintChange[]) => void;
   /** 그 칸의 기존 고정 배정을 지우고 수동 고정 제약을 추가한다. */
   setFixed: (nurseId: string, day: number, shift: Code) => void;
   clearFixed: (nurseId: string, day: number) => void;
@@ -78,6 +84,7 @@ function initialData(now: Date): Data {
     result: null,
     confirmed: null,
     inputVersion: 0,
+    resultVersion: null,
   };
 }
 
@@ -240,7 +247,26 @@ export function createAppStore(getStorage: () => Storage, now: Date = new Date()
               })
               .map((c) => c.id);
           },
-          setResult: (result) => set({ result }),
+          setResult: (result) => set((s) => ({ result, resultVersion: s.inputVersion })),
+          setEnabled: (id, enabled) => {
+            const { constraints } = get();
+            if (constraints.some((c) => c.id === id))
+              bump({ constraints: constraints.map((c) => (c.id === id ? { ...c, enabled } : c)) });
+          },
+          applyChanges: (changes) => {
+            const byId = new Map(changes.map((ch) => [ch.constraint_id, ch]));
+            bump({
+              constraints: get().constraints.map((c) => {
+                const ch = byId.get(c.id);
+                if (!ch) return c;
+                if (ch.action === "disable") return { ...c, enabled: false };
+                return patched(c, {
+                  ...(ch.params && { params: ch.params as ConstraintSpec["params"] }),
+                  ...(ch.hardness && { hardness: ch.hardness }),
+                });
+              }),
+            });
+          },
           setFixed: (nurseId, day, shift) => {
             const { constraints, nurses, period } = get();
             const name = nurses.find((n) => n.id === nurseId)?.name ?? nurseId;
@@ -274,6 +300,7 @@ export function createAppStore(getStorage: () => Storage, now: Date = new Date()
               pendingCards: [],
               carryOver: sample.carry_over as CarryOverRow[],
               result: null,
+              resultVersion: null,
               confirmed: null,
             }),
           dismissResetNotice: () => set({ resetNotice: false }),
@@ -294,6 +321,7 @@ export function createAppStore(getStorage: () => Storage, now: Date = new Date()
           result: s.result,
           confirmed: s.confirmed,
           inputVersion: s.inputVersion,
+          resultVersion: s.resultVersion,
         }),
         // 버전이 다르거나 파싱에 실패하면 버리고, merge에서 초기 상태 + resetNotice로 처리한다
         migrate: () => null as unknown as Data,
