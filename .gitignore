@@ -10,3 +10,12 @@ phases/**/step*-output.json
 
 # python
 __pycache__/
+
+# python env
+.venv/
+
+# env files
+.env*
+
+# vercel
+.vercel

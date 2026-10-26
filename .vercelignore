@@ -1,0 +1,7 @@
+docs/
+phases/
+scripts/
+eval/
+backend/tests/
+.venv/
+.claude/
