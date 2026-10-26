@@ -4,26 +4,27 @@
 대상 월 날짜를 하나 이상 포함하는 구간만 검사한다.
 """
 
-from typing import TYPE_CHECKING, Any, Callable
+from typing import TYPE_CHECKING, Any, Callable, Iterator
 
 if TYPE_CHECKING:
     from backend.solver.model import Cell, ModelContext
 
 
-def _clause(ctx: "ModelContext", lit, neg: list["Cell"], pos: list["Cell"]) -> None:
-    """lit → (¬neg[0] ∨ … ∨ pos[0] ∨ …). 이월 상수는 미리 정리한다."""
+def _clause(ctx: "ModelContext", lit, neg: list["Cell"], pos: list["Cell"]) -> bool:
+    """lit → (¬neg[0] ∨ … ∨ pos[0] ∨ …). 이월 상수는 미리 정리한다. 식을 걸었으면 True."""
     terms = []
     for v in neg:
         if v is False:
-            return
+            return False
         if v is not True:
             terms.append(v.Not())
     for v in pos:
         if v is True:
-            return
+            return False
         if v is not False:
             terms.append(v)
     ctx.model.add_bool_or(terms).only_enforce_if(lit)
+    return True
 
 
 def _first_day(ctx: "ModelContext", nurse_id: str) -> int:
@@ -44,14 +45,17 @@ def add_daily_coverage(ctx: "ModelContext", c: Any, lit) -> None:
         ctx.model.add_linear_constraint(total, p.min, p.max).only_enforce_if(lit)
 
 
-def add_forbidden_sequence(ctx: "ModelContext", c: Any, lit) -> None:
+Clauses = Iterator[tuple[list["Cell"], list["Cell"]]]
+
+
+def forbidden_sequence_clauses(ctx: "ModelContext", c: Any) -> Clauses:
     p = c.params
     for nid in _nurse_ids(ctx):
         for d in range(max(_first_day(ctx, nid), 0), ctx.days):
-            _clause(ctx, lit, [ctx.cell(nid, d, p.first), ctx.cell(nid, d + 1, p.second)], [])
+            yield [ctx.cell(nid, d, p.first), ctx.cell(nid, d + 1, p.second)], []
 
 
-def _max_run(ctx: "ModelContext", lit, nurse_id: str, k: int, breaker: Callable[[int], tuple[list, list]]) -> None:
+def _max_run(ctx: "ModelContext", nurse_id: str, k: int, breaker: Callable[[int], tuple[list, list]]) -> Clauses:
     """길이 k+1 구간마다 breaker(day)가 하나 이상 참이어야 한다."""
     for start in range(_first_day(ctx, nurse_id), ctx.days - k + 1):
         if start + k < 1:
@@ -61,17 +65,17 @@ def _max_run(ctx: "ModelContext", lit, nurse_id: str, k: int, breaker: Callable[
             n, p = breaker(d)
             neg += n
             pos += p
-        _clause(ctx, lit, neg, pos)
+        yield neg, pos
 
 
-def add_max_consecutive_work(ctx: "ModelContext", c: Any, lit) -> None:
+def max_consecutive_work_clauses(ctx: "ModelContext", c: Any) -> Clauses:
     for nid in _nurse_ids(ctx):
-        _max_run(ctx, lit, nid, c.params.days, lambda d, nid=nid: ([], [ctx.cell(nid, d, "O")]))
+        yield from _max_run(ctx, nid, c.params.days, lambda d, nid=nid: ([], [ctx.cell(nid, d, "O")]))
 
 
-def add_max_consecutive_nights(ctx: "ModelContext", c: Any, lit) -> None:
+def max_consecutive_nights_clauses(ctx: "ModelContext", c: Any) -> Clauses:
     for nid in _nurse_ids(ctx):
-        _max_run(ctx, lit, nid, c.params.days, lambda d, nid=nid: ([ctx.cell(nid, d, "N")], []))
+        yield from _max_run(ctx, nid, c.params.days, lambda d, nid=nid: ([ctx.cell(nid, d, "N")], []))
 
 
 def add_min_days_off(ctx: "ModelContext", c: Any, lit) -> None:
@@ -80,13 +84,27 @@ def add_min_days_off(ctx: "ModelContext", c: Any, lit) -> None:
         ctx.model.add(offs >= c.params.days).only_enforce_if(lit)
 
 
-def add_off_after_night_block(ctx: "ModelContext", c: Any, lit) -> None:
+def off_after_night_block_clauses(ctx: "ModelContext", c: Any) -> Clauses:
     for nid in _nurse_ids(ctx):
         for d in range(max(_first_day(ctx, nid), 0), ctx.days):
             night, next_night = ctx.cell(nid, d, "N"), ctx.cell(nid, d + 1, "N")
             for k in range(1, min(c.params.days, ctx.days - d) + 1):
                 # d가 N이고 d+1이 N이 아니면(블록 끝) d+k는 O
-                _clause(ctx, lit, [night], [next_night, ctx.cell(nid, d + k, "O")])
+                yield [night], [next_night, ctx.cell(nid, d + k, "O")]
+
+
+# 연속 계열(2, 3, 4, 6)은 절 목록으로 표현하고, hard/soft가 같은 절을 쓴다.
+CLAUSE_TEMPLATES: dict[str, Callable[["ModelContext", Any], Clauses]] = {
+    "forbidden_sequence": forbidden_sequence_clauses,
+    "max_consecutive_work": max_consecutive_work_clauses,
+    "max_consecutive_nights": max_consecutive_nights_clauses,
+    "off_after_night_block": off_after_night_block_clauses,
+}
+
+
+def _add_clauses(ctx: "ModelContext", c: Any, lit) -> None:
+    for neg, pos in CLAUSE_TEMPLATES[c.type](ctx, c):
+        _clause(ctx, lit, neg, pos)
 
 
 def add_skill_mix(ctx: "ModelContext", c: Any, lit) -> None:
@@ -108,11 +126,11 @@ def add_fixed_assignment(ctx: "ModelContext", c: Any, lit) -> None:
 
 ADDERS: dict[str, Callable[["ModelContext", Any, Any], None]] = {
     "daily_coverage": add_daily_coverage,
-    "forbidden_sequence": add_forbidden_sequence,
-    "max_consecutive_work": add_max_consecutive_work,
-    "max_consecutive_nights": add_max_consecutive_nights,
+    "forbidden_sequence": _add_clauses,
+    "max_consecutive_work": _add_clauses,
+    "max_consecutive_nights": _add_clauses,
     "min_days_off": add_min_days_off,
-    "off_after_night_block": add_off_after_night_block,
+    "off_after_night_block": _add_clauses,
     "skill_mix": add_skill_mix,
     "leave": add_leave,
     "fixed_assignment": add_fixed_assignment,

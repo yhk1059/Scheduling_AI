@@ -25,4 +25,5 @@ DEFAULT_SOFT_WEIGHTS: dict[str, int] = {
     "night_fairness": 5,
     "weekend_fairness": 5,
 }
+FAIRNESS_TOLERANCE = 1  # 공정성 편차가 이 값 이하면 soft 위반으로 나열하지 않는다
 DIFF_WEIGHT = 20  # 재스케줄 시 변경 칸 1개당 페널티

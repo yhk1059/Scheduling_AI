@@ -1,32 +1,19 @@
-"""CP-SAT 모델 골격. 기본 제약과 hard 제약을 걸고 assumptions로 푼다."""
+"""CP-SAT 모델 골격. 기본 제약과 hard 제약(리터럴 + OnlyEnforceIf), soft 페널티를 건다.
 
-import calendar
+solve()는 hard 리터럴을 참으로 고정해 푼다. assumptions로 두면 presolve가 리터럴을 고정하지 못해
+LP 하한이 약해지고(공정성 최적 증명이 시간 제한까지 감) 느려진다. unsat core는 충돌 분석에서 따로 구한다.
+"""
+
 from dataclasses import dataclass, field
 
 from ortools.sat.python import cp_model
 
 from backend.domain.constants import SOLVE_TIME_LIMIT_S
-from backend.domain.models import (
-    ScheduleRequest,
-    ScheduleResult,
-    SolveInfeasible,
-    SolveOk,
-    SolveTimeout,
-    Summary,
-)
-from backend.solver import hard
+from backend.domain.models import ScheduleRequest, SolveInfeasible, SolveOk, SolveTimeout
+from backend.solver import hard, soft, stats
+from backend.solver.stats import TOGGLEABLE  # hard → soft 토글이 가능한 템플릿 1~7
 
 SHIFTS = ("D", "E", "N", "O")
-# hard → soft 토글이 가능한 템플릿 1~7. soft면 step 2의 페널티로 처리한다.
-TOGGLEABLE = {
-    "daily_coverage",
-    "forbidden_sequence",
-    "max_consecutive_work",
-    "max_consecutive_nights",
-    "min_days_off",
-    "off_after_night_block",
-    "skill_mix",
-}
 
 Cell = cp_model.IntVar | bool | None
 
@@ -44,8 +31,7 @@ class ModelContext:
         return self.request.period.days
 
     def is_weekend(self, day: int) -> bool:
-        p = self.request.period
-        return calendar.weekday(p.year, p.month, day) >= 5 or day in self.request.holidays
+        return stats.is_weekend(self.request, day)
 
     def carry_len(self, nurse_id: str) -> int:
         return len(self._carry().get(nurse_id, []))
@@ -81,9 +67,10 @@ def build_model(request: ScheduleRequest) -> ModelContext:
                 model.add(x[n.id, d, "E"] == 0)
 
     for c in request.constraints:
-        if not c.enabled or c.type not in hard.ADDERS:
+        if not c.enabled:
             continue
-        if c.hardness == "soft" and c.type in TOGGLEABLE:
+        if c.type not in hard.ADDERS or (c.hardness == "soft" and c.type in TOGGLEABLE):
+            soft.ADDERS[c.type](ctx, c)
             continue
         lit = model.new_bool_var(f"hard_{c.id}")
         ctx.hard_literals[c.id] = lit
@@ -93,7 +80,9 @@ def build_model(request: ScheduleRequest) -> ModelContext:
 
 def solve(request: ScheduleRequest, time_limit_s: float = SOLVE_TIME_LIMIT_S) -> SolveOk | SolveInfeasible | SolveTimeout:
     ctx = build_model(request)
-    ctx.model.add_assumptions(list(ctx.hard_literals.values()))
+    ctx.model.add_bool_and(list(ctx.hard_literals.values()))
+    if ctx.objective_terms:
+        ctx.model.minimize(sum(ctx.objective_terms))
     solver = cp_model.CpSolver()
     solver.parameters.max_time_in_seconds = time_limit_s
     status = solver.solve(ctx.model)
@@ -107,13 +96,7 @@ def solve(request: ScheduleRequest, time_limit_s: float = SOLVE_TIME_LIMIT_S) ->
             ]
             for n in request.nurses
         }
-        result = ScheduleResult(
-            assignments=assignments,
-            summary=Summary(preferences_total=0, preferences_met=0, soft_violation_count=0),
-            stats={},
-            soft_violations=[],
-            optimal=status == cp_model.OPTIMAL,
-        )
+        result = stats.compute_result(request, assignments, optimal=status == cp_model.OPTIMAL)
         return SolveOk(status="ok", input_version=version, result=result)
     if status == cp_model.INFEASIBLE:
         return SolveInfeasible(status="infeasible", input_version=version, conflicts=[])
