@@ -295,6 +295,62 @@ describe("근무표 결과와 수동 고정", () => {
   });
 });
 
+describe("충돌 대응", () => {
+  const result = {
+    assignments: { n01: ["D", "E"] },
+    summary: { preferences_total: 0, preferences_met: 0, soft_violation_count: 0 },
+    stats: {},
+    soft_violations: [],
+    diff: null,
+    optimal: true,
+  } as unknown as ScheduleResult;
+
+  it("setResult는 그때의 inputVersion을 resultVersion으로 남기고, 입력이 바뀌면 달라진다", () => {
+    const store = fresh();
+    expect(store.getState().resultVersion).toBeNull();
+    store.getState().setNurses(nurses);
+    store.getState().setResult(result);
+    expect(store.getState().resultVersion).toBe(1);
+    store.getState().toggleHoliday(3);
+    expect(store.getState().resultVersion).toBe(1);
+    expect(store.getState().inputVersion).toBe(2);
+  });
+
+  it("setEnabled는 제약의 enabled를 바꾸고 inputVersion을 올린다", () => {
+    const store = fresh();
+    store.setState({ constraints: [card({ id: "a", type: "max_consecutive_work", params: { days: 5 } })] });
+    store.getState().setEnabled("a", false);
+    expect(store.getState().constraints[0].enabled).toBe(false);
+    expect(store.getState().inputVersion).toBe(1);
+    store.getState().setEnabled("a", true);
+    expect(store.getState().constraints[0].enabled).toBe(true);
+    store.getState().setEnabled("없음", false);
+    expect(store.getState().inputVersion).toBe(2);
+  });
+
+  it("applyChanges는 disable을 enabled=false로, update를 params·hardness 교체로 한 번에 반영한다", () => {
+    const store = fresh();
+    store.setState({
+      constraints: [
+        card({ id: "a", type: "leave", scope: "month", params: { nurse_id: "n01", days: [3, 4] } }),
+        card({ id: "b", type: "max_consecutive_nights", params: { days: 3 } }),
+        card({ id: "c", type: "night_fairness", hardness: "soft", weight: 5, params: {} }),
+      ],
+    });
+    store.getState().applyChanges([
+      { action: "disable", constraint_id: "a" },
+      { action: "update", constraint_id: "b", params: { days: 4 }, hardness: "soft" },
+      { action: "update", constraint_id: "없음", params: { days: 1 } },
+    ]);
+    const [a, b, c] = store.getState().constraints;
+    expect(a.enabled).toBe(false);
+    expect(a.params).toEqual({ nurse_id: "n01", days: [3, 4] });
+    expect(b).toMatchObject({ params: { days: 4 }, hardness: "soft", weight: 10, enabled: true });
+    expect(c).toMatchObject({ hardness: "soft", weight: 5 });
+    expect(store.getState().inputVersion).toBe(1);
+  });
+});
+
 describe("loadSample", () => {
   it("샘플 명단과 제약을 불러온다", () => {
     const store = fresh();

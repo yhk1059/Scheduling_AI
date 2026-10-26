@@ -2,16 +2,26 @@
 
 import { useState } from "react";
 
-import { ApiError, errorMessage, solve } from "@/lib/api";
+import { ApiError, errorMessage, explain, solve, translate } from "@/lib/api";
 import { toScheduleCsv } from "@/lib/csv";
 import { type Assignments, type Code, useAppStore } from "@/lib/store";
-import type { Nurse, ScheduleRequest, ScheduleResult } from "@/lib/types.gen";
+import type {
+  Conflict,
+  ConstraintSpec,
+  ExplainResponse,
+  Nurse,
+  RelaxationProposal,
+  ScheduleRequest,
+  ScheduleResult,
+} from "@/lib/types.gen";
 
-import { Spinner } from "./RulesStep";
+import ConstraintCard, { describeParams, TEMPLATE_NAMES } from "./ConstraintCard";
+import { Spinner, today } from "./RulesStep";
 import { ui } from "./ui";
 
 const CODES: Code[] = ["D", "E", "N", "O"];
 const WEEKDAYS = ["일", "월", "화", "수", "목", "금", "토"];
+const MAX_TEXT_CHARS = 1000; // backend/domain/constants.py MAX_TEXT_CHARS
 
 const CELL =
   "relative w-[30px] h-7 rounded-xs inline-flex items-center justify-center font-mono text-[13px] transition-colors duration-[120ms]";
@@ -26,35 +36,67 @@ function codeClass(code: Code, weekend: boolean): string {
   return code === "O" ? `${CODE_CLASS.O} ${weekend ? "bg-[#F1EEE6]" : "bg-white"}` : CODE_CLASS[code];
 }
 
-type Outcome = "infeasible" | "timeout" | null;
+type Req = Omit<ScheduleRequest, "input_version">;
+/** 해가 없거나 시간이 초과된 마지막 풀이. version은 그 요청의 inputVersion. */
+type Outcome =
+  | { kind: "infeasible"; version: number; conflicts: Conflict[]; explanation: ExplainResponse | null }
+  | { kind: "timeout"; version: number }
+  | null;
 type Cell = { nurseId: string; day: number };
+type Toast = { message: string; retry: () => void } | null;
+
+function toMessage(e: unknown): string {
+  return errorMessage(e instanceof ApiError ? e : new ApiError("INTERNAL", String(e)));
+}
 
 export default function ScheduleStep() {
   const nurses = useAppStore((s) => s.nurses);
   const period = useAppStore((s) => s.period);
   const holidays = useAppStore((s) => s.holidays);
   const constraints = useAppStore((s) => s.constraints);
+  const pendingCards = useAppStore((s) => s.pendingCards);
   const result = useAppStore((s) => s.result);
+  const resultVersion = useAppStore((s) => s.resultVersion);
+  const inputVersion = useAppStore((s) => s.inputVersion);
   const confirmed = useAppStore((s) => s.confirmed);
   const setResult = useAppStore((s) => s.setResult);
   const setFixed = useAppStore((s) => s.setFixed);
   const clearFixed = useAppStore((s) => s.clearFixed);
+  const setEnabled = useAppStore((s) => s.setEnabled);
+  const applyChanges = useAppStore((s) => s.applyChanges);
+  const addPendingCards = useAppStore((s) => s.addPendingCards);
   const confirm = useAppStore((s) => s.confirm);
   const setStep = useAppStore((s) => s.setStep);
 
   const [loading, setLoading] = useState(false);
+  const [explaining, setExplaining] = useState(false);
+  const [translating, setTranslating] = useState(false);
   const [outcome, setOutcome] = useState<Outcome>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [toast, setToast] = useState<Toast>(null);
   const [selected, setSelected] = useState<Cell | null>(null);
-  // 마지막 요청을 다시 시도할 때 같은 previous로 보낸다
-  const [lastPrevious, setLastPrevious] = useState<Assignments | null>(null);
+  // 월중 변경 입력 바에서 만든 대기 카드
+  const [changeIds, setChangeIds] = useState<string[]>([]);
+  const busy = loading || explaining || translating;
+
+  const runExplain = async (req: Req, conflicts: Conflict[], version: number) => {
+    setExplaining(true);
+    setToast(null);
+    try {
+      const res = await explain(req, conflicts);
+      if (res.input_version !== useAppStore.getState().inputVersion) return;
+      setOutcome((o) => (o?.kind === "infeasible" && o.version === version ? { ...o, explanation: res } : o));
+    } catch (e) {
+      setToast({ message: toMessage(e), retry: () => void runExplain(req, conflicts, version) });
+    } finally {
+      setExplaining(false);
+    }
+  };
 
   const run = async (previous: Assignments | null) => {
     setLoading(true);
-    setError(null);
-    setLastPrevious(previous);
+    setToast(null);
     const s = useAppStore.getState();
-    const req: Omit<ScheduleRequest, "input_version"> = {
+    const req: Req = {
       nurses: s.nurses as ScheduleRequest["nurses"],
       period: s.period,
       holidays: s.holidays,
@@ -64,17 +106,44 @@ export default function ScheduleStep() {
     };
     try {
       const res = await solve(req);
-      if (res.input_version !== useAppStore.getState().inputVersion) return; // 풀이 중 입력이 바뀌면 버린다
+      // 풀이 중 입력이 바뀌면 버린다(남은 결과에는 stale 배지가 뜬다)
+      if (res.input_version !== useAppStore.getState().inputVersion) return;
       if (res.status === "ok") {
         setResult(res.result);
         setOutcome(null);
+      } else if (res.status === "timeout") {
+        setOutcome({ kind: "timeout", version: res.input_version });
       } else {
-        setOutcome(res.status);
+        setOutcome({ kind: "infeasible", version: res.input_version, conflicts: res.conflicts, explanation: null });
+        setLoading(false);
+        await runExplain(req, res.conflicts, res.input_version);
       }
     } catch (e) {
-      setError(errorMessage(e instanceof ApiError ? e : new ApiError("INTERNAL", String(e))));
+      setToast({ message: toMessage(e), retry: () => void run(previous) });
     } finally {
       setLoading(false);
+    }
+  };
+
+  // 확정본이 있으면 모든 재풀이를 확정본에서 최소 변경으로 한다
+  const regenerate = () => void run(useAppStore.getState().confirmed);
+
+  const translateChange = async (input: string): Promise<string | null> => {
+    setTranslating(true);
+    setToast(null);
+    try {
+      const res = await translate({ text: input, scope: "month", context: { nurses, period, holidays, today: today() } });
+      if (res.status === "ok") {
+        addPendingCards(res.constraints);
+        setChangeIds((ids) => [...ids, ...res.constraints.map((c) => c.id)]);
+        return null;
+      }
+      return res.status === "clarify" ? res.question : `아직 지원하지 않는 요청이에요: ${res.reason}`;
+    } catch (e) {
+      setToast({ message: toMessage(e), retry: () => void translateChange(input) });
+      return null;
+    } finally {
+      setTranslating(false);
     }
   };
 
@@ -92,7 +161,7 @@ export default function ScheduleStep() {
     setSelected(null);
     if (code === null) clearFixed(cell.nurseId, cell.day);
     else setFixed(cell.nurseId, cell.day, code);
-    void run(result?.assignments ?? null);
+    void run(confirmed ?? result?.assignments ?? null);
   };
 
   const download = () => {
@@ -107,7 +176,12 @@ export default function ScheduleStep() {
   };
 
   const isConfirmed = result !== null && confirmed !== null && JSON.stringify(confirmed) === JSON.stringify(result.assignments);
+  const isDraft = result !== null && confirmed !== null && !isConfirmed;
   const rows = result ? nurses.filter((n) => result.assignments[n.id]) : [];
+  const shownVersion = outcome ? outcome.version : resultVersion;
+  const stale = !busy && shownVersion !== null && shownVersion !== inputVersion;
+  const changeCards = pendingCards.filter((c) => changeIds.includes(c.id));
+  const diff = isDraft ? (result.diff ?? []) : [];
 
   return (
     <div className="flex flex-col gap-5">
@@ -122,39 +196,74 @@ export default function ScheduleStep() {
         <div className="flex items-center gap-2">
           {result && (
             <>
-              <button type="button" onClick={confirm} disabled={loading || isConfirmed} className={ui.secondary}>
+              <button type="button" onClick={confirm} disabled={busy || isConfirmed} className={ui.secondary}>
                 {isConfirmed ? "확정됨" : "확정"}
               </button>
-              <button type="button" onClick={download} disabled={loading} className={ui.secondary}>
+              <button type="button" onClick={download} disabled={busy} className={ui.secondary}>
                 CSV 다운로드
               </button>
             </>
           )}
-          <button type="button" onClick={() => void run(confirmed)} disabled={loading || nurses.length === 0} className={ui.primary}>
+          <button type="button" onClick={regenerate} disabled={busy || nurses.length === 0} className={ui.primary}>
             {loading && <Spinner />}
             {loading ? "푸는 중…" : "생성"}
           </button>
         </div>
       </div>
 
-      {error && (
-        <div role="alert" className="flex items-center justify-between rounded-lg border border-[#E8B4AE] bg-white py-1.5 pr-2 pl-4 text-sm text-[#9F1F14]">
-          {error}
-          <button type="button" onClick={() => void run(lastPrevious)} className={ui.textSm}>
-            다시 시도
+      {confirmed && <ChangeBar busy={busy} translating={translating} onSubmit={translateChange} />}
+      {changeCards.length > 0 && (
+        <div className="grid grid-cols-2 gap-4">
+          {changeCards.map((c) => (
+            <ConstraintCard key={c.id} card={c} pending busy={busy} onApplied={regenerate} />
+          ))}
+        </div>
+      )}
+
+      {stale && (
+        <div
+          role="status"
+          className="flex items-center justify-between rounded-lg border border-[#F1D3A8] bg-[#FDF0DC] py-1.5 pr-2 pl-4 text-sm text-[#7A4506]"
+        >
+          <span className={`${ui.badge} bg-white text-[#7A4506]`}>입력이 바뀌었어요. 다시 생성하세요</span>
+          <button type="button" onClick={regenerate} disabled={busy} className={ui.secondarySm}>
+            다시 생성
           </button>
         </div>
       )}
+
       {outcome && (
-        <p role="status" className="rounded-lg border border-[#E8B4AE] bg-white px-4 py-2.5 text-sm text-[#9F1F14]">
-          {outcome === "infeasible" ? "해가 없습니다." : "시간 안에 풀지 못했습니다."}
-          {result && <span className="text-[#66665E]"> 아래는 마지막으로 풀린 근무표예요.</span>}
+        <OutcomePanel
+          outcome={outcome}
+          explaining={explaining}
+          busy={busy}
+          constraints={constraints}
+          nurses={nurses}
+          period={period}
+          hasResult={result !== null}
+          onAccept={(p) => {
+            applyChanges(p.changes);
+            regenerate();
+          }}
+          onDisable={(id) => {
+            setEnabled(id, false);
+            regenerate();
+          }}
+          onToggle={(id, enabled) => setEnabled(id, enabled)}
+        />
+      )}
+
+      {diff.length > 0 && (
+        <p role="status" className="rounded-lg border border-[#F1D3A8] bg-[#FDF0DC] px-4 py-2.5 text-sm text-[#7A4506]">
+          확정본 대비 <span className="font-mono font-semibold">{new Set(diff.map((c) => c.nurse_id)).size}</span>명,{" "}
+          <span className="font-mono font-semibold">{diff.length}</span>칸 변경 · 주황 테두리 칸이 바뀐 곳이에요. [확정]하면
+          확정본을 교체해요.
         </p>
       )}
 
       {result ? (
         <>
-          <SummaryCard result={result} outcome={outcome} confirmed={isConfirmed} />
+          <SummaryCard result={result} infeasible={outcome !== null} confirmed={isConfirmed} draft={isDraft} />
           <section className={`${ui.card} flex flex-col gap-3`}>
             <div className="flex h-8 items-center justify-between gap-3">
               <h2 className={ui.cardTitle}>근무표</h2>
@@ -177,7 +286,7 @@ export default function ScheduleStep() {
               isWeekend={isWeekend}
               fixed={fixed}
               selected={selected}
-              disabled={loading}
+              disabled={busy}
               onSelect={setSelected}
             />
           </section>
@@ -192,11 +301,264 @@ export default function ScheduleStep() {
           이전
         </button>
       </div>
+
+      {toast && (
+        <div
+          role="alert"
+          className="fixed right-8 bottom-6 flex items-center gap-3 rounded-lg border border-[#E8B4AE] bg-white py-2 pr-2 pl-4 text-sm text-[#9F1F14]"
+        >
+          {toast.message}
+          <button type="button" onClick={toast.retry} disabled={busy} className={ui.textSm}>
+            다시 시도
+          </button>
+          <button type="button" onClick={() => setToast(null)} aria-label="닫기" className={ui.textSm}>
+            <svg aria-hidden="true" viewBox="0 0 12 12" className="size-3" fill="none" stroke="currentColor" strokeWidth={1.6}>
+              <path d="m3 3 6 6M9 3 3 9" />
+            </svg>
+          </button>
+        </div>
+      )}
     </div>
   );
 }
 
-function SummaryCard({ result, outcome, confirmed }: { result: ScheduleResult; outcome: Outcome; confirmed: boolean }) {
+function ChangeBar({
+  busy,
+  translating,
+  onSubmit,
+}: {
+  busy: boolean;
+  translating: boolean;
+  onSubmit: (text: string) => Promise<string | null>;
+}) {
+  const [text, setText] = useState("");
+  const [notice, setNotice] = useState<string | null>(null);
+  const tooLong = text.length > MAX_TEXT_CHARS;
+
+  const submit = async () => {
+    setNotice(null);
+    const input = text.trim();
+    const question = await onSubmit(input);
+    if (question) setNotice(question);
+    else setText((t) => (t.trim() === input ? "" : t));
+  };
+
+  return (
+    <section className={`${ui.card} flex flex-col gap-2.5`}>
+      <div className="flex flex-col gap-1">
+        <h2 className={ui.cardTitle}>월중 변경</h2>
+        <p className={ui.help}>확정본 이후 생긴 병가·휴가를 적으면, 확정본에서 최소한으로 바꾼 초안을 만들어요.</p>
+      </div>
+      <form
+        className="flex gap-2"
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (!busy && !tooLong && text.trim() !== "") void submit();
+        }}
+      >
+        <input
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          placeholder="예: 최지훈 이번 주 병가"
+          aria-label="월중 변경 입력"
+          aria-invalid={tooLong || undefined}
+          className={`${ui.input} flex-1 ${tooLong ? "border-[#B42318]" : ""}`}
+        />
+        <button type="submit" disabled={busy || tooLong || text.trim() === ""} className={ui.primary}>
+          {translating && <Spinner />}
+          {translating ? "해석 중…" : "해석"}
+        </button>
+      </form>
+      {notice && (
+        <p className="text-sm text-[#1B1B18]">
+          {notice} <span className="text-xs font-medium text-[#66665E]">내용을 보완해서 다시 입력해 주세요.</span>
+        </p>
+      )}
+    </section>
+  );
+}
+
+function OutcomePanel({
+  outcome,
+  explaining,
+  busy,
+  constraints,
+  nurses,
+  period,
+  hasResult,
+  onAccept,
+  onDisable,
+  onToggle,
+}: {
+  outcome: NonNullable<Outcome>;
+  explaining: boolean;
+  busy: boolean;
+  constraints: ConstraintSpec[];
+  nurses: Nurse[];
+  period: { year: number; month: number };
+  hasResult: boolean;
+  onAccept: (p: RelaxationProposal) => void;
+  onDisable: (id: string) => void;
+  onToggle: (id: string, enabled: boolean) => void;
+}) {
+  const [dismissed, setDismissed] = useState<RelaxationProposal[]>([]);
+  const explanation = outcome.kind === "infeasible" ? outcome.explanation : null;
+  // 재풀이로 검증된 제안만 보여준다(ADR-004)
+  const proposals = (explanation?.proposals ?? []).filter((p) => p.verified_summary && !dismissed.includes(p));
+  const conflicts = outcome.kind === "infeasible" ? outcome.conflicts : [];
+  const unknownCause = outcome.kind === "timeout" || conflicts.length === 0;
+  const hardList = constraints.filter((c) => (c.hardness ?? "hard") === "hard");
+
+  return (
+    <section className="flex flex-col gap-3.5 rounded-lg border border-[#E8B4AE] bg-white px-[18px] py-4">
+      <div className="flex items-center gap-2">
+        <span className={`${ui.badge} bg-[#FBE9E7] text-[#9F1F14]`}>{outcome.kind === "timeout" ? "시간 초과" : "해 없음"}</span>
+        <h2 className={ui.cardTitle}>
+          {outcome.kind === "timeout" ? "시간 안에 풀지 못했어요" : "지금 규칙으로는 근무표를 만들 수 없어요"}
+        </h2>
+        {hasResult && <span className={ui.help}>아래는 마지막으로 풀린 근무표예요.</span>}
+      </div>
+
+      {outcome.kind === "infeasible" &&
+        (explaining && !explanation ? (
+          <p className="flex items-center gap-2 text-sm text-[#66665E]">
+            <Spinner />
+            원인을 분석하는 중…
+          </p>
+        ) : (
+          explanation && (
+            <p className="text-sm leading-relaxed whitespace-pre-line text-[#3D3D38]">
+              {explanation.text}
+              {explanation.fallback && (
+                <span className="text-[#66665E]"> 자동 설명을 만들지 못해 충돌 규칙만 표시합니다.</span>
+              )}
+            </p>
+          )
+        ))}
+
+      {proposals.length > 0 && (
+        <div className="grid grid-cols-2 gap-4">
+          {proposals.map((p, i) => (
+            <ProposalCard
+              key={i}
+              proposal={p}
+              busy={busy}
+              onAccept={() => onAccept(p)}
+              onDismiss={() => setDismissed((d) => [...d, p])}
+            />
+          ))}
+        </div>
+      )}
+
+      {!unknownCause ? (
+        <div className="flex flex-col gap-1.5">
+          <h3 className="text-[13px] font-semibold text-[#1B1B18]">충돌하는 규칙</h3>
+          <ul className="flex flex-col">
+            {conflicts.map((c) => {
+              const found = constraints.find((x) => x.id === c.constraint_id);
+              return (
+                <li key={c.constraint_id} className="flex items-center justify-between gap-3 border-b border-[#EFEFEB] py-1.5 last:border-b-0">
+                  <span className="flex items-baseline gap-2 text-sm text-[#1B1B18]">
+                    <span className="text-xs font-medium text-[#66665E]">
+                      {TEMPLATE_NAMES[c.type as ConstraintSpec["type"]] ?? c.type}
+                    </span>
+                    “{c.source_text}”
+                    {found && (
+                      <span className="font-mono text-xs text-[#66665E]">{describeParams(found, nurses, period)}</span>
+                    )}
+                  </span>
+                  {found && (
+                    <button type="button" disabled={busy} onClick={() => onDisable(c.constraint_id)} className={ui.secondarySm}>
+                      이번 달만 끄기
+                    </button>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      ) : (
+        <div className="flex flex-col gap-1.5">
+          <p className="text-sm text-[#1B1B18]">
+            {outcome.kind === "timeout"
+              ? "hard 규칙을 하나씩 꺼서 확인해 주세요."
+              : "원인을 특정하지 못했어요. 규칙을 하나씩 꺼서 확인해 주세요."}
+            <span className={ui.help}> 끄거나 켠 뒤 [다시 생성]을 눌러 주세요.</span>
+          </p>
+          <ul className="flex flex-col">
+            {hardList.map((c) => {
+              const on = c.enabled !== false;
+              return (
+                <li key={c.id} className="flex items-center justify-between gap-3 border-b border-[#EFEFEB] py-1.5 last:border-b-0">
+                  <span className={`flex items-baseline gap-2 text-sm ${on ? "text-[#1B1B18]" : "text-[#9A9A91]"}`}>
+                    <span className="text-xs font-medium text-[#66665E]">{TEMPLATE_NAMES[c.type]}</span>“{c.source_text}”
+                    <span className="font-mono text-xs text-[#66665E]">{describeParams(c, nurses, period)}</span>
+                  </span>
+                  <button
+                    type="button"
+                    disabled={busy}
+                    aria-pressed={!on}
+                    onClick={() => onToggle(c.id, !on)}
+                    className={ui.secondarySm}
+                  >
+                    {on ? "이번 달만 끄기" : "다시 켜기"}
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      )}
+    </section>
+  );
+}
+
+function ProposalCard({
+  proposal,
+  busy,
+  onAccept,
+  onDismiss,
+}: {
+  proposal: RelaxationProposal;
+  busy: boolean;
+  onAccept: () => void;
+  onDismiss: () => void;
+}) {
+  const s = proposal.verified_summary!;
+  return (
+    <article className={`${ui.card} flex flex-col gap-2.5`}>
+      <div className="flex items-center justify-between gap-3">
+        <h3 className="text-[13px] font-semibold text-[#1B1B18]">{proposal.title}</h3>
+        <span className={`${ui.badge} bg-[#E6F2EA] text-[#1E6B3F]`}>검증됨</span>
+      </div>
+      <p className="text-sm leading-relaxed text-[#3D3D38]">{proposal.description}</p>
+      <p className="font-mono text-xs text-[#66665E]">
+        재풀이 결과 · 해 있음 · 희망 반영 {s.preferences_met}/{s.preferences_total}
+        {s.soft_violation_count > 0 && ` · soft 위반 ${s.soft_violation_count}`}
+      </p>
+      <div className="flex justify-end gap-1">
+        <button type="button" onClick={onDismiss} className={ui.textSm}>
+          무시
+        </button>
+        <button type="button" disabled={busy} onClick={onAccept} className={ui.primarySm}>
+          수락
+        </button>
+      </div>
+    </article>
+  );
+}
+
+function SummaryCard({
+  result,
+  infeasible,
+  confirmed,
+  draft,
+}: {
+  result: ScheduleResult;
+  infeasible: boolean;
+  confirmed: boolean;
+  draft: boolean;
+}) {
   const { summary } = result;
   const item = "flex flex-col gap-1 border-r border-[#E2E2DC] px-5 py-3.5";
   const label = "text-xs font-medium text-[#66665E]";
@@ -206,13 +568,14 @@ function SummaryCard({ result, outcome, confirmed }: { result: ScheduleResult; o
       <div className={item}>
         <span className={label}>해 상태</span>
         <span className="flex h-7 items-center gap-2">
-          {outcome ? (
+          {infeasible ? (
             <span className={`${ui.badge} bg-[#FBE9E7] text-[#9F1F14]`}>해 없음</span>
           ) : (
             <span className={`${ui.badge} bg-[#E6F2EA] text-[#1E6B3F]`}>해 있음</span>
           )}
           {!result.optimal && <span className={`${ui.badge} bg-[#FDF0DC] text-[#7A4506]`}>최적이 아닐 수 있음</span>}
           {confirmed && <span className={`${ui.badge} bg-[#1B1B18] text-white`}>확정됨</span>}
+          {draft && <span className={`${ui.badge} border border-[#C9C9C1] bg-white text-[#3D3D38]`}>초안</span>}
         </span>
       </div>
       <div className={item}>

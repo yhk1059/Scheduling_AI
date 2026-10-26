@@ -283,11 +283,17 @@ export default function ConstraintCard({
   card,
   pending,
   replaces,
+  onApplied,
+  busy = false,
 }: {
   card: ConstraintSpec;
   pending: boolean;
   /** 적용하면 대체될 기존 제약 */
   replaces?: ConstraintSpec;
+  /** [적용] 직후 호출(④ 월중 변경의 재풀이) */
+  onApplied?: () => void;
+  /** 요청 중이면 [적용]을 막는다 */
+  busy?: boolean;
 }) {
   const nurses = useAppStore((s) => s.nurses);
   const period = useAppStore((s) => s.period);
@@ -386,7 +392,15 @@ export default function ConstraintCard({
               <button type="button" onClick={() => removeCard(card.id)} className={ui.danger}>
                 삭제
               </button>
-              <button type="button" onClick={() => applyCard(card.id)} className={ui.primarySm}>
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => {
+                  applyCard(card.id);
+                  onApplied?.();
+                }}
+                className={ui.primarySm}
+              >
                 적용
               </button>
             </>
