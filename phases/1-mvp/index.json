@@ -21,7 +21,10 @@
     {
       "step": 2,
       "name": "solver-soft-stats",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-10-26T19:21:06+0900",
+      "summary": "backend/solver/soft.py(템플릿 10~12 페널티, soft 토글된 1~7은 위반량 비례 페널티, 연속 계열은 hard.CLAUSE_TEMPLATES 절 재사용), backend/solver/stats.py(순수 함수 compute_result·is_weekend·preference_days: D/E/N/O·주말근무·최대연속·희망반영률·편차, summary, soft_violations), solve()는 objective_terms 최소화 + hard 리터럴을 add_bool_and로 고정해 풂(assumptions는 presolve를 막아 LP 하한이 약함 → step 3 충돌 분석에서 별도 사용), constants.FAIRNESS_TOLERANCE, 테스트 backend/tests/test_solver_soft_stats.py(19개, 15명×31일 성능 0.3초 OPTIMAL)",
+      "completed_at": "2026-10-26T19:29:35+0900"
     },
     {
       "step": 3,
