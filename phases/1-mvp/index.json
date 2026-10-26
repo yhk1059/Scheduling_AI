@@ -85,7 +85,10 @@
     {
       "step": 10,
       "name": "ui-shell-ward",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-10-26T19:53:11+0900",
+      "summary": "vitest 3.2.7(v4/v5는 npm arborist 버그·@types/node 피어 충돌로 설치 불가)·zustand 추가, test 스크립트에 vitest run 연결; app/layout.tsx·globals.css: IBM Plex Sans KR/Mono(next/font), 라이트 전용 배경·텍스트, 다크 미디어쿼리 제거; lib/roster-import.ts(parseDelimited 탭 우선/쉼표·RFC 4180, mapHeaders 동의어, buildRoster: 연차 숫자 추출·나이트 전담 정규화·동명이인 행 오류·0명/40명 초과 표 오류·id n01~, parseCarryOver: 명단 밖 경고·코드 동의어·셀 오류·마지막 7일, CellError{row,col,message}) + test 21개; lib/store.ts(createAppStore(getStorage, now)+useAppStore: persist 키 nurse-scheduler·version 1, 입력 액션마다 inputVersion+1(setPeriod는 공휴일 비움), applyCard는 type·scope·대상(nurse_id/shift·day_kind/금지 순서 first·second) 같으면 교체, setCoverage→daily_coverage cov-{day_kind}-{shift}, orphanConstraintIds, loadSample, 버전 불일치·파싱 실패·모양 손상→초기 상태+resetNotice, localStorage 접근/쓰기 예외→메모리+storageAvailable=false) + test 16개; lib/api.ts(translate/solve/explain, inputVersion 자동 첨부, ApiError{code,message,requestId}·NETWORK, errorMessage 코드별 문구); app/app/page.tsx(next/dynamic ssr:false로 AppShell 클라이언트 전용 렌더), components/: ui.ts(UI_GUIDE 클래스), AppShell(상단 바·스테퍼·저장소/초기화 배너, 2~4단계는 준비 중 자리표시), Stepper, WardStep(대상 월·샘플·붙여넣기 [변환]·[다음] 게이트), RosterEditor(열 매핑·첫 행도 데이터·편집 표·오류 셀 빨강·행 추가/삭제, 오류 없을 때만 store 반영), CoverageForm(D/E/N×평일/주말 min/max, 최소>최대 오류), HolidayCalendar; app/page.tsx는 /app 링크 임시 페이지; 수동 저니(Playwright·시스템 Chrome) 확인",
+      "completed_at": "2026-10-26T20:02:46+0900"
     },
     {
       "step": 11,
