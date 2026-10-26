@@ -37,7 +37,10 @@
     {
       "step": 4,
       "name": "solver-reschedule",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-10-26T19:31:45+0900",
+      "summary": "previous가 있으면 build_model이 공통 nurse_id×날짜(stats.common_cells: 새/빠진 간호사·범위 밖 날짜 무시)의 이전 근무와 다른 칸마다 constants.DIFF_WEIGHT(20, soft 가중치 최대 10보다 큼) 페널티를 objective_terms에 추가, compute_result가 ScheduleResult.diff(DiffCell 목록, previous 없으면 None)를 채움, 별도 솔버 경로 없음(고정은 fixed_assignment), 테스트 backend/tests/test_solver_reschedule.py(5개: diff None, 동일 재풀이 diff 0, 병가 3일 → 6칸 변경, 고정 칸 수정, 명단 추가)",
+      "completed_at": "2026-10-26T19:33:14+0900"
     },
     {
       "step": 5,
