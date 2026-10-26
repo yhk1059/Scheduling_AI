@@ -29,7 +29,10 @@
     {
       "step": 3,
       "name": "solver-conflicts",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-10-26T19:29:36+0900",
+      "summary": "backend/solver/conflicts.py(find_conflicts: build_model의 hard_literals를 assumptions로 걸어 sufficient_assumptions_for_infeasibility로 core → CONFLICT_TIME_LIMIT_S 안에서 deletion 기반 축소(순서 유지) → Conflict(constraint_id,type,source_text), 판정 못하면 None, 지연 import로 순환 회피), solve()는 INFEASIBLE이면 find_conflicts 호출(None이면 []), 테스트 backend/tests/test_solver_conflicts.py(10개: 휴가 과다×주말 coverage, 고정 칸끼리, 고정+forbidden_sequence, 나이트 전담 D 고정, disabled 제외, None 경로, 시간 예산), test_solver_hard의 임시 단언(conflicts==[])을 새 계약으로 갱신",
+      "completed_at": "2026-10-26T19:31:44+0900"
     },
     {
       "step": 4,
