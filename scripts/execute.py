@@ -62,6 +62,8 @@ class StepExecutor:
     FEAT_MSG = "feat({phase}): step {num} — {name}"
     CHORE_MSG = "chore({phase}): step {num} output"
     FAIL_MSG = "chore({phase}): step {num} failed"
+    # step 코드는 Claude 세션이 작성하므로 feat 커밋의 작성자로 기록한다 (committer는 실행한 사용자).
+    FEAT_AUTHOR = "Claude <noreply@anthropic.com>"
     TZ = timezone(timedelta(hours=9))
 
     def __init__(self, phase_dir_name: str, *, auto_push: bool = False):
@@ -149,7 +151,7 @@ class StepExecutor:
 
         if self._run_git("diff", "--cached", "--quiet").returncode != 0:
             msg = self.FEAT_MSG.format(phase=self._phase_name, num=step_num, name=step_name)
-            r = self._run_git("commit", "-m", msg)
+            r = self._run_git("commit", "-m", msg, f"--author={self.FEAT_AUTHOR}")
             if r.returncode == 0:
                 print(f"  Commit: {msg}")
             else:

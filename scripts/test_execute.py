@@ -419,6 +419,42 @@ class TestCommitStep:
         assert len(commit_msgs) == 1
         assert "chore" in commit_msgs[0]
 
+    def test_feat_commit_authored_by_claude_chore_is_not(self, executor):
+        calls = []
+        def fake_git(*args):
+            calls.append(args)
+            if args[:2] == ("diff", "--cached"):
+                return MagicMock(returncode=1)
+            return MagicMock(returncode=0, stdout="", stderr="")
+        executor._run_git = fake_git
+
+        executor._commit_step(2, "ui")
+
+        feat_call, chore_call = [c for c in calls if c[0] == "commit"]
+        assert f"--author={ex.StepExecutor.FEAT_AUTHOR}" in feat_call
+        assert not any(a.startswith("--author") for a in chore_call)
+
+
+class TestCommitStepRealGit:
+    def _git(self, cwd, *args):
+        return subprocess.run(["git", *args], cwd=cwd, capture_output=True, text=True, check=True)
+
+    def test_feat_author_is_claude_committer_is_user(self, executor, tmp_project):
+        env = {"GIT_AUTHOR_NAME": "t", "GIT_AUTHOR_EMAIL": "t@t",
+               "GIT_COMMITTER_NAME": "t", "GIT_COMMITTER_EMAIL": "t@t"}
+        self._git(tmp_project, "init", "-q")
+        with patch.dict(os.environ, env):
+            self._git(tmp_project, "add", "-A")
+            self._git(tmp_project, "commit", "-qm", "init")
+            (tmp_project / "feature.py").write_text("x = 1")
+            executor._write_json(executor._index_file, {"steps": [{"step": 2, "status": "completed"}]})
+            executor._commit_step(2, "ui")
+
+        feat = self._git(tmp_project, "log", "-1", "--format=%an <%ae>|%cn <%ce>|%s", "HEAD~1").stdout.strip()
+        chore = self._git(tmp_project, "log", "-1", "--format=%an <%ae>|%s", "HEAD").stdout.strip()
+        assert feat == "Claude <noreply@anthropic.com>|t <t@t>|feat(mvp): step 2 — ui"
+        assert chore == "t <t@t>|chore(mvp): step 2 output"
+
 
 # ---------------------------------------------------------------------------
 # _commit_failure (real git)
