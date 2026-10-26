@@ -322,7 +322,7 @@ class _Message:
         self.content, self.stop_reason, self.usage = content, stop_reason, _Usage()
 
 
-def test_call_tool_forces_tool_and_parses(sdk_client, monkeypatch):
+def test_call_tool_requests_tool_and_parses(sdk_client, monkeypatch):
     seen = {}
 
     def create(**kwargs):
@@ -332,7 +332,8 @@ def test_call_tool_forces_tool_and_parses(sdk_client, monkeypatch):
     monkeypatch.setattr(sdk_client._client.messages, "create", create)
     res = call(sdk_client)
     assert res == ToolCallResult(tool_input={"constraints": []}, stop_reason="tool_use", input_tokens=11, output_tokens=22)
-    assert seen["tool_choice"] == {"type": "tool", "name": "submit_constraints"}
+    # Sonnet 5.5는 강제 tool_choice(tool/any)를 400으로 거절한다 → auto + 단일 호출, 강제는 프롬프트와 재시도로
+    assert seen["tool_choice"] == {"type": "auto", "disable_parallel_tool_use": True}
     assert seen["max_tokens"] == constants.LLM_MAX_TOKENS
     assert seen["timeout"] == constants.LLM_TIMEOUT_S
     assert seen["model"] == constants.DEFAULT_MODEL
