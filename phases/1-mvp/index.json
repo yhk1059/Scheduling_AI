@@ -125,7 +125,10 @@
     {
       "step": 15,
       "name": "readme",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-10-26T20:23:45+0900",
+      "summary": "README.md(한국어 포트폴리오): 한 줄 소개·<!-- DEMO_URL --> 자리표시, 페르소나·페인 포인트 4개, 데모 GIF 주석 자리표시(docs/demo.gif·public/demo.gif)·데모 저니 8단계, mermaid 아키텍처 다이어그램+데이터 흐름·역할 분리(번역/계산/설명), ADR 6개(001·002·003·004·005·009) 한 줄씩 docs/ADR.md 링크, LLM 출력 검증 장치 6가지, eval/results.md 지표 표 그대로+데이터셋 구성·회차 요약, harness(phase/step·execute.py AC 재검증·재시도 3회·feat/chore 커밋·TDD 가드·위험 명령 차단·Stop 훅·step summary) 소개, 로컬 실행(uv 3.12·npm·.env.local·dev/test/build/lint·eval run/--dry-run·gen:types), MVP 범위 밖; 코드 무변경, build·lint·pytest·vitest 57 통과",
+      "completed_at": "2026-10-26T20:25:25+0900"
     }
   ],
   "created_at": "2026-10-26T19:14:29+0900"
