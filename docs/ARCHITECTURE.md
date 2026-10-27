@@ -23,6 +23,7 @@ backend/              # FastAPI 앱 (무상태)
 ├── gen_types.py      # JSON Schema → lib/types.gen.ts
 └── tests/
 eval/                 # dataset.jsonl, run.py, results.md
+e2e/                  # Playwright 데모 저니 (수동 실행, 실제 API, ADR-013)
 scripts/              # harness 전용 (앱 코드를 두지 않음)
 ```
 
@@ -105,7 +106,7 @@ POST /api/py/explain
 | 프론트 | Next.js 16 App Router, TS strict, Tailwind 4, Zustand + persist | Redux, React Query, UI 컴포넌트 라이브러리, 차트 라이브러리 |
 | 백엔드 | Python 3.12, FastAPI, Pydantic v2, ortools, anthropic (`requirements.txt` 고정) | LangChain, 에이전트 프레임워크, ORM, DB. **런타임 Python 의존성 추가 금지**(번들 한도, ADR-007) |
 | LLM | Claude tool use | 스트리밍, RAG, 벡터 DB, 멀티 에이전트 |
-| 테스트 | pytest(솔버는 실제로 돌리고 LLM은 mock), vitest(`lib/` 순수 함수) | 컴포넌트/E2E 테스트 프레임워크 |
+| 테스트 | pytest(솔버는 실제로 돌리고 LLM은 mock), vitest(`lib/` 순수 함수), Playwright(`e2e/`, 수동 실행, ADR-013) | 컴포넌트 테스트 프레임워크 |
 | 관측 | stdout 구조화 로그(JSON 한 줄: `request_id`, 엔드포인트, 소요 시간, LLM 재시도 횟수, 토큰 수). 키와 이름 원문은 남기지 않는다 | 모니터링 도구 |
 | 배포 | Vercel | Docker, 별도 CI |
 
@@ -115,6 +116,6 @@ POST /api/py/explain
   - Python은 `.venv`(3.12, uv)를 쓴다.
 - 배포
   - Vercel 프로젝트 1개다. `/api/py/*`는 `api/index.py`로 리라이트된다.
-  - `.vercelignore`로 docs, phases, scripts, eval, tests를 제외한다.
+  - `.vercelignore`로 docs, phases, scripts, eval, tests, e2e를 제외한다.
 - env
   - `ANTHROPIC_API_KEY`, `ANTHROPIC_MODEL`(기본값 `claude-sonnet-5-5`)

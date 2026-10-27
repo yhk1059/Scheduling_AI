@@ -5,3 +5,5 @@ eval/
 backend/tests/
 .venv/
 .claude/
+e2e/
+playwright.config.ts
