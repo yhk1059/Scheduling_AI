@@ -4,7 +4,7 @@ import { useState } from "react";
 
 import { ApiError, errorMessage, explain, solve, translate } from "@/lib/api";
 import { toScheduleCsv } from "@/lib/csv";
-import { type Assignments, type Code, useAppStore } from "@/lib/store";
+import { type Assignments, type Code, findReplaced, useAppStore } from "@/lib/store";
 import type {
   Conflict,
   ConstraintSpec,
@@ -215,7 +215,14 @@ export default function ScheduleStep() {
       {changeCards.length > 0 && (
         <div className="grid grid-cols-2 gap-4">
           {changeCards.map((c) => (
-            <ConstraintCard key={c.id} card={c} pending busy={busy} onApplied={regenerate} />
+            <ConstraintCard
+              key={c.id}
+              card={c}
+              pending
+              replaces={findReplaced(constraints, c)}
+              busy={busy}
+              onApplied={regenerate}
+            />
           ))}
         </div>
       )}
