@@ -114,7 +114,32 @@ describe("applyCard", () => {
       card({ id: "i", type: "forbidden_sequence", params: { first: "E", second: "D" } }),
     ]);
     for (const id of ["a", "b", "c", "d", "e", "f", "g", "h", "i"]) applyCard(id);
-    expect(store.getState().constraints.map((c) => c.id).sort()).toEqual(["b", "c", "e", "f", "g", "h", "i"]);
+    expect(store.getState().constraints.map((c) => c.id).sort()).toEqual(["a", "b", "c", "e", "f", "g", "h", "i"]);
+  });
+
+  it("같은 간호사의 휴가는 교체하지 않고 날짜별 요청을 모두 남긴다", () => {
+    const store = fresh();
+    store.getState().addPendingCards([
+      card({ id: "l1", type: "leave", scope: "month", params: { nurse_id: "n01", days: [15, 16, 17] } }),
+      card({ id: "l2", type: "leave", scope: "month", params: { nurse_id: "n01", days: [20] } }),
+    ]);
+    store.getState().applyCard("l1");
+    store.getState().applyCard("l2");
+    expect(store.getState().constraints.map((c) => c.params)).toEqual([
+      { nurse_id: "n01", days: [15, 16, 17] },
+      { nurse_id: "n01", days: [20] },
+    ]);
+  });
+
+  it("고정 배정은 같은 간호사·같은 날이면 교체하고, 날이 다르면 추가한다", () => {
+    const store = fresh();
+    store.getState().addPendingCards([
+      card({ id: "f5", type: "fixed_assignment", scope: "month", params: { nurse_id: "n01", day: 5, shift: "D" } }),
+      card({ id: "f6", type: "fixed_assignment", scope: "month", params: { nurse_id: "n01", day: 6, shift: "E" } }),
+      card({ id: "f5b", type: "fixed_assignment", scope: "month", params: { nurse_id: "n01", day: 5, shift: "N" } }),
+    ]);
+    for (const id of ["f5", "f6", "f5b"]) store.getState().applyCard(id);
+    expect(store.getState().constraints.map((c) => c.id)).toEqual(["f5b", "f6"]);
   });
 
   it("scope가 다르면 교체하지 않는다", () => {
@@ -135,10 +160,14 @@ describe("findReplaced", () => {
       card({ id: "a", type: "leave", scope: "month", params: { nurse_id: "n01", days: [3] } }),
       card({ id: "b", type: "max_consecutive_work", params: { days: 5 } }),
     ];
-    expect(findReplaced(existing, card({ id: "c", type: "leave", scope: "month", params: { nurse_id: "n01", days: [9] } }))?.id).toBe("a");
-    expect(findReplaced(existing, card({ id: "d", type: "leave", scope: "month", params: { nurse_id: "n02", days: [9] } }))).toBeUndefined();
+    expect(findReplaced(existing, card({ id: "c", type: "max_consecutive_work", params: { days: 4 } }))?.id).toBe("b");
     expect(findReplaced(existing, card({ id: "e", type: "max_consecutive_work", scope: "month", params: { days: 4 } }))).toBeUndefined();
     expect(findReplaced(existing, existing[1])).toBeUndefined();
+  });
+
+  it("휴가는 같은 간호사여도 대체 대상이 없다", () => {
+    const existing = [card({ id: "a", type: "leave", scope: "month", params: { nurse_id: "n01", days: [3] } })];
+    expect(findReplaced(existing, card({ id: "c", type: "leave", scope: "month", params: { nurse_id: "n01", days: [9] } }))).toBeUndefined();
   });
 });
 

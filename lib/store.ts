@@ -92,23 +92,34 @@ function initialData(now: Date): Data {
   };
 }
 
-/** 교체 기준: 같은 type·scope·대상. 대상은 nurse_id, 없으면 shift·day_kind(금지 순서는 first·second). */
-function replaceKey(c: ConstraintSpec): string {
+/**
+ * 교체 기준: 같은 type·scope·대상. 대상은 nurse_id(고정 배정은 nurse_id·day), 없으면 shift·day_kind(금지 순서는 first·second).
+ * 휴가는 날짜별 요청이 공존해야 하므로 교체하지 않는다(null).
+ */
+function replaceKey(c: ConstraintSpec): string | null {
+  if (c.type === "leave") return null;
   const p = (c.params ?? {}) as Record<string, unknown>;
   const target =
-    "nurse_id" in p ? p.nurse_id : "first" in p ? `${p.first}>${p.second}` : `${p.shift ?? ""}|${p.day_kind ?? ""}`;
+    c.type === "fixed_assignment"
+      ? `${p.nurse_id}@${p.day}`
+      : "nurse_id" in p
+        ? p.nurse_id
+        : "first" in p
+          ? `${p.first}>${p.second}`
+          : `${p.shift ?? ""}|${p.day_kind ?? ""}`;
   return `${c.type}|${c.scope}|${target}`;
 }
 
 function upsert(list: ConstraintSpec[], card: ConstraintSpec): ConstraintSpec[] {
   const key = replaceKey(card);
-  const i = list.findIndex((c) => replaceKey(c) === key);
+  const i = key === null ? -1 : list.findIndex((c) => replaceKey(c) === key);
   return i === -1 ? [...list, card] : list.map((c, j) => (j === i ? card : c));
 }
 
 /** card가 적용되면 대체할 기존 제약(같은 type·scope·대상, 다른 id). */
 export function findReplaced(constraints: ConstraintSpec[], card: ConstraintSpec): ConstraintSpec | undefined {
   const key = replaceKey(card);
+  if (key === null) return undefined;
   return constraints.find((c) => c.id !== card.id && replaceKey(c) === key);
 }
 

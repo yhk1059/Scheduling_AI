@@ -456,6 +456,10 @@ test("S7. 해 없음 → 설명과 검증된 제안", async () => {
     state.constraints.flatMap((c) => (c.type === "leave" && c.params.days.includes(20) ? [c.params.nurse_id] : [])),
   );
   expect(offOn20.size, "11/20 휴가 인원").toBe(8);
+  const lee = await nurseId(page, "이영희");
+  const leeLeave15 = (st: StoredState) =>
+    st.constraints.find((c) => c.type === "leave" && c.params.nurse_id === lee && c.params.days.includes(15));
+  expect(leeLeave15(state)?.params, "S5의 이영희 15~17일 휴가가 남아 있음").toEqual({ nurse_id: lee, days: [15, 16, 17] });
 
   await page.getByRole("button", { name: "다음" }).click();
   await expect(page.getByRole("status").filter({ hasText: "입력이 바뀌었어요. 다시 생성하세요" })).toBeVisible();
@@ -493,6 +497,8 @@ test("S7. 해 없음 → 설명과 검증된 제안", async () => {
   await expect(page.getByText("지금 규칙으로는 근무표를 만들 수 없어요")).toHaveCount(0);
   await expect(page.getByText("해 있음", { exact: true })).toBeVisible();
   await expectHardRulesHold(page);
+  expect(leeLeave15(await readState(page))?.enabled, "이영희 15~17일 휴가가 켜져 있음").not.toBe(false);
+  expect((await readGrid(page))["이영희"].slice(14, 17)).toEqual(["O", "O", "O"]);
 });
 
 test("S8. 칸 고정 후 재풀이", async () => {
@@ -545,6 +551,11 @@ test("S10. 월중 변경 → 최소 변경 재스케줄", async () => {
   await applyAllPending(page, true);
   await expect(page.getByText("해 있음", { exact: true })).toBeVisible();
   await expect(page.getByText("초안", { exact: true })).toBeVisible();
+  const choiLeaves = (await readState(page)).constraints.filter((c) => c.type === "leave" && c.params.nurse_id === choi);
+  expect(
+    choiLeaves.some((c) => c.type === "leave" && c.params.days.includes(20)),
+    "S7의 최지훈 20일 휴가가 남아 있음",
+  ).toBe(true);
   await expect(page.getByText(/^\d+칸$/)).toBeVisible(); // 이전 대비 변경
 
   const banner = page.getByRole("status").filter({ hasText: "확정본 대비" });
