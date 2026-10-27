@@ -89,7 +89,7 @@ export default function Home() {
               href="/app"
               className="inline-flex h-11 items-center gap-2 rounded-md border border-[#155E75] bg-[#155E75] px-[18px] text-[15px] font-medium text-white transition-colors duration-[120ms] hover:bg-[#0E4A5C]"
             >
-              데모 시작
+              근무표 만들기
             </Link>
             <a
               href={REPO_URL}
@@ -98,7 +98,7 @@ export default function Home() {
               GitHub
             </a>
           </div>
-          <p className="text-xs font-medium text-[#66665E]">로그인 없이 샘플 병동(15명)으로 바로 써 볼 수 있습니다.</p>
+          <p className="text-xs font-medium text-[#66665E]">로그인 없이 샘플 병동(15명)으로 체험하거나, 내 명단으로 바로 시작할 수 있습니다.</p>
         </div>
         <LandingPreview />
       </section>
