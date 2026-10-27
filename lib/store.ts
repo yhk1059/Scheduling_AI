@@ -93,8 +93,8 @@ function initialData(now: Date): Data {
 }
 
 /**
- * 교체 기준: 같은 type·scope·대상. 대상은 nurse_id(고정 배정은 nurse_id·day), 없으면 shift·day_kind(금지 순서는 first·second).
- * 휴가는 날짜별 요청이 공존해야 하므로 교체하지 않는다(null).
+ * 교체 기준: 같은 type·scope·대상. 대상은 nurse_id(고정 배정은 nurse_id·day, 희망 근무는 nurse_id·shift·대상 날짜),
+ * 없으면 shift·day_kind(금지 순서는 first·second). 휴가는 날짜별 요청이 공존해야 하므로 교체하지 않는다(null).
  */
 function replaceKey(c: ConstraintSpec): string | null {
   if (c.type === "leave") return null;
@@ -102,7 +102,9 @@ function replaceKey(c: ConstraintSpec): string | null {
   const target =
     c.type === "fixed_assignment"
       ? `${p.nurse_id}@${p.day}`
-      : "nurse_id" in p
+      : c.type === "shift_preference"
+        ? `${p.nurse_id}|${p.shift}|${[...((p.days as number[] | null) ?? [])].sort((a, b) => a - b)}|${p.weekends_only === true}`
+        : "nurse_id" in p
         ? p.nurse_id
         : "first" in p
           ? `${p.first}>${p.second}`

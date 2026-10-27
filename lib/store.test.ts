@@ -142,6 +142,22 @@ describe("applyCard", () => {
     expect(store.getState().constraints.map((c) => c.id)).toEqual(["f5b", "f6"]);
   });
 
+  it("희망 근무는 같은 간호사·근무·대상 날짜면 교체하고, 근무나 날짜가 다르면 추가한다", () => {
+    const store = fresh();
+    const pref = (id: string, params: Record<string, unknown>) =>
+      card({ id, type: "shift_preference", scope: "month", params: { nurse_id: "n01", ...params } as never });
+    store.getState().addPendingCards([
+      pref("d", { shift: "D", prefer: true }),
+      pref("n", { shift: "N", prefer: false }),
+      pref("n15", { shift: "N", prefer: false, days: [15] }),
+      pref("n20", { shift: "N", prefer: false, days: [20] }),
+      pref("ow", { shift: "O", prefer: true, weekends_only: true }),
+      pref("d2", { shift: "D", prefer: false }),
+    ]);
+    for (const id of ["d", "n", "n15", "n20", "ow", "d2"]) store.getState().applyCard(id);
+    expect(store.getState().constraints.map((c) => c.id)).toEqual(["d2", "n", "n15", "n20", "ow"]);
+  });
+
   it("scope가 다르면 교체하지 않는다", () => {
     const store = fresh();
     store.getState().addPendingCards([
