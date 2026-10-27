@@ -1,7 +1,20 @@
 import { describe, expect, it } from "vitest";
 
 import type { Nurse } from "./types.gen";
-import { buildRoster, mapHeaders, parseCarryOver, parseDelimited } from "./roster-import";
+import { buildRoster, decodeText, mapHeaders, parseCarryOver, parseDelimited } from "./roster-import";
+
+describe("decodeText", () => {
+  it("UTF-8을 읽고 BOM을 떼어낸다", () => {
+    const bytes = new Uint8Array([0xef, 0xbb, 0xbf, ...new TextEncoder().encode("이름,연차")]);
+    expect(decodeText(bytes.buffer)).toBe("이름,연차");
+  });
+
+  it("UTF-8이 아니면 CP949(엑셀 기본 CSV)로 읽는다", () => {
+    // "이름" = C0CC B8A7 (EUC-KR)
+    const bytes = new Uint8Array([0xc0, 0xcc, 0xb8, 0xa7, 0x2c, 0x31]);
+    expect(decodeText(bytes.buffer)).toBe("이름,1");
+  });
+});
 
 describe("parseDelimited", () => {
   it("탭으로 구분한다", () => {

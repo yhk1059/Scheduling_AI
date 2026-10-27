@@ -1,7 +1,10 @@
 "use client";
 
+import { useState } from "react";
+
 import { useAppStore } from "@/lib/store";
 
+import EntryStep from "./EntryStep";
 import RulesStep from "./RulesStep";
 import ScheduleStep from "./ScheduleStep";
 import Stepper from "./Stepper";
@@ -16,6 +19,8 @@ export default function AppShell() {
   const storageAvailable = useAppStore((s) => s.storageAvailable);
   const resetNotice = useAppStore((s) => s.resetNotice);
   const dismissResetNotice = useAppStore((s) => s.dismissResetNotice);
+  // /app에 들어올 때마다 시작 방법을 고른다(저장하지 않는다)
+  const [entered, setEntered] = useState(false);
 
   return (
     <div className="flex flex-1 flex-col">
@@ -30,7 +35,7 @@ export default function AppShell() {
               {nurseCount > 0 && <> · 로테이션 {nurseCount}명</>}
             </span>
           </div>
-          <Stepper current={step} onSelect={setStep} />
+          {entered && <Stepper current={step} onSelect={setStep} />}
         </div>
       </header>
 
@@ -52,7 +57,9 @@ export default function AppShell() {
           </div>
         )}
 
-        {step === 1 ? (
+        {!entered ? (
+          <EntryStep onDone={() => setEntered(true)} />
+        ) : step === 1 ? (
           <WardStep />
         ) : step === 2 ? (
           <RulesStep key="ward" scope="ward" />

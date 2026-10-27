@@ -1,6 +1,6 @@
 import type { Step } from "@/lib/store";
 
-const STEPS: { step: Step; label: string }[] = [
+export const STEPS: { step: Step; label: string }[] = [
   { step: 1, label: "병동" },
   { step: 2, label: "규칙" },
   { step: 3, label: "이달 요청" },
