@@ -2,11 +2,12 @@
 
 import { useMemo, useState } from "react";
 
-import { buildRoster, mapHeaders, parseDelimited } from "@/lib/roster-import";
+import { buildRoster, decodeText, mapHeaders, parseDelimited } from "@/lib/roster-import";
 import { useAppStore } from "@/lib/store";
 import type { Nurse } from "@/lib/types.gen";
 
 import CoverageForm, { type CoverageDrafts, hasCoverageError } from "./CoverageForm";
+import { OVERWRITE_MESSAGE } from "./EntryStep";
 import HolidayCalendar from "./HolidayCalendar";
 import RosterEditor, { type RosterDraft } from "./RosterEditor";
 import { ui } from "./ui";
@@ -59,9 +60,19 @@ export default function WardStep() {
   };
 
   const onLoadSample = () => {
+    if (useAppStore.getState().hasInput() && !window.confirm(OVERWRITE_MESSAGE)) return;
     loadSample();
     setDraft(draftFromNurses(useAppStore.getState().nurses));
     setCoverageDrafts({});
+  };
+
+  const onUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = ""; // 같은 파일을 다시 골라도 반영되게
+    if (!file) return;
+    const content = decodeText(await file.arrayBuffer());
+    setText(content);
+    updateDraft(draftFromText(content));
   };
 
   const canProceed = nurses.length > 0 && roster?.errors.length === 0 && !hasCoverageError(coverageDrafts);
@@ -107,7 +118,7 @@ export default function WardStep() {
             className={`${ui.input} h-auto py-2 font-mono`}
           />
         </label>
-        <div>
+        <div className="flex items-center gap-2">
           <button
             type="button"
             disabled={text.trim() === ""}
@@ -116,6 +127,10 @@ export default function WardStep() {
           >
             변환
           </button>
+          <label className={`${ui.secondary} cursor-pointer focus-within:outline-2 focus-within:outline-[#155E75]`}>
+            CSV 파일 올리기
+            <input type="file" accept=".csv,.tsv,.txt,text/csv" onChange={(e) => void onUpload(e)} className="sr-only" />
+          </label>
         </div>
         {draft && roster && <RosterEditor draft={draft} errors={roster.errors} onChange={updateDraft} />}
         {orphanCount > 0 && (
