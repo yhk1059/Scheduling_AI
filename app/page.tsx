@@ -7,7 +7,7 @@ import Link from "next/link";
 import LandingPreview from "@/components/LandingPreview";
 
 // 저장소를 옮기면 이 한 줄만 바꾼다.
-const REPO_URL = "https://github.com/jha0313/harness_framework";
+const REPO_URL = "https://github.com/yhk1059/harness_framework";
 
 // 빌드 시점에 public/demo.gif가 있으면 보여주고, 없으면 자리표시를 둔다.
 const HAS_DEMO_GIF = existsSync(path.join(process.cwd(), "public", "demo.gif"));
