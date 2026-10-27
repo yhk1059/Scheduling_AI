@@ -61,6 +61,15 @@ export function parseDelimited(text: string): string[][] {
     .filter((r) => r.some((c) => c !== ""));
 }
 
+/** CSV 파일 바이트를 글자로 바꾼다. UTF-8(BOM 제거)이 아니면 엑셀 기본 저장 형식인 CP949로 읽는다. */
+export function decodeText(buffer: ArrayBuffer): string {
+  try {
+    return new TextDecoder("utf-8", { fatal: true }).decode(buffer);
+  } catch {
+    return new TextDecoder("euc-kr").decode(buffer);
+  }
+}
+
 const HEADER_SYNONYMS: Record<RosterField, string[]> = {
   name: ["이름", "성명", "간호사"],
   years: ["연차", "경력", "년차"],
