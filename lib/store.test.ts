@@ -362,6 +362,53 @@ describe("loadSample", () => {
   });
 });
 
+describe("hasInput", () => {
+  it("초기 상태는 입력이 없고, 명단·공휴일·제약·대기 카드·이월 중 하나라도 있으면 입력이 있다", () => {
+    expect(fresh().getState().hasInput()).toBe(false);
+    const cases: ((s: ReturnType<ReturnType<typeof fresh>["getState"]>) => void)[] = [
+      (s) => s.setNurses(nurses),
+      (s) => s.toggleHoliday(25),
+      (s) => s.setCoverage("D", "weekday", 3, 4),
+      (s) => s.addPendingCards([card({ id: "c1", type: "night_fairness", params: {} })]),
+      (s) => s.setCarryOver([{ nurse_id: "n01", shifts: ["N"] }]),
+    ];
+    for (const act of cases) {
+      const store = fresh();
+      act(store.getState());
+      expect(store.getState().hasInput()).toBe(true);
+    }
+  });
+
+  it("단계 이동이나 대상 월 변경만으로는 입력이 생기지 않는다", () => {
+    const store = fresh();
+    store.getState().setStep(3);
+    store.getState().setPeriod({ year: 2026, month: 12 });
+    expect(store.getState().hasInput()).toBe(false);
+  });
+});
+
+describe("reset", () => {
+  it("입력과 결과를 모두 지우고 1단계로 돌아가며 inputVersion은 올린다", () => {
+    const store = fresh();
+    store.getState().loadSample();
+    store.getState().setResult({ assignments: { n01: ["D"] } } as unknown as ScheduleResult);
+    store.getState().confirm();
+    store.getState().setStep(4);
+    const before = store.getState().inputVersion;
+
+    store.getState().reset();
+    const s = store.getState();
+    expect(s.hasInput()).toBe(false);
+    expect(s.step).toBe(1);
+    expect(s.period).toEqual({ year: 2026, month: 11 });
+    expect(s.result).toBeNull();
+    expect(s.confirmed).toBeNull();
+    expect(s.resultVersion).toBeNull();
+    // 진행 중이던 요청의 응답을 버리도록 버전은 되돌리지 않는다
+    expect(s.inputVersion).toBe(before + 1);
+  });
+});
+
 describe("persist", () => {
   it("localStorage에 저장하고 다시 만들면 복원한다", () => {
     const storage = new MemoryStorage();
