@@ -64,6 +64,10 @@ export interface AppState extends Data {
   clearFixed: (nurseId: string, day: number) => void;
   confirm: () => void;
   loadSample: () => void;
+  /** 명단·공휴일·제약·대기 카드·이월 중 하나라도 있으면 true. 단계와 대상 월은 입력으로 보지 않는다. */
+  hasInput: () => boolean;
+  /** 초기 상태로 되돌린다. 진행 중 요청의 응답을 버리도록 inputVersion은 올린다. */
+  reset: () => void;
   dismissResetNotice: () => void;
 }
 
@@ -303,6 +307,11 @@ export function createAppStore(getStorage: () => Storage, now: Date = new Date()
               resultVersion: null,
               confirmed: null,
             }),
+          hasInput: () => {
+            const s = get();
+            return [s.nurses, s.holidays, s.constraints, s.pendingCards, s.carryOver].some((list) => list.length > 0);
+          },
+          reset: () => bump(initialData(now)),
           dismissResetNotice: () => set({ resetNotice: false }),
         };
       },
