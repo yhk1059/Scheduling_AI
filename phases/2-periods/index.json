@@ -1,0 +1,76 @@
+{
+  "project": "nurse-scheduler",
+  "phase": "2-periods",
+  "steps": [
+    {
+      "step": 0,
+      "name": "period-lib",
+      "status": "pending"
+    },
+    {
+      "step": 1,
+      "name": "period-domain",
+      "status": "pending"
+    },
+    {
+      "step": 2,
+      "name": "translator-period",
+      "status": "pending"
+    },
+    {
+      "step": 3,
+      "name": "store-ward-periods",
+      "status": "pending"
+    },
+    {
+      "step": 4,
+      "name": "ui-ward",
+      "status": "pending"
+    },
+    {
+      "step": 5,
+      "name": "ui-period",
+      "status": "pending"
+    },
+    {
+      "step": 6,
+      "name": "solver-history-load",
+      "status": "pending"
+    },
+    {
+      "step": 7,
+      "name": "continuity-lib",
+      "status": "pending"
+    },
+    {
+      "step": 8,
+      "name": "store-continuity",
+      "status": "pending"
+    },
+    {
+      "step": 9,
+      "name": "ui-continuity",
+      "status": "pending"
+    },
+    {
+      "step": 10,
+      "name": "e2e-journey",
+      "status": "pending"
+    },
+    {
+      "step": 11,
+      "name": "supabase-client",
+      "status": "pending"
+    },
+    {
+      "step": 12,
+      "name": "store-sync",
+      "status": "pending"
+    },
+    {
+      "step": 13,
+      "name": "ui-auth-privacy",
+      "status": "pending"
+    }
+  ]
+}
