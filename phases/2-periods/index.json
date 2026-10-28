@@ -53,7 +53,10 @@
     {
       "step": 6,
       "name": "solver-history-load",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-10-28T19:36:37+0900",
+      "summary": "HISTORY_DAYS=28, HistoryLoad(nurse_id, nights/weekends 0..28)와 ScheduleRequest.history_load(명단 밖·중복 id 검증) 추가, night/weekend_fairness와 stats 공정성 위반을 (최근 4주 + 이번 기간) 합계 기준으로 바꿈(history 있으면 detail에 \"최근 4주 포함\"), stats.history 헬퍼, types.gen.ts 재생성; 테스트: 모델 검증, 나이트·주말 history로 이번 기간 배정 감소, 나이트 전담 제외, 빈/0 history 목적함수 동일, 31일 성능, /solve·/explain 검증 재풀이 전달",
+      "completed_at": "2026-10-28T19:38:40+0900"
     },
     {
       "step": 7,
