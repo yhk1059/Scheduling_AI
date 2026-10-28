@@ -38,9 +38,8 @@ def _context_message(request: ScheduleRequest, specs: dict[str, Any], conflicts:
     context = {
         "nurse_count": len(nurses),
         "night_only_count": sum(n.night_only for n in nurses),
-        "period_start": period.start_date.isoformat(),
-        "period_end": period.date_of(days).isoformat(),
-        "period_length": days,
+        "period": {"start": period.start_date.isoformat(), "end": period.date_of(days).isoformat(), "length": days},
+        "days": [{"day": d, "date": period.date_of(d).isoformat()} for d in range(1, days + 1)],
         "weekend_and_holiday_days": weekends,
     }
     items = []

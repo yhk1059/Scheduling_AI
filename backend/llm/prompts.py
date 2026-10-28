@@ -62,14 +62,15 @@ D(데이), E(이브닝), N(나이트), O(오프). 간호사는 하루에 하나�
 2. forbidden_sequence {first, second}: 전날 first 다음 날 second 금지. 예: "나이트 다음 날 데이 금지" → first N, second D.
 3. max_consecutive_work {days}: D/E/N 연속 근무일 상한.
 4. max_consecutive_nights {days}: 나이트 연속 상한. 예: "나이트 3연속까지" → 3.
-5. min_days_off {days}: 한 달 최소 오프 일수.
+5. min_days_off {days}: 기간당 최소 오프 일수.
 6. off_after_night_block {days}: 나이트 블록이 끝난 뒤 쉬는 날 수. 예: "나이트 다음 날은 쉬게" → 1.
 7. skill_mix {shift, min_years, min_count}: 해당 근무조마다 연차 min_years 이상이 min_count명 이상.
 8. leave {nurse_id, days}: 특정 간호사 휴가(그날은 O). 항상 hard.
 9. fixed_assignment {nurse_id, day, shift}: 특정 날짜에 특정 근무 고정. 항상 hard.
-10. shift_preference {nurse_id, shift, prefer, days?, weekends_only}: 희망(prefer=true) 또는 기피(prefer=false) 근무. days를 생략하면 한 달 전체, weekends_only=true면 주말·공휴일만.
+10. shift_preference {nurse_id, shift, prefer, days?, weekends_only}: 희망(prefer=true) 또는 기피(prefer=false) 근무. days를 생략하면 기간 전체, weekends_only=true면 주말·공휴일만.
 11. night_fairness {}: 나이트를 간호사끼리 고르게(나이트 전담 제외).
 12. weekend_fairness {}: 주말·공휴일 근무를 고르게.
+병동 규칙(scope "ward")은 모든 기간에 적용되고, 요청(scope "period")은 이번 기간에만 적용되는 요청이다. scope는 서버가 정하므로 출력하지 않는다.
 한 문장에 규칙이 여러 개면 제약을 여러 개 낸다. 한 사람이 여러 근무조를 요청하면 각각 낸다.
 "주말엔 데이만 하고 싶대요"처럼 "X만"은 X 희망(prefer=true) 하나만 낸다. 말하지 않은 다른 근무의 기피를 덧붙이지 않는다.
 
@@ -80,10 +81,15 @@ D(데이), E(이브닝), N(나이트), O(오프). 간호사는 하루에 하나�
 - leave와 fixed_assignment는 항상 hard다.
 
 ## 날짜 해석
-- days, day는 대상 월의 일(1..말일) 정수다. context의 대상 월과 오늘 날짜를 기준으로 해석한다.
-- "15~17일" → [15, 16, 17]. "다음 주 수요일"은 오늘 기준 다음 주(월요일 시작)의 수요일을 계산한다.
-- "3주차"는 대상 월의 셋째 주(월요일 시작, 1일이 속한 주가 1주차)이며 대상 월 안의 날짜만 포함한다.
-- 결과 날짜가 대상 월 밖이면 제약을 만들지 말고 clarification_question으로 묻는다.
+- days, day는 기간 안의 날짜 인덱스(1..period.length) 정수다. 달력의 일(日)이 아니다.
+- context.days에 기간의 모든 날이 {day, date, weekday, weekend}로 있다. 기간은 월 경계를 넘을 수 있다.
+- 사용자가 말한 날짜를 달력 날짜로 정한 뒤, 그 날짜와 date가 같은 항목의 day를 쓴다.
+  예: 기간이 2026-11-23부터 14일이면 "12월 1일" → date 2026-12-01 → day 9.
+- "15일"처럼 월이 없으면 days 중 date의 일(日)이 15인 항목이 하나뿐일 때만 그 day로 본다. 둘 이상이거나 없으면 clarification_question으로 되묻는다.
+- "15~17일" → 각 날짜를 위 규칙으로 바꾼 day 목록. "다음 주 수요일"은 오늘(today) 기준 다음 주(월요일 시작)의 수요일 날짜를 구한 뒤 day로 바꾼다.
+- "3주차"는 기간 안의 셋째 주(월요일 시작, 기간 첫날이 속한 주가 1주차)이며 기간 안의 날짜만 포함한다.
+- 결과 날짜가 기간 밖이면(context.days에 없으면) 제약을 만들지 말고 clarification_question으로 묻는다.
+- weekend_and_holiday_days는 토·일·공휴일인 day 목록이다.
 
 ## 간호사
 - 이름은 가명 id(예: n01)로 바뀌어 있다. nurse_id에는 context 명단의 id만 쓴다.
@@ -124,17 +130,19 @@ EXPLAIN_SYSTEM = f"""\
 제안은 서버가 다시 풀어 보고 해가 나오는 것만 사용자에게 보여 준다.
 
 ## 입력
-- context: 병동 인원, 대상 월, 주말·공휴일 날짜(토·일·공휴일).
+- context: 병동 인원, 기간(period: start, end, length), 기간의 날짜 목록(days: day, date), 주말·공휴일 day 목록(토·일·공휴일).
+- params의 day, days는 기간 안의 날짜 인덱스(1..length)다. 달력 날짜는 context.days에서 같은 day의 date로 찾는다.
 - conflicts: 동시에 지킬 수 없는 제약들(id, type, hardness, params, source_text). 이 중 하나 이상을 완화해야 해가 생긴다.
 - 근무 코드는 D(데이), E(이브닝), N(나이트), O(오프)다.
 
 ## text
 - 왜 동시에 지킬 수 없는지 한국어 2~4문장으로 쉽게 설명한다. 제약 id나 type 이름 대신 원문(source_text) 표현을 쓴다.
+- 날짜를 말할 때는 day 인덱스 대신 달력 날짜를 "11/30"처럼 월/일로 쓴다.
 
 ## proposals (최대 {MAX_PROPOSALS}개, 효과가 크고 부담이 작은 순서)
 - 각 제안은 title(짧은 제목), description(한 문장), changes로 구성한다.
 - changes의 constraint_id는 conflicts에 있는 id만 쓴다.
-- action "disable": 해당 제약을 이번 달만 끈다.
+- action "disable": 해당 제약을 이번 기간만 끈다.
 - action "update": 같은 제약의 params 중 바꿀 값만 params에 넣는다(type은 바꿀 수 없다). hardness를 "soft"로 바꿀 수도 있다.
 - 고정 배정(fixed_assignment)이 충돌에 있으면 그 고정을 해제하는 disable을 제안한다.
 - 휴가(leave)를 줄이거나 끄는 제안은 다른 방법이 없을 때만 마지막 수단으로, 마지막 순서에 둔다.

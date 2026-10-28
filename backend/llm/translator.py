@@ -33,20 +33,23 @@ class _OutputError(Exception):
 
 
 def _context_message(req: TranslateRequest, text: str) -> str:
-    ctx = req.context
-    days = ctx.period.days
-    weekends = sorted(
-        {d for d in range(1, days + 1) if ctx.period.weekday(d) >= 5}
-        | set(ctx.holidays)
-    )
+    ctx, period = req.context, req.context.period
+    holidays = set(ctx.holidays)
+    days = [
+        {
+            "day": d,
+            "date": period.date_of(d).isoformat(),
+            "weekday": calendar.day_abbr[period.weekday(d)],
+            "weekend": period.weekday(d) >= 5 or d in holidays,
+        }
+        for d in range(1, period.days + 1)
+    ]
     context = {
         "today": ctx.today.isoformat(),
         "today_weekday": calendar.day_name[ctx.today.weekday()],
-        "period_start": ctx.period.start_date.isoformat(),
-        "period_end": ctx.period.date_of(days).isoformat(),
-        "period_length": days,
-        "first_day_weekday": calendar.day_name[ctx.period.weekday(1)],
-        "weekend_and_holiday_days": weekends,
+        "period": {"start": period.start_date.isoformat(), "end": period.date_of(period.days).isoformat(), "length": period.days},
+        "days": days,
+        "weekend_and_holiday_days": [d["day"] for d in days if d["weekend"]],
         "holidays": sorted(ctx.holidays),
         "nurses": [{"id": n.id, "years": n.years, "night_only": n.night_only} for n in ctx.nurses],
     }
@@ -82,7 +85,7 @@ def _to_specs(output: TranslatorOutput, req: TranslateRequest) -> list:
         out = [d for d in cdays if not 1 <= d <= days]
         if out:
             errors.append(f"constraints.{i}.params: 1..{days} 범위 밖 날짜 {out}")
-            questions.append(f"{out}일은 대상 월(1~{days}일) 밖입니다. 날짜를 확인해 주세요.")
+            questions.append(f"{out}일은 이번 기간(1~{days}일) 밖입니다. 날짜를 확인해 주세요.")
         specs.append(spec)
     if errors:
         raise _OutputError("; ".join(errors), clarify=" ".join(questions))
