@@ -4,7 +4,17 @@ import { useState } from "react";
 
 import { ApiError, errorMessage, translate } from "@/lib/api";
 import { firstPeriodStart, periodFrom, type PeriodRange, type PeriodUnit } from "@/lib/period";
-import { currentPeriod, findReplaced, orphanConstraintIds, toScheduleRequest, useAppStore, type Ward, type WorkPeriod } from "@/lib/store";
+import {
+  cardsInOrder,
+  currentPeriod,
+  findReplaced,
+  orphanConstraintIds,
+  toScheduleRequest,
+  useAppStore,
+  type Ward,
+  type WorkPeriod,
+} from "@/lib/store";
+import { wardRuleCount } from "@/lib/wording";
 
 import ConstraintCard from "./ConstraintCard";
 import { ui } from "./ui";
@@ -14,15 +24,19 @@ const MAX_TEXT_CHARS = 1000; // backend/domain/constants.py MAX_TEXT_CHARS
 const COPY = {
   ward: {
     title: "병동 규칙",
-    description: "기간이 바뀌어도 똑같이 지키는 규칙을 말로 적어 주세요. 해석한 결과를 확인하고 [적용]해야 반영돼요.",
+    description: "근무표가 바뀌어도 똑같이 지키는 규칙을 말로 적어 주세요. 만든 카드를 확인하고 [적용]해야 반영돼요.",
     placeholder: "예: 나이트 다음 날은 무조건 쉬게",
+    submit: "규칙 만들기",
     empty: "아직 규칙이 없어요.",
+    examples: ["나이트 다음 날은 무조건 쉬게", "3년차 이상이 매 근무 1명은 있게", "나이트는 3일 넘게 연속으로 하지 않게"],
   },
   period: {
     title: "요청",
-    description: "이번 기간 휴가, 고정 근무, 희망·기피 근무를 말로 적어 주세요. 해석한 결과를 확인하고 [적용]해야 반영돼요.",
+    description: "이 근무표의 휴가, 고정 근무, 희망·기피 근무를 말로 적어 주세요. 만든 카드를 확인하고 [적용]해야 반영돼요.",
     placeholder: "예: 이영희 15~17일 휴가",
+    submit: "요청 만들기",
     empty: "아직 요청이 없어요.",
+    examples: [],
   },
 } as const;
 
@@ -50,7 +64,7 @@ export default function RulesStep({ scope }: { scope: "ward" | "period" }) {
   const [text, setText] = useState("");
   const [loading, setLoading] = useState(false);
   const [notice, setNotice] = useState<Notice>(null);
-  const [toast, setToast] = useState<{ message: string; text: string } | null>(null);
+  const [failure, setFailure] = useState<{ message: string; text: string } | null>(null);
   const [blocked, setBlocked] = useState(false);
 
   if (!ward || (scope === "period" && !period)) return null;
@@ -58,12 +72,22 @@ export default function RulesStep({ scope }: { scope: "ward" | "period" }) {
   const pending = scope === "ward" ? ward.pendingRules : period!.pendingRequests;
   // 필요 인원 폼이 만든 제약(cov-*)은 [명단·필요 인원] 탭에서 다룬다
   const applied = scope === "ward" ? ward.rules.filter((c) => !c.id.startsWith("cov-")) : period!.requests;
+  const cards = cardsInOrder(pending, applied, scope === "ward" ? ward.cardOrder : period!.cardOrder);
   const tooLong = text.length > MAX_TEXT_CHARS;
+
+  const applyAll = () => {
+    const store = useAppStore.getState();
+    // 표시 순서의 아래(오래된 카드)부터 적용해 교체 규칙이 새 카드를 남기게 한다
+    for (const { card } of cards.filter((x) => x.pending).reverse()) {
+      if (scope === "ward") store.applyRule(card.id);
+      else store.applyRequest(period!.id, card.id);
+    }
+  };
 
   const run = async (input: string) => {
     setLoading(true);
     setNotice(null);
-    setToast(null);
+    setFailure(null);
     try {
       // 기간이 없으면(병동 설정) 활성 명단과 다음 기간 범위로 해석한다
       const { nurses, period: range, holidays } = period
@@ -85,7 +109,7 @@ export default function RulesStep({ scope }: { scope: "ward" | "period" }) {
       }
     } catch (e) {
       const err = e instanceof ApiError ? e : new ApiError("INTERNAL", String(e));
-      setToast({ message: errorMessage(err), text: input });
+      setFailure({ message: errorMessage(err), text: input });
     } finally {
       setLoading(false);
     }
@@ -130,9 +154,27 @@ export default function RulesStep({ scope }: { scope: "ward" | "period" }) {
           />
           <button type="submit" disabled={loading || tooLong || text.trim() === ""} className={ui.primary}>
             {loading && <Spinner />}
-            {loading ? "해석 중…" : "해석"}
+            {loading ? "읽는 중…" : copy.submit}
           </button>
         </form>
+        {copy.examples.length > 0 && (
+          <div className="flex flex-wrap items-center gap-1">
+            <span className={ui.help}>예시</span>
+            {copy.examples.map((ex) => (
+              <button key={ex} type="button" onClick={() => setText(ex)} className={ui.textSm}>
+                {ex}
+              </button>
+            ))}
+          </div>
+        )}
+        {failure && (
+          <div role="alert" className="flex items-center gap-2 text-sm text-[#9F1F14]">
+            {failure.message}
+            <button type="button" disabled={loading} onClick={() => void run(failure.text)} className={ui.textSm}>
+              다시 시도
+            </button>
+          </div>
+        )}
         <div className="flex items-start justify-between gap-3">
           <div className="text-sm">
             {notice?.kind === "clarify" && (
@@ -148,26 +190,39 @@ export default function RulesStep({ scope }: { scope: "ward" | "period" }) {
         </div>
       </section>
 
-      {pending.length + applied.length === 0 ? (
+      {cards.length === 0 ? (
         <p className="text-sm text-[#66665E]">{copy.empty}</p>
       ) : (
-        <div className="grid grid-cols-2 gap-4">
-          {pending.map((c) => (
-            <ConstraintCard key={c.id} card={c} pending replaces={findReplaced(scope === "ward" ? ward.rules : period!.requests, c)} />
-          ))}
-          {applied.map((c) =>
-            scope === "period" ? (
-              <ConstraintCard
-                key={c.id}
-                card={c}
-                pending={false}
-                off={period!.disabledIds.includes(c.id)}
-                onToggleOff={(off) => setDisabled(period!.id, c.id, off)}
-              />
-            ) : (
-              <ConstraintCard key={c.id} card={c} pending={false} />
-            ),
+        <div className="flex flex-col gap-3">
+          {pending.length >= 2 && (
+            <div className="flex justify-end">
+              <button type="button" onClick={applyAll} className={ui.secondary}>
+                모두 적용
+              </button>
+            </div>
           )}
+          <div className="grid grid-cols-2 gap-4">
+            {cards.map(({ card: c, pending: isPending }) =>
+              isPending ? (
+                <ConstraintCard
+                  key={c.id}
+                  card={c}
+                  pending
+                  replaces={findReplaced(scope === "ward" ? ward.rules : period!.requests, c)}
+                />
+              ) : scope === "period" ? (
+                <ConstraintCard
+                  key={c.id}
+                  card={c}
+                  pending={false}
+                  off={period!.disabledIds.includes(c.id)}
+                  onToggleOff={(off) => setDisabled(period!.id, c.id, off)}
+                />
+              ) : (
+                <ConstraintCard key={c.id} card={c} pending={false} />
+              ),
+            )}
+          </div>
         </div>
       )}
 
@@ -197,23 +252,6 @@ export default function RulesStep({ scope }: { scope: "ward" | "period" }) {
         </div>
       </div>
       )}
-
-      {toast && (
-        <div
-          role="alert"
-          className="fixed right-8 bottom-6 flex items-center gap-3 rounded-lg border border-[#E8B4AE] bg-white py-2 pr-2 pl-4 text-sm text-[#9F1F14]"
-        >
-          {toast.message}
-          <button type="button" onClick={() => void run(toast.text)} className={ui.textSm}>
-            다시 시도
-          </button>
-          <button type="button" onClick={() => setToast(null)} aria-label="닫기" className={ui.textSm}>
-            <svg aria-hidden="true" viewBox="0 0 12 12" className="size-3" fill="none" stroke="currentColor" strokeWidth={1.6}>
-              <path d="m3 3 6 6M9 3 3 9" />
-            </svg>
-          </button>
-        </div>
-      )}
     </div>
   );
 }
@@ -226,7 +264,7 @@ export function Spinner() {
   );
 }
 
-/** 이 기간에 적용될 병동 규칙(접힌 목록). [이번 기간만 끄기]는 이 기간의 disabledIds만 바꾼다. */
+/** 이 근무표에 적용되는 병동 규칙(접힌 목록). [이번 근무표에서만 끄기]는 이 기간의 disabledIds만 바꾼다. */
 function PeriodRules({ ward, period }: { ward: Ward; period: WorkPeriod }) {
   const setDisabled = useAppStore((s) => s.setDisabled);
   const periods = useAppStore((s) => s.periods);
@@ -239,13 +277,13 @@ function PeriodRules({ ward, period }: { ward: Ward; period: WorkPeriod }) {
     <section className={`${ui.card} flex flex-col gap-3`}>
       <div className="flex items-center justify-between gap-3">
         <div className="flex flex-col gap-1">
-          <h3 className={ui.cardTitle}>이 기간에 적용될 병동 규칙</h3>
+          <h3 className={ui.cardTitle}>이 근무표에 적용되는 병동 규칙</h3>
           <p className={ui.help}>
-            <span className="font-mono">{rules.length}</span>개
+            <span className="font-mono">{wardRuleCount(rules)}</span>개
             {offCount > 0 && (
               <>
                 {" "}
-                · 이번 기간 꺼짐 <span className="font-mono">{offCount}</span>개
+                · 이번 근무표에서 꺼짐 <span className="font-mono">{offCount}</span>개
               </>
             )}{" "}
             · 규칙 원본은 병동 설정에서 고쳐요.

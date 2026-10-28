@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import sample from "./samples/ward-15.json";
 import {
   carryOverChanged,
+  cardsInOrder,
   createAppStore,
   currentPeriod,
   findReplaced,
@@ -204,6 +205,52 @@ describe("병동 규칙 카드", () => {
     store.getState().removeRule("q");
     expect(store.getState().ward!.rules).toEqual([]);
     expect(store.getState().inputVersion).toBe(v + 1);
+  });
+});
+
+describe("카드 순서", () => {
+  const ids = (list: { card: ConstraintSpec; pending: boolean }[]) => list.map((x) => `${x.card.id}${x.pending ? "?" : ""}`);
+
+  it("병동 규칙: 새 카드는 맨 위에 붙고, 적용해도 제자리에 남는다", () => {
+    const store = fresh();
+    store.getState().startWard();
+    store.getState().addPendingRules([card({ id: "a", type: "max_consecutive_work", params: { days: 5 } })]);
+    store.getState().addPendingRules([
+      card({ id: "b", type: "min_days_off", params: { days: 8 } }),
+      card({ id: "c", type: "max_consecutive_nights", params: { days: 3 } }),
+    ]);
+    const w = () => store.getState().ward!;
+    const order = () => ids(cardsInOrder(w().pendingRules, w().rules, w().cardOrder));
+    expect(order()).toEqual(["b?", "c?", "a?"]);
+    store.getState().applyRule("c");
+    expect(order()).toEqual(["b?", "c", "a?"]);
+    store.getState().applyRule("a");
+    store.getState().applyRule("b");
+    expect(order()).toEqual(["b", "c", "a"]);
+  });
+
+  it("요청: 적용해도 제자리에 남고, 교체된 카드 자리에는 새 카드만 남는다", () => {
+    const { store, id, period } = withPeriod();
+    store.getState().addPendingRequests(id, [
+      card({ id: "f1", type: "fixed_assignment", scope: "period", params: { nurse_id: "n01", day: 3, shift: "D" } }),
+    ]);
+    store.getState().applyRequest(id, "f1");
+    store.getState().addPendingRequests(id, [
+      card({ id: "l1", type: "leave", scope: "period", params: { nurse_id: "n02", days: [5] } }),
+      card({ id: "f2", type: "fixed_assignment", scope: "period", params: { nurse_id: "n01", day: 3, shift: "E" } }),
+    ]);
+    const order = () => ids(cardsInOrder(period().pendingRequests, period().requests, period().cardOrder));
+    expect(order()).toEqual(["l1?", "f2?", "f1"]);
+    store.getState().applyRequest(id, "f2");
+    expect(order()).toEqual(["l1?", "f2"]);
+  });
+
+  it("순서 정보가 없는 카드(옛 저장본·샘플)는 대기 → 적용 순으로 뒤에 둔다", () => {
+    const p = card({ id: "p", type: "min_days_off", params: { days: 8 } });
+    const a = card({ id: "a", type: "max_consecutive_work", params: { days: 5 } });
+    const n = card({ id: "n", type: "night_fairness", params: {} });
+    expect(ids(cardsInOrder([p], [a, n], undefined))).toEqual(["p?", "a", "n"]);
+    expect(ids(cardsInOrder([p], [a, n], ["n"]))).toEqual(["n", "p?", "a"]);
   });
 });
 
