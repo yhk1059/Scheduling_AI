@@ -15,7 +15,7 @@ import {
   sameCarryOver,
 } from "./continuity";
 import { firstPeriodStart, monthDay, nextPeriod, periodFrom, type PeriodRange, type PeriodUnit } from "./period";
-import sample from "./samples/ward-15.json";
+import { buildSample } from "./sample";
 import { deleteWard, loadWard, saveWard, supabaseConfigured, type AuthUser } from "./supabase";
 import type {
   CarryOverRow,
@@ -34,7 +34,6 @@ const COVERAGE_WEIGHT = 10; // backend/domain/constants.py DEFAULT_WEIGHT
 // backend/llm/translator.py _weight와 같은 규칙: soft는 템플릿 기본값(없으면 DEFAULT_WEIGHT), hard는 1
 const SOFT_WEIGHTS: Record<string, number> = { shift_preference: 10, night_fairness: 5, weekend_fairness: 5 };
 const ALWAYS_HARD = ["leave", "fixed_assignment"];
-const SAMPLE_WARD_NAME = "샘플 병동";
 export const SAVE_DEBOUNCE_MS = 1000;
 
 export type Shift = "D" | "E" | "N";
@@ -138,7 +137,7 @@ export interface AppState extends Data {
   deleteWardData: () => Promise<void>;
   // 병동
   startWard: () => void;
-  /** 샘플 병동 + 첫 기간을 만들고 그 기간을 연다. */
+  /** 샘플 병동(운영 중인 이번 달 확정본 + 다음 달 초안)을 만들고 홈으로 간다. */
   loadSample: (today: string) => void;
   setWardName: (name: string) => void;
   setUnit: (unit: PeriodUnit) => void;
@@ -640,23 +639,9 @@ export function createAppStore(getStorage: () => Storage, now: () => Date = () =
 
           startWard: () => bump({ ward: emptyWard(), periods: [], view: { screen: "settings", tab: "roster" } }),
           loadSample: (today) => {
-            const period: WorkPeriod = {
-              ...newPeriod(periodFrom("month", firstPeriodStart("month", today))),
-              holidays: sample.holidays,
-              carryOver: sample.carry_over as CarryOverRow[],
-            };
-            bump({
-              ward: {
-                ...emptyWard(),
-                name: SAMPLE_WARD_NAME,
-                nurses: sample.nurses.map((n) => ({ ...n, active: true })),
-                nextNurseNo: sample.nurses.length + 1,
-                rules: sample.constraints as ConstraintSpec[],
-                isSample: true,
-              },
-              periods: [period],
-              view: { screen: "period", periodId: period.id, step: 1 },
-            });
+            let n = 0;
+            const { ward, periods } = buildSample(today, () => `p-sample-${++n}`);
+            bump({ ward, periods, view: { screen: "home" } });
           },
           setWardName: (name) => editWard((w) => ({ ...w, name })),
           setUnit: (unit) => editWard((w) => ({ ...w, unit })),

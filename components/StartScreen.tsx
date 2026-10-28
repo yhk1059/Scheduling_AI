@@ -18,13 +18,11 @@ export default function StartScreen({ onDone }: { onDone: () => void }) {
   const nurseCount = useAppStore((s) => s.ward?.nurses.filter((n) => n.active).length ?? 0);
   const loadSample = useAppStore((s) => s.loadSample);
   const startWard = useAppStore((s) => s.startWard);
-  const go = useAppStore((s) => s.go);
   const showLogin = useAppStore((s) => supabaseConfigured && s.auth === null);
   const [pending, setPending] = useState<(() => void) | null>(null);
 
   const sample = () => {
     loadSample(today());
-    go({ screen: "home" });
     onDone();
   };
   const fresh = () => {

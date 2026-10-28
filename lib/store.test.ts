@@ -99,7 +99,7 @@ describe("병동", () => {
     expect(s.inputVersion).toBe(1);
   });
 
-  it("loadSample은 샘플 병동과 첫 기간을 만들고 그 기간을 연다", () => {
+  it("loadSample은 샘플 병동, 운영 중인 이번 달 확정본, 다음 달 초안을 만들고 홈으로 간다", () => {
     const store = fresh();
     store.getState().loadSample(TODAY);
     const s = store.getState();
@@ -107,9 +107,20 @@ describe("병동", () => {
     expect(s.ward!.nurses).toEqual(sample.nurses.map((n) => ({ ...n, active: true })));
     expect(s.ward!.nextNurseNo).toBe(sample.nurses.length + 1);
     expect(s.ward!.rules).toHaveLength(sample.constraints.length);
-    expect(s.periods).toHaveLength(1);
-    expect(s.periods[0]).toMatchObject({ start_date: "2026-11-01", length: 30, status: "draft", result: null });
-    expect(s.view).toEqual({ screen: "period", periodId: s.periods[0].id, step: 1 });
+    expect(s.periods).toHaveLength(2);
+    expect(s.periods[0]).toMatchObject({ start_date: "2026-10-01", length: 31, status: "confirmed" });
+    expect(s.periods[1]).toMatchObject({ start_date: "2026-11-01", length: 30, status: "draft", result: null });
+    expect(new Set(s.periods.map((p) => p.id)).size).toBe(2);
+    expect(s.view).toEqual({ screen: "home" });
+    expect(s.inputVersion).toBe(1);
+  });
+
+  it("loadSample 뒤 createPeriod는 다음 달 초안을 연다", () => {
+    const store = fresh();
+    store.getState().loadSample(TODAY);
+    const id = store.getState().createPeriod(TODAY);
+    expect(id).toBe(store.getState().periods[1].id);
+    expect(store.getState().periods).toHaveLength(2);
   });
 
   it("setWardName·setUnit·setCoverage는 inputVersion을 올리고 필요 인원은 ward.rules의 daily_coverage다", () => {
@@ -959,7 +970,7 @@ describe("로그인 분기", () => {
     const doc = f.calls.save[0] as { version: number; state: Record<string, unknown> };
     expect(doc.version).toBe(4);
     expect((doc.state.ward as { name: string }).name).toBe("샘플 병동");
-    expect(doc.state.periods).toHaveLength(1);
+    expect(doc.state.periods).toHaveLength(2);
     expect(s.sync.status).toBe("saved");
   });
 
