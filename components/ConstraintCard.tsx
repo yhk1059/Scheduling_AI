@@ -75,7 +75,7 @@ export function describeParams(c: ConstraintSpec, nurses: Nurse[], period: Perio
       return `${nurseLabel(c.params.nurse_id, nurses)} · ${monthDay(period, c.params.day)} · ${c.params.shift}`;
     case "shift_preference": {
       const p = c.params;
-      const when = p.days?.length ? formatDays(p.days, period) : p.weekends_only ? "주말·공휴일" : "한 달 전체";
+      const when = p.days?.length ? formatDays(p.days, period) : p.weekends_only ? "주말·공휴일" : "기간 전체";
       const scope = p.days?.length && p.weekends_only ? `${when} 중 주말·공휴일` : when;
       return `${nurseLabel(p.nurse_id, nurses)} · ${scope} · ${p.shift} ${p.prefer ? "희망" : "기피"}`;
     }
@@ -123,7 +123,7 @@ const FIELDS: Record<ConstraintSpec["type"], Field[]> = {
   shift_preference: [
     { key: "shift", label: "근무", kind: "shift" },
     { key: "prefer", label: "희망/기피", kind: "prefer" },
-    { key: "days", label: "날짜 (비우면 한 달 전체)", kind: "daysOptional" },
+    { key: "days", label: "날짜 (비우면 기간 전체)", kind: "daysOptional" },
     { key: "weekends_only", label: "주말·공휴일만", kind: "bool" },
   ],
   night_fairness: [],
@@ -287,15 +287,24 @@ export default function ConstraintCard({
   replaces,
   onApplied,
   busy = false,
+  off = false,
+  onToggleOff,
+  readOnly = false,
 }: {
   card: ConstraintSpec;
   pending: boolean;
   /** 적용하면 대체될 기존 제약 */
   replaces?: ConstraintSpec;
-  /** [적용] 직후 호출(④ 월중 변경의 재풀이) */
+  /** [적용] 직후 호출(③ 운영 중 변경의 재풀이) */
   onApplied?: () => void;
   /** 요청 중이면 [적용]을 막는다 */
   busy?: boolean;
+  /** 이 기간에 꺼져 있는지(disabledIds) */
+  off?: boolean;
+  /** 주면 [이번 기간만 끄기]/[다시 켜기]를 둔다. 원본은 바꾸지 않는다 */
+  onToggleOff?: (off: boolean) => void;
+  /** 기간 화면의 병동 규칙: 수정·삭제·hard/soft 변경 없이 끄고 켜기만 한다 */
+  readOnly?: boolean;
 }) {
   const ward = useAppStore((s) => s.ward);
   const period = useAppStore(currentPeriod);
@@ -340,11 +349,11 @@ export default function ConstraintCard({
         <h3 className="text-[13px] font-semibold text-[#1B1B18]">{TEMPLATE_NAMES[card.type]}</h3>
         <HardnessToggle
           value={ALWAYS_HARD.includes(card.type) ? "hard" : (card.hardness ?? "hard")}
-          disabled={ALWAYS_HARD.includes(card.type)}
+          disabled={readOnly || ALWAYS_HARD.includes(card.type)}
           onChange={(hardness) => updateCard(card.id, { hardness })}
         />
       </div>
-      <p className="text-sm text-[#1B1B18]">“{card.source_text}”</p>
+      <p className={`text-sm ${off ? "text-[#66665E]" : "text-[#1B1B18]"}`}>“{card.source_text}”</p>
 
       {draft ? (
         <div className="flex flex-col gap-2.5 rounded-sm bg-[#F6F6F3] px-2.5 py-2">
@@ -370,7 +379,9 @@ export default function ConstraintCard({
 
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-2">
-          {pending ? (
+          {off ? (
+            <span className={`${ui.badge} bg-[#FDF0DC] text-[#7A4506]`}>이번 기간 꺼짐</span>
+          ) : pending ? (
             <span className={`${ui.badge} bg-[#FDF0DC] text-[#7A4506]`}>적용 대기</span>
           ) : (
             <span className={`${ui.badge} bg-[#E6F2EA] text-[#1E6B3F]`}>적용됨</span>
@@ -415,8 +426,19 @@ export default function ConstraintCard({
                 적용
               </button>
             </>
+          ) : readOnly ? (
+            onToggleOff && (
+              <button type="button" disabled={busy} onClick={() => onToggleOff(!off)} className={ui.textSm}>
+                {off ? "다시 켜기" : "이번 기간만 끄기"}
+              </button>
+            )
           ) : (
             <>
+              {off && onToggleOff && (
+                <button type="button" disabled={busy} onClick={() => onToggleOff(false)} className={ui.textSm}>
+                  다시 켜기
+                </button>
+              )}
               {editable && (
                 <button type="button" onClick={() => setDraft(toDraft(card))} className={ui.textSm}>
                   수정

@@ -4,7 +4,7 @@ import { useState } from "react";
 
 import { ApiError, errorMessage, explain, solve, translate } from "@/lib/api";
 import { toScheduleCsv } from "@/lib/csv";
-import { isWeekendDay, monthDay, periodDays } from "@/lib/period";
+import { dayHeader, isWeekendDay, monthDay, periodDays, periodEnd } from "@/lib/period";
 import { type Code, currentPeriod, findReplaced, toScheduleRequest, useAppStore } from "@/lib/store";
 import type {
   Conflict,
@@ -70,7 +70,7 @@ export default function ScheduleStep() {
   const [outcome, setOutcome] = useState<Outcome>(null);
   const [toast, setToast] = useState<Toast>(null);
   const [selected, setSelected] = useState<Cell | null>(null);
-  // 월중 변경 입력 바에서 만든 대기 카드
+  // 운영 중 변경 입력 바에서 만든 대기 카드
   const [changeIds, setChangeIds] = useState<string[]>([]);
   const busy = loading || explaining || translating;
 
@@ -169,7 +169,7 @@ export default function ScheduleStep() {
     const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
     const a = document.createElement("a");
     a.href = url;
-    a.download = `근무표-${period.start_date}.csv`;
+    a.download = `근무표-${period.start_date}_${periodEnd(period)}.csv`;
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -186,7 +186,9 @@ export default function ScheduleStep() {
     <div className="flex flex-col gap-5">
       <div className="flex items-end justify-between gap-4">
         <div className="flex flex-col gap-1">
-          <h1 className="text-[22px] font-semibold text-[#1B1B18]">근무표</h1>
+          <h2 tabIndex={-1} data-step-title className={`${ui.cardTitle} outline-none`}>
+            근무표
+          </h2>
           <p className="text-sm leading-relaxed text-[#3D3D38]">
             칸을 눌러 근무를 고정하면 나머지를 최소한으로 바꿔 다시 풀어요.
             {confirmed && " 확정본이 있으면 [생성]도 확정본에서 최소한으로 바꿔요."}
@@ -210,7 +212,7 @@ export default function ScheduleStep() {
         </div>
       </div>
 
-      {confirmed && <ChangeBar busy={busy} translating={translating} onSubmit={translateChange} />}
+      {period.status === "confirmed" && <ChangeBar busy={busy} translating={translating} onSubmit={translateChange} />}
       {changeCards.length > 0 && (
         <div className="grid grid-cols-2 gap-4">
           {changeCards.map((c) => (
@@ -350,7 +352,7 @@ function ChangeBar({
   return (
     <section className={`${ui.card} flex flex-col gap-2.5`}>
       <div className="flex flex-col gap-1">
-        <h2 className={ui.cardTitle}>월중 변경</h2>
+        <h2 className={ui.cardTitle}>운영 중 변경</h2>
         <p className={ui.help}>확정본 이후 생긴 병가·휴가를 적으면, 확정본에서 최소한으로 바꾼 초안을 만들어요.</p>
       </div>
       <form
@@ -364,7 +366,7 @@ function ChangeBar({
           value={text}
           onChange={(e) => setText(e.target.value)}
           placeholder="예: 최지훈 이번 주 병가"
-          aria-label="월중 변경 입력"
+          aria-label="운영 중 변경 입력"
           aria-invalid={tooLong || undefined}
           className={`${ui.input} flex-1 ${tooLong ? "border-[#B42318]" : ""}`}
         />
@@ -473,7 +475,7 @@ function OutcomePanel({
                   </span>
                   {found && (
                     <button type="button" disabled={busy} onClick={() => onDisable(c.constraint_id)} className={ui.secondarySm}>
-                      이번 달만 끄기
+                      이번 기간만 끄기
                     </button>
                   )}
                 </li>
@@ -505,7 +507,7 @@ function OutcomePanel({
                     onClick={() => onToggle(c.id, !on)}
                     className={ui.secondarySm}
                   >
-                    {on ? "이번 달만 끄기" : "다시 켜기"}
+                    {on ? "이번 기간만 끄기" : "다시 켜기"}
                   </button>
                 </li>
               );
@@ -674,7 +676,8 @@ export function ScheduleGrid({
 }) {
   const pdays = periodDays(period);
   const dayList = pdays.map((p) => p.day);
-  const grid = { gridTemplateColumns: `150px 44px repeat(${period.length}, 30px) repeat(4, 34px)` };
+  // grid-cols-[150px_44px_repeat(N,30px)_repeat(4,34px)_repeat(2,44px)], N = 기간 길이
+  const grid = { gridTemplateColumns: `150px 44px repeat(${period.length}, 30px) repeat(4, 34px) repeat(2, 44px)` };
   const rowClass = "grid gap-x-0.5";
   const weekendBg = (d: number) => (isWeekend(d) ? "bg-[#F1EEE6]" : "");
   const changed = new Set((result.diff ?? []).map((c) => `${c.nurse_id}-${c.day}`));
@@ -692,11 +695,13 @@ export function ScheduleGrid({
         <div className={rowClass} style={grid}>
           <span className="flex items-end text-xs font-medium text-[#66665E]">이름</span>
           <span className="flex items-end text-xs font-medium text-[#66665E]">연차</span>
-          {pdays.map(({ day: d, dom, weekday: w }) => {
+          {pdays.map(({ day: d, weekday: w }) => {
             const color = w === 0 || holidays.includes(d) ? "text-[#B42318]" : w === 6 ? "text-[#155E75]" : "text-[#66665E]";
             return (
               <span key={d} className={`flex flex-col items-center rounded-xs py-0.5 font-mono ${weekendBg(d)} ${color}`}>
-                <span className="text-[13px] font-medium">{dom}</span>
+                <span className={`${dayHeader(period, d).includes("/") ? "text-[11px]" : "text-[13px]"} font-medium`}>
+                  {dayHeader(period, d)}
+                </span>
                 <span className="text-[11px]">{WEEKDAYS[w]}</span>
               </span>
             );
@@ -704,6 +709,12 @@ export function ScheduleGrid({
           {CODES.map((c) => (
             <span key={c} className="flex items-end justify-center font-mono text-xs font-semibold text-[#66665E]">
               {c}
+            </span>
+          ))}
+          {/* 누적 부담(최근 4주) */}
+          {["4주 N", "4주 주말"].map((label) => (
+            <span key={label} className="flex items-end justify-center text-center text-[11px] leading-tight font-medium text-[#66665E]">
+              {label}
             </span>
           ))}
         </div>
@@ -720,7 +731,7 @@ export function ScheduleGrid({
               <span className="flex h-7 items-center font-mono text-[13px] text-[#3D3D38]">{n.years}</span>
               {row.map((code, i) => {
                 const d = i + 1;
-                const [m, dom] = monthDay(period, d).split("/");
+                const { month: m, dom } = pdays[i];
                 const key = `${n.id}-${d}`;
                 const isSel = selected?.nurseId === n.id && selected.day === d;
                 const warn = violations.get(key);
@@ -747,6 +758,9 @@ export function ScheduleGrid({
                   {s?.[c] ?? row.filter((x) => x === c).length}
                 </span>
               ))}
+              {/* 누적 부담은 이월·이력 계산 뒤에 채운다 */}
+              <span className={`${total} text-[#66665E]`}>—</span>
+              <span className={`${total} text-[#66665E]`}>—</span>
             </div>
           );
         })}
