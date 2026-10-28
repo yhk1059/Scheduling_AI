@@ -2,10 +2,11 @@
 
 # 입력 상한 (초과 시 413)
 MAX_NURSES = 40
-MAX_CONSTRAINTS = 200
+MAX_CONSTRAINTS = 200  # 고정 근무(칸 고정, 지난 날짜 잠금)를 뺀 규칙·요청
 MAX_TEXT_CHARS = 1000
 CARRY_OVER_DAYS = 7
 MAX_PERIOD_DAYS = 31
+MAX_FIXED_ASSIGNMENTS = MAX_NURSES * MAX_PERIOD_DAYS  # 고정 근무는 칸마다 하나
 HISTORY_DAYS = 28  # 누적 부담 창(일). 최근 4주 나이트·주말 근무 수의 상한
 
 # LLM

@@ -7,7 +7,14 @@ import pytest
 from fastapi.testclient import TestClient
 
 from backend import routes
-from backend.domain.constants import MAX_CONSTRAINTS, MAX_NURSES, MAX_PROPOSALS, MAX_TEXT_CHARS, PROPOSAL_VERIFY_TIME_LIMIT_S
+from backend.domain.constants import (
+    MAX_CONSTRAINTS,
+    MAX_FIXED_ASSIGNMENTS,
+    MAX_NURSES,
+    MAX_PROPOSALS,
+    MAX_TEXT_CHARS,
+    PROPOSAL_VERIFY_TIME_LIMIT_S,
+)
 from backend.llm.client import LLMConfigError, LLMUnavailableError, ToolCallResult
 from backend.routes import app, get_llm_client
 from backend.solver.model import solve as real_solve
@@ -280,6 +287,25 @@ def test_413_too_many_nurses():
 def test_413_too_many_constraints():
     data = sample()
     data["constraints"] = [{"bogus": i} for i in range(MAX_CONSTRAINTS + 1)]  # Pydantic 검증보다 먼저 막는다
+    assert_error(client.post("/api/py/solve", json=data), 413, "PAYLOAD_TOO_LARGE")
+
+
+def test_solve_accepts_past_day_locks_beyond_constraint_cap():
+    # 운영 중 근무표의 지난 날짜 잠금은 칸마다 고정 근무 1개다. 15명 × 27일 = 405개도 받아야 한다
+    data = sample()
+    first = client.post("/api/py/solve", json=data).json()["result"]["assignments"]
+    days = MAX_CONSTRAINTS // len(first) + 1
+    locks = [fixed(f"lock-{nid}-{d}", nid, d, row[d - 1]) for nid, row in first.items() for d in range(1, days + 1)]
+    assert len(locks) > MAX_CONSTRAINTS
+    data["constraints"] = data["constraints"] + locks
+    r = client.post("/api/py/solve", json=data)
+    assert r.status_code == 200
+    assert r.json()["status"] == "ok"
+
+
+def test_413_too_many_fixed_assignments():
+    data = sample()
+    data["constraints"] = [{"type": "fixed_assignment"} for _ in range(MAX_FIXED_ASSIGNMENTS + 1)]
     assert_error(client.post("/api/py/solve", json=data), 413, "PAYLOAD_TOO_LARGE")
 
 

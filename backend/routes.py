@@ -14,6 +14,7 @@ from starlette.concurrency import run_in_threadpool
 
 from backend.domain.constants import (
     MAX_CONSTRAINTS,
+    MAX_FIXED_ASSIGNMENTS,
     MAX_NURSES,
     MAX_PROPOSALS,
     MAX_TEXT_CHARS,
@@ -159,8 +160,12 @@ def _check_limits(data: Any) -> None:
         nurses, constraints = part.get("nurses"), part.get("constraints")
         if isinstance(nurses, list) and len(nurses) > MAX_NURSES:
             raise ApiError(413, "PAYLOAD_TOO_LARGE", f"간호사는 최대 {MAX_NURSES}명입니다")
-        if isinstance(constraints, list) and len(constraints) > MAX_CONSTRAINTS:
-            raise ApiError(413, "PAYLOAD_TOO_LARGE", f"제약은 최대 {MAX_CONSTRAINTS}개입니다")
+        if isinstance(constraints, list):
+            fixed = sum(1 for c in constraints if isinstance(c, dict) and c.get("type") == "fixed_assignment")
+            if len(constraints) - fixed > MAX_CONSTRAINTS:
+                raise ApiError(413, "PAYLOAD_TOO_LARGE", f"제약은 최대 {MAX_CONSTRAINTS}개입니다")
+            if fixed > MAX_FIXED_ASSIGNMENTS:
+                raise ApiError(413, "PAYLOAD_TOO_LARGE", f"고정 근무는 최대 {MAX_FIXED_ASSIGNMENTS}개입니다")
     text = data.get("text")
     if isinstance(text, str) and len(text) > MAX_TEXT_CHARS:
         raise ApiError(413, "PAYLOAD_TOO_LARGE", f"텍스트는 최대 {MAX_TEXT_CHARS}자입니다")
