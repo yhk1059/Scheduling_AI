@@ -86,7 +86,7 @@ POST /api/py/explain
 
 | HTTP | code | 조건 |
 |---|---|---|
-| 413 | `PAYLOAD_TOO_LARGE` | 간호사 40명, 제약 200개, 텍스트 1000자 초과 |
+| 413 | `PAYLOAD_TOO_LARGE` | 간호사 40명, 제약 200개(고정 근무 제외), 고정 근무 40×31개, 텍스트 1000자 초과 |
 | 422 | `VALIDATION_ERROR` | Pydantic 또는 참조 무결성 실패(필드 경로 포함) |
 | 502 | `LLM_INVALID_OUTPUT` | 재시도 후에도 스키마 위반 |
 | 503 | `LLM_UNAVAILABLE` | Anthropic 장애 또는 한도 초과 |
