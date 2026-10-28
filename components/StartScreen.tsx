@@ -2,19 +2,29 @@
 
 import { useState } from "react";
 
-import { useAppStore, type View } from "@/lib/store";
+import sample from "@/lib/samples/ward-15.json";
+import { currentPeriod, useAppStore, type View } from "@/lib/store";
 import { supabaseConfigured } from "@/lib/supabase";
+import type { ConstraintSpec } from "@/lib/types.gen";
+import { scheduleName, wardRuleCount } from "@/lib/wording";
 
-import { LoginButton, PrivacyLink } from "./Account";
+import { PrivacyLink } from "./Account";
 import Dialog from "./Dialog";
 import { today } from "./RulesStep";
 import { ui } from "./ui";
 
-const SCREEN_LABELS: Record<View["screen"], string> = { home: "병동 홈", settings: "병동 설정", period: "기간 작업" };
+const SCREEN_LABELS: Record<Exclude<View["screen"], "period">, string> = { home: "병동 홈", settings: "병동 설정" };
+const SAMPLE_NURSES = sample.nurses.length;
+const SAMPLE_RULES = wardRuleCount(sample.constraints as ConstraintSpec[]);
 
 export default function StartScreen({ onDone }: { onDone: () => void }) {
   const hasInput = useAppStore((s) => s.hasInput());
-  const screen = useAppStore((s) => s.view.screen);
+  // 이어서 갈 화면 이름. 근무표 화면이면 "11월 근무표"
+  const screenLabel = useAppStore((s) => {
+    if (s.view.screen !== "period") return SCREEN_LABELS[s.view.screen];
+    const p = currentPeriod(s);
+    return p && s.ward ? scheduleName(p, s.ward.unit) : "근무표";
+  });
   const nurseCount = useAppStore((s) => s.ward?.nurses.filter((n) => n.active).length ?? 0);
   const loadSample = useAppStore((s) => s.loadSample);
   const startWard = useAppStore((s) => s.startWard);
@@ -37,7 +47,7 @@ export default function StartScreen({ onDone }: { onDone: () => void }) {
       ? [
           {
             title: "이어서 하기",
-            body: `이 브라우저에 저장된 입력으로 돌아가요. ${SCREEN_LABELS[screen]}${nurseCount > 0 ? ` · 명단 ${nurseCount}명` : ""}`,
+            body: `이 브라우저에 저장된 입력으로 돌아가요. ${screenLabel}${nurseCount > 0 ? ` · 간호사 ${nurseCount}명` : ""}`,
             action: "이어서 하기",
             onClick: onDone,
           },
@@ -45,7 +55,7 @@ export default function StartScreen({ onDone }: { onDone: () => void }) {
       : []),
     {
       title: "샘플로 체험하기",
-      body: "샘플 병동(15명)과 병동 규칙을 불러와요. 바로 기간을 만들어 근무표를 생성해 볼 수 있어요.",
+      body: `간호사 ${SAMPLE_NURSES}명과 병동 규칙 ${SAMPLE_RULES}개, 이번 달 확정 근무표가 들어 있어요. 다음 달 근무표를 바로 만들어 볼 수 있어요.`,
       action: "샘플로 체험하기",
       onClick: () => start(sample),
     },
@@ -63,7 +73,7 @@ export default function StartScreen({ onDone }: { onDone: () => void }) {
         <h1 className="text-[22px] font-semibold text-[#1B1B18]">시작 방법</h1>
         <p className="text-sm leading-relaxed text-[#3D3D38]">입력은 이 브라우저에만 저장돼요.</p>
       </div>
-      <div className="grid grid-cols-3 gap-4">
+      <div className={`grid gap-4 ${options.length === 3 ? "grid-cols-3" : "grid-cols-2"}`}>
         {options.map((o, i) => (
           <section key={o.title} className={`${ui.card} flex flex-col gap-2.5`}>
             <h2 className={ui.cardTitle}>{o.title}</h2>
@@ -77,18 +87,10 @@ export default function StartScreen({ onDone }: { onDone: () => void }) {
         ))}
       </div>
       {showLogin && (
-        <section className={`${ui.card} flex items-center justify-between gap-4`}>
-          <div className="flex flex-col gap-1">
-            <h2 className={ui.cardTitle}>Google로 로그인</h2>
-            <p className="text-sm leading-relaxed text-[#3D3D38]">
-              로그인하면 병동이 저장되고 다른 기기에서도 이어서 쓸 수 있어요.
-            </p>
-            <div>
-              <PrivacyLink className={`${ui.textSm} -ml-2`} />
-            </div>
-          </div>
-          <LoginButton />
-        </section>
+        <p className="flex items-center gap-1 text-sm text-[#3D3D38]">
+          로그인하면 다른 기기에서도 이어서 쓸 수 있어요.
+          <PrivacyLink className={ui.textSm} />
+        </p>
       )}
       {pending && (
         <Dialog

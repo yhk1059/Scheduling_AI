@@ -2,9 +2,9 @@
 
 import { useEffect, useState } from "react";
 
-import { unitLabel } from "@/lib/period";
 import { useAppStore } from "@/lib/store";
 import { onAuthChange, supabaseConfigured } from "@/lib/supabase";
+import { unitShort } from "@/lib/wording";
 
 import { AccountBar, LoginPromptDialog } from "./Account";
 import PeriodWork from "./PeriodWork";
@@ -59,7 +59,7 @@ export default function AppShell() {
             <span className="text-[15px] font-semibold text-[#1B1B18]">간호사 근무표</span>
             {started && (
               <span className="text-xs font-medium text-[#66665E]">
-                {ward.name || "이름 없는 병동"} · {unitLabel(ward.unit)}
+                {ward.name || "이름 없는 병동"} · {unitShort(ward.unit)}
               </span>
             )}
           </div>
