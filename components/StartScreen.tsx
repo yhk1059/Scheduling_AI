@@ -4,6 +4,7 @@ import { useState } from "react";
 
 import { useAppStore, type View } from "@/lib/store";
 
+import { LoginButton, PrivacyLink, useNeedsLogin } from "./Account";
 import Dialog from "./Dialog";
 import { today } from "./RulesStep";
 import { ui } from "./ui";
@@ -17,6 +18,7 @@ export default function StartScreen({ onDone }: { onDone: () => void }) {
   const loadSample = useAppStore((s) => s.loadSample);
   const startWard = useAppStore((s) => s.startWard);
   const go = useAppStore((s) => s.go);
+  const needsLogin = useNeedsLogin();
   const [pending, setPending] = useState<(() => void) | null>(null);
 
   const sample = () => {
@@ -75,15 +77,32 @@ export default function StartScreen({ onDone }: { onDone: () => void }) {
           </section>
         ))}
       </div>
+      {needsLogin && (
+        <section className={`${ui.card} flex items-center justify-between gap-4`}>
+          <div className="flex flex-col gap-1">
+            <h2 className={ui.cardTitle}>Google로 로그인</h2>
+            <p className="text-sm leading-relaxed text-[#3D3D38]">
+              로그인하면 병동이 저장되고 다른 기기에서도 이어서 쓸 수 있어요.
+            </p>
+            <div>
+              <PrivacyLink className={`${ui.textSm} -ml-2`} />
+            </div>
+          </div>
+          <LoginButton />
+        </section>
+      )}
       {pending && (
         <Dialog
           title="지금 입력을 지우고 새로 시작할까요?"
-          confirmLabel="지우고 시작"
-          onCancel={() => setPending(null)}
-          onConfirm={() => {
-            const load = pending;
-            setPending(null);
-            load();
+          onClose={() => setPending(null)}
+          secondary={{ label: "취소", onClick: () => setPending(null) }}
+          primary={{
+            label: "지우고 시작",
+            onClick: () => {
+              const load = pending;
+              setPending(null);
+              load();
+            },
           }}
         >
           이 브라우저에 저장된 명단, 규칙, 요청, 근무표가 지워져요. 되돌릴 수 없어요.

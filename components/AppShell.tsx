@@ -1,10 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { unitLabel } from "@/lib/period";
 import { useAppStore } from "@/lib/store";
+import { onAuthChange, supabaseConfigured } from "@/lib/supabase";
 
+import { AccountBar, LoginPromptDialog } from "./Account";
 import PeriodWork from "./PeriodWork";
 import StartScreen from "./StartScreen";
 import { ui } from "./ui";
@@ -18,9 +20,27 @@ export default function AppShell() {
   const storageAvailable = useAppStore((s) => s.storageAvailable);
   const resetNotice = useAppStore((s) => s.resetNotice);
   const dismissResetNotice = useAppStore((s) => s.dismissResetNotice);
-  // /app에 들어올 때마다 시작 화면을 보여 준다(저장하지 않는다)
+  const auth = useAppStore((s) => s.auth);
+  const syncStatus = useAppStore((s) => s.sync.status);
+  const retrySave = useAppStore((s) => s.retrySave);
+  // /app에 들어올 때마다 시작 화면을 보여 준다(저장하지 않는다). 로그인 상태면 건너뛴다(PRD J0)
   const [entered, setEntered] = useState(false);
-  const started = entered && ward !== null;
+  // 첫 세션 확인 전에는 시작 화면을 띄우지 않는다
+  const [authChecked, setAuthChecked] = useState(!supabaseConfigured);
+  const loading = !authChecked || (auth !== null && syncStatus === "loading");
+  const started = (entered || auth !== null) && ward !== null && !loading;
+
+  useEffect(() => {
+    if (!supabaseConfigured) return;
+    return onAuthChange((user) => {
+      const s = useAppStore.getState();
+      // 토큰 갱신 등으로 같은 사용자가 다시 오면 서버 문서를 다시 읽지 않는다
+      if (user && s.auth?.userId !== user.id) void s.signedIn(user);
+      // 게스트의 첫 세션 확인(null)에 이 브라우저 데이터를 지우지 않는다
+      else if (!user && s.auth) s.signedOut();
+      setAuthChecked(true);
+    });
+  }, []);
 
   const tabs = [
     { label: "홈", current: view.screen === "home", onClick: () => go({ screen: "home" }) },
@@ -43,7 +63,7 @@ export default function AppShell() {
               </span>
             )}
           </div>
-          <span className="text-xs text-[#66665E]">이 브라우저에만 저장</span>
+          <AccountBar />
         </div>
       </header>
       {started && (
@@ -79,7 +99,20 @@ export default function AppShell() {
           </div>
         )}
 
-        {!started ? (
+        {auth !== null && syncStatus === "error" && (
+          <div role="status" className={ui.banner}>
+            저장하지 못했어요. 이 브라우저에 보관하고 있어요
+            <button type="button" onClick={() => void retrySave()} className={ui.textSm}>
+              다시 시도
+            </button>
+          </div>
+        )}
+
+        {loading ? (
+          <p role="status" className="text-sm text-[#3D3D38]">
+            불러오는 중…
+          </p>
+        ) : !started ? (
           <StartScreen onDone={() => setEntered(true)} />
         ) : view.screen === "home" ? (
           <WardHome />
@@ -88,6 +121,7 @@ export default function AppShell() {
         ) : (
           <PeriodWork />
         )}
+        <LoginPromptDialog />
       </main>
     </div>
   );

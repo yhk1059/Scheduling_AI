@@ -4,36 +4,42 @@ import { type ReactNode, useEffect, useRef } from "react";
 
 import { ui } from "./ui";
 
+interface DialogAction {
+  label: string;
+  onClick: () => void;
+  disabled?: boolean;
+}
+
 /**
- * 공용 대화상자(UI_GUIDE "대화상자"). 버튼은 [취소] + Primary 하나.
- * 열리면 첫 버튼에 포커스, Esc로 닫고, 닫히면 연 요소로 포커스를 되돌린다.
+ * 공용 대화상자(UI_GUIDE "대화상자"). 버튼은 최대 2개: Secondary + Primary(danger면 Danger 스타일).
+ * 열리면 첫 버튼에 포커스, Esc로 onClose, 닫히면 연 요소로 포커스를 되돌린다.
  */
 export default function Dialog({
   title,
   children,
-  confirmLabel,
-  onConfirm,
-  onCancel,
-  cancelLabel = "취소",
+  onClose,
+  secondary,
+  primary,
+  danger = false,
 }: {
   title: string;
   children: ReactNode;
-  confirmLabel: string;
-  onConfirm: () => void;
-  onCancel: () => void;
-  cancelLabel?: string;
+  onClose: () => void;
+  secondary?: DialogAction;
+  primary?: DialogAction;
+  danger?: boolean;
 }) {
   const ref = useRef<HTMLDivElement>(null);
-  const onCancelRef = useRef(onCancel);
+  const onCloseRef = useRef(onClose);
   useEffect(() => {
-    onCancelRef.current = onCancel;
+    onCloseRef.current = onClose;
   });
 
   useEffect(() => {
     const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     ref.current?.querySelector("button")?.focus();
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onCancelRef.current();
+      if (e.key === "Escape") onCloseRef.current();
     };
     document.addEventListener("keydown", onKey);
     return () => {
@@ -54,14 +60,23 @@ export default function Dialog({
         <h2 id="dialog-title" className={ui.cardTitle}>
           {title}
         </h2>
-        <div className="text-sm leading-relaxed text-[#3D3D38]">{children}</div>
+        <div className="flex flex-col gap-2.5 text-sm leading-relaxed text-[#3D3D38]">{children}</div>
         <div className="flex justify-end gap-2">
-          <button type="button" onClick={onCancel} className={ui.secondary}>
-            {cancelLabel}
-          </button>
-          <button type="button" onClick={onConfirm} className={ui.primary}>
-            {confirmLabel}
-          </button>
+          {secondary && (
+            <button type="button" onClick={secondary.onClick} disabled={secondary.disabled} className={ui.secondary}>
+              {secondary.label}
+            </button>
+          )}
+          {primary && (
+            <button
+              type="button"
+              onClick={primary.onClick}
+              disabled={primary.disabled}
+              className={danger ? ui.dangerMd : ui.primary}
+            >
+              {primary.label}
+            </button>
+          )}
         </div>
       </div>
     </div>
