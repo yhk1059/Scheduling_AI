@@ -29,7 +29,10 @@
     {
       "step": 3,
       "name": "store-ward-periods",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-10-28T19:17:05+0900",
+      "summary": "lib/store.ts를 ward+periods[]+view 구조(STORAGE_VERSION 3)로 바꾸고 id 보존 명단 액션(addNurses/replaceRoster/removeNurse, nextNurseNo 단조), createPeriod·기간별 요청/disabledIds/ruleOverrides/confirm(versions·snapshot), 순수 함수 toScheduleRequest(활성 필터·확정 기간은 snapshot)·orphanConstraintIds·currentPeriod를 추가(vitest 40개); 기존 4단계 화면은 view↔단계 매핑(Stepper stepOf/viewOf)과 셀렉터만 바꿔 동작 유지(대상 월 입력은 읽기 전용 기간 표시로)",
+      "completed_at": "2026-10-28T19:24:33+0900"
     },
     {
       "step": 4,
