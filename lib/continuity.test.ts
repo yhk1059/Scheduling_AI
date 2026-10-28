@@ -32,6 +32,7 @@ function period(start_date: string, length: number, extra: Partial<WorkPeriod> =
     status: "draft",
     versions: [],
     snapshot: null,
+    carryOverUsed: null,
     ...extra,
   };
 }

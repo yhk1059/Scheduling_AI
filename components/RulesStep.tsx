@@ -67,7 +67,7 @@ export default function RulesStep({ scope }: { scope: "ward" | "period" }) {
     try {
       // 기간이 없으면(병동 설정) 활성 명단과 다음 기간 범위로 해석한다
       const { nurses, period: range, holidays } = period
-        ? toScheduleRequest(ward, period)
+        ? toScheduleRequest(ward, period, useAppStore.getState().periods, today())
         : {
             nurses: ward.nurses.filter((n) => n.active).map(({ id, name, years, night_only }) => ({ id, name, years, night_only })),
             period: previewRange(ward.unit),
@@ -229,9 +229,10 @@ export function Spinner() {
 /** 이 기간에 적용될 병동 규칙(접힌 목록). [이번 기간만 끄기]는 이 기간의 disabledIds만 바꾼다. */
 function PeriodRules({ ward, period }: { ward: Ward; period: WorkPeriod }) {
   const setDisabled = useAppStore((s) => s.setDisabled);
+  const periods = useAppStore((s) => s.periods);
   const [open, setOpen] = useState(false);
   // 확정 기간의 snapshot, 이 기간의 수정본(ruleOverrides), 꺼짐(enabled=false)이 반영된 목록
-  const rules = (toScheduleRequest(ward, period).constraints ?? []).filter((c) => c.scope === "ward");
+  const rules = (toScheduleRequest(ward, period, periods, today()).constraints ?? []).filter((c) => c.scope === "ward");
   const offCount = rules.filter((c) => c.enabled === false).length;
 
   return (

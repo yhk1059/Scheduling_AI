@@ -3,6 +3,16 @@
 import { create } from "zustand";
 import { persist, type PersistStorage, type StorageValue } from "zustand/middleware";
 
+import {
+  carryOverFrom,
+  diffAssignments,
+  historyLoadFor,
+  isOperating,
+  pastDayLocks,
+  previousConfirmedPeriod,
+  rosterChanges,
+  sameCarryOver,
+} from "./continuity";
 import { firstPeriodStart, monthDay, nextPeriod, periodFrom, type PeriodRange, type PeriodUnit } from "./period";
 import sample from "./samples/ward-15.json";
 import type {
@@ -16,7 +26,7 @@ import type {
 } from "./types.gen";
 
 export const STORAGE_KEY = "nurse-scheduler";
-const STORAGE_VERSION = 3;
+const STORAGE_VERSION = 4;
 const COVERAGE_SOURCE_TEXT = "필요 인원 설정";
 const COVERAGE_WEIGHT = 10; // backend/domain/constants.py DEFAULT_WEIGHT
 // backend/llm/translator.py _weight와 같은 규칙: soft는 템플릿 기본값(없으면 DEFAULT_WEIGHT), hard는 1
@@ -71,6 +81,8 @@ export interface WorkPeriod extends PeriodRange {
   ruleOverrides: Record<string, ConstraintSpec>;
   /** 수동 입력 이월(첫 기간) */
   carryOver: CarryOverRow[];
+  /** result를 만든 요청에 쓴 carry_over. 이월 변경 판정에 쓴다. */
+  carryOverUsed: CarryOverRow[] | null;
   result: ScheduleResult | null;
   /** result를 만든 요청의 inputVersion. 현재와 다르면 stale. */
   resultVersion: number | null;
@@ -132,8 +144,9 @@ export interface AppState extends Data {
   /** 그 칸의 기존 고정 배정을 지우고 수동 고정 제약을 추가한다. */
   setFixed: (periodId: string, nurseId: string, day: number, shift: Code) => void;
   clearFixed: (periodId: string, nurseId: string, day: number) => void;
-  /** 응답 버전이 현재와 같을 때만 부른다. resultVersion = 지금의 inputVersion. */
-  setResult: (periodId: string, result: ScheduleResult) => void;
+  /** 응답 버전이 현재와 같을 때만 부른다. resultVersion = 지금의 inputVersion. usedCarryOver = 그 요청의 carry_over. */
+  setResult: (periodId: string, result: ScheduleResult, usedCarryOver: CarryOverRow[]) => void;
+  /** 첫 확정은 버전 1개, 이미 확정된 기간은 바뀐 칸이 있을 때만 버전을 추가한다([다시 확정]). */
   confirm: (periodId: string) => void;
   // 화면
   go: (view: View) => void;
@@ -162,6 +175,7 @@ function newPeriod(range: PeriodRange): WorkPeriod {
     disabledIds: [],
     ruleOverrides: {},
     carryOver: [],
+    carryOverUsed: null,
     result: null,
     resultVersion: null,
     status: "draft",
@@ -232,28 +246,88 @@ function basis(ward: Ward, period: WorkPeriod): { nurses: WardNurse[]; rules: Co
   return period.status === "confirmed" && period.snapshot ? period.snapshot : ward;
 }
 
-/** 기간 하나의 /solve·/explain 요청 본문(input_version 제외). */
-export function toScheduleRequest(ward: Ward, period: WorkPeriod): Omit<ScheduleRequest, "input_version"> {
+/**
+ * 기간 하나의 /solve·/explain 요청 본문(input_version 제외).
+ * 이월·누적 부담·지난 날짜 잠금은 요청할 때마다 periods와 today로 다시 계산한다(ADR-015).
+ */
+export function toScheduleRequest(
+  ward: Ward,
+  period: WorkPeriod,
+  periods: WorkPeriod[],
+  today: string,
+): Omit<ScheduleRequest, "input_version"> {
   const { nurses, rules } = basis(ward, period);
   const active = nurses.filter((n) => n.active);
-  const ids = new Set(active.map((n) => n.id));
+  const activeIds = active.map((n) => n.id);
+  const ids = new Set(activeIds);
+  const locks = isOperating(period, today) ? pastDayLocks(period, active, today) : [];
+  const locked = new Set(locks.map((c) => `${refNurse(c)}@${(c.params as { day: number }).day}`));
   const constraints = [...rules.map((r) => period.ruleOverrides[r.id] ?? r), ...period.requests]
     .filter((c) => {
       const ref = refNurse(c);
       return ref === undefined || ids.has(ref);
     })
+    // 지난 날짜 잠금이 같은 칸의 수동 고정보다 우선한다
+    .filter((c) => !(c.type === "fixed_assignment" && locked.has(`${c.params.nurse_id}@${c.params.day}`)))
     .map((c) => (period.disabledIds.includes(c.id) ? { ...c, enabled: false } : c));
   const previous = period.result
     ? Object.fromEntries(Object.entries(period.result.assignments).filter(([id]) => ids.has(id)))
     : null;
+  const prev = previousConfirmedPeriod(periods, period);
   return {
     nurses: active.map(({ id, name, years, night_only }) => ({ id, name, years, night_only })) as ScheduleRequest["nurses"],
     period: { start_date: period.start_date, length: period.length },
     holidays: period.holidays,
-    constraints,
-    carry_over: period.carryOver.filter((r) => ids.has(r.nurse_id)),
+    constraints: [...constraints, ...locks],
+    carry_over: prev ? carryOverFrom(prev, activeIds) : period.carryOver.filter((r) => ids.has(r.nurse_id)),
+    history_load: historyLoadFor(periods, period, activeIds),
     ...(previous && { previous }),
   };
+}
+
+/** 마지막 생성에 쓴 이월과 지금 지난 확정본에서 계산한 이월이 다른지(초안·확정 모두, PRD J4). */
+export function carryOverChanged(period: WorkPeriod, periods: WorkPeriod[]): boolean {
+  if (!period.carryOverUsed) return false;
+  const prev = previousConfirmedPeriod(periods, period);
+  if (!prev) return false;
+  const ids = period.result ? Object.keys(period.result.assignments) : period.carryOverUsed.map((r) => r.nurse_id);
+  return !sameCarryOver(period.carryOverUsed, carryOverFrom(prev, ids));
+}
+
+/** 확정된 기간에서 현재 결과가 최신 확정본과 다른지([다시 확정] 활성화). */
+export function hasUnconfirmedChanges(period: WorkPeriod): boolean {
+  const last = period.versions.at(-1);
+  if (period.status !== "confirmed" || !period.result || !last) return false;
+  return diffAssignments(last.assignments, period.result.assignments).length > 0;
+}
+
+export type NextPeriodState = { state: "none" } | { state: "draft" | "confirmed"; period: WorkPeriod };
+
+/** 병동 홈: 운영 중 기간, 오늘 이후 시작하는 가장 이른 기간, 최근 기간(시작일 내림차순). */
+export function homeSummary(
+  periods: WorkPeriod[],
+  today: string,
+): { operating: WorkPeriod | null; next: NextPeriodState; recent: WorkPeriod[] } {
+  const recent = [...periods].sort((a, b) => b.start_date.localeCompare(a.start_date));
+  const upcoming = recent.filter((p) => p.start_date > today).at(-1);
+  return {
+    operating: periods.find((p) => isOperating(p, today)) ?? null,
+    next: upcoming ? { state: upcoming.status, period: upcoming } : { state: "none" },
+    recent,
+  };
+}
+
+/** ① 준비의 명단 점검: 이 기간 이전 마지막 확정 기간의 snapshot 대비 추가·비활성화된 간호사. */
+export function rosterChangesFor(
+  ward: Ward,
+  periods: WorkPeriod[],
+  periodId: string,
+): ReturnType<typeof rosterChanges> {
+  const period = periods.find((p) => p.id === periodId);
+  const prev = period
+    ? (periods.filter((p) => p.status === "confirmed" && p.start_date < period.start_date).at(-1) ?? null)
+    : null;
+  return rosterChanges(prev, ward.nurses);
 }
 
 /** 활성 명단에 없는 간호사를 가리키는 병동 규칙·요청 id. */
@@ -313,7 +387,8 @@ function isData(v: unknown): v is Data {
         typeof p.length === "number" &&
         ["holidays", "requests", "pendingRequests", "disabledIds", "carryOver", "versions"].every((k) =>
           Array.isArray(p[k]),
-        ),
+        ) &&
+        (p.carryOverUsed === null || Array.isArray(p.carryOverUsed)),
     );
   return wardOk && periodsOk && typeof view?.screen === "string" && typeof d.inputVersion === "number";
 }
@@ -504,6 +579,7 @@ export function createAppStore(getStorage: () => Storage, now: () => Date = () =
               return draft.id;
             }
             const last = periods.at(-1);
+            // nextPeriod는 마지막 끝 + 1일 이후의 새 단위 첫 시작일이다(단위를 바꿨어도 맞춰진다)
             const period = newPeriod(
               last ? nextPeriod(ward.unit, last) : periodFrom(ward.unit, firstPeriodStart(ward.unit, today)),
             );
@@ -601,27 +677,27 @@ export function createAppStore(getStorage: () => Storage, now: () => Date = () =
           },
           clearFixed: (periodId, nurseId, day) =>
             editPeriod(periodId, (p) => ({ ...p, requests: p.requests.filter((c) => !isFixedCell(c, nurseId, day)) })),
-          setResult: (periodId, result) => {
+          setResult: (periodId, result, usedCarryOver) => {
             const v = get().inputVersion;
-            editPeriod(periodId, (p) => ({ ...p, result, resultVersion: v }), false);
+            editPeriod(periodId, (p) => ({ ...p, result, resultVersion: v, carryOverUsed: usedCarryOver }), false);
           },
           confirm: (periodId) => {
             const { ward } = get();
             if (!ward) return;
             editPeriod(
               periodId,
-              (p) =>
-                p.result
-                  ? {
-                      ...p,
-                      status: "confirmed",
-                      versions: [
-                        ...p.versions,
-                        { confirmed_at: now().toISOString(), assignments: p.result.assignments, changed: [] },
-                      ],
-                      snapshot: p.snapshot ?? { nurses: ward.nurses.filter((n) => n.active), rules: ward.rules },
-                    }
-                  : p,
+              (p) => {
+                if (!p.result) return p;
+                const last = p.versions.at(-1);
+                const changed = p.status === "confirmed" && last ? diffAssignments(last.assignments, p.result.assignments) : [];
+                if (p.status === "confirmed" && last && changed.length === 0) return p;
+                return {
+                  ...p,
+                  status: "confirmed",
+                  versions: [...p.versions, { confirmed_at: now().toISOString(), assignments: p.result.assignments, changed }],
+                  snapshot: p.snapshot ?? { nurses: ward.nurses.filter((n) => n.active), rules: ward.rules },
+                };
+              },
               false,
             );
           },
