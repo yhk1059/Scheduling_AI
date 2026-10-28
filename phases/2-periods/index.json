@@ -21,7 +21,10 @@
     {
       "step": 2,
       "name": "translator-period",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-10-28T19:14:24+0900",
+      "summary": "translator 컨텍스트를 period{start,end,length}+days[{day,date,weekday,weekend}]로, explainer 컨텍스트를 period+days[{day,date}]로 바꾸고, 프롬프트를 기간 기준(date→day 매핑, 월 없는 일자·기간 밖은 되묻기, scope period, 설명은 11/30 형식)으로 고침; eval 케이스에 선택 필드 period를 두고 월 경계 2주 케이스 p01~p05 추가",
+      "completed_at": "2026-10-28T19:16:55+0900"
     },
     {
       "step": 3,
