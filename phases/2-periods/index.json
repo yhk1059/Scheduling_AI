@@ -93,7 +93,10 @@
     {
       "step": 11,
       "name": "supabase-client",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-10-28T20:00:28+0900",
+      "summary": "supabase/migrations/20261028000000_wards.sql(wards(id, owner_id unique default auth.uid() → auth.users cascade, data jsonb ≤2MB check, updated_at), RLS + to authenticated 정책 4개 owner_id = (select auth.uid()), updated_at 트리거(security invoker, search_path ''), anon revoke; 원격 미적용), @supabase/supabase-js 의존성, lib/supabase.ts 얇은 래퍼(supabaseConfigured, 지연 생성 클라이언트 pkce·persistSession·detectSessionInUrl, onAuthChange/signInWithGoogle(redirect /app)/signOut, loadWard/saveWard(owner_id upsert)/deleteWard, 오류는 Error throw), tdd-guard 예외 */lib/supabase.ts + test_hooks 케이스, CLAUDE.md·ADR-012 TDD 예외 문구, README env 안내",
+      "completed_at": "2026-10-28T20:01:58+0900"
     },
     {
       "step": 12,
