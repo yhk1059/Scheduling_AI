@@ -25,8 +25,9 @@ import type {
   ScheduleRequest,
   ScheduleResult,
 } from "@/lib/types.gen";
+import { describeParams, TEMPLATE_NAMES } from "@/lib/wording";
 
-import ConstraintCard, { describeParams, TEMPLATE_NAMES } from "./ConstraintCard";
+import ConstraintCard from "./ConstraintCard";
 import { Spinner, today } from "./RulesStep";
 import { ui } from "./ui";
 import { confirmedTime } from "./WardHome";
