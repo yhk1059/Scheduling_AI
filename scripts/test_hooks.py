@@ -133,6 +133,7 @@ class TestTddGuard:
         "components/ScheduleGrid.tsx",
         "app/steps/ward.tsx",
         "lib/api.ts",
+        "lib/supabase.ts",
     ])
     def test_allows_exempt_files(self, work_dir, name):
         assert not _denied(_run_tdd_guard(str(work_dir / name)))

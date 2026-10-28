@@ -39,9 +39,9 @@ case "$FILE_PATH" in
     ;;
 esac
 
-# UI 컴포넌트와 fetch 래퍼는 TDD 대상이 아님 (build/lint/수동 저니로 검증) — 허용
+# UI 컴포넌트와 fetch·Supabase 래퍼는 TDD 대상이 아님 (build/lint/수동 저니로 검증) — 허용
 case "$FILE_PATH" in
-  */components/*|*/app/*|*/lib/api.ts)
+  */components/*|*/app/*|*/lib/api.ts|*/lib/supabase.ts)
     exit 0
     ;;
 esac

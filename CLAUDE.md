@@ -16,7 +16,7 @@
 
 ## 개발 프로세스
 - CRITICAL: 백엔드(`backend/`) 전체와 `lib/`의 순수 함수는 테스트를 먼저 작성하고, 테스트가 통과하는 구현을 작성할 것 (TDD)
-- UI 컴포넌트(`app/`, `components/`)와 `lib/api.ts`는 TDD 대상이 아니다. build, lint, 수동 저니로 검증한다.
+- UI 컴포넌트(`app/`, `components/`)와 `lib/api.ts`, `lib/supabase.ts`는 TDD 대상이 아니다. build, lint, 수동 저니로 검증한다.
 - 커밋 메시지는 conventional commits 형식을 따를 것 (feat:, fix:, docs:, refactor:)
 
 ## 명령어
