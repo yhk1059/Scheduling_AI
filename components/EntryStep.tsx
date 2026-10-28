@@ -2,23 +2,25 @@
 
 import { useAppStore } from "@/lib/store";
 
-import { STEPS } from "./Stepper";
+import { today } from "./RulesStep";
+import { STEPS, stepOf } from "./Stepper";
 import { ui } from "./ui";
 
 export const OVERWRITE_MESSAGE = "지금까지 입력한 명단, 규칙, 요청, 근무표가 지워져요. 계속할까요?";
 
 export default function EntryStep({ onDone }: { onDone: () => void }) {
   const hasInput = useAppStore((s) => s.hasInput());
-  const step = useAppStore((s) => s.step);
-  const nurseCount = useAppStore((s) => s.nurses.length);
+  const step = useAppStore((s) => stepOf(s.view));
+  const nurseCount = useAppStore((s) => s.ward?.nurses.filter((n) => n.active).length ?? 0);
   const loadSample = useAppStore((s) => s.loadSample);
-  const reset = useAppStore((s) => s.reset);
-  const setStep = useAppStore((s) => s.setStep);
+  const startWard = useAppStore((s) => s.startWard);
+  const createPeriod = useAppStore((s) => s.createPeriod);
+  const go = useAppStore((s) => s.go);
 
   const start = (load: () => void) => {
     if (hasInput && !window.confirm(OVERWRITE_MESSAGE)) return;
     load();
-    setStep(1);
+    go({ screen: "settings", tab: "roster" });
     onDone();
   };
 
@@ -37,13 +39,17 @@ export default function EntryStep({ onDone }: { onDone: () => void }) {
       title: "샘플로 체험하기",
       body: "샘플 병동(15명)과 규칙·요청을 불러와요. 바로 [생성]까지 해 볼 수 있어요.",
       action: "샘플 불러오기",
-      onClick: () => start(loadSample),
+      onClick: () => start(() => loadSample(today())),
     },
     {
       title: "내 데이터로 시작하기",
       body: "빈 상태에서 대상 월과 명단부터 입력해요. 엑셀 명단을 붙여넣거나 CSV 파일로 올릴 수 있어요.",
       action: "새로 시작",
-      onClick: () => start(reset),
+      onClick: () =>
+        start(() => {
+          startWard();
+          createPeriod(today());
+        }),
     },
   ];
 

@@ -4,7 +4,7 @@ import { useState } from "react";
 
 import { ApiError, errorMessage, translate } from "@/lib/api";
 import { parseCarryOver, type CellError } from "@/lib/roster-import";
-import { findReplaced, useAppStore } from "@/lib/store";
+import { currentPeriod, findReplaced, orphanConstraintIds, toScheduleRequest, useAppStore, type WorkPeriod } from "@/lib/store";
 
 import ConstraintCard from "./ConstraintCard";
 import { ui } from "./ui";
@@ -35,14 +35,11 @@ type Notice = { kind: "clarify" | "unsupported"; text: string } | null;
 
 export default function RulesStep({ scope }: { scope: "ward" | "period" }) {
   const copy = COPY[scope];
-  const nurses = useAppStore((s) => s.nurses);
-  const period = useAppStore((s) => s.period);
-  const holidays = useAppStore((s) => s.holidays);
-  const constraints = useAppStore((s) => s.constraints);
-  const pendingCards = useAppStore((s) => s.pendingCards);
-  const addPendingCards = useAppStore((s) => s.addPendingCards);
-  const setStep = useAppStore((s) => s.setStep);
-  const orphanCount = useAppStore((s) => s.orphanConstraintIds().length);
+  const ward = useAppStore((s) => s.ward);
+  const period = useAppStore(currentPeriod);
+  const addPendingRules = useAppStore((s) => s.addPendingRules);
+  const addPendingRequests = useAppStore((s) => s.addPendingRequests);
+  const go = useAppStore((s) => s.go);
 
   const [text, setText] = useState("");
   const [loading, setLoading] = useState(false);
@@ -50,9 +47,11 @@ export default function RulesStep({ scope }: { scope: "ward" | "period" }) {
   const [toast, setToast] = useState<{ message: string; text: string } | null>(null);
   const [blocked, setBlocked] = useState(false);
 
-  const pending = pendingCards.filter((c) => c.scope === scope);
+  if (!ward || !period) return null;
+  const orphanCount = orphanConstraintIds(ward, period).length;
+  const pending = scope === "ward" ? ward.pendingRules : period.pendingRequests;
   // 필요 인원 폼이 만든 제약(cov-*)은 ① 화면에서 다룬다
-  const applied = constraints.filter((c) => c.scope === scope && !c.id.startsWith("cov-"));
+  const applied = scope === "ward" ? ward.rules.filter((c) => !c.id.startsWith("cov-")) : period.requests;
   const tooLong = text.length > MAX_TEXT_CHARS;
 
   const run = async (input: string) => {
@@ -60,9 +59,11 @@ export default function RulesStep({ scope }: { scope: "ward" | "period" }) {
     setNotice(null);
     setToast(null);
     try {
-      const res = await translate({ text: input, scope, context: { nurses, period, holidays, today: today() } });
+      const { nurses, period: range, holidays } = toScheduleRequest(ward, period);
+      const res = await translate({ text: input, scope, context: { nurses, period: range, holidays, today: today() } });
       if (res.status === "ok") {
-        addPendingCards(res.constraints);
+        if (scope === "ward") addPendingRules(res.constraints);
+        else addPendingRequests(period.id, res.constraints);
         setText("");
       } else if (res.status === "clarify") {
         setNotice({ kind: "clarify", text: res.question });
@@ -79,11 +80,11 @@ export default function RulesStep({ scope }: { scope: "ward" | "period" }) {
 
   const onNext = () => {
     if (scope === "ward") {
-      setStep(3);
+      go({ screen: "period", periodId: period.id, step: 2 });
     } else if (orphanCount > 0) {
       setBlocked(true);
     } else {
-      setStep(4);
+      go({ screen: "period", periodId: period.id, step: 3 });
     }
   };
 
@@ -135,7 +136,7 @@ export default function RulesStep({ scope }: { scope: "ward" | "period" }) {
       ) : (
         <div className="grid grid-cols-2 gap-4">
           {pending.map((c) => (
-            <ConstraintCard key={c.id} card={c} pending replaces={findReplaced(constraints, c)} />
+            <ConstraintCard key={c.id} card={c} pending replaces={findReplaced(scope === "ward" ? ward.rules : period.requests, c)} />
           ))}
           {applied.map((c) => (
             <ConstraintCard key={c.id} card={c} pending={false} />
@@ -143,10 +144,10 @@ export default function RulesStep({ scope }: { scope: "ward" | "period" }) {
         </div>
       )}
 
-      {scope === "period" && <CarryOverSection />}
+      {scope === "period" && <CarryOverSection period={period} />}
 
       <div className="flex items-center justify-between gap-4">
-        <button type="button" onClick={() => setStep(scope === "ward" ? 1 : 2)} className={ui.secondary}>
+        <button type="button" onClick={() => go(scope === "ward" ? { screen: "settings", tab: "roster" } : { screen: "settings", tab: "rules" })} className={ui.secondary}>
           이전
         </button>
         <div className="flex items-center gap-3">
@@ -197,9 +198,10 @@ function cellErrorText(e: CellError): string {
   return at + e.message;
 }
 
-function CarryOverSection() {
-  const nurses = useAppStore((s) => s.nurses);
-  const carryOver = useAppStore((s) => s.carryOver);
+function CarryOverSection({ period }: { period: WorkPeriod }) {
+  const ward = useAppStore((s) => s.ward);
+  const nurses = ward?.nurses.filter((n) => n.active) ?? [];
+  const { carryOver } = period;
   const setCarryOver = useAppStore((s) => s.setCarryOver);
 
   const [text, setText] = useState("");
@@ -208,7 +210,7 @@ function CarryOverSection() {
   const onApply = () => {
     const parsed = parseCarryOver(text, nurses);
     setResult(parsed);
-    if (parsed.errors.length === 0) setCarryOver(parsed.rows);
+    if (parsed.errors.length === 0) setCarryOver(period.id, parsed.rows);
   };
 
   return (
@@ -238,7 +240,7 @@ function CarryOverSection() {
           <button
             type="button"
             onClick={() => {
-              setCarryOver([]);
+              setCarryOver(period.id, []);
               setResult(null);
             }}
             className={ui.text}

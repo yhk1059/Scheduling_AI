@@ -2,15 +2,16 @@
 
 import { useMemo, useState } from "react";
 
-import { periodFrom } from "@/lib/period";
+import { formatRange } from "@/lib/period";
 import { buildRoster, decodeText, mapHeaders, parseDelimited } from "@/lib/roster-import";
-import { useAppStore } from "@/lib/store";
+import { currentPeriod, orphanConstraintIds, useAppStore } from "@/lib/store";
 import type { Nurse } from "@/lib/types.gen";
 
 import CoverageForm, { type CoverageDrafts, hasCoverageError } from "./CoverageForm";
 import { OVERWRITE_MESSAGE } from "./EntryStep";
 import HolidayCalendar from "./HolidayCalendar";
 import RosterEditor, { type RosterDraft } from "./RosterEditor";
+import { today } from "./RulesStep";
 import { ui } from "./ui";
 
 function draftFromNurses(nurses: Nurse[]): RosterDraft {
@@ -35,13 +36,13 @@ function draftFromText(text: string): RosterDraft {
 }
 
 export default function WardStep() {
-  const period = useAppStore((s) => s.period);
-  const setPeriod = useAppStore((s) => s.setPeriod);
-  const nurses = useAppStore((s) => s.nurses);
-  const setNurses = useAppStore((s) => s.setNurses);
+  const period = useAppStore(currentPeriod);
+  const ward = useAppStore((s) => s.ward);
+  const replaceRoster = useAppStore((s) => s.replaceRoster);
   const loadSample = useAppStore((s) => s.loadSample);
-  const setStep = useAppStore((s) => s.setStep);
-  const orphanCount = useAppStore((s) => s.orphanConstraintIds().length);
+  const go = useAppStore((s) => s.go);
+  const nurses = useMemo(() => ward?.nurses.filter((n) => n.active) ?? [], [ward]);
+  const orphanCount = ward ? orphanConstraintIds(ward, period).length : 0;
 
   const [text, setText] = useState("");
   const [draft, setDraft] = useState<RosterDraft | null>(() => (nurses.length > 0 ? draftFromNurses(nurses) : null));
@@ -55,15 +56,18 @@ export default function WardStep() {
   const updateDraft = (next: RosterDraft) => {
     setDraft(next);
     const built = buildRoster(next.rows, next.mapping, next.firstRowIsData);
-    if (built.errors.length === 0 && JSON.stringify(built.nurses) !== JSON.stringify(nurses)) {
-      setNurses(built.nurses);
+    const current = nurses.map(({ name, years, night_only }) => ({ name, years, night_only }));
+    const rows = built.nurses.map(({ name, years, night_only }) => ({ name, years, night_only }));
+    if (built.errors.length === 0 && JSON.stringify(rows) !== JSON.stringify(current)) {
+      replaceRoster(rows);
     }
   };
 
   const onLoadSample = () => {
     if (useAppStore.getState().hasInput() && !window.confirm(OVERWRITE_MESSAGE)) return;
-    loadSample();
-    setDraft(draftFromNurses(useAppStore.getState().nurses));
+    loadSample(today());
+    go({ screen: "settings", tab: "roster" });
+    setDraft(draftFromNurses(useAppStore.getState().ward?.nurses ?? []));
     setCoverageDrafts({});
   };
 
@@ -76,8 +80,8 @@ export default function WardStep() {
     updateDraft(draftFromText(content));
   };
 
-  const canProceed = nurses.length > 0 && roster?.errors.length === 0 && !hasCoverageError(coverageDrafts);
-  const monthValue = period.start_date.slice(0, 7);
+  const canProceed =
+    period !== null && nurses.length > 0 && roster?.errors.length === 0 && !hasCoverageError(coverageDrafts);
 
   return (
     <div className="flex flex-col gap-5">
@@ -88,17 +92,12 @@ export default function WardStep() {
             대상 월과 명단, 근무조별 필요 인원, 공휴일을 정해 주세요.
           </p>
         </div>
-        <label className="flex flex-col gap-1">
-          <span className={ui.label}>대상 월</span>
-          <input
-            type="month"
-            value={monthValue}
-            onChange={(e) => {
-              if (e.target.value) setPeriod(periodFrom("month", `${e.target.value}-01`));
-            }}
-            className={`${ui.input} font-mono`}
-          />
-        </label>
+        {period && (
+          <div className="flex flex-col gap-1">
+            <span className={ui.label}>대상 기간</span>
+            <span className="font-mono text-sm text-[#1B1B18]">{formatRange(period)}</span>
+          </div>
+        )}
       </div>
 
       <section className={`${ui.card} flex flex-col gap-3.5`}>
@@ -151,12 +150,12 @@ export default function WardStep() {
             <h2 className={ui.cardTitle}>공휴일</h2>
             <p className={ui.help}>날짜를 누르면 공휴일로 체크됩니다. 주말과 같은 인원 기준을 씁니다.</p>
           </div>
-          <HolidayCalendar />
+          {period && <HolidayCalendar period={period} />}
         </section>
       </div>
 
       <div className="flex justify-end">
-        <button type="button" disabled={!canProceed} onClick={() => setStep(2)} className={ui.primary}>
+        <button type="button" disabled={!canProceed} onClick={() => go({ screen: "settings", tab: "rules" })} className={ui.primary}>
           다음
         </button>
       </div>

@@ -1,4 +1,20 @@
-import type { Step } from "@/lib/store";
+import type { View } from "@/lib/store";
+
+/** 지금 화면의 단계(병동 → 규칙 → 요청 → 근무표). 화면 구조 개편 전까지 쓴다. */
+export type Step = 1 | 2 | 3 | 4;
+
+/** 화면 → 단계. 기간 ①·②는 요청 단계, ③은 근무표다. */
+export function stepOf(view: View): Step {
+  if (view.screen === "settings") return view.tab === "roster" ? 1 : 2;
+  if (view.screen === "period") return view.step === 3 ? 4 : 3;
+  return 1;
+}
+
+export function viewOf(step: Step, periodId: string | undefined): View {
+  if (step === 1) return { screen: "settings", tab: "roster" };
+  if (step === 2 || periodId === undefined) return { screen: "settings", tab: "rules" };
+  return { screen: "period", periodId, step: step === 3 ? 2 : 3 };
+}
 
 export const STEPS: { step: Step; label: string }[] = [
   { step: 1, label: "병동" },

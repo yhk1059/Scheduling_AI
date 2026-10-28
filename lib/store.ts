@@ -1,20 +1,29 @@
 // 클라이언트의 유일한 저장소. Zustand + persist(localStorage), 쓸 수 없으면 메모리로 동작한다.
+// 상태는 병동 1개 + 기간 목록(ARCHITECTURE "상태 관리"). 이력은 확정된 기간이다.
 import { create } from "zustand";
 import { persist, type PersistStorage, type StorageValue } from "zustand/middleware";
 
-import { monthDay, periodFrom } from "./period";
+import { firstPeriodStart, monthDay, nextPeriod, periodFrom, type PeriodRange, type PeriodUnit } from "./period";
 import sample from "./samples/ward-15.json";
-import type { CarryOverRow, ConstraintChange, ConstraintSpec, Nurse, Period, ScheduleResult } from "./types.gen";
+import type {
+  CarryOverRow,
+  ConstraintChange,
+  ConstraintSpec,
+  DiffCell,
+  Nurse,
+  ScheduleRequest,
+  ScheduleResult,
+} from "./types.gen";
 
 export const STORAGE_KEY = "nurse-scheduler";
-const STORAGE_VERSION = 2;
+const STORAGE_VERSION = 3;
 const COVERAGE_SOURCE_TEXT = "필요 인원 설정";
 const COVERAGE_WEIGHT = 10; // backend/domain/constants.py DEFAULT_WEIGHT
 // backend/llm/translator.py _weight와 같은 규칙: soft는 템플릿 기본값(없으면 DEFAULT_WEIGHT), hard는 1
 const SOFT_WEIGHTS: Record<string, number> = { shift_preference: 10, night_fairness: 5, weekend_fairness: 5 };
 const ALWAYS_HARD = ["leave", "fixed_assignment"];
+const SAMPLE_WARD_NAME = "샘플 병동";
 
-export type Step = 1 | 2 | 3 | 4;
 export type Shift = "D" | "E" | "N";
 export type DayKind = "weekday" | "weekend";
 export type Assignments = ScheduleResult["assignments"];
@@ -25,75 +34,143 @@ export interface CardPatch {
   params?: ConstraintSpec["params"];
 }
 
-interface Data {
-  step: Step;
-  period: Period;
+export interface WardNurse extends Nurse {
+  active: boolean;
+}
+export type NurseRow = Omit<Nurse, "id">;
+
+export interface Ward {
+  name: string;
+  unit: PeriodUnit;
+  nurses: WardNurse[];
+  /** 다음에 부여할 번호. 줄어들지 않는다 */
+  nextNurseNo: number;
+  /** scope "ward". 필요 인원(daily_coverage)도 여기 */
+  rules: ConstraintSpec[];
+  pendingRules: ConstraintSpec[];
+  /** 샘플에서 시작했는지(로그인 시 질문에 쓴다) */
+  isSample: boolean;
+}
+
+export interface PeriodVersion {
+  confirmed_at: string;
+  assignments: Assignments;
+  /** 직전 버전 대비 바뀐 칸 */
+  changed: DiffCell[];
+}
+
+export interface WorkPeriod extends PeriodRange {
+  id: string;
   holidays: number[];
-  nurses: Nurse[];
-  constraints: ConstraintSpec[];
-  pendingCards: ConstraintSpec[];
+  /** scope "period" (요청, 수동 고정) */
+  requests: ConstraintSpec[];
+  pendingRequests: ConstraintSpec[];
+  /** [이번 기간만 끄기] */
+  disabledIds: string[];
+  /** 이 기간에만 바뀐 병동 규칙(제안 수락 update) */
+  ruleOverrides: Record<string, ConstraintSpec>;
+  /** 수동 입력 이월(첫 기간) */
   carryOver: CarryOverRow[];
   result: ScheduleResult | null;
-  confirmed: Assignments | null;
-  inputVersion: number;
   /** result를 만든 요청의 inputVersion. 현재와 다르면 stale. */
   resultVersion: number | null;
+  status: "draft" | "confirmed";
+  versions: PeriodVersion[];
+  /** 확정 시점의 명단·병동 규칙 */
+  snapshot: { nurses: WardNurse[]; rules: ConstraintSpec[] } | null;
+}
+
+export type View =
+  | { screen: "home" }
+  | { screen: "settings"; tab: "roster" | "rules" }
+  | { screen: "period"; periodId: string; step: 1 | 2 | 3 };
+
+interface Data {
+  ward: Ward | null;
+  /** start_date 오름차순 */
+  periods: WorkPeriod[];
+  view: View;
+  inputVersion: number;
 }
 
 export interface AppState extends Data {
   storageAvailable: boolean;
   resetNotice: boolean;
-  setStep: (step: Step) => void;
-  setPeriod: (period: Period) => void;
-  toggleHoliday: (day: number) => void;
-  setNurses: (nurses: Nurse[]) => void;
-  setCarryOver: (rows: CarryOverRow[]) => void;
+  // 병동
+  startWard: () => void;
+  /** 샘플 병동 + 첫 기간을 만들고 그 기간을 연다. */
+  loadSample: (today: string) => void;
+  setWardName: (name: string) => void;
+  setUnit: (unit: PeriodUnit) => void;
   setCoverage: (shift: Shift, dayKind: DayKind, min: number, max: number) => void;
-  addPendingCards: (cards: ConstraintSpec[]) => void;
-  applyCard: (id: string) => void;
-  /** 대기 카드는 그대로, 적용된 제약은 inputVersion을 올리며 바꾼다. */
-  updateCard: (id: string, patch: CardPatch) => void;
-  removeCard: (id: string) => void;
-  orphanConstraintIds: () => string[];
-  /** 응답 버전이 현재와 같을 때만 부른다. resultVersion = 지금의 inputVersion. */
-  setResult: (result: ScheduleResult) => void;
-  setEnabled: (id: string, enabled: boolean) => void;
-  /** 검증된 제안의 변경: disable → enabled=false, update → params·hardness 교체. */
-  applyChanges: (changes: ConstraintChange[]) => void;
+  addPendingRules: (cards: ConstraintSpec[]) => void;
+  applyRule: (id: string) => void;
+  /** 대기 카드는 그대로, 적용된 규칙은 inputVersion을 올리며 바꾼다. */
+  updateRule: (id: string, patch: CardPatch) => void;
+  removeRule: (id: string) => void;
+  // 명단
+  addNurses: (rows: NurseRow[]) => void;
+  updateNurse: (id: string, patch: Partial<NurseRow>) => void;
+  setNurseActive: (id: string, active: boolean) => void;
+  /** 같은 이름은 id를 유지하고, 새 이름에만 새 id, 빠진 사람은 비활성. */
+  replaceRoster: (rows: NurseRow[]) => void;
+  /** 어떤 기간에서도 쓰이지 않은 간호사만 지운다. 아니면 비활성으로 바꾼다. */
+  removeNurse: (id: string) => void;
+  // 기간
+  /** 초안이 있으면 그 기간을, 없으면 새 기간을 만들어 ①로 간다. 병동이 없으면 null. */
+  createPeriod: (today: string) => string | null;
+  toggleHoliday: (periodId: string, day: number) => void;
+  setCarryOver: (periodId: string, rows: CarryOverRow[]) => void;
+  addPendingRequests: (periodId: string, cards: ConstraintSpec[]) => void;
+  applyRequest: (periodId: string, id: string) => void;
+  updateRequest: (periodId: string, id: string, patch: CardPatch) => void;
+  removeRequest: (periodId: string, id: string) => void;
+  /** 이 기간의 disabledIds만 바꾼다. 병동 규칙·요청 원본은 그대로 둔다. */
+  setDisabled: (periodId: string, constraintId: string, disabled: boolean) => void;
+  /** 검증된 제안: disable → disabledIds, update → 요청은 직접, 병동 규칙은 ruleOverrides. */
+  applyChanges: (periodId: string, changes: ConstraintChange[]) => void;
   /** 그 칸의 기존 고정 배정을 지우고 수동 고정 제약을 추가한다. */
-  setFixed: (nurseId: string, day: number, shift: Code) => void;
-  clearFixed: (nurseId: string, day: number) => void;
-  confirm: () => void;
-  loadSample: () => void;
-  /** 명단·공휴일·제약·대기 카드·이월 중 하나라도 있으면 true. 단계와 대상 월은 입력으로 보지 않는다. */
+  setFixed: (periodId: string, nurseId: string, day: number, shift: Code) => void;
+  clearFixed: (periodId: string, nurseId: string, day: number) => void;
+  /** 응답 버전이 현재와 같을 때만 부른다. resultVersion = 지금의 inputVersion. */
+  setResult: (periodId: string, result: ScheduleResult) => void;
+  confirm: (periodId: string) => void;
+  // 화면
+  go: (view: View) => void;
+  /** 병동이 있거나 기간이 하나라도 있으면 true. */
   hasInput: () => boolean;
   /** 초기 상태로 되돌린다. 진행 중 요청의 응답을 버리도록 inputVersion은 올린다. */
   reset: () => void;
   dismissResetNotice: () => void;
 }
 
-/** 오늘 다음 달 전체(달력 월 기간). */
-function nextMonth(now: Date): Period {
-  const first = new Date(now.getFullYear(), now.getMonth() + 1, 1);
-  const iso = `${first.getFullYear()}-${String(first.getMonth() + 1).padStart(2, "0")}-01`;
-  return periodFrom("month", iso);
+function initialData(): Data {
+  return { ward: null, periods: [], view: { screen: "home" }, inputVersion: 0 };
 }
 
-function initialData(now: Date): Data {
+function emptyWard(): Ward {
+  return { name: "", unit: "month", nurses: [], nextNurseNo: 1, rules: [], pendingRules: [], isSample: false };
+}
+
+function newPeriod(range: PeriodRange): WorkPeriod {
   return {
-    step: 1,
-    period: nextMonth(now),
+    ...range,
+    id: `p-${range.start_date}`,
     holidays: [],
-    nurses: [],
-    constraints: [],
-    pendingCards: [],
+    requests: [],
+    pendingRequests: [],
+    disabledIds: [],
+    ruleOverrides: {},
     carryOver: [],
     result: null,
-    confirmed: null,
-    inputVersion: 0,
     resultVersion: null,
+    status: "draft",
+    versions: [],
+    snapshot: null,
   };
 }
+
+const nurseId = (no: number) => `n${String(no).padStart(2, "0")}`;
 
 /**
  * 교체 기준: 같은 type·scope·대상. 대상은 nurse_id(고정 배정은 nurse_id·day, 희망 근무는 nurse_id·shift·대상 날짜),
@@ -135,21 +212,110 @@ function patched(c: ConstraintSpec, patch: CardPatch): ConstraintSpec {
   return { ...next, hardness: patch.hardness, weight };
 }
 
+function changePatch(ch: ConstraintChange): CardPatch {
+  return {
+    ...(ch.params && { params: ch.params as ConstraintSpec["params"] }),
+    ...(ch.hardness && { hardness: ch.hardness }),
+  };
+}
+
 function isFixedCell(c: ConstraintSpec, nurseId: string, day: number): boolean {
   return c.type === "fixed_assignment" && c.params.nurse_id === nurseId && c.params.day === day;
+}
+
+function refNurse(c: ConstraintSpec): string | undefined {
+  return (c.params as { nurse_id?: string } | undefined)?.nurse_id;
+}
+
+/** 이 기간을 풀 때 쓰는 명단과 병동 규칙 원본. 확정된 기간은 확정 시점의 것을 쓴다(PRD J1). */
+function basis(ward: Ward, period: WorkPeriod): { nurses: WardNurse[]; rules: ConstraintSpec[] } {
+  return period.status === "confirmed" && period.snapshot ? period.snapshot : ward;
+}
+
+/** 기간 하나의 /solve·/explain 요청 본문(input_version 제외). */
+export function toScheduleRequest(ward: Ward, period: WorkPeriod): Omit<ScheduleRequest, "input_version"> {
+  const { nurses, rules } = basis(ward, period);
+  const active = nurses.filter((n) => n.active);
+  const ids = new Set(active.map((n) => n.id));
+  const constraints = [...rules.map((r) => period.ruleOverrides[r.id] ?? r), ...period.requests]
+    .filter((c) => {
+      const ref = refNurse(c);
+      return ref === undefined || ids.has(ref);
+    })
+    .map((c) => (period.disabledIds.includes(c.id) ? { ...c, enabled: false } : c));
+  const previous = period.result
+    ? Object.fromEntries(Object.entries(period.result.assignments).filter(([id]) => ids.has(id)))
+    : null;
+  return {
+    nurses: active.map(({ id, name, years, night_only }) => ({ id, name, years, night_only })) as ScheduleRequest["nurses"],
+    period: { start_date: period.start_date, length: period.length },
+    holidays: period.holidays,
+    constraints,
+    carry_over: period.carryOver.filter((r) => ids.has(r.nurse_id)),
+    ...(previous && { previous }),
+  };
+}
+
+/** 활성 명단에 없는 간호사를 가리키는 병동 규칙·요청 id. */
+export function orphanConstraintIds(ward: Ward, period: WorkPeriod | null): string[] {
+  const ids = new Set(ward.nurses.filter((n) => n.active).map((n) => n.id));
+  return [...ward.rules, ...(period?.requests ?? [])]
+    .filter((c) => {
+      const ref = refNurse(c);
+      return ref !== undefined && !ids.has(ref);
+    })
+    .map((c) => c.id);
+}
+
+/** 지금 화면의 기간. 기간 화면이 아니면 첫 초안, 없으면 마지막 기간. */
+export function currentPeriod(s: Pick<Data, "periods" | "view">): WorkPeriod | null {
+  if (s.view.screen === "period") {
+    const { periodId } = s.view;
+    const found = s.periods.find((p) => p.id === periodId);
+    if (found) return found;
+  }
+  return s.periods.find((p) => p.status === "draft") ?? s.periods.at(-1) ?? null;
+}
+
+/** 어떤 기간의 요청·결과·확정본·이월에서 쓰이거나, 병동 규칙이 참조하는 간호사인지. */
+function isNurseUsed(id: string, ward: Ward, periods: WorkPeriod[]): boolean {
+  const refs = (list: ConstraintSpec[]) => list.some((c) => refNurse(c) === id);
+  if (refs(ward.rules) || refs(ward.pendingRules)) return true;
+  return periods.some(
+    (p) =>
+      refs(p.requests) ||
+      refs(p.pendingRequests) ||
+      p.carryOver.some((r) => r.nurse_id === id) ||
+      (p.result !== null && id in p.result.assignments) ||
+      p.versions.some((v) => id in v.assignments) ||
+      (p.snapshot?.nurses.some((n) => n.id === id) ?? false),
+  );
 }
 
 function isData(v: unknown): v is Data {
   if (typeof v !== "object" || v === null) return false;
   const d = v as Record<string, unknown>;
-  const p = d.period as Record<string, unknown> | undefined;
-  return (
-    [1, 2, 3, 4].includes(d.step as number) &&
-    typeof p?.start_date === "string" &&
-    typeof p?.length === "number" &&
-    ["holidays", "nurses", "constraints", "pendingCards", "carryOver"].every((k) => Array.isArray(d[k])) &&
-    typeof d.inputVersion === "number"
-  );
+  const w = d.ward as Record<string, unknown> | null | undefined;
+  const view = d.view as Record<string, unknown> | undefined;
+  const wardOk =
+    w === null ||
+    (typeof w === "object" &&
+      w !== undefined &&
+      ["nurses", "rules", "pendingRules"].every((k) => Array.isArray(w[k])) &&
+      typeof w.nextNurseNo === "number" &&
+      typeof w.unit === "string");
+  const periodsOk =
+    Array.isArray(d.periods) &&
+    d.periods.every(
+      (p: Record<string, unknown>) =>
+        typeof p?.id === "string" &&
+        typeof p.start_date === "string" &&
+        typeof p.length === "number" &&
+        ["holidays", "requests", "pendingRequests", "disabledIds", "carryOver", "versions"].every((k) =>
+          Array.isArray(p[k]),
+        ),
+    );
+  return wardOk && periodsOk && typeof view?.screen === "string" && typeof d.inputVersion === "number";
 }
 
 /** localStorage를 감싼 저장소. 접근·쓰기가 예외를 던지면 메모리로 바꾸고 onFail을 부른다. */
@@ -200,7 +366,7 @@ function safeStorage(
   return { storage: persistStorage, available: storage !== null };
 }
 
-export function createAppStore(getStorage: () => Storage, now: Date = new Date()) {
+export function createAppStore(getStorage: () => Storage, now: () => Date = () => new Date()) {
   let markUnavailable = () => {};
   const { storage, available } = safeStorage(getStorage, () => markUnavailable());
 
@@ -208,23 +374,66 @@ export function createAppStore(getStorage: () => Storage, now: Date = new Date()
     persist(
       (set, get) => {
         const bump = (patch: Partial<Data>) => set((s) => ({ ...patch, inputVersion: s.inputVersion + 1 }));
+        /** 병동이 있을 때만 바꾼다. */
+        const editWard = (fn: (w: Ward) => Ward, version = true) => {
+          const { ward } = get();
+          if (!ward) return;
+          if (version) bump({ ward: fn(ward) });
+          else set({ ward: fn(ward) });
+        };
+        const editPeriod = (periodId: string, fn: (p: WorkPeriod) => WorkPeriod, version = true) => {
+          const { periods } = get();
+          if (!periods.some((p) => p.id === periodId)) return;
+          const next = periods.map((p) => (p.id === periodId ? fn(p) : p));
+          if (version) bump({ periods: next });
+          else set({ periods: next });
+        };
+        const withIds = (w: Ward, rows: NurseRow[]): Ward => ({
+          ...w,
+          nurses: [
+            ...w.nurses,
+            ...rows.map(({ name, years, night_only }, i) => ({
+              id: nurseId(w.nextNurseNo + i),
+              name,
+              years,
+              night_only,
+              active: true,
+            })),
+          ],
+          nextNurseNo: w.nextNurseNo + rows.length,
+        });
+
         return {
-          ...initialData(now),
+          ...initialData(),
           storageAvailable: available,
           resetNotice: false,
-          setStep: (step) => set({ step }),
-          setPeriod: (period) => bump({ period, holidays: [] }),
-          toggleHoliday: (day) => {
-            const { holidays } = get();
+
+          startWard: () => bump({ ward: emptyWard(), periods: [], view: { screen: "settings", tab: "roster" } }),
+          loadSample: (today) => {
+            const period: WorkPeriod = {
+              ...newPeriod(periodFrom("month", firstPeriodStart("month", today))),
+              holidays: sample.holidays,
+              carryOver: sample.carry_over as CarryOverRow[],
+            };
             bump({
-              holidays: holidays.includes(day) ? holidays.filter((d) => d !== day) : [...holidays, day].sort((a, b) => a - b),
+              ward: {
+                ...emptyWard(),
+                name: SAMPLE_WARD_NAME,
+                nurses: sample.nurses.map((n) => ({ ...n, active: true })),
+                nextNurseNo: sample.nurses.length + 1,
+                rules: sample.constraints as ConstraintSpec[],
+                isSample: true,
+              },
+              periods: [period],
+              view: { screen: "period", periodId: period.id, step: 1 },
             });
           },
-          setNurses: (nurses) => bump({ nurses }),
-          setCarryOver: (carryOver) => bump({ carryOver }),
+          setWardName: (name) => editWard((w) => ({ ...w, name })),
+          setUnit: (unit) => editWard((w) => ({ ...w, unit })),
           setCoverage: (shift, dayKind, min, max) =>
-            bump({
-              constraints: upsert(get().constraints, {
+            editWard((w) => ({
+              ...w,
+              rules: upsert(w.rules, {
                 id: `cov-${dayKind}-${shift}`,
                 type: "daily_coverage",
                 scope: "ward",
@@ -234,100 +443,192 @@ export function createAppStore(getStorage: () => Storage, now: Date = new Date()
                 enabled: true,
                 params: { shift, day_kind: dayKind, min, max },
               }),
-            }),
-          addPendingCards: (cards) => set((s) => ({ pendingCards: [...s.pendingCards, ...cards] })),
-          applyCard: (id) => {
-            const { pendingCards, constraints } = get();
-            const card = pendingCards.find((c) => c.id === id);
+            })),
+          addPendingRules: (cards) => editWard((w) => ({ ...w, pendingRules: [...w.pendingRules, ...cards] }), false),
+          applyRule: (id) => {
+            const card = get().ward?.pendingRules.find((c) => c.id === id);
             if (!card) return;
-            bump({ pendingCards: pendingCards.filter((c) => c.id !== id), constraints: upsert(constraints, card) });
+            editWard((w) => ({ ...w, pendingRules: w.pendingRules.filter((c) => c.id !== id), rules: upsert(w.rules, card) }));
           },
-          updateCard: (id, patch) => {
-            const { pendingCards, constraints } = get();
-            if (pendingCards.some((c) => c.id === id)) {
-              set({ pendingCards: pendingCards.map((c) => (c.id === id ? patched(c, patch) : c)) });
-            } else if (constraints.some((c) => c.id === id)) {
-              bump({ constraints: constraints.map((c) => (c.id === id ? patched(c, patch) : c)) });
+          updateRule: (id, patch) => {
+            const w = get().ward;
+            if (w?.pendingRules.some((c) => c.id === id)) {
+              editWard((w) => ({ ...w, pendingRules: w.pendingRules.map((c) => (c.id === id ? patched(c, patch) : c)) }), false);
+            } else if (w?.rules.some((c) => c.id === id)) {
+              editWard((w) => ({ ...w, rules: w.rules.map((c) => (c.id === id ? patched(c, patch) : c)) }));
             }
           },
-          removeCard: (id) => {
-            const { pendingCards, constraints } = get();
-            if (pendingCards.some((c) => c.id === id)) {
-              set({ pendingCards: pendingCards.filter((c) => c.id !== id) });
-            } else if (constraints.some((c) => c.id === id)) {
-              bump({ constraints: constraints.filter((c) => c.id !== id) });
+          removeRule: (id) => {
+            const w = get().ward;
+            if (w?.pendingRules.some((c) => c.id === id)) {
+              editWard((w) => ({ ...w, pendingRules: w.pendingRules.filter((c) => c.id !== id) }), false);
+            } else if (w?.rules.some((c) => c.id === id)) {
+              editWard((w) => ({ ...w, rules: w.rules.filter((c) => c.id !== id) }));
             }
           },
-          orphanConstraintIds: () => {
-            const ids = new Set(get().nurses.map((n) => n.id));
-            return get()
-              .constraints.filter((c) => {
-                const p = (c.params ?? {}) as { nurse_id?: string };
-                return p.nurse_id !== undefined && !ids.has(p.nurse_id);
-              })
-              .map((c) => c.id);
+
+          addNurses: (rows) => editWard((w) => withIds(w, rows)),
+          updateNurse: (id, patch) =>
+            editWard((w) => ({ ...w, nurses: w.nurses.map((n) => (n.id === id ? { ...n, ...patch } : n)) })),
+          setNurseActive: (id, active) =>
+            editWard((w) => ({ ...w, nurses: w.nurses.map((n) => (n.id === id ? { ...n, active } : n)) })),
+          replaceRoster: (rows) =>
+            editWard((w) => {
+              const byName = new Map(w.nurses.map((n) => [n.name, n]));
+              let no = w.nextNurseNo;
+              // 붙여넣은 순서를 따르고, 빠진 사람은 뒤에 비활성으로 남긴다
+              const listed = rows.map(({ name, years, night_only }) => ({
+                id: byName.get(name)?.id ?? nurseId(no++),
+                name,
+                years,
+                night_only,
+                active: true,
+              }));
+              const listedIds = new Set(listed.map((n) => n.id));
+              const missing = w.nurses.filter((n) => !listedIds.has(n.id)).map((n) => ({ ...n, active: false }));
+              return { ...w, nurses: [...listed, ...missing], nextNurseNo: no };
+            }),
+          removeNurse: (id) => {
+            const { ward, periods } = get();
+            if (!ward) return;
+            if (isNurseUsed(id, ward, periods)) get().setNurseActive(id, false);
+            else editWard((w) => ({ ...w, nurses: w.nurses.filter((n) => n.id !== id) }));
           },
-          setResult: (result) => set((s) => ({ result, resultVersion: s.inputVersion })),
-          setEnabled: (id, enabled) => {
-            const { constraints } = get();
-            if (constraints.some((c) => c.id === id))
-              bump({ constraints: constraints.map((c) => (c.id === id ? { ...c, enabled } : c)) });
+
+          createPeriod: (today) => {
+            const { ward, periods } = get();
+            if (!ward) return null;
+            const draft = periods.find((p) => p.status === "draft");
+            if (draft) {
+              set({ view: { screen: "period", periodId: draft.id, step: 1 } });
+              return draft.id;
+            }
+            const last = periods.at(-1);
+            const period = newPeriod(
+              last ? nextPeriod(ward.unit, last) : periodFrom(ward.unit, firstPeriodStart(ward.unit, today)),
+            );
+            bump({ periods: [...periods, period], view: { screen: "period", periodId: period.id, step: 1 } });
+            return period.id;
           },
-          applyChanges: (changes) => {
-            const byId = new Map(changes.map((ch) => [ch.constraint_id, ch]));
-            bump({
-              constraints: get().constraints.map((c) => {
-                const ch = byId.get(c.id);
-                if (!ch) return c;
-                if (ch.action === "disable") return { ...c, enabled: false };
-                return patched(c, {
-                  ...(ch.params && { params: ch.params as ConstraintSpec["params"] }),
-                  ...(ch.hardness && { hardness: ch.hardness }),
-                });
-              }),
+          toggleHoliday: (periodId, day) =>
+            editPeriod(periodId, (p) => ({
+              ...p,
+              holidays: p.holidays.includes(day)
+                ? p.holidays.filter((d) => d !== day)
+                : [...p.holidays, day].sort((a, b) => a - b),
+            })),
+          setCarryOver: (periodId, carryOver) => editPeriod(periodId, (p) => ({ ...p, carryOver })),
+          addPendingRequests: (periodId, cards) =>
+            editPeriod(periodId, (p) => ({ ...p, pendingRequests: [...p.pendingRequests, ...cards] }), false),
+          applyRequest: (periodId, id) => {
+            const card = get().periods.find((p) => p.id === periodId)?.pendingRequests.find((c) => c.id === id);
+            if (!card) return;
+            editPeriod(periodId, (p) => ({
+              ...p,
+              pendingRequests: p.pendingRequests.filter((c) => c.id !== id),
+              requests: upsert(p.requests, card),
+            }));
+          },
+          updateRequest: (periodId, id, patch) => {
+            const period = get().periods.find((p) => p.id === periodId);
+            if (period?.pendingRequests.some((c) => c.id === id)) {
+              editPeriod(
+                periodId,
+                (p) => ({ ...p, pendingRequests: p.pendingRequests.map((c) => (c.id === id ? patched(c, patch) : c)) }),
+                false,
+              );
+            } else if (period?.requests.some((c) => c.id === id)) {
+              editPeriod(periodId, (p) => ({ ...p, requests: p.requests.map((c) => (c.id === id ? patched(c, patch) : c)) }));
+            }
+          },
+          removeRequest: (periodId, id) => {
+            const period = get().periods.find((p) => p.id === periodId);
+            if (period?.pendingRequests.some((c) => c.id === id)) {
+              editPeriod(periodId, (p) => ({ ...p, pendingRequests: p.pendingRequests.filter((c) => c.id !== id) }), false);
+            } else if (period?.requests.some((c) => c.id === id)) {
+              editPeriod(periodId, (p) => ({ ...p, requests: p.requests.filter((c) => c.id !== id) }));
+            }
+          },
+          setDisabled: (periodId, constraintId, disabled) =>
+            editPeriod(periodId, (p) => ({
+              ...p,
+              disabledIds: disabled
+                ? [...p.disabledIds.filter((id) => id !== constraintId), constraintId]
+                : p.disabledIds.filter((id) => id !== constraintId),
+            })),
+          applyChanges: (periodId, changes) => {
+            const { ward } = get();
+            if (!ward) return;
+            editPeriod(periodId, (p) => {
+              const rules = basis(ward, p).rules;
+              let next = p;
+              for (const ch of changes) {
+                if (ch.action === "disable") {
+                  if (!next.disabledIds.includes(ch.constraint_id))
+                    next = { ...next, disabledIds: [...next.disabledIds, ch.constraint_id] };
+                } else if (next.requests.some((c) => c.id === ch.constraint_id)) {
+                  next = {
+                    ...next,
+                    requests: next.requests.map((c) => (c.id === ch.constraint_id ? patched(c, changePatch(ch)) : c)),
+                  };
+                } else {
+                  const rule = next.ruleOverrides[ch.constraint_id] ?? rules.find((r) => r.id === ch.constraint_id);
+                  if (rule)
+                    next = { ...next, ruleOverrides: { ...next.ruleOverrides, [rule.id]: patched(rule, changePatch(ch)) } };
+                }
+              }
+              return next;
             });
           },
-          setFixed: (nurseId, day, shift) => {
-            const { constraints, nurses, period } = get();
-            const name = nurses.find((n) => n.id === nurseId)?.name ?? nurseId;
-            bump({
-              constraints: [
-                ...constraints.filter((c) => !isFixedCell(c, nurseId, day)),
+          setFixed: (periodId, nurseId, day, shift) => {
+            const name = get().ward?.nurses.find((n) => n.id === nurseId)?.name ?? nurseId;
+            editPeriod(periodId, (p) => ({
+              ...p,
+              requests: [
+                ...p.requests.filter((c) => !isFixedCell(c, nurseId, day)),
                 {
                   id: `fix-${nurseId}-${day}`,
                   type: "fixed_assignment",
                   scope: "period",
                   hardness: "hard",
                   weight: 1,
-                  source_text: `수동 고정: ${name} ${monthDay(period, day)} ${shift}`,
+                  source_text: `수동 고정: ${name} ${monthDay(p, day)} ${shift}`,
                   enabled: true,
                   params: { nurse_id: nurseId, day, shift },
                 },
               ],
-            });
+            }));
           },
-          clearFixed: (nurseId, day) =>
-            bump({ constraints: get().constraints.filter((c) => !isFixedCell(c, nurseId, day)) }),
-          confirm: () => {
-            const { result } = get();
-            if (result) set({ confirmed: result.assignments });
+          clearFixed: (periodId, nurseId, day) =>
+            editPeriod(periodId, (p) => ({ ...p, requests: p.requests.filter((c) => !isFixedCell(c, nurseId, day)) })),
+          setResult: (periodId, result) => {
+            const v = get().inputVersion;
+            editPeriod(periodId, (p) => ({ ...p, result, resultVersion: v }), false);
           },
-          loadSample: () =>
-            bump({
-              nurses: sample.nurses,
-              holidays: sample.holidays,
-              constraints: sample.constraints as ConstraintSpec[],
-              pendingCards: [],
-              carryOver: sample.carry_over as CarryOverRow[],
-              result: null,
-              resultVersion: null,
-              confirmed: null,
-            }),
-          hasInput: () => {
-            const s = get();
-            return [s.nurses, s.holidays, s.constraints, s.pendingCards, s.carryOver].some((list) => list.length > 0);
+          confirm: (periodId) => {
+            const { ward } = get();
+            if (!ward) return;
+            editPeriod(
+              periodId,
+              (p) =>
+                p.result
+                  ? {
+                      ...p,
+                      status: "confirmed",
+                      versions: [
+                        ...p.versions,
+                        { confirmed_at: now().toISOString(), assignments: p.result.assignments, changed: [] },
+                      ],
+                      snapshot: p.snapshot ?? { nurses: ward.nurses.filter((n) => n.active), rules: ward.rules },
+                    }
+                  : p,
+              false,
+            );
           },
-          reset: () => bump(initialData(now)),
+
+          go: (view) => set({ view }),
+          hasInput: () => get().ward !== null || get().periods.length > 0,
+          reset: () => bump(initialData()),
           dismissResetNotice: () => set({ resetNotice: false }),
         };
       },
@@ -335,19 +636,7 @@ export function createAppStore(getStorage: () => Storage, now: Date = new Date()
         name: STORAGE_KEY,
         version: STORAGE_VERSION,
         storage,
-        partialize: (s): Data => ({
-          step: s.step,
-          period: s.period,
-          holidays: s.holidays,
-          nurses: s.nurses,
-          constraints: s.constraints,
-          pendingCards: s.pendingCards,
-          carryOver: s.carryOver,
-          result: s.result,
-          confirmed: s.confirmed,
-          inputVersion: s.inputVersion,
-          resultVersion: s.resultVersion,
-        }),
+        partialize: (s): Data => ({ ward: s.ward, periods: s.periods, view: s.view, inputVersion: s.inputVersion }),
         // 버전이 다르거나 파싱에 실패하면 버리고, merge에서 초기 상태 + resetNotice로 처리한다
         migrate: () => null as unknown as Data,
         merge: (persisted, current) =>

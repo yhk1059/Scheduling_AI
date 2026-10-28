@@ -33,7 +33,8 @@ export default function CoverageForm({
   drafts: CoverageDrafts;
   setDrafts: (update: (d: CoverageDrafts) => CoverageDrafts) => void;
 }) {
-  const constraints = useAppStore((s) => s.constraints);
+  const ward = useAppStore((s) => s.ward);
+  const constraints = ward?.rules ?? [];
   const setCoverage = useAppStore((s) => s.setCoverage);
 
   const stored = (shift: Shift, kind: DayKind) => {

@@ -5,7 +5,7 @@ import { useState } from "react";
 import { ApiError, errorMessage, explain, solve, translate } from "@/lib/api";
 import { toScheduleCsv } from "@/lib/csv";
 import { isWeekendDay, monthDay, periodDays } from "@/lib/period";
-import { type Assignments, type Code, findReplaced, useAppStore } from "@/lib/store";
+import { type Code, currentPeriod, findReplaced, toScheduleRequest, useAppStore } from "@/lib/store";
 import type {
   Conflict,
   ConstraintSpec,
@@ -52,23 +52,17 @@ function toMessage(e: unknown): string {
 }
 
 export default function ScheduleStep() {
-  const nurses = useAppStore((s) => s.nurses);
-  const period = useAppStore((s) => s.period);
-  const holidays = useAppStore((s) => s.holidays);
-  const constraints = useAppStore((s) => s.constraints);
-  const pendingCards = useAppStore((s) => s.pendingCards);
-  const result = useAppStore((s) => s.result);
-  const resultVersion = useAppStore((s) => s.resultVersion);
+  const ward = useAppStore((s) => s.ward);
+  const period = useAppStore(currentPeriod);
   const inputVersion = useAppStore((s) => s.inputVersion);
-  const confirmed = useAppStore((s) => s.confirmed);
   const setResult = useAppStore((s) => s.setResult);
   const setFixed = useAppStore((s) => s.setFixed);
   const clearFixed = useAppStore((s) => s.clearFixed);
-  const setEnabled = useAppStore((s) => s.setEnabled);
+  const setDisabled = useAppStore((s) => s.setDisabled);
   const applyChanges = useAppStore((s) => s.applyChanges);
-  const addPendingCards = useAppStore((s) => s.addPendingCards);
+  const addPendingRequests = useAppStore((s) => s.addPendingRequests);
   const confirm = useAppStore((s) => s.confirm);
-  const setStep = useAppStore((s) => s.setStep);
+  const go = useAppStore((s) => s.go);
 
   const [loading, setLoading] = useState(false);
   const [explaining, setExplaining] = useState(false);
@@ -94,24 +88,32 @@ export default function ScheduleStep() {
     }
   };
 
-  const run = async (previous: Assignments | null) => {
+  if (!ward || !period) return null;
+  const periodId = period.id;
+  const { nurses, period: range, holidays = [], constraints = [] } = toScheduleRequest(ward, period);
+  const { result, resultVersion } = period;
+  const confirmed = period.versions.at(-1)?.assignments ?? null;
+
+  /** 지금 store로 요청 본문을 만든다. 확정본이 있으면 확정본에서 최소한으로 바꾼다. */
+  const buildRequest = (): Req => {
+    const s = useAppStore.getState();
+    const p = s.periods.find((x) => x.id === periodId)!;
+    const req = toScheduleRequest(s.ward!, p);
+    const base = p.versions.at(-1)?.assignments;
+    if (!base) return req;
+    return { ...req, previous: Object.fromEntries(req.nurses.filter((n) => base[n.id]).map((n) => [n.id, base[n.id]])) };
+  };
+
+  const run = async () => {
     setLoading(true);
     setToast(null);
-    const s = useAppStore.getState();
-    const req: Req = {
-      nurses: s.nurses as ScheduleRequest["nurses"],
-      period: s.period,
-      holidays: s.holidays,
-      constraints: s.constraints,
-      carry_over: s.carryOver,
-      ...(previous && { previous }),
-    };
+    const req = buildRequest();
     try {
       const res = await solve(req);
       // 풀이 중 입력이 바뀌면 버린다(남은 결과에는 stale 배지가 뜬다)
       if (res.input_version !== useAppStore.getState().inputVersion) return;
       if (res.status === "ok") {
-        setResult(res.result);
+        setResult(periodId, res.result);
         setOutcome(null);
       } else if (res.status === "timeout") {
         setOutcome({ kind: "timeout", version: res.input_version });
@@ -121,22 +123,21 @@ export default function ScheduleStep() {
         await runExplain(req, res.conflicts, res.input_version);
       }
     } catch (e) {
-      setToast({ message: toMessage(e), retry: () => void run(previous) });
+      setToast({ message: toMessage(e), retry: () => void run() });
     } finally {
       setLoading(false);
     }
   };
 
-  // 확정본이 있으면 모든 재풀이를 확정본에서 최소 변경으로 한다
-  const regenerate = () => void run(useAppStore.getState().confirmed);
+  const regenerate = () => void run();
 
   const translateChange = async (input: string): Promise<string | null> => {
     setTranslating(true);
     setToast(null);
     try {
-      const res = await translate({ text: input, scope: "period", context: { nurses, period, holidays, today: today() } });
+      const res = await translate({ text: input, scope: "period", context: { nurses, period: range, holidays, today: today() } });
       if (res.status === "ok") {
-        addPendingCards(res.constraints);
+        addPendingRequests(periodId, res.constraints);
         setChangeIds((ids) => [...ids, ...res.constraints.map((c) => c.id)]);
         return null;
       }
@@ -157,9 +158,9 @@ export default function ScheduleStep() {
 
   const onPick = (cell: Cell, code: Code | null) => {
     setSelected(null);
-    if (code === null) clearFixed(cell.nurseId, cell.day);
-    else setFixed(cell.nurseId, cell.day, code);
-    void run(confirmed ?? result?.assignments ?? null);
+    if (code === null) clearFixed(periodId, cell.nurseId, cell.day);
+    else setFixed(periodId, cell.nurseId, cell.day, code);
+    void run();
   };
 
   const download = () => {
@@ -178,7 +179,7 @@ export default function ScheduleStep() {
   const rows = result ? nurses.filter((n) => result.assignments[n.id]) : [];
   const shownVersion = outcome ? outcome.version : resultVersion;
   const stale = !busy && shownVersion !== null && shownVersion !== inputVersion;
-  const changeCards = pendingCards.filter((c) => changeIds.includes(c.id));
+  const changeCards = period.pendingRequests.filter((c) => changeIds.includes(c.id));
   const diff = isDraft ? (result.diff ?? []) : [];
 
   return (
@@ -194,7 +195,7 @@ export default function ScheduleStep() {
         <div className="flex items-center gap-2">
           {result && (
             <>
-              <button type="button" onClick={confirm} disabled={busy || isConfirmed} className={ui.secondary}>
+              <button type="button" onClick={() => confirm(periodId)} disabled={busy || isConfirmed} className={ui.secondary}>
                 {isConfirmed ? "확정됨" : "확정"}
               </button>
               <button type="button" onClick={download} disabled={busy} className={ui.secondary}>
@@ -217,7 +218,7 @@ export default function ScheduleStep() {
               key={c.id}
               card={c}
               pending
-              replaces={findReplaced(constraints, c)}
+              replaces={findReplaced(period.requests, c)}
               busy={busy}
               onApplied={regenerate}
             />
@@ -247,14 +248,14 @@ export default function ScheduleStep() {
           period={period}
           hasResult={result !== null}
           onAccept={(p) => {
-            applyChanges(p.changes);
+            applyChanges(periodId, p.changes);
             regenerate();
           }}
           onDisable={(id) => {
-            setEnabled(id, false);
+            setDisabled(periodId, id, true);
             regenerate();
           }}
-          onToggle={(id, enabled) => setEnabled(id, enabled)}
+          onToggle={(id, enabled) => setDisabled(periodId, id, !enabled)}
         />
       )}
 
@@ -300,7 +301,7 @@ export default function ScheduleStep() {
       )}
 
       <div>
-        <button type="button" onClick={() => setStep(3)} className={ui.secondary}>
+        <button type="button" onClick={() => go({ screen: "period", periodId, step: 2 })} className={ui.secondary}>
           이전
         </button>
       </div>
