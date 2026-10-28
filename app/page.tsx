@@ -13,55 +13,40 @@ const REPO_URL = "https://github.com/yhk1059/harness_framework";
 const HAS_DEMO_GIF = existsSync(path.join(process.cwd(), "public", "demo.gif"));
 
 const PAINS = [
-  { pain: "규칙이 머릿속에만 있다", fix: "말로 적은 규칙이 규칙 카드가 됩니다. 원문과 해석 결과를 나란히 보고 [적용]합니다." },
+  { pain: "규칙이 머릿속에만 있다", fix: "평소 말투로 적은 규칙이 카드로 정리됩니다. 원문과 읽은 내용을 나란히 보고 [적용]을 눌러야 반영돼요." },
   {
     pain: "요청이 다 안 들어가는데 어디서 막히는지 모른다",
-    fix: "충돌하는 규칙을 찾아 설명하고, 재풀이로 해가 나오는 것이 확인된 완화 제안만 보여줍니다.",
+    fix: "함께 지킬 수 없는 규칙을 찾아 이유를 알려 줍니다. 해결책은 실제로 근무표가 만들어지는 것만 보여 드려요.",
   },
-  { pain: "확정 후 병가가 생기면 전체를 다시 짠다", fix: "확정본과 최소한으로 달라지게 다시 짜고, 바뀐 칸을 표시합니다." },
-  { pain: "“왜 나만 주말이 많아요?”에 근거를 대기 어렵다", fix: "개인별 D/E/N/O, 주말·공휴일 근무, 최대 연속 근무, 평균 대비 편차를 보여줍니다." },
+  { pain: "확정 후 병가가 생기면 전체를 다시 짠다", fix: "확정한 근무표에서 최소한의 칸만 바꿔 다시 만들고, 바뀐 칸을 표시합니다. 이미 지난 날은 건드리지 않아요." },
+  { pain: "“왜 나만 주말이 많아요?”에 근거를 대기 어렵다", fix: "간호사마다 데이·이브닝·나이트·휴무 수, 주말·공휴일 근무, 평균보다 많은 근무일을 보여 줍니다." },
+  {
+    pain: "매번 명단, 규칙, 지난 근무를 다시 옮겨 적는다",
+    fix: "병동 명단과 규칙은 그대로 남고, 지난 근무표의 마지막 며칠을 다음 근무표가 이어받습니다.",
+  },
+  {
+    pain: "지난번에 나이트를 많이 한 사람을 배려하기 어렵다",
+    fix: "최근 4주 나이트와 주말 근무를 보고, 많이 한 사람은 이번 근무표에서 줄여 줍니다.",
+  },
 ];
 
 const STEPS = [
   {
-    title: "말로 규칙 입력",
-    body: "“나이트 다음 날은 무조건 쉬게”처럼 평소 말투로 적으면, LLM이 정해진 템플릿 12개 중 하나로 번역해 카드로 제안합니다. 모호하면 되묻고, 지원하지 않는 규칙이면 그렇다고 알려줍니다.",
+    title: "말로 규칙 적기",
+    body: "“나이트 다음 날은 무조건 쉬게”처럼 평소 말투로 적으면 규칙 카드로 정리됩니다. 애매하면 되묻고, 아직 못 하는 규칙이면 그렇다고 알려 드려요.",
   },
   {
-    title: "솔버가 생성",
-    body: "적용된 규칙과 요청으로 CP-SAT 솔버가 기간 근무표를 풉니다. hard 규칙은 반드시 지키고, soft 규칙은 위반을 최소화합니다.",
+    title: "근무표 만들기",
+    body: "적용한 규칙과 요청으로 근무표를 만듭니다. ‘반드시’ 규칙은 꼭 지키고, ‘가능하면’ 규칙은 최대한 지켜요.",
   },
   {
-    title: "막히면 이유와 검증된 해결책",
-    body: "해가 없으면 충돌하는 규칙을 찾아 원인을 설명합니다. 완화 제안은 서버가 다시 풀어 해가 나오는 것만 보여주고, [수락]해야 반영됩니다.",
-  },
-];
-
-const DESIGN = [
-  {
-    title: "LLM은 번역과 설명만",
-    body: "자연어를 제약 스펙(템플릿 type + params)으로 번역하고 충돌 원인을 설명합니다. 코드를 만들거나 근무를 직접 배정하지 않습니다.",
+    title: "막히면 이유와 해결책",
+    body: "모든 규칙을 지키는 근무표가 없으면 어떤 규칙끼리 부딪히는지 설명하고, 근무표가 만들어지는 해결책만 골라 보여 드립니다. [수락]해야 반영돼요.",
   },
   {
-    title: "계산은 CP-SAT",
-    body: "OR-Tools CP-SAT가 근무표를 풀고, 해가 없음을 증명하고, 충돌하는 제약 집합을 찾습니다. 모든 풀이에 시간 제한을 겁니다.",
+    title: "다음 근무표로 이어짐",
+    body: "다음 근무표를 만들면 날짜와 지난 근무 마지막 며칠이 자동으로 채워지고, 최근 4주 나이트를 많이 한 사람을 배려합니다.",
   },
-  {
-    title: "LLM 출력 검증 장치",
-    body: "Pydantic 스키마와 참조 무결성 검사를 통과해야 쓰고(실패 시 최대 2회 재시도), 사람이 [적용]하거나 서버가 재풀이로 검증한 것만 근무표에 반영됩니다. 이름은 가명으로 바꿔 보냅니다.",
-  },
-];
-
-// eval/results.md 최종 실행(3회차) 값 그대로.
-const EVAL_ROWS = [
-  ["케이스 수", "44"],
-  ["스키마 유효율", "100.0%"],
-  ["status 정확도", "100.0%"],
-  ["제약 F1", "100.0%"],
-  ["케이스 완전 일치율", "100.0%"],
-  ["평균 재시도 횟수", "0.00"],
-  ["평균 지연(초)", "1.95"],
-  ["p95 지연(초)", "2.76"],
 ];
 
 const h2 = "text-[26px] leading-[1.35] font-semibold tracking-[-0.01em] text-[#1B1B18]";
@@ -75,14 +60,14 @@ export default function Home() {
     <main className="mx-auto w-full max-w-[1360px] px-8">
       <section className="grid grid-cols-[minmax(0,5fr)_minmax(0,7fr)] items-center gap-12 py-[72px]">
         <div className="flex flex-col gap-5">
-          <p className={eyebrow}>간호사 근무표 · LLM + CP-SAT</p>
+          <p className={eyebrow}>간호사 근무표</p>
           <h1 className="text-[42px] leading-[1.3] font-semibold tracking-[-0.02em] text-[#1B1B18]">
             말로 설명한 규칙으로
-            <br />한 달 근무표를 짭니다
+            <br />근무표를 짭니다
           </h1>
           <p className="text-[15px] leading-relaxed text-[#3D3D38]">
-            수간호사가 평소 말투로 규칙과 요청을 적으면 LLM이 규칙 카드로 번역하고, CP-SAT 솔버가 3교대 근무표를 풉니다. 막히면 이유와
-            검증된 해결책을 보여줍니다.
+            평소 말투로 규칙과 요청을 적으면 3교대 근무표가 나옵니다. 막히면 이유와 해결책을 알려 드리고, 다음 근무표는 지난 근무를
+            이어받아 만들어요.
           </p>
           <div className="flex items-center gap-2">
             <Link
@@ -98,7 +83,7 @@ export default function Home() {
               GitHub
             </a>
           </div>
-          <p className="text-xs font-medium text-[#66665E]">로그인 없이 샘플 병동(15명)으로 체험하거나, 내 명단으로 바로 시작할 수 있습니다.</p>
+          <p className="text-xs font-medium text-[#66665E]">로그인 없이 샘플 병동(15명)으로 체험하거나, 내 명단으로 바로 시작할 수 있어요.</p>
         </div>
         <LandingPreview />
       </section>
@@ -121,9 +106,9 @@ export default function Home() {
       <section className={section}>
         <div className="flex flex-col gap-2">
           <p className={eyebrow}>02 · 동작 방식</p>
-          <h2 className={h2}>입력은 말로, 계산은 솔버가</h2>
+          <h2 className={h2}>말로 적으면 근무표가 나옵니다</h2>
         </div>
-        <ol className="mt-8 grid grid-cols-3 gap-4">
+        <ol className="mt-8 grid grid-cols-4 gap-4">
           {STEPS.map((s, i) => (
             <li key={s.title} className={`${card} flex flex-col gap-2`}>
               <span className="font-mono text-[13px] font-medium text-[#66665E]">{i + 1}</span>
@@ -137,13 +122,13 @@ export default function Home() {
       <section className={section}>
         <div className="flex flex-col gap-2">
           <p className={eyebrow}>03 · 데모</p>
-          <h2 className={h2}>규칙 입력부터 운영 중 재스케줄까지</h2>
+          <h2 className={h2}>규칙 입력부터 확정 후 변경까지</h2>
         </div>
         <div className="mt-8">
           {HAS_DEMO_GIF ? (
             <Image
               src="/demo.gif"
-              alt="규칙 입력, 근무표 생성, 충돌 해결, 재스케줄 데모"
+              alt="규칙 입력, 근무표 만들기, 막힌 근무표 해결, 확정 후 변경 데모"
               width={1280}
               height={720}
               unoptimized
@@ -159,38 +144,21 @@ export default function Home() {
 
       <section className={section}>
         <div className="flex flex-col gap-2">
-          <p className={eyebrow}>04 · 설계 요약</p>
-          <h2 className={h2}>LLM이 잘하는 일에만 LLM을 씁니다</h2>
+          <p className={eyebrow}>04 · 만든 방식</p>
+          <h2 className={h2}>말은 LLM이, 계산은 솔버가</h2>
         </div>
-        <div className="mt-8 grid grid-cols-[minmax(0,7fr)_minmax(0,5fr)] gap-4">
-          <div className="flex flex-col gap-4">
-            {DESIGN.map((d) => (
-              <div key={d.title} className={`${card} flex flex-col gap-2`}>
-                <h3 className="text-[15px] font-semibold text-[#1B1B18]">{d.title}</h3>
-                <p className={body}>{d.body}</p>
-              </div>
-            ))}
-          </div>
-          <div className={`${card} flex flex-col gap-3`}>
-            <h3 className="text-[15px] font-semibold text-[#1B1B18]">번역 정확도 eval</h3>
-            <p className={body}>
-              수간호사 말투 문장 44개(규칙, 요청, 되묻기, 미지원)를 실제 API로 번역해 기대 제약과 비교했습니다. 모델{" "}
-              <span className="font-mono text-[13px]">claude-sonnet-5-5</span>, 3회차 실행 결과입니다.
-            </p>
-            <table className="w-full text-sm">
-              <tbody>
-                {EVAL_ROWS.map(([k, v]) => (
-                  <tr key={k} className="border-t border-[#EFEFEB]">
-                    <td className="py-2 text-xs font-medium text-[#66665E]">{k}</td>
-                    <td className="py-2 text-right font-mono text-[13px] font-medium text-[#1B1B18]">{v}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-            <p className="text-xs font-medium text-[#66665E]">
-              1회차 0%(API가 강제 tool_choice 거절) → 2회차 F1 97.9% → 프롬프트 지시 1줄 추가 후 3회차 100%. 데이터셋 기대값은 고치지 않았습니다.
-            </p>
-          </div>
+        <div className={`${card} mt-8 flex max-w-[760px] flex-col gap-3`}>
+          <p className={body}>
+            말을 규칙 카드로 바꾸고 막힌 이유를 설명하는 일은 LLM(Claude)이, 근무 배정 계산은 OR-Tools CP-SAT 솔버가 합니다. LLM은 근무를
+            직접 배정하지 않고, LLM이 낸 결과는 사람이 [적용]하거나 서버가 다시 계산해 확인한 것만 근무표에 들어갑니다.
+          </p>
+          <p className={body}>
+            번역 정확도: 수간호사 말투 문장 <span className="font-mono text-[13px]">44</span>개로 측정한 제약 F1{" "}
+            <span className="font-mono text-[13px]">100.0%</span>(3회차 실행).
+          </p>
+          <a href={REPO_URL} className="self-start text-sm font-medium text-[#155E75] hover:text-[#0E4A5C]">
+            GitHub에서 자세히 보기
+          </a>
         </div>
       </section>
 
