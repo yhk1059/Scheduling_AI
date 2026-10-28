@@ -29,7 +29,10 @@
     {
       "step": 3,
       "name": "sample-store",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-10-29T01:14:35+0900",
+      "summary": "lib/sample.ts buildSample(today, makeId) 추가(순수 함수: 오늘이 속한 달은 confirmed-schedules.json의 \"{길이}-{1일 요일(월=0)}\" 확정본으로 status confirmed·versions 1개(시작 전날 18:00 KST)·snapshot·carryOverUsed [], 다음 달은 next_requests 3개가 적용된 초안, 병동은 샘플 병동·달력 월·15명 활성·필요 인원+규칙 6개·isSample); store loadSample은 buildSample(id p-sample-N)로 바꾸고 view를 home으로(옛 다음 달 기간 하나만 만들던 코드와 SAMPLE_WARD_NAME·ward-15 import 제거), StartScreen의 중복 go(home) 제거; lib/sample.test.ts 8개(2026-10-28→31-3 10월 확정+11월 초안, 2027-02-15→28-0 2월, 1일 당일 운영 중, isOperating, 요청 날짜 범위, carry_over=확정본 마지막 7일·history_load 비어 있지 않음, homeSummary·nextTask \"운영 중 10월 + 작성 중 11월\", wardRuleCount 6), store.test.ts loadSample 기대값 갱신·createPeriod가 샘플 초안을 여는 테스트 추가; 샘플 로드 시 네트워크 호출 0건(Playwright 수동 확인, 생성 시 이월·최근 4주 근거 표시), STORAGE_VERSION 4 유지; pytest 411·vitest 179·build·lint 통과",
+      "completed_at": "2026-10-29T01:17:06+0900"
     },
     {
       "step": 4,
