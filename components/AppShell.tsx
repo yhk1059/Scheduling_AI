@@ -2,25 +2,36 @@
 
 import { useState } from "react";
 
+import { formatRange, unitLabel } from "@/lib/period";
 import { currentPeriod, useAppStore } from "@/lib/store";
 
-import EntryStep from "./EntryStep";
+import HolidayCalendar from "./HolidayCalendar";
 import RulesStep from "./RulesStep";
 import ScheduleStep from "./ScheduleStep";
-import Stepper, { stepOf, viewOf } from "./Stepper";
+import StartScreen from "./StartScreen";
 import { ui } from "./ui";
-import WardStep from "./WardStep";
+import WardHome from "./WardHome";
+import WardSettings from "./WardSettings";
 
 export default function AppShell() {
-  const step = useAppStore((s) => stepOf(s.view));
+  const ward = useAppStore((s) => s.ward);
+  const view = useAppStore((s) => s.view);
   const go = useAppStore((s) => s.go);
-  const period = useAppStore(currentPeriod);
-  const nurseCount = useAppStore((s) => s.ward?.nurses.filter((n) => n.active).length ?? 0);
   const storageAvailable = useAppStore((s) => s.storageAvailable);
   const resetNotice = useAppStore((s) => s.resetNotice);
   const dismissResetNotice = useAppStore((s) => s.dismissResetNotice);
-  // /app에 들어올 때마다 시작 방법을 고른다(저장하지 않는다)
+  // /app에 들어올 때마다 시작 화면을 보여 준다(저장하지 않는다)
   const [entered, setEntered] = useState(false);
+  const started = entered && ward !== null;
+
+  const tabs = [
+    { label: "홈", current: view.screen === "home", onClick: () => go({ screen: "home" }) },
+    {
+      label: "병동 설정",
+      current: view.screen === "settings",
+      onClick: () => go({ screen: "settings", tab: "roster" }),
+    },
+  ];
 
   return (
     <div className="flex flex-1 flex-col">
@@ -28,49 +39,93 @@ export default function AppShell() {
         <div className="mx-auto flex h-14 max-w-[1360px] items-center justify-between px-8">
           <div className="flex items-baseline gap-3">
             <span className="text-[15px] font-semibold text-[#1B1B18]">간호사 근무표</span>
-            <span className="text-xs font-medium text-[#66665E]">
-              {period && (
-                <span className="font-mono">
-                  {Number(period.start_date.slice(0, 4))}년 {Number(period.start_date.slice(5, 7))}월
-                </span>
-              )}
-              {nurseCount > 0 && <> · 로테이션 {nurseCount}명</>}
-            </span>
+            {started && (
+              <span className="text-xs font-medium text-[#66665E]">
+                {ward.name || "이름 없는 병동"} · {unitLabel(ward.unit)}
+              </span>
+            )}
           </div>
-          {entered && <Stepper current={step} onSelect={(s) => go(viewOf(s, period?.id))} />}
+          <span className="text-xs text-[#66665E]">이 브라우저에만 저장</span>
         </div>
       </header>
+      {started && (
+        <nav className="border-b border-[#E2E2DC] bg-white">
+          <div className="mx-auto flex max-w-[1360px] gap-1 px-6">
+            {tabs.map((t) => (
+              <button
+                key={t.label}
+                type="button"
+                onClick={t.onClick}
+                aria-current={t.current ? "page" : undefined}
+                className={`${ui.text} ${t.current ? "font-semibold text-[#1B1B18]" : ""}`}
+              >
+                {t.label}
+              </button>
+            ))}
+          </div>
+        </nav>
+      )}
 
       <main className="mx-auto flex w-full max-w-[1360px] flex-col gap-5 px-8 py-6">
         {!storageAvailable && (
-          <p role="status" className="rounded-lg border border-[#F1D3A8] bg-[#FDF0DC] px-4 py-2.5 text-sm text-[#7A4506]">
-            이 브라우저에서는 저장소를 쓸 수 없어요. 새로고침하면 입력이 사라집니다.
+          <p role="status" className={ui.banner}>
+            이 브라우저에서는 저장소를 쓸 수 없어요. 새로고침하면 입력이 사라져요.
           </p>
         )}
         {resetNotice && (
-          <div
-            role="status"
-            className="flex items-center justify-between rounded-lg border border-[#F1D3A8] bg-[#FDF0DC] px-4 py-1.5 text-sm text-[#7A4506]"
-          >
+          <div role="status" className={ui.banner}>
             저장된 데이터가 손상되었거나 이전 버전이라 처음 상태로 초기화했어요.
-            <button type="button" onClick={dismissResetNotice} className={ui.text}>
+            <button type="button" onClick={dismissResetNotice} className={ui.textSm}>
               닫기
             </button>
           </div>
         )}
 
-        {!entered ? (
-          <EntryStep onDone={() => setEntered(true)} />
-        ) : step === 1 ? (
-          <WardStep />
-        ) : step === 2 ? (
-          <RulesStep key="ward" scope="ward" />
-        ) : step === 3 ? (
-          <RulesStep key="period" scope="period" />
+        {!started ? (
+          <StartScreen onDone={() => setEntered(true)} />
+        ) : view.screen === "home" ? (
+          <WardHome />
+        ) : view.screen === "settings" ? (
+          <WardSettings />
         ) : (
-          <ScheduleStep />
+          <PeriodScreen />
         )}
       </main>
     </div>
+  );
+}
+
+/** 기간 작업. step 5에서 스테퍼 ①②③ 화면으로 바꾼다. 지금은 기존 요청·근무표 화면을 연결해 둔다. */
+function PeriodScreen() {
+  const period = useAppStore(currentPeriod);
+  const step = useAppStore((s) => (s.view.screen === "period" ? s.view.step : 1));
+  const go = useAppStore((s) => s.go);
+  if (!period) return null;
+
+  return (
+    <>
+      <div className="flex flex-col gap-1">
+        <div>
+          <button type="button" onClick={() => go({ screen: "home" })} className={ui.textSm}>
+            ← 홈
+          </button>
+        </div>
+        <p className="font-mono text-[15px] font-semibold text-[#1B1B18]">{formatRange(period)}</p>
+      </div>
+      {step === 3 ? (
+        <ScheduleStep />
+      ) : (
+        <>
+          <section className={`${ui.card} flex flex-col gap-3`}>
+            <div className="flex flex-col gap-1">
+              <h2 className={ui.cardTitle}>공휴일</h2>
+              <p className={ui.help}>날짜를 누르면 공휴일로 체크됩니다. 주말과 같은 인원 기준을 씁니다.</p>
+            </div>
+            <HolidayCalendar period={period} />
+          </section>
+          <RulesStep key="period" scope="period" />
+        </>
+      )}
+    </>
   );
 }

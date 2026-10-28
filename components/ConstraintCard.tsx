@@ -6,6 +6,7 @@ import { monthDay } from "@/lib/period";
 import { type CardPatch, currentPeriod, type Hardness, useAppStore } from "@/lib/store";
 import type { ConstraintSpec, Nurse, Period } from "@/lib/types.gen";
 
+import { previewRange } from "./RulesStep";
 import { ui } from "./ui";
 
 export const TEMPLATE_NAMES: Record<ConstraintSpec["type"], string> = {
@@ -302,20 +303,22 @@ export default function ConstraintCard({
   const [draft, setDraft] = useState<Draft | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  if (!ward || !period) return null;
-  const nurses = ward.nurses.filter((n) => n.active);
   // 병동 규칙은 병동에, 요청은 지금 기간에 반영한다
   const isRule = card.scope === "ward";
+  if (!ward || (!isRule && !period)) return null;
+  // 기간이 아직 없으면(병동 설정) 다음 기간 범위로 날짜를 보여 준다
+  const range = period ?? previewRange(ward.unit);
+  const nurses = ward.nurses.filter((n) => n.active);
   const store = useAppStore.getState();
-  const applyCard = (id: string) => (isRule ? store.applyRule(id) : store.applyRequest(period.id, id));
+  const applyCard = (id: string) => (isRule ? store.applyRule(id) : store.applyRequest(period!.id, id));
   const updateCard = (id: string, patch: CardPatch) =>
-    isRule ? store.updateRule(id, patch) : store.updateRequest(period.id, id, patch);
-  const removeCard = (id: string) => (isRule ? store.removeRule(id) : store.removeRequest(period.id, id));
+    isRule ? store.updateRule(id, patch) : store.updateRequest(period!.id, id, patch);
+  const removeCard = (id: string) => (isRule ? store.removeRule(id) : store.removeRequest(period!.id, id));
 
   const nurseId = (card.params as { nurse_id?: string } | undefined)?.nurse_id;
   const orphan = nurseId !== undefined && !nurses.some((n) => n.id === nurseId);
   const editable = FIELDS[card.type].length > 0;
-  const lastDay = period.length;
+  const lastDay = range.length;
 
   const save = () => {
     if (!draft) return;
@@ -354,7 +357,7 @@ export default function ConstraintCard({
         </div>
       ) : (
         <p className="rounded-sm bg-[#F6F6F3] px-2.5 py-2 font-mono text-xs text-[#66665E]">
-          {describeParams(card, nurses, period)}
+          {describeParams(card, nurses, range)}
         </p>
       )}
 

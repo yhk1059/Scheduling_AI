@@ -5,6 +5,7 @@ import {
   createAppStore,
   currentPeriod,
   findReplaced,
+  isNurseUsed,
   orphanConstraintIds,
   STORAGE_KEY,
   toScheduleRequest,
@@ -276,6 +277,14 @@ describe("간호사 id", () => {
     store.getState().removeNurse("n01"); // 초안 기간의 대기 요청이 참조
     store.getState().removeNurse("n02");
     expect(store.getState().ward!.nurses.map((n) => [n.id, n.active])).toEqual([["n01", false]]);
+  });
+
+  it("isNurseUsed는 기간 요청·결과에서 쓰인 간호사만 true다([삭제] 표시 기준)", () => {
+    const { store, id } = withPeriod();
+    store.getState().setResult(id, result({ n02: ["D"] }));
+    const { ward, periods } = store.getState();
+    expect(isNurseUsed("n01", ward!, periods)).toBe(false);
+    expect(isNurseUsed("n02", ward!, periods)).toBe(true);
   });
 
   it("결과나 확정본에 있는 간호사도 지우지 않는다", () => {

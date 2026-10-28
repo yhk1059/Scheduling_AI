@@ -3,6 +3,7 @@
 import { useState } from "react";
 
 import { ApiError, errorMessage, translate } from "@/lib/api";
+import { firstPeriodStart, periodFrom, type PeriodRange, type PeriodUnit } from "@/lib/period";
 import { parseCarryOver, type CellError } from "@/lib/roster-import";
 import { currentPeriod, findReplaced, orphanConstraintIds, toScheduleRequest, useAppStore, type WorkPeriod } from "@/lib/store";
 
@@ -31,6 +32,11 @@ export function today(): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
+/** 기간이 아직 없을 때 병동 규칙 해석·표시에 쓰는 다음 기간 범위. */
+export function previewRange(unit: PeriodUnit): PeriodRange {
+  return periodFrom(unit, firstPeriodStart(unit, today()));
+}
+
 type Notice = { kind: "clarify" | "unsupported"; text: string } | null;
 
 export default function RulesStep({ scope }: { scope: "ward" | "period" }) {
@@ -47,11 +53,11 @@ export default function RulesStep({ scope }: { scope: "ward" | "period" }) {
   const [toast, setToast] = useState<{ message: string; text: string } | null>(null);
   const [blocked, setBlocked] = useState(false);
 
-  if (!ward || !period) return null;
+  if (!ward || (scope === "period" && !period)) return null;
   const orphanCount = orphanConstraintIds(ward, period).length;
-  const pending = scope === "ward" ? ward.pendingRules : period.pendingRequests;
-  // 필요 인원 폼이 만든 제약(cov-*)은 ① 화면에서 다룬다
-  const applied = scope === "ward" ? ward.rules.filter((c) => !c.id.startsWith("cov-")) : period.requests;
+  const pending = scope === "ward" ? ward.pendingRules : period!.pendingRequests;
+  // 필요 인원 폼이 만든 제약(cov-*)은 [명단·필요 인원] 탭에서 다룬다
+  const applied = scope === "ward" ? ward.rules.filter((c) => !c.id.startsWith("cov-")) : period!.requests;
   const tooLong = text.length > MAX_TEXT_CHARS;
 
   const run = async (input: string) => {
@@ -59,11 +65,18 @@ export default function RulesStep({ scope }: { scope: "ward" | "period" }) {
     setNotice(null);
     setToast(null);
     try {
-      const { nurses, period: range, holidays } = toScheduleRequest(ward, period);
+      // 기간이 없으면(병동 설정) 활성 명단과 다음 기간 범위로 해석한다
+      const { nurses, period: range, holidays } = period
+        ? toScheduleRequest(ward, period)
+        : {
+            nurses: ward.nurses.filter((n) => n.active).map(({ id, name, years, night_only }) => ({ id, name, years, night_only })),
+            period: previewRange(ward.unit),
+            holidays: [],
+          };
       const res = await translate({ text: input, scope, context: { nurses, period: range, holidays, today: today() } });
       if (res.status === "ok") {
         if (scope === "ward") addPendingRules(res.constraints);
-        else addPendingRequests(period.id, res.constraints);
+        else addPendingRequests(period!.id, res.constraints);
         setText("");
       } else if (res.status === "clarify") {
         setNotice({ kind: "clarify", text: res.question });
@@ -79,9 +92,8 @@ export default function RulesStep({ scope }: { scope: "ward" | "period" }) {
   };
 
   const onNext = () => {
-    if (scope === "ward") {
-      go({ screen: "period", periodId: period.id, step: 2 });
-    } else if (orphanCount > 0) {
+    if (!period) return;
+    if (orphanCount > 0) {
       setBlocked(true);
     } else {
       go({ screen: "period", periodId: period.id, step: 3 });
@@ -90,8 +102,9 @@ export default function RulesStep({ scope }: { scope: "ward" | "period" }) {
 
   return (
     <div className="flex flex-col gap-5">
+      {/* 병동 규칙은 병동 설정의 탭 안에 놓이므로 페이지 제목을 두지 않는다 */}
       <div className="flex flex-col gap-1">
-        <h1 className="text-[22px] font-semibold text-[#1B1B18]">{copy.title}</h1>
+        {scope === "period" && <h1 className="text-[22px] font-semibold text-[#1B1B18]">{copy.title}</h1>}
         <p className="text-sm leading-relaxed text-[#3D3D38]">{copy.description}</p>
       </div>
 
@@ -136,7 +149,7 @@ export default function RulesStep({ scope }: { scope: "ward" | "period" }) {
       ) : (
         <div className="grid grid-cols-2 gap-4">
           {pending.map((c) => (
-            <ConstraintCard key={c.id} card={c} pending replaces={findReplaced(scope === "ward" ? ward.rules : period.requests, c)} />
+            <ConstraintCard key={c.id} card={c} pending replaces={findReplaced(scope === "ward" ? ward.rules : period!.requests, c)} />
           ))}
           {applied.map((c) => (
             <ConstraintCard key={c.id} card={c} pending={false} />
@@ -144,14 +157,19 @@ export default function RulesStep({ scope }: { scope: "ward" | "period" }) {
         </div>
       )}
 
-      {scope === "period" && <CarryOverSection period={period} />}
+      {scope === "period" && period && <CarryOverSection period={period} />}
 
+      {scope === "ward" && pending.length > 0 && (
+        <p className={ui.help}>적용하지 않은 카드 {pending.length}개는 근무표에 반영되지 않아요.</p>
+      )}
+
+      {scope === "period" && (
       <div className="flex items-center justify-between gap-4">
-        <button type="button" onClick={() => go(scope === "ward" ? { screen: "settings", tab: "roster" } : { screen: "settings", tab: "rules" })} className={ui.secondary}>
+        <button type="button" onClick={() => go({ screen: "home" })} className={ui.secondary}>
           이전
         </button>
         <div className="flex items-center gap-3">
-          {scope === "period" && blocked && orphanCount > 0 && (
+          {blocked && orphanCount > 0 && (
             <p role="alert" className={ui.error}>
               명단에 없는 간호사를 가리키는 규칙·요청 {orphanCount}개를 삭제하거나 고친 뒤 넘어갈 수 있어요.
             </p>
@@ -164,6 +182,7 @@ export default function RulesStep({ scope }: { scope: "ward" | "period" }) {
           </button>
         </div>
       </div>
+      )}
 
       {toast && (
         <div
