@@ -3,7 +3,7 @@
 import { useState } from "react";
 
 import { monthDay } from "@/lib/period";
-import { type Hardness, useAppStore } from "@/lib/store";
+import { type CardPatch, currentPeriod, type Hardness, useAppStore } from "@/lib/store";
 import type { ConstraintSpec, Nurse, Period } from "@/lib/types.gen";
 
 import { ui } from "./ui";
@@ -296,14 +296,21 @@ export default function ConstraintCard({
   /** 요청 중이면 [적용]을 막는다 */
   busy?: boolean;
 }) {
-  const nurses = useAppStore((s) => s.nurses);
-  const period = useAppStore((s) => s.period);
-  const applyCard = useAppStore((s) => s.applyCard);
-  const updateCard = useAppStore((s) => s.updateCard);
-  const removeCard = useAppStore((s) => s.removeCard);
+  const ward = useAppStore((s) => s.ward);
+  const period = useAppStore(currentPeriod);
 
   const [draft, setDraft] = useState<Draft | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  if (!ward || !period) return null;
+  const nurses = ward.nurses.filter((n) => n.active);
+  // 병동 규칙은 병동에, 요청은 지금 기간에 반영한다
+  const isRule = card.scope === "ward";
+  const store = useAppStore.getState();
+  const applyCard = (id: string) => (isRule ? store.applyRule(id) : store.applyRequest(period.id, id));
+  const updateCard = (id: string, patch: CardPatch) =>
+    isRule ? store.updateRule(id, patch) : store.updateRequest(period.id, id, patch);
+  const removeCard = (id: string) => (isRule ? store.removeRule(id) : store.removeRequest(period.id, id));
 
   const nurseId = (card.params as { nurse_id?: string } | undefined)?.nurse_id;
   const orphan = nurseId !== undefined && !nurses.some((n) => n.id === nurseId);

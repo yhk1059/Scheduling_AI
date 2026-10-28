@@ -2,20 +2,20 @@
 
 import { useState } from "react";
 
-import { useAppStore } from "@/lib/store";
+import { currentPeriod, useAppStore } from "@/lib/store";
 
 import EntryStep from "./EntryStep";
 import RulesStep from "./RulesStep";
 import ScheduleStep from "./ScheduleStep";
-import Stepper from "./Stepper";
+import Stepper, { stepOf, viewOf } from "./Stepper";
 import { ui } from "./ui";
 import WardStep from "./WardStep";
 
 export default function AppShell() {
-  const step = useAppStore((s) => s.step);
-  const setStep = useAppStore((s) => s.setStep);
-  const period = useAppStore((s) => s.period);
-  const nurseCount = useAppStore((s) => s.nurses.length);
+  const step = useAppStore((s) => stepOf(s.view));
+  const go = useAppStore((s) => s.go);
+  const period = useAppStore(currentPeriod);
+  const nurseCount = useAppStore((s) => s.ward?.nurses.filter((n) => n.active).length ?? 0);
   const storageAvailable = useAppStore((s) => s.storageAvailable);
   const resetNotice = useAppStore((s) => s.resetNotice);
   const dismissResetNotice = useAppStore((s) => s.dismissResetNotice);
@@ -29,13 +29,15 @@ export default function AppShell() {
           <div className="flex items-baseline gap-3">
             <span className="text-[15px] font-semibold text-[#1B1B18]">간호사 근무표</span>
             <span className="text-xs font-medium text-[#66665E]">
-              <span className="font-mono">
-                {Number(period.start_date.slice(0, 4))}년 {Number(period.start_date.slice(5, 7))}월
-              </span>
+              {period && (
+                <span className="font-mono">
+                  {Number(period.start_date.slice(0, 4))}년 {Number(period.start_date.slice(5, 7))}월
+                </span>
+              )}
               {nurseCount > 0 && <> · 로테이션 {nurseCount}명</>}
             </span>
           </div>
-          {entered && <Stepper current={step} onSelect={setStep} />}
+          {entered && <Stepper current={step} onSelect={(s) => go(viewOf(s, period?.id))} />}
         </div>
       </header>
 
