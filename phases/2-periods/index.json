@@ -61,7 +61,10 @@
     {
       "step": 7,
       "name": "continuity-lib",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-10-28T19:38:51+0900",
+      "summary": "lib/continuity.ts 순수 함수 추가: HISTORY_DAYS=28(constants.py 미러), latestConfirmed, previousConfirmedPeriod(끝+1=시작인 확정 기간만), carryOverFrom(최신 확정본 마지막 CARRY_OVER_DAYS일, nurseIds만), historyLoadFor(target 직전 28일 창을 날짜로 잘라 확정 기간 최신본의 나이트·주말(토·일+holidays) 집계, 0 제외), isOperating, pastDayLocks(today 이전 날짜를 lock-{id}-{day} fixed_assignment로, source_text \"지난 날짜 고정: 이름 M/D 코드\"), diffAssignments, sameCarryOver, rosterChanges(snapshot 대비 added/deactivated); vitest 26개",
+      "completed_at": "2026-10-28T19:41:02+0900"
     },
     {
       "step": 8,
