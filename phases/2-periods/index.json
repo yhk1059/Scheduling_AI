@@ -109,7 +109,10 @@
     {
       "step": 13,
       "name": "ui-auth-privacy",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-10-28T20:05:56+0900",
+      "summary": "로그인·저장 UI 연결: AppShell이 onAuthChange 구독(새 사용자면 signedIn, 로그인 상태였다가 null이면 signedOut, 첫 세션 확인·서버 불러오기 동안 \"불러오는 중…\", 로그인 상태면 시작 화면 건너뜀, 저장 실패 배너+[다시 시도]), components/Account.tsx(상단 바 저장 상태 게스트/저장 중/저장됨 HH:MM/저장 실패+[다시 시도], [Google로 로그인]·이메일+계정 메뉴[로그아웃][내 병동 데이터 삭제], 로그인 요구 대화상자([CSV만 받기]/[닫기] + [Google로 로그인], 로그인 클릭 때 requireLogin), 샘플 저장 선택·서버 우선 안내, 데이터 삭제 2단계(병동 이름 일치 시 Danger [삭제], 삭제 중…, 실패 alert)), Dialog를 onClose/secondary/primary/danger로 일반화, 게스트 [확정]과 [다음 기간 만들기](첫 기간 제외)는 supabaseConfigured일 때만 로그인 요구, StartScreen 로그인 카드+방침 링크, 정적 /privacy(수집 항목·목적·보관·위탁(가명화)·삭제·프로토타입, 문의처 없음)와 랜딩 하단 링크 (실제 Google 로그인과 원격 저장은 미검증, 마이그레이션 적용 후 수동 확인 필요)",
+      "completed_at": "2026-10-28T20:14:16+0900"
     }
   ],
   "created_at": "2026-10-28T19:04:25+0900"
