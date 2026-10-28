@@ -54,6 +54,7 @@ function toMessage(e: unknown): string {
 export default function ScheduleStep() {
   const ward = useAppStore((s) => s.ward);
   const period = useAppStore(currentPeriod);
+  const periods = useAppStore((s) => s.periods);
   const inputVersion = useAppStore((s) => s.inputVersion);
   const setResult = useAppStore((s) => s.setResult);
   const setFixed = useAppStore((s) => s.setFixed);
@@ -90,7 +91,7 @@ export default function ScheduleStep() {
 
   if (!ward || !period) return null;
   const periodId = period.id;
-  const { nurses, period: range, holidays = [], constraints = [] } = toScheduleRequest(ward, period);
+  const { nurses, period: range, holidays = [], constraints = [] } = toScheduleRequest(ward, period, periods, today());
   const { result, resultVersion } = period;
   const confirmed = period.versions.at(-1)?.assignments ?? null;
 
@@ -98,7 +99,7 @@ export default function ScheduleStep() {
   const buildRequest = (): Req => {
     const s = useAppStore.getState();
     const p = s.periods.find((x) => x.id === periodId)!;
-    const req = toScheduleRequest(s.ward!, p);
+    const req = toScheduleRequest(s.ward!, p, s.periods, today());
     const base = p.versions.at(-1)?.assignments;
     if (!base) return req;
     return { ...req, previous: Object.fromEntries(req.nurses.filter((n) => base[n.id]).map((n) => [n.id, base[n.id]])) };
@@ -113,7 +114,7 @@ export default function ScheduleStep() {
       // 풀이 중 입력이 바뀌면 버린다(남은 결과에는 stale 배지가 뜬다)
       if (res.input_version !== useAppStore.getState().inputVersion) return;
       if (res.status === "ok") {
-        setResult(periodId, res.result);
+        setResult(periodId, res.result, req.carry_over ?? []);
         setOutcome(null);
       } else if (res.status === "timeout") {
         setOutcome({ kind: "timeout", version: res.input_version });

@@ -2,11 +2,15 @@ import { describe, expect, it } from "vitest";
 
 import sample from "./samples/ward-15.json";
 import {
+  carryOverChanged,
   createAppStore,
   currentPeriod,
   findReplaced,
+  hasUnconfirmedChanges,
+  homeSummary,
   isNurseUsed,
   orphanConstraintIds,
+  rosterChangesFor,
   STORAGE_KEY,
   toScheduleRequest,
 } from "./store";
@@ -281,7 +285,7 @@ describe("간호사 id", () => {
 
   it("isNurseUsed는 기간 요청·결과에서 쓰인 간호사만 true다([삭제] 표시 기준)", () => {
     const { store, id } = withPeriod();
-    store.getState().setResult(id, result({ n02: ["D"] }));
+    store.getState().setResult(id, result({ n02: ["D"] }), []);
     const { ward, periods } = store.getState();
     expect(isNurseUsed("n01", ward!, periods)).toBe(false);
     expect(isNurseUsed("n02", ward!, periods)).toBe(true);
@@ -289,7 +293,7 @@ describe("간호사 id", () => {
 
   it("결과나 확정본에 있는 간호사도 지우지 않는다", () => {
     const { store, id } = withPeriod();
-    store.getState().setResult(id, result({ n02: ["D"] }));
+    store.getState().setResult(id, result({ n02: ["D"] }), []);
     store.getState().removeNurse("n02");
     expect(store.getState().ward!.nurses.find((n) => n.id === "n02")?.active).toBe(false);
   });
@@ -324,7 +328,7 @@ describe("createPeriod", () => {
 
   it("마지막 기간이 확정되면 그 다음 연속 기간을 만든다", () => {
     const { store, id } = withPeriod();
-    store.getState().setResult(id, result({ n01: ["D"], n02: ["O"] }));
+    store.getState().setResult(id, result({ n01: ["D"], n02: ["O"] }), []);
     store.getState().confirm(id);
     const next = store.getState().createPeriod(TODAY);
     expect(next).not.toBe(id);
@@ -389,7 +393,7 @@ describe("기간 입력", () => {
   it("setResult는 inputVersion을 바꾸지 않고 그때의 버전을 resultVersion으로 남긴다", () => {
     const { store, id, period } = withPeriod();
     const v = store.getState().inputVersion;
-    store.getState().setResult(id, result({ n01: ["D"] }));
+    store.getState().setResult(id, result({ n01: ["D"] }), []);
     expect(period().resultVersion).toBe(v);
     expect(store.getState().inputVersion).toBe(v);
   });
@@ -463,7 +467,7 @@ describe("toScheduleRequest", () => {
     store.getState().setDisabled(id, "l", true);
     store.getState().applyChanges(id, [{ action: "update", constraint_id: "r", params: { days: 4 } }]);
 
-    const req = toScheduleRequest(store.getState().ward!, period());
+    const req = toScheduleRequest(store.getState().ward!, period(), store.getState().periods, TODAY);
     expect(req.nurses).toEqual([
       { id: "n01", name: "이영희", years: 12, night_only: false },
       { id: "n02", name: "박민수", years: 9, night_only: false },
@@ -493,10 +497,10 @@ describe("toScheduleRequest", () => {
       { nurse_id: "n01", shifts: ["N"] },
       { nurse_id: "n02", shifts: ["D"] },
     ]);
-    store.getState().setResult(id, result({ n01: ["D", "E"], n02: ["N", "O"] }));
+    store.getState().setResult(id, result({ n01: ["D", "E"], n02: ["N", "O"] }), []);
     store.getState().setNurseActive("n02", false);
 
-    const req = toScheduleRequest(store.getState().ward!, period());
+    const req = toScheduleRequest(store.getState().ward!, period(), store.getState().periods, TODAY);
     expect(req.nurses.map((n) => n.id)).toEqual(["n01"]);
     expect(req.constraints!.map((c) => c.id)).toEqual(["l1"]);
     expect(req.carry_over).toEqual([{ nurse_id: "n01", shifts: ["N"] }]);
@@ -506,14 +510,14 @@ describe("toScheduleRequest", () => {
   it("확정된 기간은 병동이 바뀌어도 확정 시점의 명단과 병동 규칙을 쓴다", () => {
     const { store, id, period } = withPeriod();
     store.getState().setCoverage("D", "weekday", 1, 1);
-    store.getState().setResult(id, result({ n01: ["D"], n02: ["O"] }));
+    store.getState().setResult(id, result({ n01: ["D"], n02: ["O"] }), []);
     store.getState().confirm(id);
 
     store.getState().setCoverage("D", "weekday", 2, 2);
     store.getState().addNurses([{ name: "김철수", years: 7, night_only: false }]);
     store.getState().setNurseActive("n02", false);
 
-    const confirmedReq = toScheduleRequest(store.getState().ward!, period());
+    const confirmedReq = toScheduleRequest(store.getState().ward!, period(), store.getState().periods, TODAY);
     expect(confirmedReq.nurses.map((n) => n.id)).toEqual(["n01", "n02"]);
     expect(confirmedReq.constraints![0].params).toMatchObject({ min: 1, max: 1 });
   });
@@ -531,13 +535,201 @@ describe("confirm", () => {
     store.getState().confirm(id);
     expect(period().status).toBe("draft"); // 결과가 없으면 확정하지 않는다
 
-    store.getState().setResult(id, result({ n01: ["D"], n02: ["O"] }));
+    store.getState().setResult(id, result({ n01: ["D"], n02: ["O"] }), []);
     store.getState().confirm(id);
     const p = period();
     expect(p.status).toBe("confirmed");
     expect(p.versions).toEqual([{ confirmed_at: CONFIRMED_AT.toISOString(), assignments: { n01: ["D"], n02: ["O"] }, changed: [] }]);
     expect(p.snapshot!.nurses.map((n) => n.id)).toEqual(["n01", "n02"]);
     expect(p.snapshot!.rules.map((c) => c.params)).toEqual([{ days: 3 }]);
+  });
+});
+
+/** 길이 len의 근무 배열(pattern 반복). */
+const fill = (len: number, pattern: string) => Array.from({ length: len }, (_, i) => pattern[i % pattern.length]);
+
+/** 첫 기간(2026-11-01, 30일)을 n01·n02 배정으로 확정한다. */
+function withConfirmed(n01 = fill(30, "DDEENNO"), n02 = fill(30, "O")) {
+  const ctx = withPeriod();
+  ctx.store.getState().setResult(ctx.id, result({ n01, n02 }), []);
+  ctx.store.getState().confirm(ctx.id);
+  return ctx;
+}
+
+describe("기간 연속성: 요청 조립", () => {
+  it("연속한 다음 기간은 범위가 자동이고, carry_over는 지난 확정본 마지막 7일이다(기간에 복사하지 않음)", () => {
+    const n01 = fill(30, "DDEENNO");
+    const { store } = withConfirmed(n01);
+    const nextId = store.getState().createPeriod(TODAY)!;
+    const next = store.getState().periods.find((p) => p.id === nextId)!;
+    expect([next.start_date, next.length, next.holidays]).toEqual(["2026-12-01", 31, []]);
+    expect(next.carryOver).toEqual([]);
+
+    const req = toScheduleRequest(store.getState().ward!, next, store.getState().periods, TODAY);
+    expect(req.carry_over).toEqual([
+      { nurse_id: "n01", shifts: n01.slice(-7) },
+      { nurse_id: "n02", shifts: fill(7, "O") },
+    ]);
+  });
+
+  it("지난 확정 기간이 없는 첫 기간은 수동 입력 carry_over를 쓴다", () => {
+    const { store, id, period } = withPeriod();
+    store.getState().setCarryOver(id, [{ nurse_id: "n01", shifts: ["N", "N"] }]);
+    const req = toScheduleRequest(store.getState().ward!, period(), store.getState().periods, TODAY);
+    expect(req.carry_over).toEqual([{ nurse_id: "n01", shifts: ["N", "N"] }]);
+  });
+
+  it("history_load는 최근 4주 확정본으로 채우고 비활성 간호사는 뺀다", () => {
+    const { store } = withConfirmed(fill(30, "N"), fill(30, "D"));
+    store.getState().setNurseActive("n02", false);
+    const nextId = store.getState().createPeriod(TODAY)!;
+    const next = store.getState().periods.find((p) => p.id === nextId)!;
+    const req = toScheduleRequest(store.getState().ward!, next, store.getState().periods, TODAY);
+    // 창: 11/3~11/30, 주말 7·8·14·15·21·22·28·29
+    expect(req.history_load).toEqual([{ nurse_id: "n01", nights: 28, weekends: 8 }]);
+    expect(req.nurses.map((n) => n.id)).toEqual(["n01"]);
+  });
+
+  it("운영 중 기간은 오늘 이전 날짜 잠금을 더하고, 같은 칸의 수동 고정은 뺀다", () => {
+    const { store, id, period } = withConfirmed(fill(30, "D"), fill(30, "O"));
+    store.getState().setFixed(id, "n01", 2, "O");
+    store.getState().setFixed(id, "n01", 10, "E");
+
+    const req = toScheduleRequest(store.getState().ward!, period(), store.getState().periods, "2026-11-05");
+    const ids = req.constraints!.map((c) => c.id);
+    expect(ids).toContain("fix-n01-10");
+    expect(ids).not.toContain("fix-n01-2");
+    const locks = req.constraints!.filter((c) => c.id.startsWith("lock-"));
+    expect(locks).toHaveLength(8); // 2명 × 11/1~11/4
+    expect(locks.find((c) => c.id === "lock-n01-2")!.params).toEqual({ nurse_id: "n01", day: 2, shift: "D" });
+    // 잠금은 요청에 저장하지 않는다
+    expect(period().requests.some((c) => c.id.startsWith("lock-"))).toBe(false);
+
+    // 운영 전(오늘이 기간 시작 전)에는 잠금이 없다
+    const before = toScheduleRequest(store.getState().ward!, period(), store.getState().periods, TODAY);
+    expect(before.constraints!.some((c) => c.id.startsWith("lock-"))).toBe(false);
+    expect(before.constraints!.map((c) => c.id)).toContain("fix-n01-2");
+  });
+});
+
+describe("기간 연속성: 확정 버전과 이월 변경", () => {
+  it("[다시 확정]은 직전 버전 대비 changed로 버전을 추가하고, 바뀐 칸이 없으면 추가하지 않는다", () => {
+    const { store, id, period } = withConfirmed(fill(30, "D"), fill(30, "O"));
+    expect(hasUnconfirmedChanges(period())).toBe(false);
+
+    store.getState().setResult(id, result({ n01: fill(30, "D"), n02: fill(30, "O") }), []);
+    store.getState().confirm(id);
+    expect(period().versions).toHaveLength(1);
+
+    const changed = fill(30, "D");
+    changed[4] = "O";
+    store.getState().setResult(id, result({ n01: changed, n02: fill(30, "O") }), []);
+    expect(hasUnconfirmedChanges(period())).toBe(true);
+    store.getState().confirm(id);
+    const p = period();
+    expect(p.status).toBe("confirmed");
+    expect(p.versions).toHaveLength(2);
+    expect(p.versions[1].changed).toEqual([{ nurse_id: "n01", day: 5, before: "D", after: "O" }]);
+    expect(p.versions[1].assignments.n01).toEqual(changed);
+    expect(hasUnconfirmedChanges(p)).toBe(false);
+
+    store.getState().confirm(id);
+    expect(period().versions).toHaveLength(2);
+  });
+
+  it("초안 기간은 hasUnconfirmedChanges가 false다", () => {
+    const { store, id, period } = withPeriod();
+    store.getState().setResult(id, result({ n01: ["D"] }), []);
+    expect(hasUnconfirmedChanges(period())).toBe(false);
+  });
+
+  it("setResult는 그 요청에 쓴 carry_over를 carryOverUsed로 남긴다", () => {
+    const { store, id, period } = withPeriod();
+    expect(period().carryOverUsed).toBeNull();
+    store.getState().setResult(id, result({ n01: ["D"] }), [{ nurse_id: "n01", shifts: ["N"] }]);
+    expect(period().carryOverUsed).toEqual([{ nurse_id: "n01", shifts: ["N"] }]);
+  });
+
+  it("지난 기간 [다시 확정]으로 마지막 7일이 바뀌면 다음 기간의 carryOverChanged가 true다(초안·확정 모두)", () => {
+    const { store, id } = withConfirmed(fill(30, "D"), fill(30, "O"));
+    const nextId = store.getState().createPeriod(TODAY)!;
+    const next = () => store.getState().periods.find((p) => p.id === nextId)!;
+    expect(carryOverChanged(next(), store.getState().periods)).toBe(false); // 아직 생성 안 함
+
+    const req = toScheduleRequest(store.getState().ward!, next(), store.getState().periods, TODAY);
+    store.getState().setResult(nextId, result({ n01: fill(31, "D"), n02: fill(31, "O") }), req.carry_over ?? []);
+    expect(carryOverChanged(next(), store.getState().periods)).toBe(false);
+
+    // 마지막 7일 밖(1일)만 바뀌면 이월은 같다
+    const early = fill(30, "D");
+    early[0] = "O";
+    store.getState().setResult(id, result({ n01: early, n02: fill(30, "O") }), []);
+    store.getState().confirm(id);
+    expect(carryOverChanged(next(), store.getState().periods)).toBe(false);
+
+    const late = [...early];
+    late[29] = "N";
+    store.getState().setResult(id, result({ n01: late, n02: fill(30, "O") }), []);
+    expect(carryOverChanged(next(), store.getState().periods)).toBe(false); // 다시 확정 전에는 그대로
+    store.getState().confirm(id);
+    expect(carryOverChanged(next(), store.getState().periods)).toBe(true);
+
+    store.getState().confirm(nextId);
+    expect(next().status).toBe("confirmed");
+    expect(carryOverChanged(next(), store.getState().periods)).toBe(true);
+  });
+});
+
+describe("createPeriod: 다음 기간", () => {
+  it("단위를 바꾸면 마지막 기간 끝 다음 날 이후의 새 단위 첫 시작일로 만든다", () => {
+    const { store } = withConfirmed();
+    store.getState().toggleHoliday(store.getState().periods[0].id, 18);
+    store.getState().setUnit("1w");
+    const nextId = store.getState().createPeriod(TODAY)!;
+    const next = store.getState().periods.find((p) => p.id === nextId)!;
+    // 11/30 끝 → 12/1(화) 이후 첫 월요일
+    expect([next.start_date, next.length, next.holidays]).toEqual(["2026-12-07", 7, []]);
+  });
+});
+
+describe("homeSummary", () => {
+  it("운영 중 기간과 다음 기간(없음·초안·확정), 최근 기간(시작일 내림차순)", () => {
+    const { store, id } = withPeriod();
+    // 오늘이 첫 기간 시작 전: 운영 중 없음, 다음 = 첫 기간 초안
+    let h = homeSummary(store.getState().periods, TODAY);
+    expect(h.operating).toBeNull();
+    expect(h.next).toMatchObject({ state: "draft", period: { id } });
+
+    store.getState().setResult(id, result({ n01: fill(30, "D"), n02: fill(30, "O") }), []);
+    store.getState().confirm(id);
+    const during = "2026-11-05";
+    h = homeSummary(store.getState().periods, during);
+    expect(h.operating?.id).toBe(id);
+    expect(h.next).toEqual({ state: "none" });
+
+    const nextId = store.getState().createPeriod(during)!;
+    h = homeSummary(store.getState().periods, during);
+    expect(h.next).toMatchObject({ state: "draft", period: { id: nextId } });
+    expect(h.recent.map((p) => p.id)).toEqual([nextId, id]);
+
+    store.getState().setResult(nextId, result({ n01: fill(31, "D"), n02: fill(31, "O") }), []);
+    store.getState().confirm(nextId);
+    h = homeSummary(store.getState().periods, during);
+    expect(h.next).toMatchObject({ state: "confirmed", period: { id: nextId } });
+  });
+});
+
+describe("rosterChangesFor", () => {
+  it("지난 확정 기간 snapshot 대비 추가·비활성화된 간호사", () => {
+    const { store, id } = withConfirmed();
+    store.getState().addNurses([{ name: "김철수", years: 7, night_only: false }]);
+    store.getState().setNurseActive("n02", false);
+    const nextId = store.getState().createPeriod(TODAY)!;
+    const { ward, periods } = store.getState();
+    const changes = rosterChangesFor(ward!, periods, nextId);
+    expect(changes.added.map((n) => n.id)).toEqual(["n03"]);
+    expect(changes.deactivated.map((n) => n.id)).toEqual(["n02"]);
+    expect(rosterChangesFor(ward!, periods, id)).toEqual({ added: [], deactivated: [] });
   });
 });
 
@@ -586,7 +778,7 @@ describe("persist", () => {
     const a = fresh(storage);
     a.getState().loadSample(TODAY);
     const saved = JSON.parse(storage.getItem(STORAGE_KEY)!);
-    expect(saved.version).toBe(3);
+    expect(saved.version).toBe(4);
     expect(saved.state).not.toHaveProperty("storageAvailable");
 
     const b = fresh(storage).getState();
@@ -619,7 +811,7 @@ describe("persist", () => {
 
   it("모양이 손상되면 초기화한다", () => {
     const storage = new MemoryStorage();
-    storage.setItem(STORAGE_KEY, JSON.stringify({ version: 3, state: { ward: { nurses: "x" }, periods: [], inputVersion: 1 } }));
+    storage.setItem(STORAGE_KEY, JSON.stringify({ version: 4, state: { ward: { nurses: "x" }, periods: [], inputVersion: 1 } }));
     const s = fresh(storage).getState();
     expect(s.ward).toBeNull();
     expect(s.resetNotice).toBe(true);
