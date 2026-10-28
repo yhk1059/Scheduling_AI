@@ -2,13 +2,14 @@
 
 import { useEffect, useRef, useState } from "react";
 
-import { formatRange } from "@/lib/period";
+import { carryOverFrom, previousConfirmedPeriod } from "@/lib/continuity";
+import { formatRange, isWeekendDay, monthDay } from "@/lib/period";
 import { parseCarryOver, type CellError } from "@/lib/roster-import";
-import { currentPeriod, useAppStore, type WorkPeriod } from "@/lib/store";
+import { carryOverChanged, currentPeriod, rosterChangesFor, useAppStore, type WorkPeriod } from "@/lib/store";
 
 import HolidayCalendar from "./HolidayCalendar";
 import RulesStep from "./RulesStep";
-import ScheduleStep from "./ScheduleStep";
+import ScheduleStep, { CELL, codeClass } from "./ScheduleStep";
 import Stepper, { type PeriodStep } from "./Stepper";
 import { ui } from "./ui";
 
@@ -62,15 +63,28 @@ export default function PeriodWork() {
 
 function PrepareStep({ period, onNext }: { period: WorkPeriod; onNext: () => void }) {
   const ward = useAppStore((s) => s.ward);
+  const periods = useAppStore((s) => s.periods);
   const go = useAppStore((s) => s.go);
   if (!ward) return null;
   const active = ward.nurses.filter((n) => n.active).length;
+  const hasPrevious = periods.some((p) => p.status === "confirmed" && p.start_date < period.start_date);
+  const { added, deactivated } = rosterChangesFor(ward, periods, period.id);
+  const names = (list: { name: string }[]) => list.map((n) => n.name).join(", ");
 
   return (
     <div className="flex flex-col gap-5">
       <h2 tabIndex={-1} data-step-title className={`${ui.cardTitle} outline-none`}>
         준비
       </h2>
+
+      {carryOverChanged(period, periods) && (
+        <div role="status" className={ui.banner}>
+          지난 기간이 바뀌어 이월이 달라졌어요. 다시 생성하면 반영돼요.
+          <button type="button" onClick={() => go({ screen: "period", periodId: period.id, step: 3 })} className={ui.textSm}>
+            근무표로
+          </button>
+        </div>
+      )}
 
       <section className={`${ui.card} flex flex-col gap-3`}>
         <div className="flex flex-col gap-1">
@@ -88,9 +102,24 @@ function PrepareStep({ period, onNext }: { period: WorkPeriod; onNext: () => voi
       </section>
 
       <section className={`${ui.card} flex items-center justify-between gap-3`}>
-        <p className="text-sm text-[#3D3D38]">
-          명단 활성 <span className="font-mono">{active}</span>명
-        </p>
+        <div className="flex flex-col gap-1">
+          <h3 className={ui.cardTitle}>명단 점검</h3>
+          <p className="text-sm text-[#3D3D38]">
+            명단 활성 <span className="font-mono">{active}</span>명
+            {hasPrevious &&
+              (added.length === 0 && deactivated.length === 0 ? (
+                " · 지난 기간과 명단이 같아요"
+              ) : (
+                <>
+                  {" "}
+                  · 지난 기간 이후 추가 <span className="font-mono">{added.length}</span>명 · 비활성{" "}
+                  <span className="font-mono">{deactivated.length}</span>명
+                </>
+              ))}
+          </p>
+          {added.length > 0 && <p className={ui.help}>추가: {names(added)}</p>}
+          {deactivated.length > 0 && <p className={ui.help}>비활성: {names(deactivated)}</p>}
+        </div>
         <button type="button" onClick={() => go({ screen: "settings", tab: "roster" })} className={ui.text}>
           병동 설정
         </button>
@@ -112,7 +141,65 @@ function cellErrorText(e: CellError): string {
   return at + e.message;
 }
 
+/** 지난 확정본의 마지막 며칠. 근무 셀 모양의 읽기 전용 표(편집하려면 지난 기간을 고친다). */
+function CarryOverTable({ period, prev }: { period: WorkPeriod; prev: WorkPeriod }) {
+  const ward = useAppStore((s) => s.ward);
+  const nurses = ward?.nurses.filter((n) => n.active) ?? [];
+  const rows = carryOverFrom(prev, nurses.map((n) => n.id));
+  const width = Math.max(0, ...rows.map((r) => r.shifts.length));
+  const days = Array.from({ length: width }, (_, i) => prev.length - width + 1 + i);
+  const grid = { gridTemplateColumns: `150px repeat(${width}, 30px)` };
+  const name = (id: string) => nurses.find((n) => n.id === id)?.name ?? id;
+
+  return (
+    <section className={`${ui.card} flex flex-col gap-3`}>
+      <div className="flex flex-col gap-1">
+        <h3 className={ui.cardTitle}>이월 근무</h3>
+        <p className={ui.help}>
+          지난 기간 확정본에서 가져왔어요({formatRange(prev)}). 바꾸려면 지난 기간을 고쳐 주세요.
+          {rows.length < nurses.length && ` 지난 기간에 없던 ${nurses.length - rows.length}명은 이월 근무 없이 시작해요.`}
+        </p>
+      </div>
+      <div className="overflow-x-auto" aria-label={`${formatRange(period)} 이월 근무`}>
+        <div className="flex w-max flex-col gap-0.5">
+          <div className="grid gap-x-0.5" style={grid}>
+            <span className="flex items-end text-xs font-medium text-[#66665E]">이름</span>
+            {days.map((d) => (
+              <span key={d} className="flex justify-center font-mono text-[11px] font-medium text-[#66665E]">
+                {monthDay(prev, d)}
+              </span>
+            ))}
+          </div>
+          {rows.map((r) => (
+            <div key={r.nurse_id} className="grid gap-x-0.5" style={grid}>
+              <span className="flex h-7 items-center truncate text-sm text-[#1B1B18]">{name(r.nurse_id)}</span>
+              {r.shifts.map((code, i) => {
+                const d = prev.length - r.shifts.length + 1 + i;
+                return (
+                  <div
+                    key={d}
+                    aria-label={`${name(r.nurse_id)} ${monthDay(prev, d)} ${code}`}
+                    className={`${CELL} ${codeClass(code, isWeekendDay(prev, d, prev.holidays))}`}
+                  >
+                    {code}
+                  </div>
+                );
+              })}
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
 function CarryOverSection({ period }: { period: WorkPeriod }) {
+  const periods = useAppStore((s) => s.periods);
+  const prev = previousConfirmedPeriod(periods, period);
+  return prev ? <CarryOverTable period={period} prev={prev} /> : <CarryOverPaste period={period} />;
+}
+
+function CarryOverPaste({ period }: { period: WorkPeriod }) {
   const ward = useAppStore((s) => s.ward);
   const nurses = ward?.nurses.filter((n) => n.active) ?? [];
   const { carryOver } = period;
