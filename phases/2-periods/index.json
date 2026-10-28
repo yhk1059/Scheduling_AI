@@ -101,7 +101,10 @@
     {
       "step": 12,
       "name": "store-sync",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-10-28T20:02:05+0900",
+      "summary": "lib/store.ts에 로그인 저장 분기 추가: WardRemote 주입(createAppStore 3번째 인자, 기본 인스턴스는 supabaseConfigured일 때 loadWard/saveWard/deleteWard), 비persist 상태 auth·sync(guest/loading/saving/saved/error, savedAt)·loginPrompt(sample-choice/server-replaced-guest), persist되는 pendingAfterLogin; 액션 requireLogin/signedIn(서버 우선 교체+안내·pending 폐기, 샘플이면 chooseSample(keep), 게스트 업로드(isSample false), 빈 병동 업로드→병동 설정, 업로드 뒤 confirm/create-period 실행, 손상 문서는 빈 상태+resetNotice·변경 전 저장 안 함)/chooseSample/dismissLoginPrompt/retrySave(load 실패면 다시 읽기)/signedOut(초기화+localStorage 키 삭제, 서버 유지)/deleteWardData(remove 후 빈 병동+설정, 재업로드 없음, 실패 throw); 병동·기간 변경 시 SAVE_DEBOUNCE_MS=1000 디바운스 자동 저장(저장 중 변경은 끝난 뒤 재저장, 서버 문서={version, state}); 가짜 remote·fake timers vitest 21개",
+      "completed_at": "2026-10-28T20:05:48+0900"
     },
     {
       "step": 13,
