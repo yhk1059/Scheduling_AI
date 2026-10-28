@@ -37,7 +37,10 @@
     {
       "step": 4,
       "name": "ui-rules-settings",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-10-29T01:17:17+0900",
+      "summary": "규칙·요청 카드와 병동 설정 문구 정리: ConstraintCard 토글 반드시/가능하면(hardnessLabel, group aria-label '반드시/가능하면'), 해석 결과 본문 글꼴, 배지 '이번 근무표에서 꺼짐'·버튼 [이번 근무표에서만 끄기], 수정 폼 근무 선택 데이/이브닝/나이트/휴무·'근무표 전체'; RulesStep [규칙 만들기]/[요청 만들기]·'읽는 중…', 병동 규칙 예시 Text 버튼 3개, 대기 2개 이상이면 [모두 적용] Secondary, 토스트 대신 입력 바 아래 role=alert+[다시 시도], '이 근무표에 적용되는 병동 규칙 N개'(wardRuleCount); 카드 순서 유지: Ward·WorkPeriod에 선택 필드 cardOrder(새 카드 id 앞에) + 순수 함수 cardsInOrder(pending, applied, order)로 대기·적용 카드를 한 목록에 그려 적용해도 제자리(옛 저장본은 대기→적용 순, STORAGE_VERSION 4 유지), store.test.ts 3개 먼저 추가; WardSettings '근무표 주기'(unitName, 한 달/1주/2주/4주)·변경 배너 '근무표부터…최소 휴무 일수', '바꾼 내용은 바로 저장돼요', 제외 배지·'제외된 간호사 N명 보기'·[근무표에서 빼기]/[다시 넣기]+'빼도 지난 근무표와 통계에는 남아요', [삭제]는 isNurseUsed=false인 간호사의 ⋯ 메뉴('{이름} 더 보기', Esc·바깥 클릭으로 닫힘)에만, [표로 만들기], [첫 근무표 만들기]; e2e의 'hard/soft' group·'이번 기간만 끄기'·'해석'·'변환'·'비활성으로'·'첫 기간 만들기' 기대값은 step 8에서 갱신 필요(ScheduleStep의 끄기 문구는 step 5·6 범위라 그대로); pytest 411·vitest 182·build·lint·AC grep 통과, Playwright 수동 확인(샘플 요청 2개 해석→모두 적용 후 순서 동일, 샘플 간호사 ⋯ 메뉴 없음, 새 간호사 메뉴 삭제 동작)",
+      "completed_at": "2026-10-29T01:21:27+0900"
     },
     {
       "step": 5,
