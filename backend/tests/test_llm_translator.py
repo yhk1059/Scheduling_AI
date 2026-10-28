@@ -37,11 +37,11 @@ NURSES = [
 ]
 
 
-def request(text: str, scope: str = "month") -> TranslateRequest:
+def request(text: str, scope: str = "period") -> TranslateRequest:
     return TranslateRequest(
         text=text,
         scope=scope,
-        context=TranslateContext(nurses=NURSES, period=Period(2026, 11), holidays=[5], today=date(2026, 10, 26)),
+        context=TranslateContext(nurses=NURSES, period=Period(start_date=date(2026, 11, 1), length=30), holidays=[5], today=date(2026, 10, 26)),
         input_version=7,
     )
 
@@ -74,6 +74,17 @@ def last_user_text(call: dict) -> str:
 
 
 # --- 정상 경로 ---
+
+
+def test_context_has_period_range():
+    client = FakeClient(ok({"constraints": [c("night_fairness", {})]}))
+    translate(request("나이트 공평하게"), client)
+    body = last_user_text(client.calls[0])
+    context = json.loads(body.split("<context>\n")[1].split("\n</context>")[0])
+    assert (context["period_start"], context["period_end"], context["period_length"]) == ("2026-11-01", "2026-11-30", 30)
+    assert context["first_day_weekday"] == "Sunday"
+    assert "target_month" not in context and "days_in_month" not in context
+    assert context["weekend_and_holiday_days"][:3] == [1, 5, 7]
 
 
 def test_translate_two_rules_with_hardness():

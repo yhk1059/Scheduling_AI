@@ -31,7 +31,7 @@ function feb(over: { nurses?: Nurse[]; holidays?: number[] } = {}) {
   const list = over.nurses ?? nurses;
   return {
     nurses: list,
-    period: { year: 2026, month: 2 },
+    period: { start_date: "2026-02-01", length: 28 },
     holidays: over.holidays ?? [],
     assignments: { [list[0].id]: a, [list[1].id]: b },
     stats: { [list[0].id]: stats(a, 4), [list[1].id]: stats(b, 8) },
@@ -87,7 +87,7 @@ describe("toScheduleCsv", () => {
     const row: Code[] = Array.from({ length: 31 }, () => "O");
     const csv = toScheduleCsv({
       nurses: [nurses[0]],
-      period: { year: 2026, month: 12 },
+      period: { start_date: "2026-12-01", length: 31 },
       holidays: [25],
       assignments: { n01: row },
       stats: { n01: stats(row, 0) },
@@ -98,6 +98,20 @@ describe("toScheduleCsv", () => {
     expect(head[2 + 24]).toBe("금(공휴일)");
     expect(dates[2 + 30]).toBe("31");
     expect(nurse.slice(2, 33)).toEqual(row);
+  });
+
+  it("월을 넘는 기간은 날짜 행에 실제 일(日)을 쓰고 요일도 날짜마다 계산한다", () => {
+    const row: Code[] = Array.from({ length: 14 }, () => "O");
+    const csv = toScheduleCsv({
+      nurses: [nurses[0]],
+      period: { start_date: "2026-11-23", length: 14 },
+      holidays: [],
+      assignments: { n01: row },
+      stats: { n01: stats(row, 0) },
+    });
+    const [head, dates] = rows(csv);
+    expect(head.slice(2, 9)).toEqual(["월", "화", "수", "목", "금", "토", "일"]);
+    expect(dates.slice(2, 16)).toEqual(["23", "24", "25", "26", "27", "28", "29", "30", "1", "2", "3", "4", "5", "6"]);
   });
 
   it("쉼표·따옴표·줄바꿈이 있는 셀은 RFC 4180으로 이스케이프한다", () => {

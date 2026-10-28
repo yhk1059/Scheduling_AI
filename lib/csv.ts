@@ -1,4 +1,5 @@
 // 근무표 CSV 직렬화. 엑셀에서 바로 열리도록 UTF-8 BOM + CRLF, RFC 4180 이스케이프.
+import { periodDays } from "./period";
 import type { Nurse, NurseStats, Period, ScheduleResult } from "./types.gen";
 
 const WEEKDAYS = ["일", "월", "화", "수", "목", "금", "토"];
@@ -20,18 +21,18 @@ function cell(value: string | number): string {
 }
 
 export function toScheduleCsv({ nurses, period, holidays, assignments, stats }: ScheduleCsvInput): string {
-  const days = new Date(period.year, period.month, 0).getDate();
-  const dayList = Array.from({ length: days }, (_, i) => i + 1);
+  const pdays = periodDays(period);
+  const dayList = pdays.map((p) => p.day);
   const blankTotals = ["", "", "", "", ""];
   const listed = nurses.filter((n) => assignments[n.id]);
 
-  const weekdays = dayList.map((d) => {
-    const w = WEEKDAYS[new Date(period.year, period.month - 1, d).getDay()];
-    return holidays.includes(d) ? `${w}(공휴일)` : w;
+  const weekdays = pdays.map(({ day, weekday }) => {
+    const w = WEEKDAYS[weekday];
+    return holidays.includes(day) ? `${w}(공휴일)` : w;
   });
   const rows: (string | number)[][] = [
     ["이름", "연차", ...weekdays, ...TOTALS, "주말근무"],
-    ["", "", ...dayList, ...blankTotals],
+    ["", "", ...pdays.map((p) => p.dom), ...blankTotals],
     ...listed.map((n) => {
       const s = stats[n.id];
       return [n.name, n.years, ...assignments[n.id], ...(s ? [s.D, s.E, s.N, s.O, s.weekend_holiday_work] : blankTotals)];

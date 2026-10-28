@@ -1,7 +1,6 @@
 """충돌 설명과 완화 제안 후보. 제안 검증(재풀이)은 routes에서 한다(ADR-004, ADR-006)."""
 
 import json
-from datetime import date
 from typing import Any
 
 from pydantic import TypeAdapter, ValidationError
@@ -34,13 +33,14 @@ def _context_message(request: ScheduleRequest, specs: dict[str, Any], conflicts:
     period, nurses = request.period, request.nurses
     days = period.days
     weekends = sorted(
-        {d for d in range(1, days + 1) if date(period.year, period.month, d).weekday() >= 5} | set(request.holidays)
+        {d for d in range(1, days + 1) if period.weekday(d) >= 5} | set(request.holidays)
     )
     context = {
         "nurse_count": len(nurses),
         "night_only_count": sum(n.night_only for n in nurses),
-        "target_month": f"{period.year}-{period.month:02d}",
-        "days_in_month": days,
+        "period_start": period.start_date.isoformat(),
+        "period_end": period.date_of(days).isoformat(),
+        "period_length": days,
         "weekend_and_holiday_days": weekends,
     }
     items = []

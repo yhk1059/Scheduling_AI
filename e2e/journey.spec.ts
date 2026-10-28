@@ -1,6 +1,7 @@
 // docs/BROWSER_TEST_SCENARIOS.md S3~S11. 앞 시나리오의 상태를 이어받는 하나의 흐름이라 페이지 하나를 공유하며 순서대로 돈다.
 import { type BrowserContext, expect, type Locator, type Page, test } from "@playwright/test";
 
+import { isWeekendDay } from "../lib/period";
 import type { ConstraintSpec, Nurse, Period, TranslateResponse } from "../lib/types.gen";
 
 type Code = "D" | "E" | "N" | "O";
@@ -72,11 +73,8 @@ const cellCount = (grid: Grid) => Object.values(grid).reduce((sum, row) => sum +
 function hardViolations(state: StoredState, grid: Grid): string[] {
   const out: string[] = [];
   const { nurses, constraints, holidays, period } = state;
-  const days = new Date(period.year, period.month, 0).getDate();
-  const isWeekend = (d: number) => {
-    const w = new Date(period.year, period.month - 1, d).getDay();
-    return w === 0 || w === 6 || holidays.includes(d);
-  };
+  const days = period.length;
+  const isWeekend = (d: number) => isWeekendDay(period, d, holidays);
   const rows = new Map<string, Code[]>();
   for (const n of nurses) {
     const row = grid[n.name];
@@ -294,7 +292,7 @@ test("S3. ① 병동 준비", async () => {
   await expect(page.getByRole("textbox", { name: "2행 1열", exact: true })).toHaveValue("이영희");
 
   const state = await readState(page);
-  expect(state.period).toEqual({ year: YEAR, month: MONTH });
+  expect(state.period).toEqual({ start_date: `${YEAR}-${MONTH}-01`, length: 30 });
   expect(state.holidays).toEqual([HOLIDAY]);
   expect(state.nurses.filter((n) => n.night_only).map((n) => n.name)).toEqual(["문가람", "배수아"]);
   expect(state.constraints.filter((c) => c.type === "daily_coverage")).toHaveLength(6);

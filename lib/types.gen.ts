@@ -61,13 +61,16 @@ export interface Nurse {
   years: number;
   night_only?: boolean;
 }
+/**
+ * 시작일 + 길이(ADR-015). 날짜는 기간 안의 1..length 인덱스로 다룬다.
+ */
 export interface Period {
-  year: number;
-  month: number;
+  start_date: string;
+  length: number;
 }
 export interface DailyCoverage {
   id: string;
-  scope: "ward" | "month";
+  scope: "ward" | "period";
   hardness?: "hard" | "soft";
   weight?: number;
   source_text: string;
@@ -83,7 +86,7 @@ export interface DailyCoverageParams {
 }
 export interface ForbiddenSequence {
   id: string;
-  scope: "ward" | "month";
+  scope: "ward" | "period";
   hardness?: "hard" | "soft";
   weight?: number;
   source_text: string;
@@ -97,7 +100,7 @@ export interface ForbiddenSequenceParams {
 }
 export interface MaxConsecutiveWork {
   id: string;
-  scope: "ward" | "month";
+  scope: "ward" | "period";
   hardness?: "hard" | "soft";
   weight?: number;
   source_text: string;
@@ -110,7 +113,7 @@ export interface DaysParams {
 }
 export interface MaxConsecutiveNights {
   id: string;
-  scope: "ward" | "month";
+  scope: "ward" | "period";
   hardness?: "hard" | "soft";
   weight?: number;
   source_text: string;
@@ -120,7 +123,7 @@ export interface MaxConsecutiveNights {
 }
 export interface MinDaysOff {
   id: string;
-  scope: "ward" | "month";
+  scope: "ward" | "period";
   hardness?: "hard" | "soft";
   weight?: number;
   source_text: string;
@@ -130,7 +133,7 @@ export interface MinDaysOff {
 }
 export interface OffAfterNightBlock {
   id: string;
-  scope: "ward" | "month";
+  scope: "ward" | "period";
   hardness?: "hard" | "soft";
   weight?: number;
   source_text: string;
@@ -140,7 +143,7 @@ export interface OffAfterNightBlock {
 }
 export interface SkillMix {
   id: string;
-  scope: "ward" | "month";
+  scope: "ward" | "period";
   hardness?: "hard" | "soft";
   weight?: number;
   source_text: string;
@@ -155,7 +158,7 @@ export interface SkillMixParams {
 }
 export interface Leave {
   id: string;
-  scope: "ward" | "month";
+  scope: "ward" | "period";
   hardness?: "hard" | "soft";
   weight?: number;
   source_text: string;
@@ -172,7 +175,7 @@ export interface LeaveParams {
 }
 export interface FixedAssignment {
   id: string;
-  scope: "ward" | "month";
+  scope: "ward" | "period";
   hardness?: "hard" | "soft";
   weight?: number;
   source_text: string;
@@ -187,7 +190,7 @@ export interface FixedAssignmentParams {
 }
 export interface ShiftPreference {
   id: string;
-  scope: "ward" | "month";
+  scope: "ward" | "period";
   hardness?: "hard" | "soft";
   weight?: number;
   source_text: string;
@@ -204,7 +207,7 @@ export interface ShiftPreferenceParams {
 }
 export interface NightFairness {
   id: string;
-  scope: "ward" | "month";
+  scope: "ward" | "period";
   hardness?: "hard" | "soft";
   weight?: number;
   source_text: string;
@@ -215,7 +218,7 @@ export interface NightFairness {
 export interface EmptyParams {}
 export interface WeekendFairness {
   id: string;
-  scope: "ward" | "month";
+  scope: "ward" | "period";
   hardness?: "hard" | "soft";
   weight?: number;
   source_text: string;
@@ -290,7 +293,7 @@ export interface SolveTimeout {
 }
 export interface TranslateRequest {
   text: string;
-  scope: "ward" | "month";
+  scope: "ward" | "period";
   context: TranslateContext;
   input_version: number;
 }

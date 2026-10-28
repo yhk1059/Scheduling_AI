@@ -2,11 +2,12 @@
 import { create } from "zustand";
 import { persist, type PersistStorage, type StorageValue } from "zustand/middleware";
 
+import { monthDay, periodFrom } from "./period";
 import sample from "./samples/ward-15.json";
 import type { CarryOverRow, ConstraintChange, ConstraintSpec, Nurse, Period, ScheduleResult } from "./types.gen";
 
 export const STORAGE_KEY = "nurse-scheduler";
-const STORAGE_VERSION = 1;
+const STORAGE_VERSION = 2;
 const COVERAGE_SOURCE_TEXT = "필요 인원 설정";
 const COVERAGE_WEIGHT = 10; // backend/domain/constants.py DEFAULT_WEIGHT
 // backend/llm/translator.py _weight와 같은 규칙: soft는 템플릿 기본값(없으면 DEFAULT_WEIGHT), hard는 1
@@ -71,9 +72,11 @@ export interface AppState extends Data {
   dismissResetNotice: () => void;
 }
 
+/** 오늘 다음 달 전체(달력 월 기간). */
 function nextMonth(now: Date): Period {
-  const m = now.getMonth() + 1; // 0-based → 다음 달(1-based)
-  return m === 12 ? { year: now.getFullYear() + 1, month: 1 } : { year: now.getFullYear(), month: m + 1 };
+  const first = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+  const iso = `${first.getFullYear()}-${String(first.getMonth() + 1).padStart(2, "0")}-01`;
+  return periodFrom("month", iso);
 }
 
 function initialData(now: Date): Data {
@@ -142,8 +145,8 @@ function isData(v: unknown): v is Data {
   const p = d.period as Record<string, unknown> | undefined;
   return (
     [1, 2, 3, 4].includes(d.step as number) &&
-    typeof p?.year === "number" &&
-    typeof p?.month === "number" &&
+    typeof p?.start_date === "string" &&
+    typeof p?.length === "number" &&
     ["holidays", "nurses", "constraints", "pendingCards", "carryOver"].every((k) => Array.isArray(d[k])) &&
     typeof d.inputVersion === "number"
   );
@@ -293,10 +296,10 @@ export function createAppStore(getStorage: () => Storage, now: Date = new Date()
                 {
                   id: `fix-${nurseId}-${day}`,
                   type: "fixed_assignment",
-                  scope: "month",
+                  scope: "period",
                   hardness: "hard",
                   weight: 1,
-                  source_text: `수동 고정: ${name} ${period.month}/${day} ${shift}`,
+                  source_text: `수동 고정: ${name} ${monthDay(period, day)} ${shift}`,
                   enabled: true,
                   params: { nurse_id: nurseId, day, shift },
                 },

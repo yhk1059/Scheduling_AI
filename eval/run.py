@@ -39,7 +39,7 @@ DATASET = ROOT / "eval" / "dataset.jsonl"
 RESULTS = ROOT / "eval" / "results.md"
 SAMPLE = ROOT / "lib" / "samples" / "ward-15.json"
 STATUSES = ("ok", "clarify", "unsupported")
-SCOPES = ("ward", "month")
+SCOPES = ("ward", "period")
 
 _spec_adapter = TypeAdapter(ConstraintSpec)
 _FILLER = {"id": "eval", "scope": "ward", "source_text": "eval", "weight": 1}

@@ -97,6 +97,12 @@ export function periodDays(p: PeriodRange): PeriodDay[] {
   });
 }
 
+/** 1-based 인덱스 → 실제 날짜 "M/D". */
+export function monthDay(p: PeriodRange, day: number): string {
+  const { month, dom } = parts(toSerial(p.start_date) + day - 1);
+  return `${month}/${dom}`;
+}
+
 /** 토·일 또는 holidays(인덱스)에 있으면 true. */
 export function isWeekendDay(p: PeriodRange, day: number, holidays: number[]): boolean {
   const { weekday } = parts(toSerial(p.start_date) + day - 1);

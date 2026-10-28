@@ -217,7 +217,7 @@ def test_compute_result_disabled_soft_not_listed():
 
 def test_sample_ward_31_days_solves_within_10s():
     data = json.loads(SAMPLE_PATH.read_text())
-    data["period"] = {"year": 2026, "month": 12}
+    data["period"] = {"start_date": "2026-12-01", "length": 31}
     data["constraints"] += [
         con("fs-nd", "forbidden_sequence", {"first": "N", "second": "D"}),
         con("fs-ne", "forbidden_sequence", {"first": "N", "second": "E"}),
