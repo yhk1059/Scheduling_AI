@@ -21,7 +21,10 @@
     {
       "step": 2,
       "name": "wording-lib",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-10-29T01:11:51+0900",
+      "summary": "lib/wording.ts 추가(순수 함수: scheduleName·unitName·unitShort·TEMPLATE_NAMES·hardnessLabel·dayRanges·describeParams·wardRuleCount·formatDeviation·NextTask/nextTask) — describeParams는 이름·M/D·데이/이브닝/나이트/휴무로 쓰고 내부 id·코드 표기·≤≥를 쓰지 않으며 명단 밖은 \"(명단에 없는 간호사)\", nextTask는 store homeSummary를 감싸고 \"없음\" 이름은 store에서 추출한 upcomingRange(createPeriod도 이것을 사용)로 계산; ConstraintCard의 TEMPLATE_NAMES·describeParams·dayRanges·formatDays·nurseLabel을 wording으로 옮기고 ConstraintCard·ScheduleStep은 import만 교체(카드 문구가 새 문구로 바뀌어 e2e S4 등 카드 제목 기대값은 step 8에서 갱신 필요); lib/wording.test.ts 20개(월 경계 주 단위 이름, 반올림·0·− 기호, 필요 인원 제외, nextTask 4상태·운영 중 다음 근무표); pytest 411·vitest 170·build·lint 통과",
+      "completed_at": "2026-10-29T01:14:24+0900"
     },
     {
       "step": 3,
