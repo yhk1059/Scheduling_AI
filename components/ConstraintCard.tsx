@@ -4,7 +4,7 @@ import { useState } from "react";
 
 import { type CardPatch, currentPeriod, type Hardness, useAppStore } from "@/lib/store";
 import type { ConstraintSpec } from "@/lib/types.gen";
-import { dayRanges, describeParams, TEMPLATE_NAMES } from "@/lib/wording";
+import { dayRanges, describeParams, hardnessLabel, TEMPLATE_NAMES } from "@/lib/wording";
 
 import { previewRange } from "./RulesStep";
 import { ui } from "./ui";
@@ -48,7 +48,7 @@ const FIELDS: Record<ConstraintSpec["type"], Field[]> = {
   shift_preference: [
     { key: "shift", label: "근무", kind: "shift" },
     { key: "prefer", label: "희망/기피", kind: "prefer" },
-    { key: "days", label: "날짜 (비우면 기간 전체)", kind: "daysOptional" },
+    { key: "days", label: "날짜 (비우면 근무표 전체)", kind: "daysOptional" },
     { key: "weekends_only", label: "주말·공휴일만", kind: "bool" },
   ],
   night_fairness: [],
@@ -111,9 +111,16 @@ function fromDraft(c: ConstraintSpec, draft: Draft, last: number): { params: Con
   return { params: params as ConstraintSpec["params"] };
 }
 
+const SHIFT_OPTIONS: [string, string][] = [
+  ["D", "데이"],
+  ["E", "이브닝"],
+  ["N", "나이트"],
+  ["O", "휴무"],
+];
+
 function FieldInput({ field, value, onChange }: { field: Field; value: string; onChange: (v: string) => void }) {
   const select = (options: [string, string][]) => (
-    <select value={value} onChange={(e) => onChange(e.target.value)} className={`${ui.input} h-8 font-mono`}>
+    <select value={value} onChange={(e) => onChange(e.target.value)} className={`${ui.input} h-8`}>
       {options.map(([v, label]) => (
         <option key={v} value={v}>
           {label}
@@ -124,9 +131,9 @@ function FieldInput({ field, value, onChange }: { field: Field; value: string; o
   const control = (() => {
     switch (field.kind) {
       case "shift":
-        return select(["D", "E", "N", "O"].map((s) => [s, s]));
+        return select(SHIFT_OPTIONS);
       case "shiftDEN":
-        return select(["D", "E", "N"].map((s) => [s, s]));
+        return select(SHIFT_OPTIONS.slice(0, 3));
       case "dayKind":
         return select([
           ["weekday", "평일"],
@@ -186,8 +193,8 @@ function HardnessToggle({ value, disabled, onChange }: { value: Hardness; disabl
   return (
     <div
       role="group"
-      aria-label="hard/soft"
-      title={disabled ? "휴가와 고정 배정은 항상 hard예요" : undefined}
+      aria-label="반드시/가능하면"
+      title={disabled ? "휴가와 고정 근무는 항상 반드시 지켜요" : undefined}
       className="inline-flex overflow-hidden rounded-md border border-[#C9C9C1]"
     >
       {(["hard", "soft"] as const).map((h) => (
@@ -199,7 +206,7 @@ function HardnessToggle({ value, disabled, onChange }: { value: Hardness; disabl
           onClick={() => onChange(h)}
           className="h-7 bg-white px-3 text-xs font-medium text-[#66665E] disabled:cursor-not-allowed aria-pressed:bg-[#1B1B18] aria-pressed:text-white"
         >
-          {h}
+          {hardnessLabel(h)}
         </button>
       ))}
     </div>
@@ -226,7 +233,7 @@ export default function ConstraintCard({
   busy?: boolean;
   /** 이 기간에 꺼져 있는지(disabledIds) */
   off?: boolean;
-  /** 주면 [이번 기간만 끄기]/[다시 켜기]를 둔다. 원본은 바꾸지 않는다 */
+  /** 주면 [이번 근무표에서만 끄기]/[다시 켜기]를 둔다. 원본은 바꾸지 않는다 */
   onToggleOff?: (off: boolean) => void;
   /** 기간 화면의 병동 규칙: 수정·삭제·hard/soft 변경 없이 끄고 켜기만 한다 */
   readOnly?: boolean;
@@ -290,7 +297,7 @@ export default function ConstraintCard({
           {error && <p className={ui.error}>{error}</p>}
         </div>
       ) : (
-        <p className="rounded-sm bg-[#F6F6F3] px-2.5 py-2 font-mono text-xs text-[#66665E]">
+        <p className={`rounded-sm bg-[#F6F6F3] px-2.5 py-2 text-xs ${off ? "text-[#66665E]" : "text-[#3D3D38]"}`}>
           {describeParams(card, nurses, range)}
         </p>
       )}
@@ -305,7 +312,7 @@ export default function ConstraintCard({
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-2">
           {off ? (
-            <span className={`${ui.badge} bg-[#FDF0DC] text-[#7A4506]`}>이번 기간 꺼짐</span>
+            <span className={`${ui.badge} bg-[#FDF0DC] text-[#7A4506]`}>이번 근무표에서 꺼짐</span>
           ) : pending ? (
             <span className={`${ui.badge} bg-[#FDF0DC] text-[#7A4506]`}>적용 대기</span>
           ) : (
@@ -354,7 +361,7 @@ export default function ConstraintCard({
           ) : readOnly ? (
             onToggleOff && (
               <button type="button" disabled={busy} onClick={() => onToggleOff(!off)} className={ui.textSm}>
-                {off ? "다시 켜기" : "이번 기간만 끄기"}
+                {off ? "다시 켜기" : "이번 근무표에서만 끄기"}
               </button>
             )
           ) : (

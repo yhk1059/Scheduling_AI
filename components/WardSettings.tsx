@@ -1,10 +1,11 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
-import { PERIOD_UNITS, type PeriodUnit } from "@/lib/period";
+import type { PeriodUnit } from "@/lib/period";
 import { buildRoster, decodeText, mapHeaders, parseDelimited } from "@/lib/roster-import";
 import { isNurseUsed, orphanConstraintIds, useAppStore, type WardNurse } from "@/lib/store";
+import { unitName } from "@/lib/wording";
 
 import CoverageForm, { type CoverageDrafts, hasCoverageError } from "./CoverageForm";
 import RosterEditor, { type RosterDraft } from "./RosterEditor";
@@ -16,6 +17,8 @@ const TABS = [
   { tab: "roster", label: "명단·필요 인원" },
   { tab: "rules", label: "병동 규칙" },
 ] as const;
+
+const UNITS: PeriodUnit[] = ["month", "1w", "2w", "4w"];
 
 function draftFromText(text: string): RosterDraft {
   const rows = parseDelimited(text);
@@ -65,9 +68,9 @@ export default function WardSettings() {
 
       {!hasPeriods && (
         <div className="flex items-center justify-end gap-3">
-          {!ready && <p className={ui.help}>명단과 필요 인원을 입력하면 첫 기간을 만들 수 있어요.</p>}
+          {!ready && <p className={ui.help}>명단과 필요 인원을 입력하면 첫 근무표를 만들 수 있어요.</p>}
           <button type="button" disabled={!ready} onClick={() => createPeriod(today())} className={ui.primary}>
-            첫 기간 만들기
+            첫 근무표 만들기
           </button>
         </div>
       )}
@@ -119,7 +122,7 @@ function RosterTab() {
             />
           </label>
           <label className="flex flex-col gap-1">
-            <span className={ui.label}>기간 단위</span>
+            <span className={ui.label}>근무표 주기</span>
             <select
               value={ward.unit}
               onChange={(e) => {
@@ -128,9 +131,9 @@ function RosterTab() {
               }}
               className={`${ui.input} w-40`}
             >
-              {PERIOD_UNITS.map((u) => (
-                <option key={u.value} value={u.value}>
-                  {u.label}
+              {UNITS.map((u) => (
+                <option key={u} value={u}>
+                  {unitName(u)}
                 </option>
               ))}
             </select>
@@ -138,7 +141,7 @@ function RosterTab() {
         </div>
         {unitChanged && (
           <p role="status" className={ui.banner}>
-            다음에 만드는 기간부터 적용돼요. 최소 오프 일수 같은 규칙 값을 다시 확인하세요.
+            다음에 만드는 근무표부터 적용돼요. 최소 휴무 일수 같은 규칙 값을 다시 확인하세요.
           </p>
         )}
       </section>
@@ -146,12 +149,12 @@ function RosterTab() {
       <section className={`${ui.card} flex flex-col gap-3.5`}>
         <div className="flex flex-col gap-1">
           <h2 className={ui.cardTitle}>명단</h2>
-          <p className={ui.help}>이름 입력란에는 이니셜을 써도 됩니다.</p>
+          <p className={ui.help}>이름 입력란에는 이니셜을 써도 됩니다. 바꾼 내용은 바로 저장돼요.</p>
         </div>
         <NurseTable nurses={ward.nurses} />
         {orphanCount > 0 && (
           <p className="text-xs font-medium text-[#A15C07]">
-            활성 명단에 없는 간호사를 가리키는 병동 규칙이 {orphanCount}개 있어요. [병동 규칙] 탭에서 확인해 주세요.
+            명단에 없거나 근무표에서 뺀 간호사를 가리키는 병동 규칙이 {orphanCount}개 있어요. [병동 규칙] 탭에서 확인해 주세요.
           </p>
         )}
 
@@ -173,7 +176,7 @@ function RosterTab() {
               onClick={() => setDraft(draftFromText(text))}
               className={ui.secondary}
             >
-              변환
+              표로 만들기
             </button>
             <label className={`${ui.secondary} cursor-pointer focus-within:outline-2 focus-within:outline-[#155E75]`}>
               CSV 파일 올리기
@@ -187,7 +190,7 @@ function RosterTab() {
                 <p className={ui.help}>
                   {roster.errors.length > 0
                     ? "오류를 고치면 명단에 반영할 수 있어요."
-                    : "같은 이름은 그대로 두고, 붙여넣은 명단에 없는 사람은 비활성으로 바꿔요."}
+                    : "같은 이름은 그대로 두고, 붙여넣은 명단에 없는 사람은 근무표에서 빼요."}
                 </p>
                 <button type="button" onClick={() => setDraft(null)} className={ui.text}>
                   취소
@@ -207,7 +210,7 @@ function RosterTab() {
           <CoverageForm drafts={coverageDrafts} setDrafts={setCoverageDrafts} />
         </div>
         {hasCoverageError(coverageDrafts) && <p className={ui.error}>최소 인원이 최대 인원보다 많아요.</p>}
-        {!hasCoverage(ward) && <p className={ui.help}>필요 인원을 입력하면 기간을 만들 수 있어요.</p>}
+        {!hasCoverage(ward) && <p className={ui.help}>필요 인원을 입력하면 근무표를 만들 수 있어요.</p>}
       </section>
     </>
   );
@@ -241,13 +244,14 @@ function NurseTable({ nurses }: { nurses: WardNurse[] }) {
           </tbody>
         </table>
       </div>
-      {inactive.length > 0 && (
-        <div>
+      <div className="flex items-center gap-3">
+        {inactive.length > 0 && (
           <button type="button" onClick={() => setShowInactive((v) => !v)} className={ui.textSm}>
-            {showInactive ? `비활성 ${inactive.length}명 접기` : `비활성 ${inactive.length}명 보기`}
+            {showInactive ? `제외된 간호사 ${inactive.length}명 접기` : `제외된 간호사 ${inactive.length}명 보기`}
           </button>
-        </div>
-      )}
+        )}
+        <p className={ui.help}>근무표에서 빼도 지난 근무표와 통계에는 남아요.</p>
+      </div>
     </div>
   );
 }
@@ -327,7 +331,7 @@ function NurseRow({ nurse, index, nurses }: { nurse: WardNurse; index: number; n
           <td className="px-2 py-1">
             <span className="flex items-center gap-2 text-[#66665E]">
               {nurse.name}
-              <span className={`${ui.badge} bg-[#EFEFEB] text-[#66665E]`}>비활성</span>
+              <span className={`${ui.badge} bg-[#EFEFEB] text-[#66665E]`}>제외</span>
             </span>
           </td>
           <td className="px-2 py-1 font-mono text-[#66665E]">{nurse.years}</td>
@@ -336,16 +340,64 @@ function NurseRow({ nurse, index, nurses }: { nurse: WardNurse; index: number; n
       )}
       <td className="px-1 py-1">
         <div className="flex items-center justify-end gap-1">
-          {deletable && (
-            <button type="button" onClick={() => removeNurse(nurse.id)} className={ui.danger}>
-              삭제
-            </button>
-          )}
           <button type="button" onClick={() => setNurseActive(nurse.id, !nurse.active)} className={ui.textSm}>
-            {nurse.active ? "비활성으로" : "다시 활성으로"}
+            {nurse.active ? "근무표에서 빼기" : "다시 넣기"}
           </button>
+          {deletable ? <RowMenu name={nurse.name} onDelete={() => removeNurse(nurse.id)} /> : <span className="w-8" />}
         </div>
       </td>
     </tr>
+  );
+}
+
+/** 행 끝 ⋯ 메뉴. [삭제]는 근무표에 들어간 적 없는 간호사에게만 둔다. */
+function RowMenu({ name, onDelete }: { name: string; onDelete: () => void }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const close = (e: MouseEvent | KeyboardEvent) => {
+      if (e instanceof KeyboardEvent ? e.key === "Escape" : !ref.current?.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", close);
+    document.addEventListener("keydown", close);
+    return () => {
+      document.removeEventListener("mousedown", close);
+      document.removeEventListener("keydown", close);
+    };
+  }, [open]);
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        type="button"
+        aria-label={`${name} 더 보기`}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        onClick={() => setOpen((o) => !o)}
+        className={`${ui.textSm} w-8 justify-center px-0`}
+      >
+        <svg aria-hidden="true" viewBox="0 0 14 14" className="size-3.5" fill="currentColor">
+          <circle cx="3" cy="7" r="1.1" />
+          <circle cx="7" cy="7" r="1.1" />
+          <circle cx="11" cy="7" r="1.1" />
+        </svg>
+      </button>
+      {open && (
+        <div role="menu" className="absolute top-full right-0 z-10 mt-1 rounded-md border border-[#E2E2DC] bg-white p-1">
+          <button
+            type="button"
+            role="menuitem"
+            onClick={() => {
+              setOpen(false);
+              onDelete();
+            }}
+            className={`${ui.danger} w-full whitespace-nowrap`}
+          >
+            삭제
+          </button>
+        </div>
+      )}
+    </div>
   );
 }

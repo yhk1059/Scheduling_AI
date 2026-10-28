@@ -60,6 +60,8 @@ export interface Ward {
   /** scope "ward". 필요 인원(daily_coverage)도 여기 */
   rules: ConstraintSpec[];
   pendingRules: ConstraintSpec[];
+  /** 카드 표시 순서(새 카드가 앞). 적용해도 바뀌지 않는다. 옛 저장본에는 없다 */
+  cardOrder?: string[];
   /** 샘플에서 시작했는지(로그인 시 질문에 쓴다) */
   isSample: boolean;
 }
@@ -77,6 +79,8 @@ export interface WorkPeriod extends PeriodRange {
   /** scope "period" (요청, 수동 고정) */
   requests: ConstraintSpec[];
   pendingRequests: ConstraintSpec[];
+  /** 카드 표시 순서(새 카드가 앞). 적용해도 바뀌지 않는다. 옛 저장본에는 없다 */
+  cardOrder?: string[];
   /** [이번 기간만 끄기] */
   disabledIds: string[];
   /** 이 기간에만 바뀐 병동 규칙(제안 수락 update) */
@@ -238,6 +242,23 @@ function upsert(list: ConstraintSpec[], card: ConstraintSpec): ConstraintSpec[] 
   const i = key === null ? -1 : list.findIndex((c) => replaceKey(c) === key);
   return i === -1 ? [...list, card] : list.map((c, j) => (j === i ? card : c));
 }
+
+/** 대기·적용 카드를 한 목록으로. order에 있는 카드가 그 순서로 앞에, 없는 카드는 대기 → 적용 순으로 뒤에 둔다. */
+export function cardsInOrder(
+  pending: ConstraintSpec[],
+  applied: ConstraintSpec[],
+  order: string[] = [],
+): { card: ConstraintSpec; pending: boolean }[] {
+  const all = [...pending.map((card) => ({ card, pending: true })), ...applied.map((card) => ({ card, pending: false }))];
+  const rank = (id: string) => {
+    const i = order.indexOf(id);
+    return i === -1 ? order.length : i;
+  };
+  return all.map((x, i) => ({ x, i })).sort((a, b) => rank(a.x.card.id) - rank(b.x.card.id) || a.i - b.i).map(({ x }) => x);
+}
+
+/** 새 카드 id를 순서 맨 앞에 붙인다. */
+const prependOrder = (order: string[] | undefined, cards: ConstraintSpec[]) => [...cards.map((c) => c.id), ...(order ?? [])];
 
 /** card가 적용되면 대체할 기존 제약(같은 type·scope·대상, 다른 id). */
 export function findReplaced(constraints: ConstraintSpec[], card: ConstraintSpec): ConstraintSpec | undefined {
@@ -659,7 +680,11 @@ export function createAppStore(getStorage: () => Storage, now: () => Date = () =
                 params: { shift, day_kind: dayKind, min, max },
               }),
             })),
-          addPendingRules: (cards) => editWard((w) => ({ ...w, pendingRules: [...w.pendingRules, ...cards] }), false),
+          addPendingRules: (cards) =>
+            editWard(
+              (w) => ({ ...w, pendingRules: [...w.pendingRules, ...cards], cardOrder: prependOrder(w.cardOrder, cards) }),
+              false,
+            ),
           applyRule: (id) => {
             const card = get().ward?.pendingRules.find((c) => c.id === id);
             if (!card) return;
@@ -731,7 +756,11 @@ export function createAppStore(getStorage: () => Storage, now: () => Date = () =
             })),
           setCarryOver: (periodId, carryOver) => editPeriod(periodId, (p) => ({ ...p, carryOver })),
           addPendingRequests: (periodId, cards) =>
-            editPeriod(periodId, (p) => ({ ...p, pendingRequests: [...p.pendingRequests, ...cards] }), false),
+            editPeriod(
+              periodId,
+              (p) => ({ ...p, pendingRequests: [...p.pendingRequests, ...cards], cardOrder: prependOrder(p.cardOrder, cards) }),
+              false,
+            ),
           applyRequest: (periodId, id) => {
             const card = get().periods.find((p) => p.id === periodId)?.pendingRequests.find((c) => c.id === id);
             if (!card) return;
