@@ -13,7 +13,10 @@
     {
       "step": 1,
       "name": "period-domain",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-10-28T19:05:53+0900",
+      "summary": "Period를 {start_date, length}(≤MAX_PERIOD_DAYS=31, days/date_of/weekday)로, scope \"month\"→\"period\"로 바꾸고 solver/llm(context period_start·period_end·period_length)/eval/샘플/types.gen.ts/store(v2, 다음 달 기간)/csv/components를 lib/period.ts(monthDay 추가)로 맞춤",
+      "completed_at": "2026-10-28T19:14:15+0900"
     },
     {
       "step": 2,
