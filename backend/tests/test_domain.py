@@ -357,3 +357,33 @@ def test_explain_request_wraps_schedule_request():
 def test_error_body():
     body = ErrorBody.model_validate({"error": {"code": "VALIDATION_ERROR", "message": "m", "request_id": "r1"}})
     assert body.error.code == "VALIDATION_ERROR"
+
+
+# --- history_load ---
+
+
+def test_history_load_accepted():
+    load = [{"nurse_id": "n01", "nights": 8, "weekends": 3}]
+    req = ScheduleRequest.model_validate(request([], history_load=load))
+    assert req.history_load[0].nights == 8
+    assert ScheduleRequest.model_validate(request([])).history_load == []
+
+
+@pytest.mark.parametrize("field", ["nights", "weekends"])
+@pytest.mark.parametrize("value", [-1, constants.HISTORY_DAYS + 1])
+def test_history_load_out_of_range_rejected(field, value):
+    load = [{"nurse_id": "n01", "nights": 0, "weekends": 0, field: value}]
+    with pytest.raises(ValidationError):
+        ScheduleRequest.model_validate(request([], history_load=load))
+
+
+def test_history_load_unknown_nurse_rejected():
+    load = [{"nurse_id": "n99", "nights": 1, "weekends": 1}]
+    with pytest.raises(ValidationError, match="n99"):
+        ScheduleRequest.model_validate(request([], history_load=load))
+
+
+def test_history_load_duplicate_nurse_rejected():
+    load = [{"nurse_id": "n01", "nights": 1, "weekends": 1}, {"nurse_id": "n01", "nights": 2, "weekends": 0}]
+    with pytest.raises(ValidationError, match="n01"):
+        ScheduleRequest.model_validate(request([], history_load=load))

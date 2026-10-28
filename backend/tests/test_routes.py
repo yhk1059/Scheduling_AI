@@ -123,6 +123,15 @@ def test_solve_ok_returns_input_version():
     assert len(body["result"]["assignments"]) == 15
 
 
+def test_solve_passes_history_load(monkeypatch):
+    seen = []
+    monkeypatch.setattr(routes, "solve", lambda req: seen.append(req.history_load) or real_solve(req))
+    data = sample()
+    data["history_load"] = [{"nurse_id": "n03", "nights": 8, "weekends": 2}]
+    assert client.post("/api/py/solve", json=data).status_code == 200
+    assert seen[0][0].nights == 8
+
+
 def test_solve_infeasible_with_conflicts():
     r = client.post("/api/py/solve", json=infeasible_request())
     assert r.status_code == 200
@@ -221,6 +230,21 @@ def test_explain_verifies_with_time_limit_without_conflict_analysis(llm, monkeyp
     assert len(calls) == 1
     assert calls[0][0] <= PROPOSAL_VERIFY_TIME_LIMIT_S
     assert calls[0][1] is False
+
+
+def test_explain_verify_passes_history_load(llm, monkeypatch):
+    seen = []
+
+    def fake_solve(req, time_limit_s, analyze_conflicts):
+        seen.append(req.history_load)
+        return real_solve(req, time_limit_s=time_limit_s, analyze_conflicts=analyze_conflicts)
+
+    monkeypatch.setattr(routes, "solve", fake_solve)
+    body = explain_body()
+    body["request"]["history_load"] = [{"nurse_id": "n03", "nights": 8, "weekends": 2}]
+    llm.responses = [ok({"text": "설명", "proposals": [GOOD]})]
+    assert client.post("/api/py/explain", json=body).status_code == 200
+    assert [[h.model_dump() for h in load] for load in seen] == [[{"nurse_id": "n03", "nights": 8, "weekends": 2}]]
 
 
 def test_explain_stops_when_verify_budget_exhausted(llm, monkeypatch):

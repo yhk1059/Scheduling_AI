@@ -29,6 +29,12 @@ def is_weekend(request: ScheduleRequest, day: int) -> bool:
     return request.period.weekday(day) >= 5 or day in request.holidays
 
 
+def history(request: ScheduleRequest, attr: str) -> dict[str, int]:
+    """간호사별 누적 부담(attr: "nights" | "weekends"). history가 없는 간호사는 0."""
+    loads = {h.nurse_id: getattr(h, attr) for h in request.history_load}
+    return {n.id: loads.get(n.id, 0) for n in request.nurses}
+
+
 def preference_days(request: ScheduleRequest, c: Any) -> list[int]:
     """shift_preference의 대상 날짜. days=None이면 기간 전체, weekends_only면 주말·공휴일만."""
     p = c.params
@@ -88,14 +94,17 @@ def _violations(request: ScheduleRequest, a: Assignments, c: Any) -> list[SoftVi
                 out.append(v(f"{'희망' if p.prefer else '기피'} {p.shift} 미반영", p.nurse_id, d))
     elif c.type in ("night_fairness", "weekend_fairness"):
         if c.type == "night_fairness":
-            counts = [a[n.id].count("N") for n in nurses if not n.night_only]
+            past = history(request, "nights")
+            counts = [past[n.id] + a[n.id].count("N") for n in nurses if not n.night_only]
             label = "나이트"
         else:
-            counts = [sum(a[n.id][d - 1] != "O" for d in range(1, days + 1) if is_weekend(request, d))
+            past = history(request, "weekends")
+            counts = [past[n.id] + sum(a[n.id][d - 1] != "O" for d in range(1, days + 1) if is_weekend(request, d))
                       for n in nurses]
             label = "주말·공휴일 근무"
+        prefix = "최근 4주 포함 " if request.history_load else ""
         if len(counts) >= 2 and max(counts) - min(counts) > FAIRNESS_TOLERANCE:
-            out.append(v(f"{label} 개수 편차 {max(counts) - min(counts)}"))
+            out.append(v(f"{prefix}{label} 개수 편차 {max(counts) - min(counts)}"))
     elif c.type == "daily_coverage":
         for d in range(1, days + 1):
             if is_weekend(request, d) != (p.day_kind == "weekend"):

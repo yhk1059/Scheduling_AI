@@ -6,8 +6,9 @@
 
 from typing import TYPE_CHECKING, Any, Callable
 
+from backend.domain.constants import HISTORY_DAYS
 from backend.solver import hard
-from backend.solver.stats import preference_days
+from backend.solver.stats import history, preference_days
 
 if TYPE_CHECKING:
     from backend.solver.model import ModelContext
@@ -35,11 +36,11 @@ def add_shift_preference(ctx: "ModelContext", c: Any) -> None:
 
 
 def _spread(ctx: "ModelContext", c: Any, counts: list) -> None:
-    """(최대 − 최소) × weight. 최소화 목적이라 부등식만으로 충분하다."""
+    """(최대 − 최소) × weight. 최소화 목적이라 부등식만으로 충분하다. counts는 누적 부담을 포함한다."""
     if len(counts) < 2:
         return
-    hi = ctx.model.new_int_var(0, ctx.days, "")
-    lo = ctx.model.new_int_var(0, ctx.days, "")
+    hi = ctx.model.new_int_var(0, ctx.days + HISTORY_DAYS, "")
+    lo = ctx.model.new_int_var(0, ctx.days + HISTORY_DAYS, "")
     for cnt in counts:
         ctx.model.add(hi >= cnt)
         ctx.model.add(lo <= cnt)
@@ -47,13 +48,17 @@ def _spread(ctx: "ModelContext", c: Any, counts: list) -> None:
 
 
 def add_night_fairness(ctx: "ModelContext", c: Any) -> None:
+    """나이트 전담을 뺀 간호사의 (최근 4주 N + 이번 기간 N) 편차."""
+    past = history(ctx.request, "nights")
     regular = [n.id for n in ctx.request.nurses if not n.night_only]
-    _spread(ctx, c, [sum(ctx.x[nid, d, "N"] for d in range(1, ctx.days + 1)) for nid in regular])
+    _spread(ctx, c, [past[nid] + sum(ctx.x[nid, d, "N"] for d in range(1, ctx.days + 1)) for nid in regular])
 
 
 def add_weekend_fairness(ctx: "ModelContext", c: Any) -> None:
+    """(최근 4주 주말·공휴일 근무 + 이번 기간 주말·공휴일 근무) 편차."""
+    past = history(ctx.request, "weekends")
     weekends = [d for d in range(1, ctx.days + 1) if ctx.is_weekend(d)]
-    counts = [sum(ctx.x[n.id, d, "O"].Not() for d in weekends) for n in ctx.request.nurses]
+    counts = [past[n.id] + sum(ctx.x[n.id, d, "O"].Not() for d in weekends) for n in ctx.request.nurses]
     _spread(ctx, c, counts)
 
 
