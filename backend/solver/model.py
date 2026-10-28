@@ -84,14 +84,21 @@ def build_model(request: ScheduleRequest) -> ModelContext:
 
 
 def solve(
-    request: ScheduleRequest, time_limit_s: float = SOLVE_TIME_LIMIT_S, analyze_conflicts: bool = True
+    request: ScheduleRequest,
+    time_limit_s: float = SOLVE_TIME_LIMIT_S,
+    analyze_conflicts: bool = True,
+    deterministic: bool = False,
 ) -> SolveOk | SolveInfeasible | SolveTimeout:
+    """deterministic이면 단일 워커·고정 시드로 푼다. 최적해를 시간 안에 찾으면 다시 풀어도 같은 해가 나온다."""
     ctx = build_model(request)
     ctx.model.add_bool_and(list(ctx.hard_literals.values()))
     if ctx.objective_terms:
         ctx.model.minimize(sum(ctx.objective_terms))
     solver = cp_model.CpSolver()
     solver.parameters.max_time_in_seconds = time_limit_s
+    if deterministic:
+        solver.parameters.num_workers = 1
+        solver.parameters.random_seed = 0
     status = solver.solve(ctx.model)
     version = request.input_version
 

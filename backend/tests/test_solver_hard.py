@@ -13,6 +13,13 @@ START, DAYS = "2026-11-01", 30
 WEEKENDS = {1, 7, 8, 14, 15, 21, 22, 28, 29}
 
 
+def sample_data() -> dict:
+    """샘플 병동을 요청 dict로. next_requests(다음 근무표 요청)는 ScheduleRequest 필드가 아니라 뺀다."""
+    data = json.loads(SAMPLE_PATH.read_text(encoding="utf-8"))
+    del data["next_requests"]
+    return data
+
+
 def nurse(nid: str, years: int = 5, night_only: bool = False) -> dict:
     return {"id": nid, "name": f"간호사{nid}", "years": years, "night_only": night_only}
 
@@ -264,12 +271,14 @@ def test_soft_toggled_template_is_skipped_in_hard_phase():
 
 
 def test_sample_ward_has_solution():
-    req = ScheduleRequest.model_validate(json.loads(SAMPLE_PATH.read_text(encoding="utf-8")))
+    req = ScheduleRequest.model_validate(sample_data())
     a = solve_ok(req)
     night_only = {n.id for n in req.nurses if n.night_only}
     assert all(set(a[nid]) <= {"N", "O"} for nid in night_only)
     ctx = build_model(req)
     for c in req.constraints:
+        if c.type != "daily_coverage":
+            continue
         p = c.params
         for d in range(1, req.period.days + 1):
             if (p.day_kind == "weekend") == ctx.is_weekend(d):

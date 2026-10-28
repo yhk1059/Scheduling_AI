@@ -1,17 +1,14 @@
 """최소 변경 재스케줄: previous가 있으면 바뀐 칸에 DIFF_WEIGHT 페널티, 결과에 diff."""
 
-import json
-
 import pytest
 
 from backend.domain.models import ScheduleRequest, SolveOk
 from backend.solver.model import solve
-from backend.tests.test_solver_hard import con, nurse
-from backend.tests.test_solver_soft_stats import SAMPLE_PATH
+from backend.tests.test_solver_hard import con, nurse, sample_data
 
 
 def sample() -> dict:
-    return json.loads(SAMPLE_PATH.read_text())
+    return sample_data()
 
 
 def solve_result(raw: dict):

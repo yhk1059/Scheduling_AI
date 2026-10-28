@@ -1,6 +1,5 @@
 """충돌 분석: assumptions core → Conflict 목록, solve() 연동."""
 
-import json
 import time
 
 from backend.domain.constants import CONFLICT_TIME_LIMIT_S, SOLVE_TIME_LIMIT_S
@@ -8,7 +7,7 @@ from backend.domain.models import ScheduleRequest, SolveInfeasible
 from backend.solver import model as solver_model
 from backend.solver.conflicts import find_conflicts
 from backend.solver.model import solve
-from backend.tests.test_solver_hard import SAMPLE_PATH, con, coverage, nurse, request
+from backend.tests.test_solver_hard import con, coverage, nurse, request, sample_data
 
 
 def leave(cid: str, nid: str, days: list[int]) -> dict:
@@ -29,7 +28,7 @@ def ids(conflicts) -> set[str]:
 
 def overloaded_sample() -> tuple[ScheduleRequest, set[str]]:
     """샘플 병동(주말 7명 필요)에서 토요일 7일에 9명이 휴가 → 6명만 남는다."""
-    data = json.loads(SAMPLE_PATH.read_text(encoding="utf-8"))
+    data = sample_data()
     leaves = [leave(f"lv-n{i:02d}", f"n{i:02d}", [7]) for i in range(1, 10)]
     data["constraints"] += leaves + [con("mcn", "max_consecutive_nights", {"days": 3})]
     return ScheduleRequest.model_validate(data), {c["id"] for c in leaves}
