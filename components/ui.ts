@@ -20,4 +20,6 @@ export const ui = {
   label: "text-xs font-medium text-[#3D3D38]",
   help: "text-xs font-medium text-[#66665E]",
   error: "text-xs font-medium text-[#B42318]",
+  /** 주의 배너(이월 변경, 저장 안내, 기간 단위 변경 등 공통). 버튼은 최대 하나. */
+  banner: "flex items-center justify-between gap-3 rounded-lg border border-[#F1D3A8] bg-[#FDF0DC] px-4 py-2.5 text-sm text-[#7A4506]",
 };

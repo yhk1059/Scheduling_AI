@@ -278,7 +278,7 @@ export function currentPeriod(s: Pick<Data, "periods" | "view">): WorkPeriod | n
 }
 
 /** 어떤 기간의 요청·결과·확정본·이월에서 쓰이거나, 병동 규칙이 참조하는 간호사인지. */
-function isNurseUsed(id: string, ward: Ward, periods: WorkPeriod[]): boolean {
+export function isNurseUsed(id: string, ward: Ward, periods: WorkPeriod[]): boolean {
   const refs = (list: ConstraintSpec[]) => list.some((c) => refNurse(c) === id);
   if (refs(ward.rules) || refs(ward.pendingRules)) return true;
   return periods.some(
