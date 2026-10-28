@@ -86,6 +86,34 @@ def test_validate_dataset_errors(cases):
     assert run.validate_dataset(cases)
 
 
+CROSS = {"start_date": "2026-11-23", "length": 14}
+
+
+def test_validate_dataset_uses_case_period():
+    # 14일 기간에는 15일이 없고, 기본(샘플) 30일 기간에는 있다
+    assert run.validate_dataset([case("a", {"status": "ok", "constraints": [leave("n01", [15])]}, period=CROSS)])
+    assert run.validate_dataset([case("a", {"status": "ok", "constraints": [leave("n01", [9, 10, 11])]}, period=CROSS)]) == []
+
+
+@pytest.mark.parametrize("period", [{"start_date": "2026-11-23"}, {"start_date": "x", "length": 14}, {"start_date": "2026-11-23", "length": 40}])
+def test_validate_dataset_bad_period(period):
+    assert run.validate_dataset([case("a", {"status": "clarify"}, period=period)])
+
+
+def test_request_period_from_case_or_sample():
+    ward = run._ward()
+    req = run._request(case("a", {"status": "clarify"}, period=CROSS), ward)
+    assert (req.context.period.start_date.isoformat(), req.context.period.length) == ("2026-11-23", 14)
+    req = run._request(case("a", {"status": "clarify"}), ward)
+    assert req.context.period.model_dump(mode="json") == ward["period"]
+
+
+def test_real_dataset_has_cross_month_cases():
+    cases = [c for c in run.load_dataset(run.DATASET) if "period" in c]
+    assert len(cases) >= 4
+    assert all(run.Period(**c["period"]).date_of(1).month != run.Period(**c["period"]).date_of(c["period"]["length"]).month for c in cases)
+
+
 def test_real_dataset_valid():
     cases = run.load_dataset(run.DATASET)
     assert 35 <= len(cases) <= 50

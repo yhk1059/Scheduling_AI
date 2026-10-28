@@ -140,9 +140,22 @@ def test_request_is_pseudonymized_and_uses_tool():
     assert '"hardness": "hard"' in body
     assert '"nurse_count": 3' in body
     context = json.loads(body.split("<context>\n")[1].split("\n</context>")[0])
-    assert (context["period_start"], context["period_end"], context["period_length"]) == ("2026-11-01", "2026-11-30", 30)
-    assert "target_month" not in context
+    assert context["period"] == {"start": "2026-11-01", "end": "2026-11-30", "length": 30}
+    assert len(context["days"]) == 30
+    assert context["days"][13] == {"day": 14, "date": "2026-11-14"}
+    for old in ("target_month", "days_in_month", "period_start", "period_end", "period_length"):
+        assert old not in context
     assert context["weekend_and_holiday_days"][:4] == [1, 5, 7, 8]
+
+
+def test_context_days_cross_month():
+    req = REQUEST.model_copy(update={"period": Period(start_date=date(2026, 11, 23), length=14), "holidays": []})
+    client = FakeClient(ok({"text": TEXT, "proposals": []}))
+    explain(req, CONFLICTS, client)
+    body = client.calls[0]["messages"][0]["content"]
+    context = json.loads(body.split("<context>\n")[1].split("\n</context>")[0])
+    assert context["period"] == {"start": "2026-11-23", "end": "2026-12-06", "length": 14}
+    assert context["days"][8] == {"day": 9, "date": "2026-12-01"}
 
 
 def test_tool_schema_from_pydantic():
@@ -156,6 +169,8 @@ def test_prompt_instructions():
     assert "leave" in EXPLAIN_SYSTEM and "마지막 수단" in EXPLAIN_SYSTEM
     assert "fixed_assignment" in EXPLAIN_SYSTEM and "disable" in EXPLAIN_SYSTEM
     assert "update" in EXPLAIN_SYSTEM
+    assert "11/30" in EXPLAIN_SYSTEM and "days" in EXPLAIN_SYSTEM
+    assert "대상 월" not in EXPLAIN_SYSTEM and "이번 달" not in EXPLAIN_SYSTEM
 
 
 # --- 후처리 ---

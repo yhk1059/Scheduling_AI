@@ -37,13 +37,22 @@ NURSES = [
 ]
 
 
-def request(text: str, scope: str = "period") -> TranslateRequest:
+NOV = Period(start_date=date(2026, 11, 1), length=30)
+CROSS = Period(start_date=date(2026, 11, 23), length=14)  # 11/23(월) ~ 12/6(일)
+
+
+def request(text: str, scope: str = "period", period: Period = NOV, holidays: list[int] | None = None, today: date = date(2026, 10, 26)) -> TranslateRequest:
     return TranslateRequest(
         text=text,
         scope=scope,
-        context=TranslateContext(nurses=NURSES, period=Period(start_date=date(2026, 11, 1), length=30), holidays=[5], today=date(2026, 10, 26)),
+        context=TranslateContext(nurses=NURSES, period=period, holidays=[5] if holidays is None else holidays, today=today),
         input_version=7,
     )
+
+
+def sent_context(call: dict) -> dict:
+    body = call["messages"][0]["content"]
+    return json.loads(body.split("<context>\n")[1].split("\n</context>")[0])
 
 
 def ok(tool_input: dict | None, stop_reason: str = "tool_use") -> ToolCallResult:
@@ -76,15 +85,34 @@ def last_user_text(call: dict) -> str:
 # --- 정상 경로 ---
 
 
-def test_context_has_period_range():
+def test_context_has_period_and_days():
     client = FakeClient(ok({"constraints": [c("night_fairness", {})]}))
     translate(request("나이트 공평하게"), client)
-    body = last_user_text(client.calls[0])
-    context = json.loads(body.split("<context>\n")[1].split("\n</context>")[0])
-    assert (context["period_start"], context["period_end"], context["period_length"]) == ("2026-11-01", "2026-11-30", 30)
-    assert context["first_day_weekday"] == "Sunday"
-    assert "target_month" not in context and "days_in_month" not in context
+    context = sent_context(client.calls[0])
+    assert context["today"] == "2026-10-26" and context["today_weekday"] == "Monday"
+    assert context["period"] == {"start": "2026-11-01", "end": "2026-11-30", "length": 30}
+    assert len(context["days"]) == 30
+    assert context["days"][0] == {"day": 1, "date": "2026-11-01", "weekday": "Sun", "weekend": True}
+    assert context["days"][4] == {"day": 5, "date": "2026-11-05", "weekday": "Thu", "weekend": True}  # 공휴일
+    assert context["days"][5]["weekend"] is False
     assert context["weekend_and_holiday_days"][:3] == [1, 5, 7]
+    assert context["holidays"] == [5]
+    for old in ("period_start", "period_end", "period_length", "first_day_weekday", "target_month", "days_in_month"):
+        assert old not in context
+
+
+def test_context_cross_month_period():
+    client = FakeClient(ok({"constraints": [c("night_fairness", {})]}))
+    translate(request("나이트 공평하게", period=CROSS, holidays=[], today=date(2026, 11, 20)), client)
+    context = sent_context(client.calls[0])
+    assert context["today_weekday"] == "Friday"
+    assert context["period"] == {"start": "2026-11-23", "end": "2026-12-06", "length": 14}
+    assert [d["day"] for d in context["days"]] == list(range(1, 15))
+    assert context["days"][0] == {"day": 1, "date": "2026-11-23", "weekday": "Mon", "weekend": False}
+    assert context["days"][8] == {"day": 9, "date": "2026-12-01", "weekday": "Tue", "weekend": False}
+    assert context["days"][13]["date"] == "2026-12-06"
+    assert context["weekend_and_holiday_days"] == [6, 7, 13, 14]
+    assert [d["day"] for d in context["days"] if d["weekend"]] == [6, 7, 13, 14]
 
 
 def test_translate_two_rules_with_hardness():
@@ -199,6 +227,15 @@ def test_out_of_range_day_retry_then_clarify():
     assert "32" in last_user_text(client.calls[1])
 
 
+def test_day_outside_cross_month_period_clarify():
+    bad = ok({"constraints": [c("leave", {"nurse_id": "n03", "days": [15]})]})
+    client = FakeClient(*[bad] * (1 + constants.LLM_MAX_RETRIES))
+    res = translate(request("김민수 15일 휴가", period=CROSS, holidays=[]), client)
+    assert isinstance(res, TranslateClarify)
+    assert "15" in res.question and "기간" in res.question
+    assert "1..14" in last_user_text(client.calls[1])
+
+
 def test_out_of_range_day_then_fixed():
     client = FakeClient(
         ok({"constraints": [c("leave", {"nurse_id": "n02", "days": [31]})]}),
@@ -252,6 +289,13 @@ def test_tool_schema_generated_from_models():
 def test_system_prompt_covers_rules():
     for word in ("무조건", "가능하면", "clarification_question", "unsupported_reason", "다음 주", "3주차"):
         assert word in TRANSLATE_SYSTEM
+
+
+def test_system_prompt_uses_period_dates():
+    for word in ("기간당 최소 오프", "기간 전체", "days", "date", "기간 밖", '"period"'):
+        assert word in TRANSLATE_SYSTEM
+    for old in ("한 달", "대상 월"):
+        assert old not in TRANSLATE_SYSTEM
 
 
 # --- AnthropicClient 예외 매핑 ---

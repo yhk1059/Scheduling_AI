@@ -42,3 +42,8 @@
 {"id": "u01", "today": "2026-10-26", "scope": "ward", "text": "김철수랑 박민수는 같은 조 금지", "expected": {"status": "unsupported"}}
 {"id": "u02", "today": "2026-10-26", "scope": "ward", "text": "신규는 프리셉터랑 같은 근무조로 붙여줘", "expected": {"status": "unsupported"}}
 {"id": "u03", "today": "2026-10-26", "scope": "ward", "text": "한 달 근무시간이 160시간 넘지 않게 해줘", "expected": {"status": "unsupported"}}
+{"id": "p01", "today": "2026-11-02", "scope": "period", "period": {"start_date": "2026-11-23", "length": 14}, "text": "이영희 12월 1~3일 휴가", "expected": {"status": "ok", "constraints": [{"type": "leave", "hardness": "hard", "params": {"nurse_id": "n01", "days": [9, 10, 11]}}]}}
+{"id": "p02", "today": "2026-11-02", "scope": "period", "period": {"start_date": "2026-11-23", "length": 14}, "text": "박민수 11월 28일 나이트 고정", "expected": {"status": "ok", "constraints": [{"type": "fixed_assignment", "hardness": "hard", "params": {"nurse_id": "n02", "day": 6, "shift": "N"}}]}}
+{"id": "p03", "today": "2026-11-02", "scope": "period", "period": {"start_date": "2026-11-23", "length": 14}, "text": "김철수 15일 휴가", "expected": {"status": "clarify"}}
+{"id": "p04", "today": "2026-11-02", "scope": "period", "period": {"start_date": "2026-11-23", "length": 14}, "text": "정유진 1일 휴가 낼게요", "expected": {"status": "ok", "constraints": [{"type": "leave", "hardness": "hard", "params": {"nurse_id": "n04", "days": [9]}}]}}
+{"id": "p05", "today": "2026-11-02", "scope": "period", "period": {"start_date": "2026-11-23", "length": 14}, "text": "최지훈 12월 10일 휴가", "expected": {"status": "clarify"}}

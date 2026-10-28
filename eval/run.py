@@ -112,7 +112,7 @@ def validate_dataset(cases: list[dict]) -> list[str]:
             ScheduleRequest.model_validate(
                 {
                     "nurses": ward["nurses"],
-                    "period": ward["period"],
+                    "period": c.get("period", ward["period"]),
                     "holidays": c.get("holidays", ward["holidays"]),
                     "constraints": specs,
                     "input_version": 0,
@@ -167,7 +167,7 @@ def _request(case: dict, ward: dict) -> TranslateRequest:
         scope=case["scope"],
         context=TranslateContext(
             nurses=[Nurse(**n) for n in ward["nurses"]],
-            period=Period(**ward["period"]),
+            period=Period(**case.get("period", ward["period"])),
             holidays=case.get("holidays", ward["holidays"]),
             today=date.fromisoformat(case["today"]),
         ),
