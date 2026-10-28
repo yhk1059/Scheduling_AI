@@ -85,7 +85,10 @@
     {
       "step": 10,
       "name": "e2e-journey",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-10-28T19:51:32+0900",
+      "summary": "docs/BROWSER_TEST_SCENARIOS.md를 게스트 모드 새 구조(S1 랜딩, S2 시작 화면·지우기 Dialog, S3 병동 설정 기본·명단·필요 인원·비활성, S4 병동 규칙 4개(+나이트 공정성)·병동 홈, S5~S10 첫 기간 ①공휴일→②요청→③생성→해 없음 제안→칸 고정→확정, S11 시계 11/9로 옮겨 지난 날짜 잠금·병가 최소 변경·[다시 확정], S12 다음 기간 이월 근무 표·history_load·누적 부담 열·근거 한 줄, S13 이어서 하기)와 시계 고정(2026-10-28)으로 개정하고 e2e/entry.spec.ts(S1~S2)·journey.spec.ts(S3~S13, 마지막 /solve 요청 기준 hard 규칙·이월 경계 검사)를 1:1로 다시 씀; e2e 실행 결과 13/13 통과(실제 Anthropic API, 46초), 앱 수정 없음",
+      "completed_at": "2026-10-28T20:00:19+0900"
     },
     {
       "step": 11,
