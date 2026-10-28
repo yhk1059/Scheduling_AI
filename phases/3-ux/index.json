@@ -5,7 +5,10 @@
     {
       "step": 0,
       "name": "sample-schedules",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-10-29T01:04:58+0900",
+      "summary": "lib/samples/ward-15.json에 병동 규칙 6개(off_after_night_block 1·max_consecutive_work 5·max_consecutive_nights 3·min_days_off 8 hard, night/weekend_fairness soft — 규칙 값 조정 없이 28개 모두 최적해)와 next_requests 3개(이영희 10~12 휴가, 박민수 주말 N 기피, 정유진 20일 D 희망) 추가; backend/gen_sample.py(npm run gen:sample: 달 모양 28개 L-W마다 실제 1일 날짜 탐색(윤년 2월 위해 2026~2059) → solve(deterministic=True) → 최적해 아니면 실패) → lib/samples/confirmed-schedules.json(109,331 bytes, 압축 JSON, 두 번 생성 동일, 생성 약 7초); solve()에 deterministic 옵션(num_workers=1, random_seed=0) 추가; backend/tests/test_sample_schedules.py(28키·형태·나이트 전담 휴무≥8·연속 근무≤5·전 칸 fixed_assignment 재풀이로 hard 규칙 검증·결정성); 기존 테스트는 sample_data() 헬퍼로 next_requests를 빼고 읽게 수정; Python 의존성 추가 없음, solver↔llm import 없음; pytest 411·vitest 150·build·lint 통과",
+      "completed_at": "2026-10-29T01:09:10+0900"
     },
     {
       "step": 1,
@@ -47,5 +50,6 @@
       "name": "e2e-ux",
       "status": "pending"
     }
-  ]
+  ],
+  "created_at": "2026-10-29T01:04:58+0900"
 }
