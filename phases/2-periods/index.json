@@ -77,7 +77,10 @@
     {
       "step": 9,
       "name": "ui-continuity",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-10-28T19:44:29+0900",
+      "summary": "UI에 기간 연속성 연결: WardHome을 homeSummary 기반 운영 중 기간 카드(운영 중 배지·마지막 확정 시각·[열기])/다음 기간 카드(없음→[다음 기간 만들기]·[첫 기간 만들기] 유일 Primary, 초안→[이어서 작성], 확정→[열기], 확정된 다음 기간이 마지막이면 [다음 기간 만들기]도)/최근 기간 표로, ① 준비에 명단 점검(rosterChangesFor 추가·비활성 이름, 변동 없으면 \"지난 기간과 명단이 같아요\")·지난 확정본이 있으면 읽기 전용 이월 근무 표(<div> 셀, M/D 헤더, 없으면 붙여넣기)·이월 변경 배너([근무표로]), ③ 근무표에 누적 부담 열·통계 열(history_load, 없으면 0), 결정적 근거 한 줄(historyEvidence, 나이트 전담 제외), 운영 중 지난 날짜 잠금(자물쇠·aria-disabled·편집 막음)과 오늘 열 밑줄, 확정 기간은 [다시 확정] Primary(hasUnconfirmedChanges)·\"마지막 확정 HH:MM\", 이월 변경 배너([다시 생성]), 오류 토스트를 제자리 alert로; CELL/codeClass export, WardHome confirmedTime export",
+      "completed_at": "2026-10-28T19:51:25+0900"
     },
     {
       "step": 10,
