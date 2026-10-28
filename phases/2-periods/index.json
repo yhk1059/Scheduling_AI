@@ -45,7 +45,10 @@
     {
       "step": 5,
       "name": "ui-period",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-10-28T19:30:49+0900",
+      "summary": "PeriodWork(← 홈, formatRange 제목+초안/확정 배지, 3단계 Stepper(reached·지난 단계 버튼, 단계 이동 시 h2[data-step-title] 포커스)) 추가: ① 준비(기간·길이, 기간이 걸친 달마다 그리는 HolidayCalendar(기간 밖 비활성), 활성 명단+[병동 설정], 이월 근무 붙여넣기(선택)) ② 요청(RulesStep period, 이 기간 병동 규칙 접힌 목록, ConstraintCard off/readOnly로 [이번 기간만 끄기]/이번 기간 꺼짐/[다시 켜기], setDisabled) ③ ScheduleStep(dayHeader 날짜 헤더, periodDays 셀 aria-label, 누적 부담 열 2개 —, 운영 중 변경은 확정 기간만, CSV 근무표-{start}_{end}.csv); 이달/이번 달/전월/월중 문구 정리, AppShell PeriodScreen 제거",
+      "completed_at": "2026-10-28T19:36:30+0900"
     },
     {
       "step": 6,
