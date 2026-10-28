@@ -13,7 +13,10 @@
     {
       "step": 1,
       "name": "guest-confirm",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-10-29T01:09:28+0900",
+      "summary": "store에서 PendingAfterLogin·pendingAfterLogin·requireLogin과 signedIn 업로드 뒤 대기 동작 실행을 제거(STORAGE_VERSION 4 유지, isData는 옛 필드 허용, persist merge·서버 문서 로드는 persisted()로 Data 필드만 취해 옛 pendingAfterLogin을 버림); Account.tsx의 LoginRequiredDialog·useNeedsLogin·useGoogleLogin before 인자 제거, ScheduleStep 확정·WardHome 다음 기간 만들기는 게스트도 바로 동작(CSV만 받기 안내 제거), StartScreen 로그인 카드는 supabaseConfigured && auth===null로 그대로 표시; store.test.ts에 게스트 확정(버전 1개·remote 미호출)·게스트 다음 기간(이월 계산)·옛 필드 localStorage/서버 문서 호환 테스트 추가; pytest 411·vitest 150·build·lint 통과",
+      "completed_at": "2026-10-29T01:11:39+0900"
     },
     {
       "step": 2,
