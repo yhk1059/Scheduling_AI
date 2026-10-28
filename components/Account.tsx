@@ -3,26 +3,19 @@
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 
-import { useAppStore, type PendingAfterLogin } from "@/lib/store";
+import { useAppStore } from "@/lib/store";
 import { signInWithGoogle, signOut, supabaseConfigured } from "@/lib/supabase";
 
 import Dialog from "./Dialog";
 import { ui } from "./ui";
 
-/** 게스트가 이 동작을 하려면 로그인이 필요한가. Supabase env가 없으면 게스트로만 동작한다. */
-export function useNeedsLogin(): boolean {
-  const auth = useAppStore((s) => s.auth);
-  return supabaseConfigured && auth === null;
-}
-
 /** Google 로그인으로 이동. 진행 중 "이동 중…", 실패하면 그 자리에 문구. */
-export function useGoogleLogin(before?: () => void) {
+export function useGoogleLogin() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(false);
   const login = async () => {
     setBusy(true);
     setError(false);
-    before?.();
     try {
       await signInWithGoogle();
     } catch {
@@ -56,39 +49,6 @@ export function LoginButton({ className = ui.secondary }: { className?: string }
         </span>
       )}
     </span>
-  );
-}
-
-/** 게스트가 [확정]·[다음 기간 만들기]를 눌렀을 때. 로그인하면 로그인 뒤 그 동작을 이어서 한다. */
-export function LoginRequiredDialog({
-  action,
-  onClose,
-  onCsvOnly,
-}: {
-  action: PendingAfterLogin;
-  onClose: () => void;
-  /** 확정에서 열렸을 때만. [CSV만 받기] */
-  onCsvOnly?: () => void;
-}) {
-  const requireLogin = useAppStore((s) => s.requireLogin);
-  const { busy, error, login, label } = useGoogleLogin(() => requireLogin(action));
-  return (
-    <Dialog
-      title="로그인하고 저장하기"
-      onClose={onClose}
-      secondary={onCsvOnly ? { label: "CSV만 받기", onClick: onCsvOnly } : { label: "닫기", onClick: onClose }}
-      primary={{ label, onClick: login, disabled: busy }}
-    >
-      <p>이 근무표와 병동을 저장하려면 로그인하세요.</p>
-      <div>
-        <PrivacyLink className={`${ui.textSm} -ml-2`} />
-      </div>
-      {error && (
-        <p role="alert" className={ui.error}>
-          {LOGIN_ERROR}
-        </p>
-      )}
-    </Dialog>
   );
 }
 

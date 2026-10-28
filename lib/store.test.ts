@@ -899,7 +899,7 @@ function serverDoc() {
   s.getState().setWardName("서버 병동");
   s.getState().addNurses([rows[0]]);
   const { ward, periods, view, inputVersion } = s.getState();
-  return { version: 4, state: { ward, periods, view, inputVersion, pendingAfterLogin: null } };
+  return { version: 4, state: { ward, periods, view, inputVersion } };
 }
 
 const savedState = (doc: unknown) => (doc as { version: number; state: Record<string, unknown> }).state;
@@ -913,7 +913,6 @@ describe("로그인 분기", () => {
     expect(s.auth).toBeNull();
     expect(s.sync).toEqual({ status: "guest", savedAt: null });
     expect(s.loginPrompt).toBeNull();
-    expect(s.pendingAfterLogin).toBeNull();
   });
 
   it("서버에 병동이 있고 게스트 입력도 있으면 서버 문서로 바꾸고 안내한다", async () => {
@@ -1034,55 +1033,68 @@ function withPeriodSynced(remote: WardRemote, storage: Storage = new MemoryStora
   return { store, id };
 }
 
-describe("pendingAfterLogin", () => {
+describe("게스트 확정과 다음 기간", () => {
   beforeEach(() => vi.useFakeTimers());
   afterEach(() => vi.useRealTimers());
 
-  it("requireLogin은 persist되어 리디렉트 뒤에도 남는다", () => {
-    const storage = new MemoryStorage();
-    const f = fakeRemote();
-    const { store, id } = withPeriodSynced(f.remote, storage);
-    store.getState().requireLogin({ action: "confirm", periodId: id });
-    expect(store.getState().pendingAfterLogin).toEqual({ action: "confirm", periodId: id });
-    const again = synced(f.remote, storage);
-    expect(again.getState().pendingAfterLogin).toEqual({ action: "confirm", periodId: id });
-    expect(f.calls.load).toBe(0);
-  });
-
-  it("업로드가 끝나면 확정을 기록하고 비운 뒤 그 변경도 저장한다", async () => {
+  it("게스트가 확정하면 버전 1개를 남기고 remote를 부르지 않는다", async () => {
     const f = fakeRemote();
     const { store, id } = withPeriodSynced(f.remote);
-    store.getState().setResult(id, result({ n01: ["D"], n02: ["E"] }), []);
-    store.getState().requireLogin({ action: "confirm", periodId: id });
+    store.getState().setResult(id, result({ n01: fill(30, "D"), n02: fill(30, "O") }), []);
+    store.getState().confirm(id);
+    const p = store.getState().periods.find((x) => x.id === id)!;
+    expect(p.status).toBe("confirmed");
+    expect(p.versions).toHaveLength(1);
+    await vi.advanceTimersByTimeAsync(SAVE_DEBOUNCE_MS * 2);
+    expect(f.calls).toMatchObject({ load: 0, save: [] });
+    expect(store.getState().sync.status).toBe("guest");
+  });
+
+  it("게스트가 확정 기간 뒤에 다음 기간을 만들고 이월을 계산한다", async () => {
+    const f = fakeRemote();
+    const { store, id } = withPeriodSynced(f.remote);
+    const n01 = fill(30, "DDEENNO");
+    store.getState().setResult(id, result({ n01, n02: fill(30, "O") }), []);
+    store.getState().confirm(id);
+    const nextId = store.getState().createPeriod(TODAY)!;
+    const next = store.getState().periods.find((p) => p.id === nextId)!;
+    expect([next.start_date, next.status]).toEqual(["2026-12-01", "draft"]);
+    const req = toScheduleRequest(store.getState().ward!, next, store.getState().periods, TODAY);
+    expect(req.carry_over).toEqual([
+      { nurse_id: "n01", shifts: n01.slice(-7) },
+      { nurse_id: "n02", shifts: fill(7, "O") },
+    ]);
+    await vi.advanceTimersByTimeAsync(SAVE_DEBOUNCE_MS * 2);
+    expect(f.calls).toMatchObject({ load: 0, save: [] });
+  });
+});
+
+describe("옛 pendingAfterLogin 필드", () => {
+  it("localStorage에 남아 있어도 resetNotice 없이 불러오고 필드는 버린다", () => {
+    const storage = new MemoryStorage();
+    const a = fresh(storage);
+    a.getState().loadSample(TODAY);
+    const saved = JSON.parse(storage.getItem(STORAGE_KEY)!);
+    saved.state.pendingAfterLogin = { action: "confirm", periodId: a.getState().periods[0].id };
+    storage.setItem(STORAGE_KEY, JSON.stringify(saved));
+
+    const b = fresh(storage).getState();
+    expect(b.resetNotice).toBe(false);
+    expect(b.ward).toEqual(a.getState().ward);
+    expect(b.periods).toEqual(a.getState().periods);
+    expect(b).not.toHaveProperty("pendingAfterLogin");
+  });
+
+  it("서버 문서에 남아 있어도 resetNotice 없이 불러오고 필드는 버린다", async () => {
+    const data = serverDoc();
+    const f = fakeRemote({ data: { ...data, state: { ...data.state, pendingAfterLogin: { action: "create-period" } } }, updatedAt: SERVER_AT });
+    const store = synced(f.remote);
     await store.getState().signedIn(USER);
     const s = store.getState();
-    expect(s.pendingAfterLogin).toBeNull();
-    expect(s.periods[0].status).toBe("confirmed");
-    expect((savedState(f.calls.save[0]).periods as { status: string }[])[0].status).toBe("draft");
-    await vi.advanceTimersByTimeAsync(SAVE_DEBOUNCE_MS);
-    expect(f.calls.save).toHaveLength(2);
-    expect((savedState(f.calls.save[1]).periods as { status: string }[])[0].status).toBe("confirmed");
-  });
-
-  it("create-period면 업로드 뒤 다음 기간을 만든다", async () => {
-    const f = fakeRemote();
-    const store = synced(f.remote);
-    store.getState().startWard();
-    store.getState().addNurses(rows);
-    store.getState().requireLogin({ action: "create-period" });
-    await store.getState().signedIn(USER);
-    expect(store.getState().periods).toHaveLength(1);
-    expect(store.getState().pendingAfterLogin).toBeNull();
-  });
-
-  it("서버 우선이면 버린다", async () => {
-    const f = fakeRemote({ data: serverDoc(), updatedAt: SERVER_AT });
-    const { store, id } = withPeriodSynced(f.remote);
-    store.getState().setResult(id, result({ n01: ["D"], n02: ["E"] }), []);
-    store.getState().requireLogin({ action: "confirm", periodId: id });
-    await store.getState().signedIn(USER);
-    expect(store.getState().pendingAfterLogin).toBeNull();
-    expect(store.getState().periods).toEqual([]);
+    expect(s.resetNotice).toBe(false);
+    expect(s.ward!.name).toBe("서버 병동");
+    expect(s).not.toHaveProperty("pendingAfterLogin");
+    expect(s.periods).toEqual([]);
   });
 });
 

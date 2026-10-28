@@ -3,8 +3,9 @@
 import { useState } from "react";
 
 import { useAppStore, type View } from "@/lib/store";
+import { supabaseConfigured } from "@/lib/supabase";
 
-import { LoginButton, PrivacyLink, useNeedsLogin } from "./Account";
+import { LoginButton, PrivacyLink } from "./Account";
 import Dialog from "./Dialog";
 import { today } from "./RulesStep";
 import { ui } from "./ui";
@@ -18,7 +19,7 @@ export default function StartScreen({ onDone }: { onDone: () => void }) {
   const loadSample = useAppStore((s) => s.loadSample);
   const startWard = useAppStore((s) => s.startWard);
   const go = useAppStore((s) => s.go);
-  const needsLogin = useNeedsLogin();
+  const showLogin = useAppStore((s) => supabaseConfigured && s.auth === null);
   const [pending, setPending] = useState<(() => void) | null>(null);
 
   const sample = () => {
@@ -77,7 +78,7 @@ export default function StartScreen({ onDone }: { onDone: () => void }) {
           </section>
         ))}
       </div>
-      {needsLogin && (
+      {showLogin && (
         <section className={`${ui.card} flex items-center justify-between gap-4`}>
           <div className="flex flex-col gap-1">
             <h2 className={ui.cardTitle}>Google로 로그인</h2>
