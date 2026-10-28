@@ -1,0 +1,51 @@
+{
+  "project": "nurse-scheduler",
+  "phase": "3-ux",
+  "steps": [
+    {
+      "step": 0,
+      "name": "sample-schedules",
+      "status": "pending"
+    },
+    {
+      "step": 1,
+      "name": "guest-confirm",
+      "status": "pending"
+    },
+    {
+      "step": 2,
+      "name": "wording-lib",
+      "status": "pending"
+    },
+    {
+      "step": 3,
+      "name": "sample-store",
+      "status": "pending"
+    },
+    {
+      "step": 4,
+      "name": "ui-rules-settings",
+      "status": "pending"
+    },
+    {
+      "step": 5,
+      "name": "ui-period-schedule",
+      "status": "pending"
+    },
+    {
+      "step": 6,
+      "name": "ui-home-start",
+      "status": "pending"
+    },
+    {
+      "step": 7,
+      "name": "landing",
+      "status": "pending"
+    },
+    {
+      "step": 8,
+      "name": "e2e-ux",
+      "status": "pending"
+    }
+  ]
+}
