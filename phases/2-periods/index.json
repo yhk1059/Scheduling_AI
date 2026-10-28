@@ -5,7 +5,10 @@
     {
       "step": 0,
       "name": "period-lib",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-10-28T19:04:25+0900",
+      "summary": "lib/period.ts(PeriodUnit·PeriodRange, firstPeriodStart/periodFrom/nextPeriod/periodEnd/dateOfDay/dayOfDate/periodDays/isWeekendDay/formatRange/dayHeader/unitLabel, UTC 일수 기반 순수 함수)와 vitest 18개 추가",
+      "completed_at": "2026-10-28T19:05:45+0900"
     },
     {
       "step": 1,
@@ -72,5 +75,6 @@
       "name": "ui-auth-privacy",
       "status": "pending"
     }
-  ]
+  ],
+  "created_at": "2026-10-28T19:04:25+0900"
 }
