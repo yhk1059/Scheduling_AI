@@ -69,7 +69,10 @@
     {
       "step": 8,
       "name": "store-continuity",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-10-28T19:41:10+0900",
+      "summary": "lib/store.ts에 continuity 연결: toScheduleRequest(ward, period, periods, today)가 매 요청마다 carry_over(previousConfirmedPeriod면 carryOverFrom, 아니면 수동 입력)·history_load(historyLoadFor, 활성만)·운영 중 기간 pastDayLocks(같은 칸 fixed_assignment 제거)를 계산, WorkPeriod.carryOverUsed + setResult(periodId, result, usedCarryOver), confirm은 [다시 확정] 시 diffAssignments로 changed 버전 추가(변경 없으면 생략), 셀렉터 carryOverChanged/hasUnconfirmedChanges/homeSummary/rosterChangesFor export, STORAGE_VERSION 4; ScheduleStep·RulesStep 호출부 시그니처 맞춤(today()); vitest 10개 추가",
+      "completed_at": "2026-10-28T19:44:21+0900"
     },
     {
       "step": 9,
