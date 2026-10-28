@@ -100,19 +100,12 @@ export type View =
   | { screen: "settings"; tab: "roster" | "rules" }
   | { screen: "period"; periodId: string; step: 1 | 2 | 3 };
 
-export interface PendingAfterLogin {
-  action: "confirm" | "create-period";
-  periodId?: string;
-}
-
 interface Data {
   ward: Ward | null;
   /** start_date 오름차순 */
   periods: WorkPeriod[];
   view: View;
   inputVersion: number;
-  /** 게스트가 로그인을 요구받은 동작. OAuth 리디렉트를 넘어야 하므로 persist한다. */
-  pendingAfterLogin: PendingAfterLogin | null;
 }
 
 /** 원격 병동 문서(wards 1행). 테스트에서 가짜로 주입한다. */
@@ -133,8 +126,6 @@ export interface AppState extends Data {
   sync: { status: SyncStatus; savedAt: string | null };
   /** 화면이 대화상자로 보여 줄 것 */
   loginPrompt: LoginPrompt;
-  /** 게스트가 [확정]·[다음 기간 만들기]를 누르면 화면이 부른다. */
-  requireLogin: (action: PendingAfterLogin) => void;
   /** 로그인 직후(세션 복원 포함) 한 번. 서버 문서가 있으면 서버 우선, 없으면 게스트 상태를 올린다. */
   signedIn: (user: AuthUser) => Promise<void>;
   /** sample-choice 답. keep이면 샘플을 내 병동으로, 아니면 빈 병동으로 올린다. */
@@ -195,7 +186,7 @@ export interface AppState extends Data {
 }
 
 function initialData(): Data {
-  return { ward: null, periods: [], view: { screen: "home" }, inputVersion: 0, pendingAfterLogin: null };
+  return { ward: null, periods: [], view: { screen: "home" }, inputVersion: 0 };
 }
 
 function emptyWard(): Ward {
@@ -415,8 +406,6 @@ function isData(v: unknown): v is Data {
       ["nurses", "rules", "pendingRules"].every((k) => Array.isArray(w[k])) &&
       typeof w.nextNurseNo === "number" &&
       typeof w.unit === "string");
-  const p = d.pendingAfterLogin;
-  const pendingOk = p === undefined || p === null || typeof (p as Record<string, unknown>).action === "string";
   const periodsOk =
     Array.isArray(d.periods) &&
     d.periods.every(
@@ -429,7 +418,7 @@ function isData(v: unknown): v is Data {
         ) &&
         (p.carryOverUsed === null || Array.isArray(p.carryOverUsed)),
     );
-  return wardOk && periodsOk && pendingOk && typeof view?.screen === "string" && typeof d.inputVersion === "number";
+  return wardOk && periodsOk && typeof view?.screen === "string" && typeof d.inputVersion === "number";
 }
 
 /** localStorage를 감싼 저장소. 접근·쓰기가 예외를 던지면 메모리로 바꾸고 onFail을 부른다. */
@@ -480,16 +469,11 @@ function safeStorage(
   return { storage: persistStorage, available: storage !== null };
 }
 
-function localDate(d: Date): string {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-}
-
 const persisted = (s: Data): Data => ({
   ward: s.ward,
   periods: s.periods,
   view: s.view,
   inputVersion: s.inputVersion,
-  pendingAfterLogin: s.pendingAfterLogin,
 });
 
 export function createAppStore(getStorage: () => Storage, now: () => Date = () => new Date(), remote?: WardRemote) {
@@ -539,7 +523,7 @@ export function createAppStore(getStorage: () => Storage, now: () => Date = () =
         });
 
         /** 서버에 저장하는 문서. persist와 같은 모양이다. */
-        const doc = () => ({ version: STORAGE_VERSION, state: { ...persisted(get()), pendingAfterLogin: null } });
+        const doc = () => ({ version: STORAGE_VERSION, state: persisted(get()) });
         const save = async (): Promise<void> => {
           const userId = get().auth?.userId;
           if (!remote || !userId || !ready) return;
@@ -566,15 +550,10 @@ export function createAppStore(getStorage: () => Storage, now: () => Date = () =
         const replace = (data: Data, extra: Partial<AppState> = {}) =>
           set((s) => ({ ...data, inputVersion: Math.max(s.inputVersion, data.inputVersion) + 1, ...extra }));
         const emptyWardData = (): Data => ({ ...initialData(), ward: emptyWard(), view: { screen: "settings", tab: "roster" } });
-        /** 게스트 상태를 올리고, 남은 로그인 대기 동작을 실행한다. */
+        /** 게스트 상태를 올린다. */
         const upload = async () => {
           ready = true;
-          const pending = get().pendingAfterLogin;
           await save();
-          if (!pending) return;
-          set({ pendingAfterLogin: null });
-          if (pending.action === "confirm" && pending.periodId) get().confirm(pending.periodId);
-          else if (pending.action === "create-period") get().createPeriod(localDate(now()));
         };
 
         return {
@@ -585,7 +564,6 @@ export function createAppStore(getStorage: () => Storage, now: () => Date = () =
           sync: { status: "guest", savedAt: null },
           loginPrompt: null,
 
-          requireLogin: (action) => set({ pendingAfterLogin: action }),
           signedIn: async (user) => {
             if (!remote) return;
             ready = false;
@@ -601,10 +579,10 @@ export function createAppStore(getStorage: () => Storage, now: () => Date = () =
             if (get().auth?.userId !== user.id) return;
             const guest = get().hasInput();
             if (row) {
-              // 서버 우선. 게스트 기간이 서버 문서에 없으므로 pendingAfterLogin은 버린다
+              // 서버 우선
               const d = row.data as { version?: unknown; state?: unknown } | null;
               const ok = d?.version === STORAGE_VERSION && isData(d.state);
-              replace(ok ? { ...(d.state as Data), pendingAfterLogin: null } : initialData(), {
+              replace(ok ? persisted(d.state as Data) : initialData(), {
                 sync: { status: "saved", savedAt: row.updatedAt },
                 loginPrompt: guest ? { kind: "server-replaced-guest" } : null,
                 ...(!ok && { resetNotice: true }),
@@ -885,11 +863,12 @@ export function createAppStore(getStorage: () => Storage, now: () => Date = () =
         partialize: (s): Data => persisted(s),
         // 버전이 다르거나 파싱에 실패하면 버리고, merge에서 초기 상태 + resetNotice로 처리한다
         migrate: () => null as unknown as Data,
-        merge: (persisted, current) =>
-          persisted === undefined
+        // 지금은 쓰지 않는 옛 필드는 버리고 Data 필드만 가져온다
+        merge: (saved, current) =>
+          saved === undefined
             ? current
-            : isData(persisted)
-              ? { ...current, ...persisted, pendingAfterLogin: persisted.pendingAfterLogin ?? null }
+            : isData(saved)
+              ? { ...current, ...persisted(saved) }
               : { ...current, resetNotice: true },
       },
     ),

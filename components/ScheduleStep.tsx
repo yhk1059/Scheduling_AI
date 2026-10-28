@@ -26,7 +26,6 @@ import type {
   ScheduleResult,
 } from "@/lib/types.gen";
 
-import { LoginRequiredDialog, useNeedsLogin } from "./Account";
 import ConstraintCard, { describeParams, TEMPLATE_NAMES } from "./ConstraintCard";
 import { Spinner, today } from "./RulesStep";
 import { ui } from "./ui";
@@ -103,10 +102,6 @@ export default function ScheduleStep() {
   const [selected, setSelected] = useState<Cell | null>(null);
   // 운영 중 변경 입력 바에서 만든 대기 카드
   const [changeIds, setChangeIds] = useState<string[]>([]);
-  // 게스트 확정: 로그인 요구 대화상자, [CSV만 받기] 뒤 안내
-  const needsLogin = useNeedsLogin();
-  const [askLogin, setAskLogin] = useState(false);
-  const [csvOnly, setCsvOnly] = useState(false);
   const busy = loading || explaining || translating;
 
   const runExplain = async (req: Req, conflicts: Conflict[], version: number) => {
@@ -226,8 +221,6 @@ export default function ScheduleStep() {
     URL.revokeObjectURL(url);
   };
 
-  const confirmOrAsk = () => (needsLogin ? setAskLogin(true) : confirm(periodId));
-
   const isConfirmed = result !== null && confirmed !== null && JSON.stringify(confirmed) === JSON.stringify(result.assignments);
   const isDraft = result !== null && confirmed !== null && !isConfirmed;
   const rows = result ? nurses.filter((n) => result.assignments[n.id]) : [];
@@ -250,11 +243,6 @@ export default function ScheduleStep() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          {csvOnly && (
-            <span role="status" className={`${ui.help} mr-1`}>
-              데이터는 이 브라우저에만 남아요
-            </span>
-          )}
           {lastVersion && (
             <span className={`${ui.help} mr-1`}>
               마지막 확정 <span className="font-mono">{confirmedTime(lastVersion.confirmed_at)}</span>
@@ -268,14 +256,14 @@ export default function ScheduleStep() {
               {period.status === "confirmed" ? (
                 <button
                   type="button"
-                  onClick={confirmOrAsk}
+                  onClick={() => confirm(periodId)}
                   disabled={busy || !unconfirmed}
                   className={unconfirmed ? ui.primary : ui.secondary}
                 >
                   {unconfirmed ? "다시 확정" : "확정됨"}
                 </button>
               ) : (
-                <button type="button" onClick={confirmOrAsk} disabled={busy || isConfirmed} className={ui.secondary}>
+                <button type="button" onClick={() => confirm(periodId)} disabled={busy || isConfirmed} className={ui.secondary}>
                   확정
                 </button>
               )}
@@ -292,18 +280,6 @@ export default function ScheduleStep() {
           </button>
         </div>
       </div>
-
-      {askLogin && (
-        <LoginRequiredDialog
-          action={{ action: "confirm", periodId }}
-          onClose={() => setAskLogin(false)}
-          onCsvOnly={() => {
-            download();
-            setAskLogin(false);
-            setCsvOnly(true);
-          }}
-        />
-      )}
 
       {carryOverChanged(period, periods) && (
         <div role="status" className={ui.banner}>

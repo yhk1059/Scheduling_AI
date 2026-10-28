@@ -1,11 +1,8 @@
 "use client";
 
-import { useState } from "react";
-
 import { formatRange } from "@/lib/period";
 import { homeSummary, useAppStore, type Ward, type WorkPeriod } from "@/lib/store";
 
-import { LoginRequiredDialog, useNeedsLogin } from "./Account";
 import { today } from "./RulesStep";
 import { ui } from "./ui";
 
@@ -45,8 +42,6 @@ export default function WardHome() {
   const periods = useAppStore((s) => s.periods);
   const createPeriod = useAppStore((s) => s.createPeriod);
   const go = useAppStore((s) => s.go);
-  const needsLogin = useNeedsLogin();
-  const [askLogin, setAskLogin] = useState(false);
   if (!ward) return null;
 
   const ready = isWardReady(ward);
@@ -54,8 +49,7 @@ export default function WardHome() {
   const inactive = ward.nurses.length - active;
   const ruleCount = ward.rules.filter((r) => r.type !== "daily_coverage").length;
   const { operating, next, recent } = homeSummary(periods, today());
-  // 첫 기간은 게스트도 만든다. 다음 기간부터 로그인을 요구한다(PRD 핵심 기능 7)
-  const create = () => (needsLogin && periods.length > 0 ? setAskLogin(true) : createPeriod(today()));
+  const create = () => createPeriod(today());
   const open = (p: WorkPeriod) => go({ screen: "period", periodId: p.id, step: p.result ? 3 : 1 });
   // 다음 기간이 확정됐고 그 뒤에 만든 기간이 없으면 그다음 기간도 만들 수 있다
   const canCreateAfter = next.state === "confirmed" && periods.at(-1)?.id === next.period.id;
@@ -187,7 +181,6 @@ export default function WardHome() {
           병동 설정
         </button>
       </div>
-      {askLogin && <LoginRequiredDialog action={{ action: "create-period" }} onClose={() => setAskLogin(false)} />}
     </div>
   );
 }
