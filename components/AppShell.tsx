@@ -2,12 +2,10 @@
 
 import { useState } from "react";
 
-import { formatRange, unitLabel } from "@/lib/period";
-import { currentPeriod, useAppStore } from "@/lib/store";
+import { unitLabel } from "@/lib/period";
+import { useAppStore } from "@/lib/store";
 
-import HolidayCalendar from "./HolidayCalendar";
-import RulesStep from "./RulesStep";
-import ScheduleStep from "./ScheduleStep";
+import PeriodWork from "./PeriodWork";
 import StartScreen from "./StartScreen";
 import { ui } from "./ui";
 import WardHome from "./WardHome";
@@ -88,44 +86,9 @@ export default function AppShell() {
         ) : view.screen === "settings" ? (
           <WardSettings />
         ) : (
-          <PeriodScreen />
+          <PeriodWork />
         )}
       </main>
     </div>
-  );
-}
-
-/** 기간 작업. step 5에서 스테퍼 ①②③ 화면으로 바꾼다. 지금은 기존 요청·근무표 화면을 연결해 둔다. */
-function PeriodScreen() {
-  const period = useAppStore(currentPeriod);
-  const step = useAppStore((s) => (s.view.screen === "period" ? s.view.step : 1));
-  const go = useAppStore((s) => s.go);
-  if (!period) return null;
-
-  return (
-    <>
-      <div className="flex flex-col gap-1">
-        <div>
-          <button type="button" onClick={() => go({ screen: "home" })} className={ui.textSm}>
-            ← 홈
-          </button>
-        </div>
-        <p className="font-mono text-[15px] font-semibold text-[#1B1B18]">{formatRange(period)}</p>
-      </div>
-      {step === 3 ? (
-        <ScheduleStep />
-      ) : (
-        <>
-          <section className={`${ui.card} flex flex-col gap-3`}>
-            <div className="flex flex-col gap-1">
-              <h2 className={ui.cardTitle}>공휴일</h2>
-              <p className={ui.help}>날짜를 누르면 공휴일로 체크됩니다. 주말과 같은 인원 기준을 씁니다.</p>
-            </div>
-            <HolidayCalendar period={period} />
-          </section>
-          <RulesStep key="period" scope="period" />
-        </>
-      )}
-    </>
   );
 }

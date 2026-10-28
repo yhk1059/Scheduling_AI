@@ -4,8 +4,7 @@ import { useState } from "react";
 
 import { ApiError, errorMessage, translate } from "@/lib/api";
 import { firstPeriodStart, periodFrom, type PeriodRange, type PeriodUnit } from "@/lib/period";
-import { parseCarryOver, type CellError } from "@/lib/roster-import";
-import { currentPeriod, findReplaced, orphanConstraintIds, toScheduleRequest, useAppStore, type WorkPeriod } from "@/lib/store";
+import { currentPeriod, findReplaced, orphanConstraintIds, toScheduleRequest, useAppStore, type Ward, type WorkPeriod } from "@/lib/store";
 
 import ConstraintCard from "./ConstraintCard";
 import { ui } from "./ui";
@@ -15,13 +14,13 @@ const MAX_TEXT_CHARS = 1000; // backend/domain/constants.py MAX_TEXT_CHARS
 const COPY = {
   ward: {
     title: "병동 규칙",
-    description: "매달 똑같이 지키는 규칙을 말로 적어 주세요. 해석한 결과를 확인하고 [적용]해야 반영돼요.",
+    description: "기간이 바뀌어도 똑같이 지키는 규칙을 말로 적어 주세요. 해석한 결과를 확인하고 [적용]해야 반영돼요.",
     placeholder: "예: 나이트 다음 날은 무조건 쉬게",
     empty: "아직 규칙이 없어요.",
   },
   period: {
-    title: "이달 요청",
-    description: "이번 달 휴가, 고정 근무, 희망·기피 근무를 말로 적어 주세요.",
+    title: "요청",
+    description: "이번 기간 휴가, 고정 근무, 희망·기피 근무를 말로 적어 주세요. 해석한 결과를 확인하고 [적용]해야 반영돼요.",
     placeholder: "예: 이영희 15~17일 휴가",
     empty: "아직 요청이 없어요.",
   },
@@ -45,6 +44,7 @@ export default function RulesStep({ scope }: { scope: "ward" | "period" }) {
   const period = useAppStore(currentPeriod);
   const addPendingRules = useAppStore((s) => s.addPendingRules);
   const addPendingRequests = useAppStore((s) => s.addPendingRequests);
+  const setDisabled = useAppStore((s) => s.setDisabled);
   const go = useAppStore((s) => s.go);
 
   const [text, setText] = useState("");
@@ -104,7 +104,11 @@ export default function RulesStep({ scope }: { scope: "ward" | "period" }) {
     <div className="flex flex-col gap-5">
       {/* 병동 규칙은 병동 설정의 탭 안에 놓이므로 페이지 제목을 두지 않는다 */}
       <div className="flex flex-col gap-1">
-        {scope === "period" && <h1 className="text-[22px] font-semibold text-[#1B1B18]">{copy.title}</h1>}
+        {scope === "period" && (
+          <h2 tabIndex={-1} data-step-title className={`${ui.cardTitle} outline-none`}>
+            {copy.title}
+          </h2>
+        )}
         <p className="text-sm leading-relaxed text-[#3D3D38]">{copy.description}</p>
       </div>
 
@@ -151,13 +155,23 @@ export default function RulesStep({ scope }: { scope: "ward" | "period" }) {
           {pending.map((c) => (
             <ConstraintCard key={c.id} card={c} pending replaces={findReplaced(scope === "ward" ? ward.rules : period!.requests, c)} />
           ))}
-          {applied.map((c) => (
-            <ConstraintCard key={c.id} card={c} pending={false} />
-          ))}
+          {applied.map((c) =>
+            scope === "period" ? (
+              <ConstraintCard
+                key={c.id}
+                card={c}
+                pending={false}
+                off={period!.disabledIds.includes(c.id)}
+                onToggleOff={(off) => setDisabled(period!.id, c.id, off)}
+              />
+            ) : (
+              <ConstraintCard key={c.id} card={c} pending={false} />
+            ),
+          )}
         </div>
       )}
 
-      {scope === "period" && period && <CarryOverSection period={period} />}
+      {scope === "period" && period && <PeriodRules ward={ward} period={period} />}
 
       {scope === "ward" && pending.length > 0 && (
         <p className={ui.help}>적용하지 않은 카드 {pending.length}개는 근무표에 반영되지 않아요.</p>
@@ -165,7 +179,7 @@ export default function RulesStep({ scope }: { scope: "ward" | "period" }) {
 
       {scope === "period" && (
       <div className="flex items-center justify-between gap-4">
-        <button type="button" onClick={() => go({ screen: "home" })} className={ui.secondary}>
+        <button type="button" onClick={() => go({ screen: "period", periodId: period!.id, step: 1 })} className={ui.secondary}>
           이전
         </button>
         <div className="flex items-center gap-3">
@@ -212,79 +226,47 @@ export function Spinner() {
   );
 }
 
-function cellErrorText(e: CellError): string {
-  const at = e.row === null ? "" : e.col === null ? `${e.row + 1}행: ` : `${e.row + 1}행 ${e.col + 1}열: `;
-  return at + e.message;
-}
-
-function CarryOverSection({ period }: { period: WorkPeriod }) {
-  const ward = useAppStore((s) => s.ward);
-  const nurses = ward?.nurses.filter((n) => n.active) ?? [];
-  const { carryOver } = period;
-  const setCarryOver = useAppStore((s) => s.setCarryOver);
-
-  const [text, setText] = useState("");
-  const [result, setResult] = useState<ReturnType<typeof parseCarryOver> | null>(null);
-
-  const onApply = () => {
-    const parsed = parseCarryOver(text, nurses);
-    setResult(parsed);
-    if (parsed.errors.length === 0) setCarryOver(period.id, parsed.rows);
-  };
+/** 이 기간에 적용될 병동 규칙(접힌 목록). [이번 기간만 끄기]는 이 기간의 disabledIds만 바꾼다. */
+function PeriodRules({ ward, period }: { ward: Ward; period: WorkPeriod }) {
+  const setDisabled = useAppStore((s) => s.setDisabled);
+  const [open, setOpen] = useState(false);
+  // 확정 기간의 snapshot, 이 기간의 수정본(ruleOverrides), 꺼짐(enabled=false)이 반영된 목록
+  const rules = (toScheduleRequest(ward, period).constraints ?? []).filter((c) => c.scope === "ward");
+  const offCount = rules.filter((c) => c.enabled === false).length;
 
   return (
     <section className={`${ui.card} flex flex-col gap-3`}>
-      <div className="flex flex-col gap-1">
-        <h2 className={ui.cardTitle}>전월 마지막 주 근무 (선택)</h2>
-        <p className={ui.help}>
-          연속 근무와 나이트 규칙을 달 경계에서도 지키도록 씁니다. 지금 반영된 간호사:{" "}
-          <span className="font-mono">{carryOver.length}</span>명
-        </p>
-      </div>
-      <label className="flex flex-col gap-1">
-        <span className={ui.label}>이름, 그다음 오래된 날부터 근무 코드(D/E/N/O)</span>
-        <textarea
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-          rows={4}
-          placeholder={"이영희\tD\tD\tE\tE\tN\tN\tO"}
-          className={`${ui.input} h-auto py-2 font-mono`}
-        />
-      </label>
-      <div className="flex gap-2">
-        <button type="button" disabled={text.trim() === ""} onClick={onApply} className={ui.secondary}>
-          반영
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex flex-col gap-1">
+          <h3 className={ui.cardTitle}>이 기간에 적용될 병동 규칙</h3>
+          <p className={ui.help}>
+            <span className="font-mono">{rules.length}</span>개
+            {offCount > 0 && (
+              <>
+                {" "}
+                · 이번 기간 꺼짐 <span className="font-mono">{offCount}</span>개
+              </>
+            )}{" "}
+            · 규칙 원본은 병동 설정에서 고쳐요.
+          </p>
+        </div>
+        <button type="button" aria-expanded={open} onClick={() => setOpen((o) => !o)} className={ui.textSm}>
+          {open ? "접기" : "병동 규칙 보기"}
         </button>
-        {carryOver.length > 0 && (
-          <button
-            type="button"
-            onClick={() => {
-              setCarryOver(period.id, []);
-              setResult(null);
-            }}
-            className={ui.text}
-          >
-            비우기
-          </button>
-        )}
       </div>
-      {result && (
-        <ul className="flex flex-col gap-1">
-          {result.errors.map((e, i) => (
-            <li key={`e${i}`} className={ui.error}>
-              {cellErrorText(e)}
-            </li>
+      {open && (
+        <div className="grid grid-cols-2 gap-4">
+          {rules.map((c) => (
+            <ConstraintCard
+              key={c.id}
+              card={c}
+              pending={false}
+              readOnly
+              off={c.enabled === false}
+              onToggleOff={(off) => setDisabled(period.id, c.id, off)}
+            />
           ))}
-          {result.warnings.map((w, i) => (
-            <li key={`w${i}`} className="text-xs font-medium text-[#A15C07]">
-              {w}
-            </li>
-          ))}
-          {result.errors.length === 0 && (
-            <li className="text-xs font-medium text-[#1E6B3F]">{result.rows.length}명의 이월 근무를 반영했어요.</li>
-          )}
-          {result.errors.length > 0 && <li className={ui.help}>오류를 고친 뒤 다시 반영해 주세요.</li>}
-        </ul>
+        </div>
       )}
     </section>
   );

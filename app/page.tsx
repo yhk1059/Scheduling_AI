@@ -29,7 +29,7 @@ const STEPS = [
   },
   {
     title: "솔버가 생성",
-    body: "적용된 규칙과 이달 요청으로 CP-SAT 솔버가 한 달 근무표를 풉니다. hard 규칙은 반드시 지키고, soft 규칙은 위반을 최소화합니다.",
+    body: "적용된 규칙과 요청으로 CP-SAT 솔버가 기간 근무표를 풉니다. hard 규칙은 반드시 지키고, soft 규칙은 위반을 최소화합니다.",
   },
   {
     title: "막히면 이유와 검증된 해결책",
@@ -106,7 +106,7 @@ export default function Home() {
       <section className={section}>
         <div className="flex flex-col gap-2">
           <p className={eyebrow}>01 · 문제</p>
-          <h2 className={h2}>매달 엑셀과 머릿속 규칙으로 며칠씩 걸립니다</h2>
+          <h2 className={h2}>매번 엑셀과 머릿속 규칙으로 며칠씩 걸립니다</h2>
         </div>
         <div className="mt-8 grid grid-cols-2 gap-4">
           {PAINS.map((p) => (
@@ -137,7 +137,7 @@ export default function Home() {
       <section className={section}>
         <div className="flex flex-col gap-2">
           <p className={eyebrow}>03 · 데모</p>
-          <h2 className={h2}>규칙 입력부터 월중 재스케줄까지</h2>
+          <h2 className={h2}>규칙 입력부터 운영 중 재스케줄까지</h2>
         </div>
         <div className="mt-8">
           {HAS_DEMO_GIF ? (
@@ -174,7 +174,7 @@ export default function Home() {
           <div className={`${card} flex flex-col gap-3`}>
             <h3 className="text-[15px] font-semibold text-[#1B1B18]">번역 정확도 eval</h3>
             <p className={body}>
-              수간호사 말투 문장 44개(규칙, 이달 요청, 되묻기, 미지원)를 실제 API로 번역해 기대 제약과 비교했습니다. 모델{" "}
+              수간호사 말투 문장 44개(규칙, 요청, 되묻기, 미지원)를 실제 API로 번역해 기대 제약과 비교했습니다. 모델{" "}
               <span className="font-mono text-[13px]">claude-sonnet-5-5</span>, 3회차 실행 결과입니다.
             </p>
             <table className="w-full text-sm">
