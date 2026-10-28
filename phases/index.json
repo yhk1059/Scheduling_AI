@@ -12,7 +12,8 @@
     },
     {
       "dir": "3-ux",
-      "status": "pending"
+      "status": "completed",
+      "completed_at": "2026-10-29T01:48:44+0900"
     }
   ]
 }
