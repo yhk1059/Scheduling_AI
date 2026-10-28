@@ -15,6 +15,8 @@ export const ui = {
   textSm: "inline-flex items-center gap-2 h-8 px-2 rounded-md text-[13px] font-medium text-[#3D3D38] transition-colors duration-[120ms] hover:bg-[#EFEFEB] hover:text-[#1B1B18]",
   badge: "inline-flex items-center h-[22px] px-2 rounded-sm text-xs font-semibold",
   danger: "inline-flex items-center h-8 px-2 rounded-md text-[13px] font-medium text-[#B42318] hover:bg-[#EFEFEB]",
+  /** Primary 자리에 두는 Danger(데이터 삭제 확인). */
+  dangerMd: `${btn} bg-white text-[#B42318] border border-[#C9C9C1] hover:bg-[#FBE9E7]`,
   input:
     "h-10 rounded-md bg-white border border-[#C9C9C1] px-3 text-sm text-[#1B1B18] placeholder:text-[#8A8A80] focus:outline-2 focus:outline-[#155E75] focus:-outline-offset-1 focus:border-[#155E75]",
   label: "text-xs font-medium text-[#3D3D38]",

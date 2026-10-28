@@ -196,9 +196,14 @@ export default function Home() {
 
       <footer className="flex items-center justify-between border-t border-[#E2E2DC] py-8 text-xs font-medium text-[#66665E]">
         <span>간호사 근무표 · 포트폴리오 프로토타입</span>
-        <a href={REPO_URL} className="text-[#155E75] hover:text-[#0E4A5C]">
-          GitHub 저장소
-        </a>
+        <span className="flex items-center gap-4">
+          <Link href="/privacy" className="text-[#155E75] hover:text-[#0E4A5C]">
+            개인정보처리방침
+          </Link>
+          <a href={REPO_URL} className="text-[#155E75] hover:text-[#0E4A5C]">
+            GitHub 저장소
+          </a>
+        </span>
       </footer>
     </main>
   );
