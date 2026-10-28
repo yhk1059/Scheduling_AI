@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import sample from "./samples/ward-15.json";
 import {
@@ -11,8 +11,10 @@ import {
   isNurseUsed,
   orphanConstraintIds,
   rosterChangesFor,
+  SAVE_DEBOUNCE_MS,
   STORAGE_KEY,
   toScheduleRequest,
+  type WardRemote,
 } from "./store";
 import type { ConstraintSpec, ScheduleResult } from "./types.gen";
 
@@ -846,5 +848,366 @@ describe("localStorage 예외", () => {
     expect(store.getState().storageAvailable).toBe(false);
     store.getState().startWard();
     expect(store.getState().ward).not.toBeNull();
+  });
+});
+
+// ---- 로그인 저장(ADR-014) ----
+
+const USER = { id: "u1", email: "nurse@example.com" };
+const SERVER_AT = "2026-10-28T06:00:00.000Z";
+
+/** 가짜 원격 저장소. 호출을 기록하고, save는 resolve를 직접 부를 때까지 기다리게 할 수 있다. */
+function fakeRemote(row: { data: unknown; updatedAt: string } | null = null) {
+  const calls = { load: 0, save: [] as unknown[], remove: 0 };
+  let n = 0;
+  let hold = false;
+  let failSave = false;
+  const held: (() => void)[] = [];
+  const remote: WardRemote = {
+    load: async () => {
+      calls.load++;
+      return row;
+    },
+    save: (_userId, data) => {
+      calls.save.push(structuredClone(data));
+      if (failSave) return Promise.reject(new Error("network"));
+      const res = { updatedAt: `2026-10-28T07:00:0${n++}.000Z` };
+      if (!hold) return Promise.resolve(res);
+      return new Promise((resolve) => held.push(() => resolve(res)));
+    },
+    remove: async () => {
+      calls.remove++;
+    },
+  };
+  return {
+    remote,
+    calls,
+    hold: (v: boolean) => (hold = v),
+    failSave: (v: boolean) => (failSave = v),
+    release: () => held.splice(0).forEach((r) => r()),
+  };
+}
+
+function synced(remote: WardRemote, storage: Storage = new MemoryStorage()) {
+  return createAppStore(() => storage, () => CONFIRMED_AT, remote);
+}
+
+/** 서버 문서: 병동 "서버 병동"(간호사 1명) + 기간 없음. */
+function serverDoc() {
+  const s = fresh();
+  s.getState().startWard();
+  s.getState().setWardName("서버 병동");
+  s.getState().addNurses([rows[0]]);
+  const { ward, periods, view, inputVersion } = s.getState();
+  return { version: 4, state: { ward, periods, view, inputVersion, pendingAfterLogin: null } };
+}
+
+const savedState = (doc: unknown) => (doc as { version: number; state: Record<string, unknown> }).state;
+
+describe("로그인 분기", () => {
+  beforeEach(() => vi.useFakeTimers());
+  afterEach(() => vi.useRealTimers());
+
+  it("초기 sync는 guest, auth와 loginPrompt는 null", () => {
+    const s = synced(fakeRemote().remote).getState();
+    expect(s.auth).toBeNull();
+    expect(s.sync).toEqual({ status: "guest", savedAt: null });
+    expect(s.loginPrompt).toBeNull();
+    expect(s.pendingAfterLogin).toBeNull();
+  });
+
+  it("서버에 병동이 있고 게스트 입력도 있으면 서버 문서로 바꾸고 안내한다", async () => {
+    const f = fakeRemote({ data: serverDoc(), updatedAt: SERVER_AT });
+    const store = synced(f.remote);
+    store.getState().loadSample(TODAY);
+    await store.getState().signedIn(USER);
+    const s = store.getState();
+    expect(s.ward!.name).toBe("서버 병동");
+    expect(s.periods).toEqual([]);
+    expect(s.auth).toEqual({ userId: "u1", email: "nurse@example.com" });
+    expect(s.sync).toEqual({ status: "saved", savedAt: SERVER_AT });
+    expect(s.loginPrompt).toEqual({ kind: "server-replaced-guest" });
+    await vi.advanceTimersByTimeAsync(SAVE_DEBOUNCE_MS * 2);
+    expect(f.calls.save).toHaveLength(0);
+  });
+
+  it("서버에 병동이 있고 게스트 입력이 없으면 안내 없이 서버 문서로 바꾼다", async () => {
+    const f = fakeRemote({ data: serverDoc(), updatedAt: SERVER_AT });
+    const store = synced(f.remote);
+    const v = store.getState().inputVersion;
+    await store.getState().signedIn(USER);
+    const s = store.getState();
+    expect(s.ward!.name).toBe("서버 병동");
+    expect(s.loginPrompt).toBeNull();
+    expect(s.inputVersion).toBeGreaterThan(Math.max(v, serverDoc().state.inputVersion));
+    expect(f.calls.save).toHaveLength(0);
+  });
+
+  it("서버에 없고 샘플이면 묻고, keep이면 샘플을 내 병동으로 올린다", async () => {
+    const f = fakeRemote();
+    const store = synced(f.remote);
+    store.getState().loadSample(TODAY);
+    await store.getState().signedIn(USER);
+    expect(store.getState().loginPrompt).toEqual({ kind: "sample-choice" });
+    expect(f.calls.save).toHaveLength(0);
+
+    await store.getState().chooseSample(true);
+    const s = store.getState();
+    expect(s.loginPrompt).toBeNull();
+    expect(s.ward!.isSample).toBe(false);
+    expect(s.ward!.nurses).toHaveLength(sample.nurses.length);
+    expect(f.calls.save).toHaveLength(1);
+    const doc = f.calls.save[0] as { version: number; state: Record<string, unknown> };
+    expect(doc.version).toBe(4);
+    expect((doc.state.ward as { name: string }).name).toBe("샘플 병동");
+    expect(doc.state.periods).toHaveLength(1);
+    expect(s.sync.status).toBe("saved");
+  });
+
+  it("샘플을 버리면 빈 병동으로 바꾸고 병동 설정으로 가서 올린다", async () => {
+    const f = fakeRemote();
+    const store = synced(f.remote);
+    store.getState().loadSample(TODAY);
+    await store.getState().signedIn(USER);
+    await store.getState().chooseSample(false);
+    const s = store.getState();
+    expect(s.ward).toMatchObject({ name: "", nurses: [], isSample: false });
+    expect(s.periods).toEqual([]);
+    expect(s.view).toEqual({ screen: "settings", tab: "roster" });
+    expect(f.calls.save).toHaveLength(1);
+    expect((savedState(f.calls.save[0]).ward as { nurses: unknown[] }).nurses).toEqual([]);
+  });
+
+  it("서버에 없고 게스트 입력이 있으면 그대로 올린다", async () => {
+    const f = fakeRemote();
+    const { store } = withPeriodSynced(f.remote);
+    await store.getState().signedIn(USER);
+    expect(store.getState().loginPrompt).toBeNull();
+    expect(f.calls.save).toHaveLength(1);
+    const state = savedState(f.calls.save[0]);
+    expect((state.ward as { nurses: unknown[]; isSample: boolean }).nurses).toHaveLength(2);
+    expect((state.ward as { isSample: boolean }).isSample).toBe(false);
+    expect(state.periods).toHaveLength(1);
+    expect(store.getState().sync).toEqual({ status: "saved", savedAt: "2026-10-28T07:00:00.000Z" });
+  });
+
+  it("둘 다 없으면 빈 병동을 올리고 병동 설정으로 간다", async () => {
+    const f = fakeRemote();
+    const store = synced(f.remote);
+    await store.getState().signedIn(USER);
+    const s = store.getState();
+    expect(s.ward).toMatchObject({ name: "", nurses: [], isSample: false });
+    expect(s.view).toEqual({ screen: "settings", tab: "roster" });
+    expect(f.calls.save).toHaveLength(1);
+  });
+
+  it("서버 문서가 손상됐으면 빈 상태 + resetNotice, 바꾸기 전에는 저장하지 않는다", async () => {
+    const f = fakeRemote({ data: { version: 3, state: { step: 1 } }, updatedAt: SERVER_AT });
+    const store = synced(f.remote);
+    await store.getState().signedIn(USER);
+    expect(store.getState().ward).toBeNull();
+    expect(store.getState().resetNotice).toBe(true);
+    await vi.advanceTimersByTimeAsync(SAVE_DEBOUNCE_MS * 2);
+    expect(f.calls.save).toHaveLength(0);
+
+    store.getState().startWard();
+    await vi.advanceTimersByTimeAsync(SAVE_DEBOUNCE_MS);
+    expect(f.calls.save).toHaveLength(1);
+  });
+
+  it("모양이 손상된 서버 문서도 빈 상태로 시작한다", async () => {
+    const f = fakeRemote({ data: { version: 4, state: { ward: { nurses: "x" } } }, updatedAt: SERVER_AT });
+    const store = synced(f.remote);
+    await store.getState().signedIn(USER);
+    expect(store.getState().ward).toBeNull();
+    expect(store.getState().resetNotice).toBe(true);
+    expect(f.calls.save).toHaveLength(0);
+  });
+});
+
+/** withPeriod와 같지만 remote를 주입한다. */
+function withPeriodSynced(remote: WardRemote, storage: Storage = new MemoryStorage()) {
+  const store = synced(remote, storage);
+  store.getState().startWard();
+  store.getState().addNurses(rows);
+  const id = store.getState().createPeriod(TODAY)!;
+  return { store, id };
+}
+
+describe("pendingAfterLogin", () => {
+  beforeEach(() => vi.useFakeTimers());
+  afterEach(() => vi.useRealTimers());
+
+  it("requireLogin은 persist되어 리디렉트 뒤에도 남는다", () => {
+    const storage = new MemoryStorage();
+    const f = fakeRemote();
+    const { store, id } = withPeriodSynced(f.remote, storage);
+    store.getState().requireLogin({ action: "confirm", periodId: id });
+    expect(store.getState().pendingAfterLogin).toEqual({ action: "confirm", periodId: id });
+    const again = synced(f.remote, storage);
+    expect(again.getState().pendingAfterLogin).toEqual({ action: "confirm", periodId: id });
+    expect(f.calls.load).toBe(0);
+  });
+
+  it("업로드가 끝나면 확정을 기록하고 비운 뒤 그 변경도 저장한다", async () => {
+    const f = fakeRemote();
+    const { store, id } = withPeriodSynced(f.remote);
+    store.getState().setResult(id, result({ n01: ["D"], n02: ["E"] }), []);
+    store.getState().requireLogin({ action: "confirm", periodId: id });
+    await store.getState().signedIn(USER);
+    const s = store.getState();
+    expect(s.pendingAfterLogin).toBeNull();
+    expect(s.periods[0].status).toBe("confirmed");
+    expect((savedState(f.calls.save[0]).periods as { status: string }[])[0].status).toBe("draft");
+    await vi.advanceTimersByTimeAsync(SAVE_DEBOUNCE_MS);
+    expect(f.calls.save).toHaveLength(2);
+    expect((savedState(f.calls.save[1]).periods as { status: string }[])[0].status).toBe("confirmed");
+  });
+
+  it("create-period면 업로드 뒤 다음 기간을 만든다", async () => {
+    const f = fakeRemote();
+    const store = synced(f.remote);
+    store.getState().startWard();
+    store.getState().addNurses(rows);
+    store.getState().requireLogin({ action: "create-period" });
+    await store.getState().signedIn(USER);
+    expect(store.getState().periods).toHaveLength(1);
+    expect(store.getState().pendingAfterLogin).toBeNull();
+  });
+
+  it("서버 우선이면 버린다", async () => {
+    const f = fakeRemote({ data: serverDoc(), updatedAt: SERVER_AT });
+    const { store, id } = withPeriodSynced(f.remote);
+    store.getState().setResult(id, result({ n01: ["D"], n02: ["E"] }), []);
+    store.getState().requireLogin({ action: "confirm", periodId: id });
+    await store.getState().signedIn(USER);
+    expect(store.getState().pendingAfterLogin).toBeNull();
+    expect(store.getState().periods).toEqual([]);
+  });
+});
+
+describe("자동 저장", () => {
+  beforeEach(() => vi.useFakeTimers());
+  afterEach(() => vi.useRealTimers());
+
+  async function signedInStore() {
+    const f = fakeRemote();
+    const { store, id } = withPeriodSynced(f.remote);
+    await store.getState().signedIn(USER);
+    f.calls.save.length = 0;
+    return { f, store, id };
+  }
+
+  it("바뀌면 디바운스 뒤 한 번 저장하고 saved + savedAt", async () => {
+    const { f, store } = await signedInStore();
+    store.getState().setWardName("가");
+    store.getState().setWardName("가나");
+    await vi.advanceTimersByTimeAsync(SAVE_DEBOUNCE_MS - 1);
+    expect(f.calls.save).toHaveLength(0);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(f.calls.save).toHaveLength(1);
+    expect((savedState(f.calls.save[0]).ward as { name: string }).name).toBe("가나");
+    expect(store.getState().sync).toEqual({ status: "saved", savedAt: "2026-10-28T07:00:01.000Z" });
+  });
+
+  it("화면 이동만으로는 저장하지 않는다", async () => {
+    const { f, store } = await signedInStore();
+    store.getState().go({ screen: "home" });
+    await vi.advanceTimersByTimeAsync(SAVE_DEBOUNCE_MS * 2);
+    expect(f.calls.save).toHaveLength(0);
+  });
+
+  it("저장 중이면 saving, 그 사이 바뀌면 끝난 뒤 한 번 더 저장한다", async () => {
+    const { f, store } = await signedInStore();
+    f.hold(true);
+    store.getState().setWardName("가");
+    await vi.advanceTimersByTimeAsync(SAVE_DEBOUNCE_MS);
+    expect(store.getState().sync.status).toBe("saving");
+    store.getState().setWardName("가나");
+    await vi.advanceTimersByTimeAsync(SAVE_DEBOUNCE_MS);
+    expect(f.calls.save).toHaveLength(1);
+    f.hold(false);
+    f.release();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(f.calls.save).toHaveLength(2);
+    expect((savedState(f.calls.save[1]).ward as { name: string }).name).toBe("가나");
+    expect(store.getState().sync.status).toBe("saved");
+  });
+
+  it("실패하면 error, localStorage에는 남고, retrySave로 즉시 다시 저장한다", async () => {
+    const storage = new MemoryStorage();
+    const f = fakeRemote();
+    const { store } = withPeriodSynced(f.remote, storage);
+    await store.getState().signedIn(USER);
+    f.failSave(true);
+    store.getState().setWardName("가");
+    await vi.advanceTimersByTimeAsync(SAVE_DEBOUNCE_MS);
+    expect(store.getState().sync.status).toBe("error");
+    expect(JSON.parse(storage.getItem(STORAGE_KEY)!).state.ward.name).toBe("가");
+
+    f.failSave(false);
+    const before = f.calls.save.length;
+    await store.getState().retrySave();
+    expect(f.calls.save).toHaveLength(before + 1);
+    expect(store.getState().sync.status).toBe("saved");
+  });
+
+  it("게스트 모드에서는 remote를 부르지 않는다", async () => {
+    const f = fakeRemote();
+    const { store, id } = withPeriodSynced(f.remote);
+    store.getState().setWardName("가");
+    store.getState().setResult(id, result({ n01: ["D"], n02: ["E"] }), []);
+    store.getState().confirm(id);
+    await store.getState().retrySave();
+    await vi.advanceTimersByTimeAsync(SAVE_DEBOUNCE_MS * 3);
+    expect(f.calls).toEqual({ load: 0, save: [], remove: 0 });
+    expect(store.getState().sync.status).toBe("guest");
+  });
+});
+
+describe("로그아웃과 데이터 삭제", () => {
+  beforeEach(() => vi.useFakeTimers());
+  afterEach(() => vi.useRealTimers());
+
+  it("signedOut은 상태를 초기화하고 localStorage 키를 지우며 서버는 건드리지 않는다", async () => {
+    const storage = new MemoryStorage();
+    const f = fakeRemote();
+    const { store } = withPeriodSynced(f.remote, storage);
+    await store.getState().signedIn(USER);
+    store.getState().setWardName("가");
+    store.getState().signedOut();
+    const s = store.getState();
+    expect(s.ward).toBeNull();
+    expect(s.periods).toEqual([]);
+    expect(s.auth).toBeNull();
+    expect(s.sync.status).toBe("guest");
+    expect(storage.getItem(STORAGE_KEY)).toBeNull();
+    await vi.advanceTimersByTimeAsync(SAVE_DEBOUNCE_MS * 2);
+    expect(f.calls.save).toHaveLength(1);
+    expect(f.calls.remove).toBe(0);
+  });
+
+  it("deleteWardData는 서버 문서를 지우고 빈 병동 + 병동 설정, 로그인은 유지한다", async () => {
+    const f = fakeRemote();
+    const { store } = withPeriodSynced(f.remote);
+    await store.getState().signedIn(USER);
+    await store.getState().deleteWardData();
+    const s = store.getState();
+    expect(f.calls.remove).toBe(1);
+    expect(s.ward).toMatchObject({ name: "", nurses: [] });
+    expect(s.periods).toEqual([]);
+    expect(s.view).toEqual({ screen: "settings", tab: "roster" });
+    expect(s.auth).toEqual({ userId: "u1", email: "nurse@example.com" });
+    await vi.advanceTimersByTimeAsync(SAVE_DEBOUNCE_MS * 2);
+    expect(f.calls.save).toHaveLength(1);
+  });
+
+  it("deleteWardData가 실패하면 throw하고 상태를 그대로 둔다", async () => {
+    const f = fakeRemote();
+    f.remote.remove = () => Promise.reject(new Error("network"));
+    const { store } = withPeriodSynced(f.remote);
+    await store.getState().signedIn(USER);
+    await expect(store.getState().deleteWardData()).rejects.toThrow("network");
+    expect(store.getState().periods).toHaveLength(1);
   });
 });

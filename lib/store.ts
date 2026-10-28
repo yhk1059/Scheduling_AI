@@ -1,5 +1,6 @@
 // 클라이언트의 유일한 저장소. Zustand + persist(localStorage), 쓸 수 없으면 메모리로 동작한다.
 // 상태는 병동 1개 + 기간 목록(ARCHITECTURE "상태 관리"). 이력은 확정된 기간이다.
+// 로그인하면 같은 문서를 remote(wards.data)에도 저장한다(ADR-014). 서버 우선, 마지막 저장이 이긴다.
 import { create } from "zustand";
 import { persist, type PersistStorage, type StorageValue } from "zustand/middleware";
 
@@ -15,6 +16,7 @@ import {
 } from "./continuity";
 import { firstPeriodStart, monthDay, nextPeriod, periodFrom, type PeriodRange, type PeriodUnit } from "./period";
 import sample from "./samples/ward-15.json";
+import { deleteWard, loadWard, saveWard, supabaseConfigured, type AuthUser } from "./supabase";
 import type {
   CarryOverRow,
   ConstraintChange,
@@ -33,6 +35,7 @@ const COVERAGE_WEIGHT = 10; // backend/domain/constants.py DEFAULT_WEIGHT
 const SOFT_WEIGHTS: Record<string, number> = { shift_preference: 10, night_fairness: 5, weekend_fairness: 5 };
 const ALWAYS_HARD = ["leave", "fixed_assignment"];
 const SAMPLE_WARD_NAME = "샘플 병동";
+export const SAVE_DEBOUNCE_MS = 1000;
 
 export type Shift = "D" | "E" | "N";
 export type DayKind = "weekday" | "weekend";
@@ -97,17 +100,51 @@ export type View =
   | { screen: "settings"; tab: "roster" | "rules" }
   | { screen: "period"; periodId: string; step: 1 | 2 | 3 };
 
+export interface PendingAfterLogin {
+  action: "confirm" | "create-period";
+  periodId?: string;
+}
+
 interface Data {
   ward: Ward | null;
   /** start_date 오름차순 */
   periods: WorkPeriod[];
   view: View;
   inputVersion: number;
+  /** 게스트가 로그인을 요구받은 동작. OAuth 리디렉트를 넘어야 하므로 persist한다. */
+  pendingAfterLogin: PendingAfterLogin | null;
 }
+
+/** 원격 병동 문서(wards 1행). 테스트에서 가짜로 주입한다. */
+export interface WardRemote {
+  load(): Promise<{ data: unknown; updatedAt: string } | null>;
+  save(userId: string, data: unknown): Promise<{ updatedAt: string }>;
+  remove(): Promise<void>;
+}
+
+export type SyncStatus = "guest" | "loading" | "saving" | "saved" | "error";
+export type LoginPrompt = null | { kind: "sample-choice" } | { kind: "server-replaced-guest" };
 
 export interface AppState extends Data {
   storageAvailable: boolean;
   resetNotice: boolean;
+  // 로그인 저장 (persist 대상 아님)
+  auth: { userId: string; email: string | null } | null;
+  sync: { status: SyncStatus; savedAt: string | null };
+  /** 화면이 대화상자로 보여 줄 것 */
+  loginPrompt: LoginPrompt;
+  /** 게스트가 [확정]·[다음 기간 만들기]를 누르면 화면이 부른다. */
+  requireLogin: (action: PendingAfterLogin) => void;
+  /** 로그인 직후(세션 복원 포함) 한 번. 서버 문서가 있으면 서버 우선, 없으면 게스트 상태를 올린다. */
+  signedIn: (user: AuthUser) => Promise<void>;
+  /** sample-choice 답. keep이면 샘플을 내 병동으로, 아니면 빈 병동으로 올린다. */
+  chooseSample: (keep: boolean) => Promise<void>;
+  dismissLoginPrompt: () => void;
+  retrySave: () => Promise<void>;
+  /** 이 브라우저의 상태와 localStorage 키를 지운다. 서버 문서는 그대로 둔다. */
+  signedOut: () => void;
+  /** 서버 문서를 지우고 빈 병동으로(로그인 유지). 실패하면 throw한다. */
+  deleteWardData: () => Promise<void>;
   // 병동
   startWard: () => void;
   /** 샘플 병동 + 첫 기간을 만들고 그 기간을 연다. */
@@ -158,7 +195,7 @@ export interface AppState extends Data {
 }
 
 function initialData(): Data {
-  return { ward: null, periods: [], view: { screen: "home" }, inputVersion: 0 };
+  return { ward: null, periods: [], view: { screen: "home" }, inputVersion: 0, pendingAfterLogin: null };
 }
 
 function emptyWard(): Ward {
@@ -378,6 +415,8 @@ function isData(v: unknown): v is Data {
       ["nurses", "rules", "pendingRules"].every((k) => Array.isArray(w[k])) &&
       typeof w.nextNurseNo === "number" &&
       typeof w.unit === "string");
+  const p = d.pendingAfterLogin;
+  const pendingOk = p === undefined || p === null || typeof (p as Record<string, unknown>).action === "string";
   const periodsOk =
     Array.isArray(d.periods) &&
     d.periods.every(
@@ -390,7 +429,7 @@ function isData(v: unknown): v is Data {
         ) &&
         (p.carryOverUsed === null || Array.isArray(p.carryOverUsed)),
     );
-  return wardOk && periodsOk && typeof view?.screen === "string" && typeof d.inputVersion === "number";
+  return wardOk && periodsOk && pendingOk && typeof view?.screen === "string" && typeof d.inputVersion === "number";
 }
 
 /** localStorage를 감싼 저장소. 접근·쓰기가 예외를 던지면 메모리로 바꾸고 onFail을 부른다. */
@@ -441,9 +480,30 @@ function safeStorage(
   return { storage: persistStorage, available: storage !== null };
 }
 
-export function createAppStore(getStorage: () => Storage, now: () => Date = () => new Date()) {
+function localDate(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+const persisted = (s: Data): Data => ({
+  ward: s.ward,
+  periods: s.periods,
+  view: s.view,
+  inputVersion: s.inputVersion,
+  pendingAfterLogin: s.pendingAfterLogin,
+});
+
+export function createAppStore(getStorage: () => Storage, now: () => Date = () => new Date(), remote?: WardRemote) {
   let markUnavailable = () => {};
   const { storage, available } = safeStorage(getStorage, () => markUnavailable());
+  // 서버 상태를 확인한 뒤에만 자동 저장한다(로딩·샘플 선택 중에는 서버 문서를 덮어쓰지 않게)
+  let ready = false;
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  let saving = false;
+  let dirty = false;
+  const cancelTimer = () => {
+    if (timer) clearTimeout(timer);
+    timer = null;
+  };
 
   const store = create<AppState>()(
     persist(
@@ -478,10 +538,120 @@ export function createAppStore(getStorage: () => Storage, now: () => Date = () =
           nextNurseNo: w.nextNurseNo + rows.length,
         });
 
+        /** 서버에 저장하는 문서. persist와 같은 모양이다. */
+        const doc = () => ({ version: STORAGE_VERSION, state: { ...persisted(get()), pendingAfterLogin: null } });
+        const save = async (): Promise<void> => {
+          const userId = get().auth?.userId;
+          if (!remote || !userId || !ready) return;
+          cancelTimer();
+          if (saving) {
+            dirty = true;
+            return;
+          }
+          saving = true;
+          dirty = false;
+          set((s) => ({ sync: { ...s.sync, status: "saving" } }));
+          try {
+            const { updatedAt } = await remote.save(userId, doc());
+            if (get().auth?.userId === userId) set({ sync: { status: "saved", savedAt: updatedAt } });
+          } catch {
+            // localStorage에는 남아 있다. [다시 시도]나 다음 변경으로 다시 저장한다(PRD J8)
+            if (get().auth?.userId === userId) set((s) => ({ sync: { ...s.sync, status: "error" } }));
+          } finally {
+            saving = false;
+          }
+          if (dirty) await save();
+        };
+        /** 상태를 통째로 바꾼다. 진행 중 요청의 응답을 버리도록 inputVersion은 지금보다 크게 한다. */
+        const replace = (data: Data, extra: Partial<AppState> = {}) =>
+          set((s) => ({ ...data, inputVersion: Math.max(s.inputVersion, data.inputVersion) + 1, ...extra }));
+        const emptyWardData = (): Data => ({ ...initialData(), ward: emptyWard(), view: { screen: "settings", tab: "roster" } });
+        /** 게스트 상태를 올리고, 남은 로그인 대기 동작을 실행한다. */
+        const upload = async () => {
+          ready = true;
+          const pending = get().pendingAfterLogin;
+          await save();
+          if (!pending) return;
+          set({ pendingAfterLogin: null });
+          if (pending.action === "confirm" && pending.periodId) get().confirm(pending.periodId);
+          else if (pending.action === "create-period") get().createPeriod(localDate(now()));
+        };
+
         return {
           ...initialData(),
           storageAvailable: available,
           resetNotice: false,
+          auth: null,
+          sync: { status: "guest", savedAt: null },
+          loginPrompt: null,
+
+          requireLogin: (action) => set({ pendingAfterLogin: action }),
+          signedIn: async (user) => {
+            if (!remote) return;
+            ready = false;
+            cancelTimer();
+            set({ auth: { userId: user.id, email: user.email }, sync: { status: "loading", savedAt: null }, loginPrompt: null });
+            let row: Awaited<ReturnType<WardRemote["load"]>>;
+            try {
+              row = await remote.load();
+            } catch {
+              set((s) => ({ sync: { ...s.sync, status: "error" } }));
+              return;
+            }
+            if (get().auth?.userId !== user.id) return;
+            const guest = get().hasInput();
+            if (row) {
+              // 서버 우선. 게스트 기간이 서버 문서에 없으므로 pendingAfterLogin은 버린다
+              const d = row.data as { version?: unknown; state?: unknown } | null;
+              const ok = d?.version === STORAGE_VERSION && isData(d.state);
+              replace(ok ? { ...(d.state as Data), pendingAfterLogin: null } : initialData(), {
+                sync: { status: "saved", savedAt: row.updatedAt },
+                loginPrompt: guest ? { kind: "server-replaced-guest" } : null,
+                ...(!ok && { resetNotice: true }),
+              });
+              ready = true;
+              return;
+            }
+            const { ward } = get();
+            if (ward?.isSample) {
+              set({ loginPrompt: { kind: "sample-choice" } });
+              return;
+            }
+            if (guest) set({ ward: ward && { ...ward, isSample: false } });
+            else replace(emptyWardData());
+            await upload();
+          },
+          chooseSample: async (keep) => {
+            const { ward, auth } = get();
+            if (!remote || !auth || ready) return;
+            if (keep) set({ ward: ward && { ...ward, isSample: false }, loginPrompt: null });
+            else replace(emptyWardData(), { loginPrompt: null });
+            await upload();
+          },
+          dismissLoginPrompt: () => set({ loginPrompt: null }),
+          retrySave: async () => {
+            const { auth } = get();
+            if (!remote || !auth) return;
+            // 서버 문서를 읽지 못했으면 덮어쓰지 않고 다시 읽는다
+            if (!ready) return get().signedIn({ id: auth.userId, email: auth.email });
+            await save();
+          },
+          signedOut: () => {
+            ready = false;
+            cancelTimer();
+            dirty = false;
+            replace(initialData(), { auth: null, sync: { status: "guest", savedAt: null }, loginPrompt: null });
+            storage.removeItem(STORAGE_KEY);
+          },
+          deleteWardData: async () => {
+            if (!remote || !get().auth) return;
+            cancelTimer();
+            await remote.remove();
+            // 지운 직후 빈 병동을 다시 올리지 않는다. 사용자가 바꾸면 그때 저장한다
+            ready = false;
+            replace(emptyWardData(), { sync: { status: "saved", savedAt: null } });
+            ready = true;
+          },
 
           startWard: () => bump({ ward: emptyWard(), periods: [], view: { screen: "settings", tab: "roster" } }),
           loadSample: (today) => {
@@ -712,21 +882,31 @@ export function createAppStore(getStorage: () => Storage, now: () => Date = () =
         name: STORAGE_KEY,
         version: STORAGE_VERSION,
         storage,
-        partialize: (s): Data => ({ ward: s.ward, periods: s.periods, view: s.view, inputVersion: s.inputVersion }),
+        partialize: (s): Data => persisted(s),
         // 버전이 다르거나 파싱에 실패하면 버리고, merge에서 초기 상태 + resetNotice로 처리한다
         migrate: () => null as unknown as Data,
         merge: (persisted, current) =>
           persisted === undefined
             ? current
             : isData(persisted)
-              ? { ...current, ...persisted }
+              ? { ...current, ...persisted, pendingAfterLogin: persisted.pendingAfterLogin ?? null }
               : { ...current, resetNotice: true },
       },
     ),
   );
 
   markUnavailable = () => store.setState({ storageAvailable: false });
+  // 로그인 상태에서 병동·기간이 바뀌면 디바운스 후 저장한다(화면 이동만으로는 저장하지 않음)
+  store.subscribe((s, prev) => {
+    if (!remote || !ready || !s.auth || (s.ward === prev.ward && s.periods === prev.periods)) return;
+    cancelTimer();
+    timer = setTimeout(() => void store.getState().retrySave(), SAVE_DEBOUNCE_MS);
+  });
   return store;
 }
 
-export const useAppStore = createAppStore(() => window.localStorage);
+export const useAppStore = createAppStore(
+  () => window.localStorage,
+  undefined,
+  supabaseConfigured ? { load: loadWard, save: saveWard, remove: deleteWard } : undefined,
+);
