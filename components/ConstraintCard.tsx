@@ -2,89 +2,14 @@
 
 import { useState } from "react";
 
-import { monthDay } from "@/lib/period";
 import { type CardPatch, currentPeriod, type Hardness, useAppStore } from "@/lib/store";
-import type { ConstraintSpec, Nurse, Period } from "@/lib/types.gen";
+import type { ConstraintSpec } from "@/lib/types.gen";
+import { dayRanges, describeParams, TEMPLATE_NAMES } from "@/lib/wording";
 
 import { previewRange } from "./RulesStep";
 import { ui } from "./ui";
 
-export const TEMPLATE_NAMES: Record<ConstraintSpec["type"], string> = {
-  daily_coverage: "일일 최소/최대 인원",
-  forbidden_sequence: "금지 순서",
-  max_consecutive_work: "최대 연속 근무",
-  max_consecutive_nights: "최대 연속 나이트",
-  min_days_off: "최소 오프 일수",
-  off_after_night_block: "나이트 후 오프 (N-OFF)",
-  skill_mix: "숙련도 믹스",
-  leave: "휴가",
-  fixed_assignment: "고정 배정",
-  shift_preference: "희망/기피 근무",
-  night_fairness: "나이트 공정성",
-  weekend_fairness: "주말·공휴일 공정성",
-};
-
 const ALWAYS_HARD: ConstraintSpec["type"][] = ["leave", "fixed_assignment"];
-
-// --- 해석 결과 한 줄 ---
-
-/** [15,16,17,20] → [[15,17],[20,20]] */
-function dayRanges(days: number[]): [number, number][] {
-  const sorted = [...new Set(days)].sort((a, b) => a - b);
-  const out: [number, number][] = [];
-  for (const d of sorted) {
-    const last = out.at(-1);
-    if (last && last[1] === d - 1) last[1] = d;
-    else out.push([d, d]);
-  }
-  return out;
-}
-
-/** [15,16,17,20] → "11/15~11/17, 11/20" */
-function formatDays(days: number[], period: Period): string {
-  const md = (d: number) => monthDay(period, d);
-  return dayRanges(days)
-    .map(([a, b]) => (a === b ? md(a) : `${md(a)}~${md(b)}`))
-    .join(", ");
-}
-
-function nurseLabel(id: string, nurses: Nurse[]): string {
-  const n = nurses.find((n) => n.id === id);
-  return n ? `${id} ${n.name}` : `${id} (명단에 없음)`;
-}
-
-export function describeParams(c: ConstraintSpec, nurses: Nurse[], period: Period): string {
-  switch (c.type) {
-    case "daily_coverage":
-      return `${c.params.shift} · ${c.params.day_kind === "weekday" ? "평일" : "주말·공휴일"} · ${c.params.min}~${c.params.max}명`;
-    case "forbidden_sequence":
-      return `${c.params.first} → ${c.params.second} 금지`;
-    case "max_consecutive_work":
-      return `연속 근무 ≤ ${c.params.days}일`;
-    case "max_consecutive_nights":
-      return `연속 N ≤ ${c.params.days}일`;
-    case "min_days_off":
-      return `오프 ≥ ${c.params.days}일`;
-    case "off_after_night_block":
-      return `N 뒤 O ${c.params.days}일`;
-    case "skill_mix":
-      return `${c.params.shift} · ${c.params.min_years}년차 이상 ≥ ${c.params.min_count}명`;
-    case "leave":
-      return `${nurseLabel(c.params.nurse_id, nurses)} · ${formatDays(c.params.days, period)} · O`;
-    case "fixed_assignment":
-      return `${nurseLabel(c.params.nurse_id, nurses)} · ${monthDay(period, c.params.day)} · ${c.params.shift}`;
-    case "shift_preference": {
-      const p = c.params;
-      const when = p.days?.length ? formatDays(p.days, period) : p.weekends_only ? "주말·공휴일" : "기간 전체";
-      const scope = p.days?.length && p.weekends_only ? `${when} 중 주말·공휴일` : when;
-      return `${nurseLabel(p.nurse_id, nurses)} · ${scope} · ${p.shift} ${p.prefer ? "희망" : "기피"}`;
-    }
-    case "night_fairness":
-      return "나이트 개수 편차 최소화";
-    case "weekend_fairness":
-      return "주말·공휴일 근무 편차 최소화";
-  }
-}
 
 // --- 수정 폼 ---
 

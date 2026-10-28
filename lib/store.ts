@@ -329,6 +329,13 @@ export function hasUnconfirmedChanges(period: WorkPeriod): boolean {
   return diffAssignments(last.assignments, period.result.assignments).length > 0;
 }
 
+/** 새로 만들 기간 범위. 마지막 기간 다음, 기간이 없으면 today 이후 첫 기간. */
+export function upcomingRange(unit: PeriodUnit, periods: WorkPeriod[], today: string): PeriodRange {
+  const last = periods.at(-1);
+  // nextPeriod는 마지막 끝 + 1일 이후의 새 단위 첫 시작일이다(단위를 바꿨어도 맞춰진다)
+  return last ? nextPeriod(unit, last) : periodFrom(unit, firstPeriodStart(unit, today));
+}
+
 export type NextPeriodState = { state: "none" } | { state: "draft" | "confirmed"; period: WorkPeriod };
 
 /** 병동 홈: 운영 중 기간, 오늘 이후 시작하는 가장 이른 기간, 최근 기간(시작일 내림차순). */
@@ -726,11 +733,7 @@ export function createAppStore(getStorage: () => Storage, now: () => Date = () =
               set({ view: { screen: "period", periodId: draft.id, step: 1 } });
               return draft.id;
             }
-            const last = periods.at(-1);
-            // nextPeriod는 마지막 끝 + 1일 이후의 새 단위 첫 시작일이다(단위를 바꿨어도 맞춰진다)
-            const period = newPeriod(
-              last ? nextPeriod(ward.unit, last) : periodFrom(ward.unit, firstPeriodStart(ward.unit, today)),
-            );
+            const period = newPeriod(upcomingRange(ward.unit, periods, today));
             bump({ periods: [...periods, period], view: { screen: "period", periodId: period.id, step: 1 } });
             return period.id;
           },
