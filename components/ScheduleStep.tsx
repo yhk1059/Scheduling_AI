@@ -25,8 +25,10 @@ import type {
   ScheduleRequest,
   ScheduleResult,
 } from "@/lib/types.gen";
-import { describeParams, TEMPLATE_NAMES } from "@/lib/wording";
+import { supabaseConfigured } from "@/lib/supabase";
+import { describeParams, formatDeviation, TEMPLATE_NAMES } from "@/lib/wording";
 
+import { LoginButton } from "./Account";
 import ConstraintCard from "./ConstraintCard";
 import { Spinner, today } from "./RulesStep";
 import { ui } from "./ui";
@@ -60,7 +62,7 @@ type Toast = { message: string; retry: () => void } | null;
 type Load = { nights: number; weekends: number };
 
 /**
- * 누적 부담 근거 한 줄. 최근 4주 나이트가 평균보다 많았던 간호사 중 이번 기간 N이 평균 이하인 사람.
+ * 누적 부담 근거 한 줄. 최근 4주 나이트가 평균보다 많았던 간호사 중 이번 근무표 N이 평균 이하인 사람.
  * 나이트 전담은 나이트 공정성에서 빠지므로 제외한다. 해당자가 없거나 history가 비면 null.
  */
 function historyEvidence(rows: Nurse[], result: ScheduleResult, history: Map<string, Load>): string | null {
@@ -73,8 +75,8 @@ function historyEvidence(rows: Nurse[], result: ScheduleResult, history: Map<str
   const nowAvg = avg(now);
   const eased = pool.filter((n) => past(n) > pastAvg && now(n) <= nowAvg);
   if (eased.length === 0) return null;
-  if (eased.length === 1) return `${eased[0].name} 지난 4주 나이트 ${past(eased[0])}회 → 이번 기간 ${now(eased[0])}회`;
-  return `최근 4주 나이트가 많았던 ${eased.length}명은 이번 기간 나이트를 줄였어요`;
+  if (eased.length === 1) return `${eased[0].name} 최근 4주 나이트 ${past(eased[0])}회 → 이번 근무표 ${now(eased[0])}회`;
+  return `최근 4주 나이트가 많았던 ${eased.length}명은 이번 근무표에서 나이트를 줄였어요`;
 }
 
 function toMessage(e: unknown): string {
@@ -94,6 +96,7 @@ export default function ScheduleStep() {
   const addPendingRequests = useAppStore((s) => s.addPendingRequests);
   const confirm = useAppStore((s) => s.confirm);
   const go = useAppStore((s) => s.go);
+  const guest = useAppStore((s) => s.auth === null);
 
   const [loading, setLoading] = useState(false);
   const [explaining, setExplaining] = useState(false);
@@ -103,6 +106,8 @@ export default function ScheduleStep() {
   const [selected, setSelected] = useState<Cell | null>(null);
   // 운영 중 변경 입력 바에서 만든 대기 카드
   const [changeIds, setChangeIds] = useState<string[]>([]);
+  // 게스트가 이 화면에서 확정했으면 저장 안내 배너를 보여 준다(화면에 머무는 동안)
+  const [guestConfirmed, setGuestConfirmed] = useState(false);
   const busy = loading || explaining || translating;
 
   const runExplain = async (req: Req, conflicts: Conflict[], version: number) => {
@@ -230,6 +235,10 @@ export default function ScheduleStep() {
   const changeCards = period.pendingRequests.filter((c) => changeIds.includes(c.id));
   const diff = isDraft ? (result.diff ?? []) : [];
   const evidence = result ? historyEvidence(rows, result, history) : null;
+  const onConfirm = () => {
+    confirm(periodId);
+    if (guest) setGuestConfirmed(true);
+  };
 
   return (
     <div className="flex flex-col gap-5">
@@ -239,54 +248,70 @@ export default function ScheduleStep() {
             근무표
           </h2>
           <p className="text-sm leading-relaxed text-[#3D3D38]">
-            칸을 눌러 근무를 고정하면 나머지를 최소한으로 바꿔 다시 풀어요.
-            {confirmed && " 확정본이 있으면 [생성]도 확정본에서 최소한으로 바꿔요."}
+            {result
+              ? "칸을 눌러 근무를 고정하면 나머지를 최소한으로 바꿔 다시 만들어요."
+              : "적용한 규칙과 요청으로 근무표를 만들어요."}
           </p>
         </div>
         <div className="flex items-center gap-2">
+          {loading && result && period.status === "confirmed" && (
+            <span role="status" className={`${ui.help} mr-1 flex items-center gap-1.5`}>
+              <Spinner />
+              만드는 중…
+            </span>
+          )}
           {lastVersion && (
             <span className={`${ui.help} mr-1`}>
               마지막 확정 <span className="font-mono">{confirmedTime(lastVersion.confirmed_at)}</span>
             </span>
           )}
-          {result && (
+          {!result ? (
+            <button type="button" onClick={regenerate} disabled={busy || nurses.length === 0} className={ui.primary}>
+              {loading && <Spinner />}
+              {loading ? "만드는 중…" : "근무표 만들기"}
+            </button>
+          ) : period.status !== "confirmed" ? (
             <>
-              <button type="button" onClick={download} disabled={busy} className={ui.secondary}>
-                CSV 다운로드
+              <button type="button" onClick={download} disabled={busy} className={ui.text}>
+                CSV 받기
               </button>
-              {period.status === "confirmed" ? (
-                <button
-                  type="button"
-                  onClick={() => confirm(periodId)}
-                  disabled={busy || !unconfirmed}
-                  className={unconfirmed ? ui.primary : ui.secondary}
-                >
-                  {unconfirmed ? "다시 확정" : "확정됨"}
-                </button>
-              ) : (
-                <button type="button" onClick={() => confirm(periodId)} disabled={busy || isConfirmed} className={ui.secondary}>
-                  확정
-                </button>
-              )}
+              <button type="button" onClick={regenerate} disabled={busy || nurses.length === 0} className={ui.secondary}>
+                {loading && <Spinner />}
+                {loading ? "만드는 중…" : "다시 만들기"}
+              </button>
+              <button type="button" onClick={onConfirm} disabled={busy} className={ui.primary}>
+                확정
+              </button>
             </>
+          ) : unconfirmed ? (
+            <>
+              <button type="button" onClick={download} disabled={busy} className={ui.text}>
+                CSV 받기
+              </button>
+              <button type="button" onClick={onConfirm} disabled={busy} className={ui.primary}>
+                다시 확정
+              </button>
+            </>
+          ) : (
+            <button type="button" onClick={download} disabled={busy} className={ui.secondary}>
+              CSV 받기
+            </button>
           )}
-          <button
-            type="button"
-            onClick={regenerate}
-            disabled={busy || nurses.length === 0}
-            className={unconfirmed ? ui.secondary : ui.primary}
-          >
-            {loading && <Spinner />}
-            {loading ? "푸는 중…" : "생성"}
-          </button>
         </div>
       </div>
 
+      {guestConfirmed && period.status === "confirmed" && (
+        <div role="status" className={ui.banner}>
+          확정했어요. 이 브라우저에만 저장돼 있어요
+          {supabaseConfigured && <LoginButton className={ui.secondarySm} />}
+        </div>
+      )}
+
       {carryOverChanged(period, periods) && (
         <div role="status" className={ui.banner}>
-          지난 기간이 바뀌어 이월이 달라졌어요. 다시 생성하면 반영돼요.
+          지난 근무표가 바뀌어 이어지는 근무가 달라졌어요. 다시 만들면 반영돼요
           <button type="button" onClick={regenerate} disabled={busy} className={ui.textSm}>
-            다시 생성
+            다시 만들기
           </button>
         </div>
       )}
@@ -326,9 +351,9 @@ export default function ScheduleStep() {
           role="status"
           className="flex items-center justify-between rounded-lg border border-[#F1D3A8] bg-[#FDF0DC] py-1.5 pr-2 pl-4 text-sm text-[#7A4506]"
         >
-          <span className={`${ui.badge} bg-white text-[#7A4506]`}>입력이 바뀌었어요. 다시 생성하세요</span>
+          <span className={`${ui.badge} bg-white text-[#7A4506]`}>입력이 바뀌었어요. 다시 만들어 주세요</span>
           <button type="button" onClick={regenerate} disabled={busy} className={ui.secondarySm}>
-            다시 생성
+            다시 만들기
           </button>
         </div>
       )}
@@ -395,9 +420,7 @@ export default function ScheduleStep() {
           </section>
           <StatsTable rows={rows} result={result} history={history} />
         </>
-      ) : (
-        !outcome && <p className="text-sm text-[#66665E]">[생성]을 누르면 지금까지 적용한 규칙과 요청으로 근무표를 만들어요.</p>
-      )}
+      ) : null}
 
       <div>
         <button type="button" onClick={() => go({ screen: "period", periodId, step: 2 })} className={ui.secondary}>
@@ -434,7 +457,7 @@ function ChangeBar({
     <section className={`${ui.card} flex flex-col gap-2.5`}>
       <div className="flex flex-col gap-1">
         <h2 className={ui.cardTitle}>운영 중 변경</h2>
-        <p className={ui.help}>확정본 이후 생긴 병가·휴가를 적으면, 확정본에서 최소한으로 바꾼 초안을 만들어요.</p>
+        <p className={ui.help}>확정한 뒤 생긴 병가·휴가를 적으면, 확정 근무표에서 최소한으로 바꿔 다시 만들어요.</p>
       </div>
       <form
         className="flex gap-2"
@@ -453,7 +476,7 @@ function ChangeBar({
         />
         <button type="submit" disabled={busy || tooLong || text.trim() === ""} className={ui.primary}>
           {translating && <Spinner />}
-          {translating ? "해석 중…" : "해석"}
+          {translating ? "읽는 중…" : "요청 만들기"}
         </button>
       </form>
       {notice && (
@@ -490,7 +513,7 @@ function OutcomePanel({
 }) {
   const [dismissed, setDismissed] = useState<RelaxationProposal[]>([]);
   const explanation = outcome.kind === "infeasible" ? outcome.explanation : null;
-  // 재풀이로 검증된 제안만 보여준다(ADR-004)
+  // 다시 풀어 검증된 제안만 보여준다(ADR-004)
   const proposals = (explanation?.proposals ?? []).filter((p) => p.verified_summary && !dismissed.includes(p));
   const conflicts = outcome.kind === "infeasible" ? outcome.conflicts : [];
   const unknownCause = outcome.kind === "timeout" || conflicts.length === 0;
@@ -499,11 +522,11 @@ function OutcomePanel({
   return (
     <section className="flex flex-col gap-3.5 rounded-lg border border-[#E8B4AE] bg-white px-[18px] py-4">
       <div className="flex items-center gap-2">
-        <span className={`${ui.badge} bg-[#FBE9E7] text-[#9F1F14]`}>{outcome.kind === "timeout" ? "시간 초과" : "해 없음"}</span>
+        <span className={`${ui.badge} bg-[#FBE9E7] text-[#9F1F14]`}>{outcome.kind === "timeout" ? "시간 초과" : "근무표 없음"}</span>
         <h2 className={ui.cardTitle}>
-          {outcome.kind === "timeout" ? "시간 안에 풀지 못했어요" : "지금 규칙으로는 근무표를 만들 수 없어요"}
+          {outcome.kind === "timeout" ? "시간 안에 근무표를 만들지 못했어요" : "규칙을 모두 지키는 근무표가 없어요"}
         </h2>
-        {hasResult && <span className={ui.help}>아래는 마지막으로 풀린 근무표예요.</span>}
+        {hasResult && <span className={ui.help}>아래는 마지막으로 만든 근무표예요.</span>}
       </div>
 
       {outcome.kind === "infeasible" &&
@@ -517,7 +540,7 @@ function OutcomePanel({
             <p className="text-sm leading-relaxed whitespace-pre-line text-[#3D3D38]">
               {explanation.text}
               {explanation.fallback && (
-                <span className="text-[#66665E]"> 자동 설명을 만들지 못해 충돌 규칙만 표시합니다.</span>
+                <span className="text-[#66665E]"> 자동 설명을 만들지 못해 함께 지킬 수 없는 규칙만 보여 줘요.</span>
               )}
             </p>
           )
@@ -539,7 +562,7 @@ function OutcomePanel({
 
       {!unknownCause ? (
         <div className="flex flex-col gap-1.5">
-          <h3 className="text-[13px] font-semibold text-[#1B1B18]">충돌하는 규칙</h3>
+          <h3 className="text-[13px] font-semibold text-[#1B1B18]">함께 지킬 수 없는 규칙</h3>
           <ul className="flex flex-col">
             {conflicts.map((c) => {
               const found = constraints.find((x) => x.id === c.constraint_id);
@@ -556,7 +579,7 @@ function OutcomePanel({
                   </span>
                   {found && (
                     <button type="button" disabled={busy} onClick={() => onDisable(c.constraint_id)} className={ui.secondarySm}>
-                      이번 기간만 끄기
+                      이번 근무표에서만 끄기
                     </button>
                   )}
                 </li>
@@ -568,16 +591,16 @@ function OutcomePanel({
         <div className="flex flex-col gap-1.5">
           <p className="text-sm text-[#1B1B18]">
             {outcome.kind === "timeout"
-              ? "hard 규칙을 하나씩 꺼서 확인해 주세요."
-              : "원인을 특정하지 못했어요. 규칙을 하나씩 꺼서 확인해 주세요."}
-            <span className={ui.help}> 끄거나 켠 뒤 [다시 생성]을 눌러 주세요.</span>
+              ? "'반드시' 규칙을 하나씩 꺼서 확인해 주세요."
+              : "원인을 찾지 못했어요. 규칙을 하나씩 꺼서 확인해 주세요."}
+            <span className={ui.help}> 끄거나 켠 뒤 [다시 만들기]를 눌러 주세요.</span>
           </p>
           <ul className="flex flex-col">
             {hardList.map((c) => {
               const on = c.enabled !== false;
               return (
                 <li key={c.id} className="flex items-center justify-between gap-3 border-b border-[#EFEFEB] py-1.5 last:border-b-0">
-                  <span className={`flex items-baseline gap-2 text-sm ${on ? "text-[#1B1B18]" : "text-[#9A9A91]"}`}>
+                  <span className={`flex items-baseline gap-2 text-sm ${on ? "text-[#1B1B18]" : "text-[#66665E]"}`}>
                     <span className="text-xs font-medium text-[#66665E]">{TEMPLATE_NAMES[c.type]}</span>“{c.source_text}”
                     <span className="font-mono text-xs text-[#66665E]">{describeParams(c, nurses, period)}</span>
                   </span>
@@ -588,7 +611,7 @@ function OutcomePanel({
                     onClick={() => onToggle(c.id, !on)}
                     className={ui.secondarySm}
                   >
-                    {on ? "이번 기간만 끄기" : "다시 켜기"}
+                    {on ? "이번 근무표에서만 끄기" : "다시 켜기"}
                   </button>
                 </li>
               );
@@ -619,9 +642,17 @@ function ProposalCard({
         <span className={`${ui.badge} bg-[#E6F2EA] text-[#1E6B3F]`}>검증됨</span>
       </div>
       <p className="text-sm leading-relaxed text-[#3D3D38]">{proposal.description}</p>
-      <p className="font-mono text-xs text-[#66665E]">
-        재풀이 결과 · 해 있음 · 희망 반영 {s.preferences_met}/{s.preferences_total}
-        {s.soft_violation_count > 0 && ` · soft 위반 ${s.soft_violation_count}`}
+      <p className="text-xs text-[#66665E]">
+        이렇게 바꾸면 근무표를 만들 수 있어요 · 희망 반영{" "}
+        <span className="font-mono">
+          {s.preferences_met}/{s.preferences_total}
+        </span>
+        {s.soft_violation_count > 0 && (
+          <>
+            {" "}
+            · 못 지킨 규칙 <span className="font-mono">{s.soft_violation_count}</span>
+          </>
+        )}
       </p>
       <div className="flex justify-end gap-1">
         <button type="button" onClick={onDismiss} className={ui.textSm}>
@@ -653,16 +684,16 @@ function SummaryCard({
   return (
     <section className="flex items-stretch rounded-lg border border-[#E2E2DC] bg-white">
       <div className={item}>
-        <span className={label}>해 상태</span>
+        <span className={label}>결과</span>
         <span className="flex h-7 items-center gap-2">
           {infeasible ? (
-            <span className={`${ui.badge} bg-[#FBE9E7] text-[#9F1F14]`}>해 없음</span>
+            <span className={`${ui.badge} bg-[#FBE9E7] text-[#9F1F14]`}>근무표 없음</span>
           ) : (
-            <span className={`${ui.badge} bg-[#E6F2EA] text-[#1E6B3F]`}>해 있음</span>
+            <span className={`${ui.badge} bg-[#E6F2EA] text-[#1E6B3F]`}>규칙을 모두 지켰어요</span>
           )}
-          {!result.optimal && <span className={`${ui.badge} bg-[#FDF0DC] text-[#7A4506]`}>최적이 아닐 수 있음</span>}
-          {confirmed && <span className={`${ui.badge} bg-[#1B1B18] text-white`}>확정됨</span>}
-          {draft && <span className={`${ui.badge} border border-[#C9C9C1] bg-white text-[#3D3D38]`}>초안</span>}
+          {!result.optimal && <span className={`${ui.badge} bg-[#FDF0DC] text-[#7A4506]`}>더 나은 배치가 있을 수 있어요</span>}
+          {confirmed && <span className={`${ui.badge} bg-[#E6F2EA] text-[#1E6B3F]`}>확정</span>}
+          {draft && <span className={`${ui.badge} border border-[#C9C9C1] bg-white text-[#3D3D38]`}>작성 중</span>}
         </span>
       </div>
       <div className={item}>
@@ -670,14 +701,15 @@ function SummaryCard({
         <span className={`${value} text-[#1B1B18]`}>
           {summary.preferences_met}/{summary.preferences_total}
         </span>
+        <span className={label}>희망·기피 요청이 걸린 날 중 지킨 날</span>
       </div>
       <div className={item}>
-        <span className={label}>soft 위반</span>
+        <span className={label}>못 지킨 규칙</span>
         <span className={`${value} text-[#A15C07]`}>{summary.soft_violation_count}</span>
       </div>
       {result.diff && (
         <div className={item}>
-          <span className={label}>이전 대비 변경</span>
+          <span className={label}>확정본에서 바뀐 칸</span>
           <span className={`${value} text-[#1B1B18]`}>{result.diff.length}칸</span>
         </div>
       )}
@@ -765,9 +797,13 @@ export function ScheduleGrid({
   todayDay?: number | null;
 }) {
   const pdays = periodDays(period);
+  // 최근 4주 기록이 하나도 없으면(첫 근무표) 누적 부담 열을 그리지 않는다
+  const showHistory = [...(history?.values() ?? [])].some((h) => h.nights > 0 || h.weekends > 0);
   const dayList = pdays.map((p) => p.day);
   // grid-cols-[150px_44px_repeat(N,30px)_repeat(4,34px)_repeat(2,44px)], N = 기간 길이
-  const grid = { gridTemplateColumns: `150px 44px repeat(${period.length}, 30px) repeat(4, 34px) repeat(2, 44px)` };
+  const grid = {
+    gridTemplateColumns: `150px 44px repeat(${period.length}, 30px) repeat(4, 34px)${showHistory ? " repeat(2, 44px)" : ""}`,
+  };
   const rowClass = "grid gap-x-0.5";
   const weekendBg = (d: number) => (isWeekend(d) ? "bg-[#F1EEE6]" : "");
   const changed = new Set((result.diff ?? []).map((c) => `${c.nurse_id}-${c.day}`));
@@ -807,7 +843,7 @@ export function ScheduleGrid({
             </span>
           ))}
           {/* 누적 부담(최근 4주) */}
-          {["4주 N", "4주 주말"].map((label) => (
+          {showHistory && ["최근 4주 나이트", "최근 4주 주말"].map((label) => (
             <span key={label} className="flex items-end justify-center text-center text-[11px] leading-tight font-medium text-[#66665E]">
               {label}
             </span>
@@ -821,7 +857,7 @@ export function ScheduleGrid({
             <div key={n.id} className={rowClass} style={grid}>
               <span className="flex h-7 items-center truncate text-sm text-[#1B1B18]">
                 {n.name}
-                {n.night_only && <span className="ml-1.5 text-xs font-medium text-[#66665E]">N전담</span>}
+                {n.night_only && <span className="ml-1.5 text-xs font-medium text-[#66665E]">나이트 전담</span>}
               </span>
               <span className="flex h-7 items-center font-mono text-[13px] text-[#3D3D38]">{n.years}</span>
               {row.map((code, i) => {
@@ -857,8 +893,12 @@ export function ScheduleGrid({
                   {s?.[c] ?? row.filter((x) => x === c).length}
                 </span>
               ))}
-              <span className={total}>{history?.get(n.id)?.nights ?? 0}</span>
-              <span className={total}>{history?.get(n.id)?.weekends ?? 0}</span>
+              {showHistory && (
+                <>
+                  <span className={total}>{history?.get(n.id)?.nights ?? 0}</span>
+                  <span className={total}>{history?.get(n.id)?.weekends ?? 0}</span>
+                </>
+              )}
             </div>
           );
         })}
@@ -883,6 +923,7 @@ function StatsTable({ rows, result, history }: { rows: Nurse[]; result: Schedule
   const thBase = "px-3 py-2 text-xs font-medium whitespace-nowrap text-[#66665E]";
   const th = `${thBase} text-right`;
   const td = "px-3 py-1.5 text-right font-mono text-[13px] font-medium text-[#1B1B18]";
+  const showHistory = [...history.values()].some((h) => h.nights > 0 || h.weekends > 0);
   return (
     <section className={`${ui.card} flex flex-col gap-3`}>
       <h2 className={ui.cardTitle}>개인별 통계</h2>
@@ -899,9 +940,13 @@ function StatsTable({ rows, result, history }: { rows: Nurse[]; result: Schedule
               <th className={th}>주말·공휴일 근무</th>
               <th className={th}>최대 연속 근무</th>
               <th className={th}>희망 반영률</th>
-              <th className={th}>평균 대비 편차</th>
-              <th className={th}>최근 4주 N</th>
-              <th className={th}>최근 4주 주말</th>
+              <th className={th}>평균보다 많은 근무일</th>
+              {showHistory && (
+                <>
+                  <th className={th}>최근 4주 나이트</th>
+                  <th className={th}>최근 4주 주말</th>
+                </>
+              )}
             </tr>
           </thead>
           <tbody>
@@ -919,12 +964,13 @@ function StatsTable({ rows, result, history }: { rows: Nurse[]; result: Schedule
                   <td className={td}>{s.weekend_holiday_work}</td>
                   <td className={td}>{s.max_consecutive_work}일</td>
                   <td className={td}>{s.preference_rate === null ? "–" : `${Math.round(s.preference_rate * 100)}%`}</td>
-                  <td className={td}>
-                    {s.deviation > 0 ? "+" : ""}
-                    {s.deviation.toFixed(2)}
-                  </td>
-                  <td className={td}>{history.get(n.id)?.nights ?? 0}</td>
-                  <td className={td}>{history.get(n.id)?.weekends ?? 0}</td>
+                  <td className={td}>{formatDeviation(s.deviation)}</td>
+                  {showHistory && (
+                    <>
+                      <td className={td}>{history.get(n.id)?.nights ?? 0}</td>
+                      <td className={td}>{history.get(n.id)?.weekends ?? 0}</td>
+                    </>
+                  )}
                 </tr>
               );
             })}
