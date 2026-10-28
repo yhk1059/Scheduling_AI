@@ -33,7 +33,7 @@ def test_score_sorts_days():
 
 
 def test_score_ignores_id_source_text_weight_scope():
-    actual = leave("n01", [15], id="abc", source_text="이영희 15일 휴가", weight=1, scope="month", enabled=True)
+    actual = leave("n01", [15], id="abc", source_text="이영희 15일 휴가", weight=1, scope="period", enabled=True)
     assert run.score_constraints([leave("n01", [15])], [actual]) == (1, 1, 1)
 
 
@@ -57,7 +57,7 @@ def test_score_fills_defaults():
 
 
 def case(id_: str, expected: dict, **extra) -> dict:
-    return {"id": id_, "today": "2026-10-26", "scope": "month", "text": "t", "expected": expected, **extra}
+    return {"id": id_, "today": "2026-10-26", "scope": "period", "text": "t", "expected": expected, **extra}
 
 
 def test_validate_dataset_ok():

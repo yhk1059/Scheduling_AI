@@ -3,7 +3,6 @@
 import calendar
 import json
 import uuid
-from datetime import date
 from typing import Any
 
 from pydantic import TypeAdapter, ValidationError
@@ -37,15 +36,16 @@ def _context_message(req: TranslateRequest, text: str) -> str:
     ctx = req.context
     days = ctx.period.days
     weekends = sorted(
-        {d for d in range(1, days + 1) if date(ctx.period.year, ctx.period.month, d).weekday() >= 5}
+        {d for d in range(1, days + 1) if ctx.period.weekday(d) >= 5}
         | set(ctx.holidays)
     )
     context = {
         "today": ctx.today.isoformat(),
         "today_weekday": calendar.day_name[ctx.today.weekday()],
-        "target_month": f"{ctx.period.year}-{ctx.period.month:02d}",
-        "days_in_month": days,
-        "first_day_weekday": calendar.day_name[date(ctx.period.year, ctx.period.month, 1).weekday()],
+        "period_start": ctx.period.start_date.isoformat(),
+        "period_end": ctx.period.date_of(days).isoformat(),
+        "period_length": days,
+        "first_day_weekday": calendar.day_name[ctx.period.weekday(1)],
         "weekend_and_holiday_days": weekends,
         "holidays": sorted(ctx.holidays),
         "nurses": [{"id": n.id, "years": n.years, "night_only": n.night_only} for n in ctx.nurses],

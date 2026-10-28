@@ -9,7 +9,7 @@ from backend.solver.model import build_model, solve
 SAMPLE_PATH = Path(__file__).resolve().parents[2] / "lib" / "samples" / "ward-15.json"
 
 # 2026-11: 30일, 1일이 일요일. 주말 = 1, 7, 8, 14, 15, 21, 22, 28, 29
-YEAR, MONTH, DAYS = 2026, 11, 30
+START, DAYS = "2026-11-01", 30
 WEEKENDS = {1, 7, 8, 14, 15, 21, 22, 28, 29}
 
 
@@ -29,7 +29,7 @@ def coverage(shift: str, day_kind: str, lo: int, hi: int, **extra) -> dict:
 def request(nurses: list[dict] | None = None, constraints: list[dict] | None = None, **extra) -> ScheduleRequest:
     return ScheduleRequest.model_validate({
         "nurses": nurses if nurses is not None else [nurse(f"n{i}") for i in range(1, 7)],
-        "period": {"year": YEAR, "month": MONTH},
+        "period": {"start_date": START, "length": DAYS},
         "constraints": constraints or [],
         "input_version": 1,
         **extra,

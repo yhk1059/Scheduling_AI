@@ -1,16 +1,15 @@
 """도메인 모델. tool input_schema, 입력 검증, 솔버 입력, TS 타입의 단일 기준이다(ADR-003)."""
 
-import calendar
-from datetime import date
+from datetime import date, timedelta
 from typing import Annotated, Any, Literal, Union
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
-from backend.domain.constants import CARRY_OVER_DAYS, DEFAULT_SOFT_WEIGHTS, DEFAULT_WEIGHT
+from backend.domain.constants import CARRY_OVER_DAYS, DEFAULT_SOFT_WEIGHTS, DEFAULT_WEIGHT, MAX_PERIOD_DAYS
 
 ShiftCode = Literal["D", "E", "N", "O"]
 WorkShift = Literal["D", "E", "N"]
-Scope = Literal["ward", "month"]
+Scope = Literal["ward", "period"]
 Hardness = Literal["hard", "soft"]
 
 
@@ -29,19 +28,21 @@ class Nurse(_Strict):
 
 
 class Period(_Strict):
-    year: int = Field(ge=2000, le=2100)
-    month: int = Field(ge=1, le=12)
+    """시작일 + 길이(ADR-015). 날짜는 기간 안의 1..length 인덱스로 다룬다."""
 
-    def __init__(self, year: int | None = None, month: int | None = None, **data: Any) -> None:
-        if year is not None:
-            data["year"] = year
-        if month is not None:
-            data["month"] = month
-        super().__init__(**data)
+    start_date: date
+    length: int = Field(ge=1, le=MAX_PERIOD_DAYS)
 
     @property
     def days(self) -> int:
-        return calendar.monthrange(self.year, self.month)[1]
+        return self.length
+
+    def date_of(self, day: int) -> date:
+        return self.start_date + timedelta(days=day - 1)
+
+    def weekday(self, day: int) -> int:
+        """0=월 … 6=일."""
+        return self.date_of(day).weekday()
 
 
 # --- 제약 템플릿 params ---

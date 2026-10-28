@@ -4,12 +4,14 @@ import { useState } from "react";
 
 import { ApiError, errorMessage, explain, solve, translate } from "@/lib/api";
 import { toScheduleCsv } from "@/lib/csv";
+import { isWeekendDay, monthDay, periodDays } from "@/lib/period";
 import { type Assignments, type Code, findReplaced, useAppStore } from "@/lib/store";
 import type {
   Conflict,
   ConstraintSpec,
   ExplainResponse,
   Nurse,
+  Period,
   RelaxationProposal,
   ScheduleRequest,
   ScheduleResult,
@@ -132,7 +134,7 @@ export default function ScheduleStep() {
     setTranslating(true);
     setToast(null);
     try {
-      const res = await translate({ text: input, scope: "month", context: { nurses, period, holidays, today: today() } });
+      const res = await translate({ text: input, scope: "period", context: { nurses, period, holidays, today: today() } });
       if (res.status === "ok") {
         addPendingCards(res.constraints);
         setChangeIds((ids) => [...ids, ...res.constraints.map((c) => c.id)]);
@@ -147,11 +149,7 @@ export default function ScheduleStep() {
     }
   };
 
-  const days = new Date(period.year, period.month, 0).getDate();
-  const isWeekend = (d: number) => {
-    const dow = new Date(period.year, period.month - 1, d).getDay();
-    return dow === 0 || dow === 6 || holidays.includes(d);
-  };
+  const isWeekend = (d: number) => isWeekendDay(period, d, holidays);
   const fixed = new Map<string, Code>();
   for (const c of constraints) {
     if (c.type === "fixed_assignment" && c.enabled !== false) fixed.set(`${c.params.nurse_id}-${c.params.day}`, c.params.shift);
@@ -170,7 +168,7 @@ export default function ScheduleStep() {
     const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
     const a = document.createElement("a");
     a.href = url;
-    a.download = `근무표-${period.year}-${String(period.month).padStart(2, "0")}.csv`;
+    a.download = `근무표-${period.start_date}.csv`;
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -276,7 +274,7 @@ export default function ScheduleStep() {
               <h2 className={ui.cardTitle}>근무표</h2>
               {selected && (
                 <CellEditor
-                  label={`${nurses.find((n) => n.id === selected.nurseId)?.name ?? selected.nurseId} ${period.month}/${selected.day}`}
+                  label={`${nurses.find((n) => n.id === selected.nurseId)?.name ?? selected.nurseId} ${monthDay(period, selected.day)}`}
                   fixed={fixed.get(`${selected.nurseId}-${selected.day}`)}
                   onPick={(code) => onPick(selected, code)}
                   onCancel={() => setSelected(null)}
@@ -286,9 +284,7 @@ export default function ScheduleStep() {
             <ScheduleGrid
               rows={rows}
               result={result}
-              month={period.month}
-              days={days}
-              dow={(d) => new Date(period.year, period.month - 1, d).getDay()}
+              period={period}
               holidays={holidays}
               isWeekend={isWeekend}
               fixed={fixed}
@@ -402,7 +398,7 @@ function OutcomePanel({
   busy: boolean;
   constraints: ConstraintSpec[];
   nurses: Nurse[];
-  period: { year: number; month: number };
+  period: Period;
   hasResult: boolean;
   onAccept: (p: RelaxationProposal) => void;
   onDisable: (id: string) => void;
@@ -657,9 +653,7 @@ function LockIcon() {
 export function ScheduleGrid({
   rows,
   result,
-  month,
-  days,
-  dow,
+  period,
   holidays,
   isWeekend,
   fixed,
@@ -669,9 +663,7 @@ export function ScheduleGrid({
 }: {
   rows: Nurse[];
   result: ScheduleResult;
-  month: number;
-  days: number;
-  dow: (d: number) => number;
+  period: Period;
   holidays: number[];
   isWeekend: (d: number) => boolean;
   fixed: Map<string, Code>;
@@ -679,8 +671,9 @@ export function ScheduleGrid({
   disabled: boolean;
   onSelect: (cell: Cell) => void;
 }) {
-  const dayList = Array.from({ length: days }, (_, i) => i + 1);
-  const grid = { gridTemplateColumns: `150px 44px repeat(${days}, 30px) repeat(4, 34px)` };
+  const pdays = periodDays(period);
+  const dayList = pdays.map((p) => p.day);
+  const grid = { gridTemplateColumns: `150px 44px repeat(${period.length}, 30px) repeat(4, 34px)` };
   const rowClass = "grid gap-x-0.5";
   const weekendBg = (d: number) => (isWeekend(d) ? "bg-[#F1EEE6]" : "");
   const changed = new Set((result.diff ?? []).map((c) => `${c.nurse_id}-${c.day}`));
@@ -698,12 +691,11 @@ export function ScheduleGrid({
         <div className={rowClass} style={grid}>
           <span className="flex items-end text-xs font-medium text-[#66665E]">이름</span>
           <span className="flex items-end text-xs font-medium text-[#66665E]">연차</span>
-          {dayList.map((d) => {
-            const w = dow(d);
+          {pdays.map(({ day: d, dom, weekday: w }) => {
             const color = w === 0 || holidays.includes(d) ? "text-[#B42318]" : w === 6 ? "text-[#155E75]" : "text-[#66665E]";
             return (
               <span key={d} className={`flex flex-col items-center rounded-xs py-0.5 font-mono ${weekendBg(d)} ${color}`}>
-                <span className="text-[13px] font-medium">{d}</span>
+                <span className="text-[13px] font-medium">{dom}</span>
                 <span className="text-[11px]">{WEEKDAYS[w]}</span>
               </span>
             );
@@ -727,6 +719,7 @@ export function ScheduleGrid({
               <span className="flex h-7 items-center font-mono text-[13px] text-[#3D3D38]">{n.years}</span>
               {row.map((code, i) => {
                 const d = i + 1;
+                const [m, dom] = monthDay(period, d).split("/");
                 const key = `${n.id}-${d}`;
                 const isSel = selected?.nurseId === n.id && selected.day === d;
                 const warn = violations.get(key);
@@ -736,7 +729,7 @@ export function ScheduleGrid({
                     type="button"
                     disabled={disabled}
                     onClick={() => onSelect({ nurseId: n.id, day: d })}
-                    aria-label={`${n.name} ${month}월 ${d}일 ${code}`}
+                    aria-label={`${n.name} ${m}월 ${dom}일 ${code}`}
                     title={warn ? warn.join(", ") : undefined}
                     className={`${CELL} ${codeClass(code, isWeekend(d))} hover:opacity-80 disabled:cursor-wait ${
                       changed.has(key) ? "shadow-[inset_0_0_0_2px_#D97706]" : ""

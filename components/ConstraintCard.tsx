@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 
+import { monthDay } from "@/lib/period";
 import { type Hardness, useAppStore } from "@/lib/store";
 import type { ConstraintSpec, Nurse, Period } from "@/lib/types.gen";
 
@@ -39,9 +40,10 @@ function dayRanges(days: number[]): [number, number][] {
 }
 
 /** [15,16,17,20] → "11/15~11/17, 11/20" */
-function formatDays(days: number[], month: number): string {
+function formatDays(days: number[], period: Period): string {
+  const md = (d: number) => monthDay(period, d);
   return dayRanges(days)
-    .map(([a, b]) => (a === b ? `${month}/${a}` : `${month}/${a}~${month}/${b}`))
+    .map(([a, b]) => (a === b ? md(a) : `${md(a)}~${md(b)}`))
     .join(", ");
 }
 
@@ -51,7 +53,6 @@ function nurseLabel(id: string, nurses: Nurse[]): string {
 }
 
 export function describeParams(c: ConstraintSpec, nurses: Nurse[], period: Period): string {
-  const m = period.month;
   switch (c.type) {
     case "daily_coverage":
       return `${c.params.shift} · ${c.params.day_kind === "weekday" ? "평일" : "주말·공휴일"} · ${c.params.min}~${c.params.max}명`;
@@ -68,12 +69,12 @@ export function describeParams(c: ConstraintSpec, nurses: Nurse[], period: Perio
     case "skill_mix":
       return `${c.params.shift} · ${c.params.min_years}년차 이상 ≥ ${c.params.min_count}명`;
     case "leave":
-      return `${nurseLabel(c.params.nurse_id, nurses)} · ${formatDays(c.params.days, m)} · O`;
+      return `${nurseLabel(c.params.nurse_id, nurses)} · ${formatDays(c.params.days, period)} · O`;
     case "fixed_assignment":
-      return `${nurseLabel(c.params.nurse_id, nurses)} · ${m}/${c.params.day} · ${c.params.shift}`;
+      return `${nurseLabel(c.params.nurse_id, nurses)} · ${monthDay(period, c.params.day)} · ${c.params.shift}`;
     case "shift_preference": {
       const p = c.params;
-      const when = p.days?.length ? formatDays(p.days, m) : p.weekends_only ? "주말·공휴일" : "한 달 전체";
+      const when = p.days?.length ? formatDays(p.days, period) : p.weekends_only ? "주말·공휴일" : "한 달 전체";
       const scope = p.days?.length && p.weekends_only ? `${when} 중 주말·공휴일` : when;
       return `${nurseLabel(p.nurse_id, nurses)} · ${scope} · ${p.shift} ${p.prefer ? "희망" : "기피"}`;
     }
@@ -307,7 +308,7 @@ export default function ConstraintCard({
   const nurseId = (card.params as { nurse_id?: string } | undefined)?.nurse_id;
   const orphan = nurseId !== undefined && !nurses.some((n) => n.id === nurseId);
   const editable = FIELDS[card.type].length > 0;
-  const lastDay = new Date(period.year, period.month, 0).getDate();
+  const lastDay = period.length;
 
   const save = () => {
     if (!draft) return;

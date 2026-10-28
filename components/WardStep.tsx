@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 
+import { periodFrom } from "@/lib/period";
 import { buildRoster, decodeText, mapHeaders, parseDelimited } from "@/lib/roster-import";
 import { useAppStore } from "@/lib/store";
 import type { Nurse } from "@/lib/types.gen";
@@ -76,7 +77,7 @@ export default function WardStep() {
   };
 
   const canProceed = nurses.length > 0 && roster?.errors.length === 0 && !hasCoverageError(coverageDrafts);
-  const monthValue = `${period.year}-${String(period.month).padStart(2, "0")}`;
+  const monthValue = period.start_date.slice(0, 7);
 
   return (
     <div className="flex flex-col gap-5">
@@ -93,8 +94,7 @@ export default function WardStep() {
             type="month"
             value={monthValue}
             onChange={(e) => {
-              const [y, m] = e.target.value.split("-").map(Number);
-              if (y && m) setPeriod({ year: y, month: m });
+              if (e.target.value) setPeriod(periodFrom("month", `${e.target.value}-01`));
             }}
             className={`${ui.input} font-mono`}
           />

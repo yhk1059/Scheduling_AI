@@ -43,14 +43,19 @@ function fresh(storage: Storage = new MemoryStorage()) {
 describe("초기 상태", () => {
   it("대상 월은 다음 달이고 1단계에서 시작한다", () => {
     const s = fresh().getState();
-    expect(s.period).toEqual({ year: 2026, month: 11 });
+    expect(s.period).toEqual({ start_date: "2026-11-01", length: 30 });
     expect(s.step).toBe(1);
     expect(s.inputVersion).toBe(0);
     expect(s.storageAvailable).toBe(true);
     expect(s.resetNotice).toBe(false);
     expect(createAppStore(() => new MemoryStorage(), new Date(2026, 11, 5)).getState().period).toEqual({
-      year: 2027,
-      month: 1,
+      start_date: "2027-01-01",
+      length: 31,
+    });
+    // 1일이어도 이번 달이 아니라 다음 달
+    expect(createAppStore(() => new MemoryStorage(), new Date(2027, 0, 1)).getState().period).toEqual({
+      start_date: "2027-02-01",
+      length: 28,
     });
   });
 });
@@ -61,7 +66,7 @@ describe("inputVersion", () => {
     const v = () => store.getState().inputVersion;
     store.getState().setNurses(nurses);
     expect(v()).toBe(1);
-    store.getState().setPeriod({ year: 2026, month: 12 });
+    store.getState().setPeriod({ start_date: "2026-12-01", length: 31 });
     expect(v()).toBe(2);
     store.getState().toggleHoliday(25);
     expect(v()).toBe(3);
@@ -85,7 +90,7 @@ describe("inputVersion", () => {
     store.getState().toggleHoliday(9);
     store.getState().toggleHoliday(3);
     expect(store.getState().holidays).toEqual([9]);
-    store.getState().setPeriod({ year: 2026, month: 12 });
+    store.getState().setPeriod({ start_date: "2026-12-01", length: 31 });
     expect(store.getState().holidays).toEqual([]);
   });
 });
@@ -103,9 +108,9 @@ describe("applyCard", () => {
     const store = fresh();
     const { addPendingCards, applyCard } = store.getState();
     addPendingCards([
-      card({ id: "a", type: "leave", scope: "month", params: { nurse_id: "n01", days: [3] } }),
-      card({ id: "b", type: "leave", scope: "month", params: { nurse_id: "n02", days: [4] } }),
-      card({ id: "c", type: "leave", scope: "month", params: { nurse_id: "n01", days: [5, 6] } }),
+      card({ id: "a", type: "leave", scope: "period", params: { nurse_id: "n01", days: [3] } }),
+      card({ id: "b", type: "leave", scope: "period", params: { nurse_id: "n02", days: [4] } }),
+      card({ id: "c", type: "leave", scope: "period", params: { nurse_id: "n01", days: [5, 6] } }),
       card({ id: "d", type: "max_consecutive_work", params: { days: 5 } }),
       card({ id: "e", type: "max_consecutive_work", params: { days: 6 } }),
       card({ id: "f", type: "skill_mix", params: { shift: "N", min_years: 3, min_count: 1 } }),
@@ -120,8 +125,8 @@ describe("applyCard", () => {
   it("같은 간호사의 휴가는 교체하지 않고 날짜별 요청을 모두 남긴다", () => {
     const store = fresh();
     store.getState().addPendingCards([
-      card({ id: "l1", type: "leave", scope: "month", params: { nurse_id: "n01", days: [15, 16, 17] } }),
-      card({ id: "l2", type: "leave", scope: "month", params: { nurse_id: "n01", days: [20] } }),
+      card({ id: "l1", type: "leave", scope: "period", params: { nurse_id: "n01", days: [15, 16, 17] } }),
+      card({ id: "l2", type: "leave", scope: "period", params: { nurse_id: "n01", days: [20] } }),
     ]);
     store.getState().applyCard("l1");
     store.getState().applyCard("l2");
@@ -134,9 +139,9 @@ describe("applyCard", () => {
   it("고정 배정은 같은 간호사·같은 날이면 교체하고, 날이 다르면 추가한다", () => {
     const store = fresh();
     store.getState().addPendingCards([
-      card({ id: "f5", type: "fixed_assignment", scope: "month", params: { nurse_id: "n01", day: 5, shift: "D" } }),
-      card({ id: "f6", type: "fixed_assignment", scope: "month", params: { nurse_id: "n01", day: 6, shift: "E" } }),
-      card({ id: "f5b", type: "fixed_assignment", scope: "month", params: { nurse_id: "n01", day: 5, shift: "N" } }),
+      card({ id: "f5", type: "fixed_assignment", scope: "period", params: { nurse_id: "n01", day: 5, shift: "D" } }),
+      card({ id: "f6", type: "fixed_assignment", scope: "period", params: { nurse_id: "n01", day: 6, shift: "E" } }),
+      card({ id: "f5b", type: "fixed_assignment", scope: "period", params: { nurse_id: "n01", day: 5, shift: "N" } }),
     ]);
     for (const id of ["f5", "f6", "f5b"]) store.getState().applyCard(id);
     expect(store.getState().constraints.map((c) => c.id)).toEqual(["f5b", "f6"]);
@@ -145,7 +150,7 @@ describe("applyCard", () => {
   it("희망 근무는 같은 간호사·근무·대상 날짜면 교체하고, 근무나 날짜가 다르면 추가한다", () => {
     const store = fresh();
     const pref = (id: string, params: Record<string, unknown>) =>
-      card({ id, type: "shift_preference", scope: "month", params: { nurse_id: "n01", ...params } as never });
+      card({ id, type: "shift_preference", scope: "period", params: { nurse_id: "n01", ...params } as never });
     store.getState().addPendingCards([
       pref("d", { shift: "D", prefer: true }),
       pref("n", { shift: "N", prefer: false }),
@@ -162,7 +167,7 @@ describe("applyCard", () => {
     const store = fresh();
     store.getState().addPendingCards([
       card({ id: "w", type: "max_consecutive_work", params: { days: 5 } }),
-      card({ id: "m", type: "max_consecutive_work", scope: "month", params: { days: 4 } }),
+      card({ id: "m", type: "max_consecutive_work", scope: "period", params: { days: 4 } }),
     ]);
     store.getState().applyCard("w");
     store.getState().applyCard("m");
@@ -173,17 +178,17 @@ describe("applyCard", () => {
 describe("findReplaced", () => {
   it("같은 type·scope·대상의 다른 제약을 찾는다", () => {
     const existing = [
-      card({ id: "a", type: "leave", scope: "month", params: { nurse_id: "n01", days: [3] } }),
+      card({ id: "a", type: "leave", scope: "period", params: { nurse_id: "n01", days: [3] } }),
       card({ id: "b", type: "max_consecutive_work", params: { days: 5 } }),
     ];
     expect(findReplaced(existing, card({ id: "c", type: "max_consecutive_work", params: { days: 4 } }))?.id).toBe("b");
-    expect(findReplaced(existing, card({ id: "e", type: "max_consecutive_work", scope: "month", params: { days: 4 } }))).toBeUndefined();
+    expect(findReplaced(existing, card({ id: "e", type: "max_consecutive_work", scope: "period", params: { days: 4 } }))).toBeUndefined();
     expect(findReplaced(existing, existing[1])).toBeUndefined();
   });
 
   it("휴가는 같은 간호사여도 대체 대상이 없다", () => {
-    const existing = [card({ id: "a", type: "leave", scope: "month", params: { nurse_id: "n01", days: [3] } })];
-    expect(findReplaced(existing, card({ id: "c", type: "leave", scope: "month", params: { nurse_id: "n01", days: [9] } }))).toBeUndefined();
+    const existing = [card({ id: "a", type: "leave", scope: "period", params: { nurse_id: "n01", days: [3] } })];
+    expect(findReplaced(existing, card({ id: "c", type: "leave", scope: "period", params: { nurse_id: "n01", days: [9] } }))).toBeUndefined();
   });
 });
 
@@ -223,7 +228,7 @@ describe("updateCard", () => {
   it("휴가와 고정 배정은 항상 hard다", () => {
     const store = fresh();
     store.getState().addPendingCards([
-      card({ id: "l", type: "leave", scope: "month", params: { nurse_id: "n01", days: [3] } }),
+      card({ id: "l", type: "leave", scope: "period", params: { nurse_id: "n01", days: [3] } }),
     ]);
     store.getState().updateCard("l", { hardness: "soft", params: { nurse_id: "n01", days: [3, 4] } });
     expect(store.getState().pendingCards[0]).toMatchObject({ hardness: "hard", params: { days: [3, 4] } });
@@ -272,8 +277,8 @@ describe("orphanConstraintIds", () => {
     const store = fresh();
     store.getState().setNurses(nurses);
     store.getState().addPendingCards([
-      card({ id: "ok", type: "leave", scope: "month", params: { nurse_id: "n01", days: [3] } }),
-      card({ id: "gone", type: "fixed_assignment", scope: "month", params: { nurse_id: "n09", day: 2, shift: "D" } }),
+      card({ id: "ok", type: "leave", scope: "period", params: { nurse_id: "n01", days: [3] } }),
+      card({ id: "gone", type: "fixed_assignment", scope: "period", params: { nurse_id: "n09", day: 2, shift: "D" } }),
       card({ id: "ward", type: "night_fairness", params: {} }),
     ]);
     for (const id of ["ok", "gone", "ward"]) store.getState().applyCard(id);
@@ -315,15 +320,23 @@ describe("근무표 결과와 수동 고정", () => {
       { nurse_id: "n01", day: 6, shift: "E" },
       { nurse_id: "n01", day: 5, shift: "N" },
     ]);
-    expect(fixed[1]).toMatchObject({ scope: "month", hardness: "hard", enabled: true, source_text: "수동 고정: 이영희 11/5 N" });
+    expect(fixed[1]).toMatchObject({ scope: "period", hardness: "hard", enabled: true, source_text: "수동 고정: 이영희 11/5 N" });
     expect(store.getState().inputVersion).toBe(4);
+  });
+
+  it("setFixed 원문의 M/D는 기간 시작일 기준 실제 날짜다", () => {
+    const store = fresh();
+    store.getState().setNurses(nurses);
+    store.getState().setPeriod({ start_date: "2026-11-23", length: 14 });
+    store.getState().setFixed("n01", 9, "O");
+    expect(store.getState().constraints.at(-1)).toMatchObject({ source_text: "수동 고정: 이영희 12/1 O" });
   });
 
   it("setFixed는 번역으로 만든 같은 칸의 고정 배정도 교체한다", () => {
     const store = fresh();
     store.getState().setNurses(nurses);
     store.setState({
-      constraints: [card({ id: "x", type: "fixed_assignment", scope: "month", params: { nurse_id: "n01", day: 5, shift: "E" } })],
+      constraints: [card({ id: "x", type: "fixed_assignment", scope: "period", params: { nurse_id: "n01", day: 5, shift: "E" } })],
     });
     store.getState().setFixed("n01", 5, "D");
     expect(store.getState().constraints.map((c) => c.params)).toEqual([{ nurse_id: "n01", day: 5, shift: "D" }]);
@@ -377,7 +390,7 @@ describe("충돌 대응", () => {
     const store = fresh();
     store.setState({
       constraints: [
-        card({ id: "a", type: "leave", scope: "month", params: { nurse_id: "n01", days: [3, 4] } }),
+        card({ id: "a", type: "leave", scope: "period", params: { nurse_id: "n01", days: [3, 4] } }),
         card({ id: "b", type: "max_consecutive_nights", params: { days: 3 } }),
         card({ id: "c", type: "night_fairness", hardness: "soft", weight: 5, params: {} }),
       ],
@@ -427,7 +440,7 @@ describe("hasInput", () => {
   it("단계 이동이나 대상 월 변경만으로는 입력이 생기지 않는다", () => {
     const store = fresh();
     store.getState().setStep(3);
-    store.getState().setPeriod({ year: 2026, month: 12 });
+    store.getState().setPeriod({ start_date: "2026-12-01", length: 31 });
     expect(store.getState().hasInput()).toBe(false);
   });
 });
@@ -445,7 +458,7 @@ describe("reset", () => {
     const s = store.getState();
     expect(s.hasInput()).toBe(false);
     expect(s.step).toBe(1);
-    expect(s.period).toEqual({ year: 2026, month: 11 });
+    expect(s.period).toEqual({ start_date: "2026-11-01", length: 30 });
     expect(s.result).toBeNull();
     expect(s.confirmed).toBeNull();
     expect(s.resultVersion).toBeNull();
@@ -461,7 +474,7 @@ describe("persist", () => {
     a.getState().setNurses(nurses);
     a.getState().setStep(2);
     const saved = JSON.parse(storage.getItem(STORAGE_KEY)!);
-    expect(saved.version).toBe(1);
+    expect(saved.version).toBe(2);
     expect(saved.state).not.toHaveProperty("storageAvailable");
 
     const b = fresh(storage).getState();
@@ -473,7 +486,7 @@ describe("persist", () => {
 
   it("버전이 다르면 초기 상태로 되돌리고 resetNotice를 켠다", () => {
     const storage = new MemoryStorage();
-    storage.setItem(STORAGE_KEY, JSON.stringify({ version: 0, state: { nurses, step: 3, inputVersion: 9 } }));
+    storage.setItem(STORAGE_KEY, JSON.stringify({ version: 1, state: { nurses, step: 3, inputVersion: 9 } }));
     const s = fresh(storage).getState();
     expect(s.nurses).toEqual([]);
     expect(s.step).toBe(1);
@@ -491,7 +504,16 @@ describe("persist", () => {
 
   it("모양이 손상되면 초기화한다", () => {
     const storage = new MemoryStorage();
-    storage.setItem(STORAGE_KEY, JSON.stringify({ version: 1, state: { nurses: "x", step: 1 } }));
+    storage.setItem(STORAGE_KEY, JSON.stringify({ version: 2, state: { nurses: "x", step: 1 } }));
+    const s = fresh(storage).getState();
+    expect(s.nurses).toEqual([]);
+    expect(s.resetNotice).toBe(true);
+  });
+
+  it("예전 기간 모양(year/month)이면 초기화한다", () => {
+    const storage = new MemoryStorage();
+    const state = { ...JSON.parse(JSON.stringify(fresh().getState())), nurses, period: { year: 2026, month: 11 } };
+    storage.setItem(STORAGE_KEY, JSON.stringify({ version: 2, state }));
     const s = fresh(storage).getState();
     expect(s.nurses).toEqual([]);
     expect(s.resetNotice).toBe(true);

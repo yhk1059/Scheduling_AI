@@ -1,6 +1,5 @@
 """배정 결과 → 요약·통계·soft 위반. 솔버 변수를 쓰지 않는 결정적 순수 함수다."""
 
-import calendar
 from typing import Any
 
 from backend.domain.constants import FAIRNESS_TOLERANCE
@@ -27,8 +26,7 @@ TOGGLEABLE = {
 
 def is_weekend(request: ScheduleRequest, day: int) -> bool:
     """토·일 또는 체크한 공휴일."""
-    p = request.period
-    return calendar.weekday(p.year, p.month, day) >= 5 or day in request.holidays
+    return request.period.weekday(day) >= 5 or day in request.holidays
 
 
 def preference_days(request: ScheduleRequest, c: Any) -> list[int]:

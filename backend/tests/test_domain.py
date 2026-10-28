@@ -1,6 +1,7 @@
 """도메인 모델: 템플릿 12개 직렬화, hardness 강제, params 검증, 참조 무결성, 샘플."""
 
 import json
+from datetime import date
 from pathlib import Path
 
 import pytest
@@ -42,12 +43,12 @@ TEMPLATES = [
     common("c5", "min_days_off", params={"days": 8}),
     common("c6", "off_after_night_block", params={"days": 1}),
     common("c7", "skill_mix", params={"shift": "N", "min_years": 3, "min_count": 1}),
-    common("c8", "leave", scope="month", params={"nurse_id": "n01", "days": [15, 16, 17]}),
-    common("c9", "fixed_assignment", scope="month", params={"nurse_id": "n02", "day": 3, "shift": "E"}),
+    common("c8", "leave", scope="period", params={"nurse_id": "n01", "days": [15, 16, 17]}),
+    common("c9", "fixed_assignment", scope="period", params={"nurse_id": "n02", "day": 3, "shift": "E"}),
     common(
         "c10",
         "shift_preference",
-        scope="month",
+        scope="period",
         hardness="soft",
         params={"nurse_id": "n03", "shift": "O", "prefer": True, "days": None, "weekends_only": True},
     ),
@@ -63,7 +64,7 @@ def nurses(n: int = 3) -> list[dict]:
 def request(constraints: list[dict], **extra) -> dict:
     return {
         "nurses": nurses(),
-        "period": {"year": 2026, "month": 11},
+        "period": {"start_date": "2026-11-01", "length": 30},
         "holidays": [],
         "constraints": constraints,
         "input_version": 0,
@@ -150,16 +151,40 @@ def test_invalid_params_rejected(raw):
 # --- Period ---
 
 
-def test_period_days():
-    assert Period(2026, 2).days == 28
-    assert Period(2028, 2).days == 29
-    assert Period(2026, 11).days == 30
-    assert Period(2026, 12).days == 31
+def test_period_days_is_length():
+    assert Period(start_date=date(2026, 11, 1), length=30).days == 30
+    assert Period(start_date=date(2026, 11, 2), length=7).days == 7
 
 
-def test_period_rejects_bad_month():
+def test_period_date_of_crosses_month():
+    p = Period(start_date=date(2026, 11, 23), length=14)
+    assert p.date_of(1) == date(2026, 11, 23)
+    assert p.date_of(8) == date(2026, 11, 30)
+    assert p.date_of(9) == date(2026, 12, 1)
+    assert p.date_of(14) == date(2026, 12, 6)
+
+
+def test_period_weekday():
+    p = Period(start_date=date(2026, 11, 1), length=30)  # 11/1 일요일
+    assert p.weekday(1) == 6
+    assert p.weekday(2) == 0
+    assert p.weekday(7) == 5
+
+
+def test_period_accepts_iso_string():
+    p = Period.model_validate({"start_date": "2026-11-01", "length": 30})
+    assert p.start_date == date(2026, 11, 1)
+
+
+@pytest.mark.parametrize("length", [0, constants.MAX_PERIOD_DAYS + 1])
+def test_period_rejects_bad_length(length):
     with pytest.raises(ValidationError):
-        Period(2026, 13)
+        Period(start_date=date(2026, 11, 1), length=length)
+
+
+def test_period_rejects_old_shape():
+    with pytest.raises(ValidationError):
+        Period.model_validate({"year": 2026, "month": 11})
 
 
 # --- ScheduleRequest 참조 무결성 ---
@@ -249,7 +274,7 @@ def test_sample_ward_is_valid():
     raw = json.loads(SAMPLE_PATH.read_text(encoding="utf-8"))
     req = ScheduleRequest.model_validate(raw)
     assert req.input_version == 0
-    assert (req.period.year, req.period.month) == (2026, 11)
+    assert req.period == Period(start_date=date(2026, 11, 1), length=30)
     assert req.holidays == []
     assert len(req.nurses) == 15
     assert sum(n.night_only for n in req.nurses) == 2
@@ -310,7 +335,7 @@ def test_translate_models():
         {
             "text": "나이트 다음 날은 무조건 쉬게",
             "scope": "ward",
-            "context": {"nurses": nurses(), "period": {"year": 2026, "month": 11}, "holidays": [], "today": "2026-10-26"},
+            "context": {"nurses": nurses(), "period": {"start_date": "2026-11-01", "length": 30}, "holidays": [], "today": "2026-10-26"},
             "input_version": 5,
         }
     )

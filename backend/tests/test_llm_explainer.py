@@ -2,6 +2,7 @@
 
 import copy
 import json
+from datetime import date
 
 import pytest
 
@@ -26,14 +27,14 @@ COVERAGE = {
 }
 LEAVE = {
     "id": "lv1",
-    "scope": "month",
+    "scope": "period",
     "type": "leave",
     "params": {"nurse_id": "n01", "days": [14, 15]},
     "source_text": "이영희 14~15일 휴가",
 }
 FIXED = {
     "id": "fx1",
-    "scope": "month",
+    "scope": "period",
     "type": "fixed_assignment",
     "params": {"nurse_id": "n02", "day": 14, "shift": "N"},
     "source_text": "박민수 14일 N 고정",
@@ -48,7 +49,7 @@ UNRELATED = {
 
 REQUEST = ScheduleRequest(
     nurses=NURSES,
-    period=Period(2026, 11),
+    period=Period(start_date=date(2026, 11, 1), length=30),
     holidays=[5],
     constraints=[COVERAGE, LEAVE, FIXED, UNRELATED],
     input_version=3,
@@ -138,9 +139,10 @@ def test_request_is_pseudonymized_and_uses_tool():
     assert "seq" not in body
     assert '"hardness": "hard"' in body
     assert '"nurse_count": 3' in body
-    assert "2026-11" in body
-    weekend = json.loads(body.split("<context>\n")[1].split("\n</context>")[0])["weekend_and_holiday_days"]
-    assert weekend[:4] == [1, 5, 7, 8]
+    context = json.loads(body.split("<context>\n")[1].split("\n</context>")[0])
+    assert (context["period_start"], context["period_end"], context["period_length"]) == ("2026-11-01", "2026-11-30", 30)
+    assert "target_month" not in context
+    assert context["weekend_and_holiday_days"][:4] == [1, 5, 7, 8]
 
 
 def test_tool_schema_from_pydantic():

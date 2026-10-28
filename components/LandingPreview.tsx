@@ -1,6 +1,7 @@
 "use client";
 
 // 랜딩 첫 화면의 실제 제품 화면 조각. 앱의 카드·그리드 컴포넌트를 샘플 데이터로 정적 렌더한다(조작 불가).
+import { isWeekendDay } from "@/lib/period";
 import type { Code } from "@/lib/store";
 import type { ConstraintSpec, Nurse, ScheduleResult } from "@/lib/types.gen";
 
@@ -53,9 +54,8 @@ const RESULT: ScheduleResult = {
   diff: null,
   optimal: true,
 };
-const DAYS = 7;
-const dow = (d: number) => new Date(2026, 10, d).getDay();
-const isWeekend = (d: number) => dow(d) === 0 || dow(d) === 6;
+const PERIOD = { start_date: "2026-11-01", length: 7 };
+const isWeekend = (d: number) => isWeekendDay(PERIOD, d, []);
 const FIXED = new Map<string, Code>([["n04-2", "D"]]);
 
 export default function LandingPreview() {
@@ -70,9 +70,7 @@ export default function LandingPreview() {
         <ScheduleGrid
           rows={NURSES}
           result={RESULT}
-          month={11}
-          days={DAYS}
-          dow={dow}
+          period={PERIOD}
           holidays={[]}
           isWeekend={isWeekend}
           fixed={FIXED}

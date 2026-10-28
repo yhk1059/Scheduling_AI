@@ -9,6 +9,7 @@ import {
   firstPeriodStart,
   formatRange,
   isWeekendDay,
+  monthDay,
   nextPeriod,
   periodDays,
   periodEnd,
@@ -120,6 +121,15 @@ describe("dayHeader", () => {
     expect(dayHeader(p, 9)).toBe("12/1");
     expect(dayHeader(p, 2)).toBe("24");
     expect(dayHeader(p, 10)).toBe("2");
+  });
+});
+
+describe("monthDay", () => {
+  it("인덱스를 실제 날짜 M/D로 쓴다", () => {
+    const p = { start_date: "2026-11-23", length: 14 };
+    expect(monthDay(p, 1)).toBe("11/23");
+    expect(monthDay(p, 2)).toBe("11/24");
+    expect(monthDay(p, 9)).toBe("12/1");
   });
 });
 

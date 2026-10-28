@@ -51,7 +51,7 @@ def sample() -> dict:
 def fixed(cid: str, nid: str, day: int, shift: str) -> dict:
     return {
         "id": cid,
-        "scope": "month",
+        "scope": "period",
         "type": "fixed_assignment",
         "params": {"nurse_id": nid, "day": day, "shift": shift},
         "source_text": f"{cid} 원문",
@@ -69,7 +69,7 @@ def translate_body(text: str = "이영희 15~17일 휴가") -> dict:
     data = sample()
     return {
         "text": text,
-        "scope": "month",
+        "scope": "period",
         "context": {"nurses": data["nurses"], "period": data["period"], "holidays": [5], "today": "2026-10-26"},
         "input_version": 9,
     }

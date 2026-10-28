@@ -18,7 +18,7 @@ const COPY = {
     placeholder: "예: 나이트 다음 날은 무조건 쉬게",
     empty: "아직 규칙이 없어요.",
   },
-  month: {
+  period: {
     title: "이달 요청",
     description: "이번 달 휴가, 고정 근무, 희망·기피 근무를 말로 적어 주세요.",
     placeholder: "예: 이영희 15~17일 휴가",
@@ -33,7 +33,7 @@ export function today(): string {
 
 type Notice = { kind: "clarify" | "unsupported"; text: string } | null;
 
-export default function RulesStep({ scope }: { scope: "ward" | "month" }) {
+export default function RulesStep({ scope }: { scope: "ward" | "period" }) {
   const copy = COPY[scope];
   const nurses = useAppStore((s) => s.nurses);
   const period = useAppStore((s) => s.period);
@@ -143,14 +143,14 @@ export default function RulesStep({ scope }: { scope: "ward" | "month" }) {
         </div>
       )}
 
-      {scope === "month" && <CarryOverSection />}
+      {scope === "period" && <CarryOverSection />}
 
       <div className="flex items-center justify-between gap-4">
         <button type="button" onClick={() => setStep(scope === "ward" ? 1 : 2)} className={ui.secondary}>
           이전
         </button>
         <div className="flex items-center gap-3">
-          {scope === "month" && blocked && orphanCount > 0 && (
+          {scope === "period" && blocked && orphanCount > 0 && (
             <p role="alert" className={ui.error}>
               명단에 없는 간호사를 가리키는 규칙·요청 {orphanCount}개를 삭제하거나 고친 뒤 넘어갈 수 있어요.
             </p>

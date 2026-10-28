@@ -30,7 +30,7 @@ export default function AppShell() {
             <span className="text-[15px] font-semibold text-[#1B1B18]">간호사 근무표</span>
             <span className="text-xs font-medium text-[#66665E]">
               <span className="font-mono">
-                {period.year}년 {period.month}월
+                {Number(period.start_date.slice(0, 4))}년 {Number(period.start_date.slice(5, 7))}월
               </span>
               {nurseCount > 0 && <> · 로테이션 {nurseCount}명</>}
             </span>
@@ -64,7 +64,7 @@ export default function AppShell() {
         ) : step === 2 ? (
           <RulesStep key="ward" scope="ward" />
         ) : step === 3 ? (
-          <RulesStep key="month" scope="month" />
+          <RulesStep key="period" scope="period" />
         ) : (
           <ScheduleStep />
         )}
