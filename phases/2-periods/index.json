@@ -37,7 +37,10 @@
     {
       "step": 4,
       "name": "ui-ward",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-10-28T19:24:41+0900",
+      "summary": "앱 셸(상단 바 병동 이름·기간 단위 + 게스트 저장 문구, [홈][병동 설정] 탭 aria-current, 주의 배너 ui.banner 통일), StartScreen(샘플→홈, 새로 시작→설정, 입력 있으면 공용 Dialog 확인), Dialog(Esc·첫 버튼 포커스·포커스 복귀), WardHome(미준비 안내/첫·다음 기간 만들기, 최근 기간 표, 병동 요약), WardSettings([명단·필요 인원]: 이름·기간 단위+변경 배너, id 보존 명단 표(비활성 접기, 비활성으로/다시 활성으로, 미사용만 삭제), 붙여넣기·CSV→replaceRoster, 필요 인원 / [병동 규칙]: RulesStep ward, 기간 없이 previewRange로 해석·표시); isNurseUsed export(+테스트); EntryStep·WardStep 삭제, 기간 화면은 임시로 공휴일+요청/근무표 연결",
+      "completed_at": "2026-10-28T19:30:43+0900"
     },
     {
       "step": 5,
