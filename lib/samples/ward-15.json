@@ -186,6 +186,127 @@
         "min": 2,
         "max": 2
       }
+    },
+    {
+      "id": "rule-noff",
+      "type": "off_after_night_block",
+      "scope": "ward",
+      "hardness": "hard",
+      "weight": 10,
+      "source_text": "나이트 끝나면 다음 날은 무조건 쉬게",
+      "enabled": true,
+      "params": {
+        "days": 1
+      }
+    },
+    {
+      "id": "rule-max-work",
+      "type": "max_consecutive_work",
+      "scope": "ward",
+      "hardness": "hard",
+      "weight": 10,
+      "source_text": "6일 연속 근무는 안 돼요",
+      "enabled": true,
+      "params": {
+        "days": 5
+      }
+    },
+    {
+      "id": "rule-max-nights",
+      "type": "max_consecutive_nights",
+      "scope": "ward",
+      "hardness": "hard",
+      "weight": 10,
+      "source_text": "나이트는 3번 연속까지만",
+      "enabled": true,
+      "params": {
+        "days": 3
+      }
+    },
+    {
+      "id": "rule-min-off",
+      "type": "min_days_off",
+      "scope": "ward",
+      "hardness": "hard",
+      "weight": 10,
+      "source_text": "한 달에 최소 8일은 쉬게",
+      "enabled": true,
+      "params": {
+        "days": 8
+      }
+    },
+    {
+      "id": "rule-night-fair",
+      "type": "night_fairness",
+      "scope": "ward",
+      "hardness": "soft",
+      "weight": 5,
+      "source_text": "나이트는 골고루",
+      "enabled": true,
+      "params": {}
+    },
+    {
+      "id": "rule-weekend-fair",
+      "type": "weekend_fairness",
+      "scope": "ward",
+      "hardness": "soft",
+      "weight": 5,
+      "source_text": "주말 근무도 골고루",
+      "enabled": true,
+      "params": {}
+    }
+  ],
+  "next_requests": [
+    {
+      "id": "req-leave-n01",
+      "type": "leave",
+      "scope": "period",
+      "hardness": "hard",
+      "weight": 10,
+      "source_text": "이영희 10~12일 휴가",
+      "enabled": true,
+      "params": {
+        "nurse_id": "n01",
+        "days": [
+          10,
+          11,
+          12
+        ]
+      }
+    },
+    {
+      "id": "req-avoid-n02",
+      "type": "shift_preference",
+      "scope": "period",
+      "hardness": "soft",
+      "weight": 10,
+      "source_text": "박민수는 주말엔 나이트 빼 주세요",
+      "enabled": true,
+      "params": {
+        "nurse_id": "n02",
+        "shift": "N",
+        "prefer": false,
+        "days": null,
+        "weekends_only": true
+      }
+    },
+    {
+      "id": "req-prefer-n04",
+      "type": "shift_preference",
+      "scope": "period",
+      "hardness": "soft",
+      "weight": 10,
+      "source_text": "정유진 20일은 데이로 해 주세요",
+      "enabled": true,
+      "params": {
+        "nurse_id": "n04",
+        "shift": "D",
+        "prefer": true,
+        "days": [
+          20
+        ],
+        "weekends_only": false
+      }
     }
   ],
   "carry_over": [],

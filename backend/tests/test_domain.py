@@ -272,7 +272,9 @@ def test_negative_years_rejected():
 
 def test_sample_ward_is_valid():
     raw = json.loads(SAMPLE_PATH.read_text(encoding="utf-8"))
+    next_requests = raw.pop("next_requests")
     req = ScheduleRequest.model_validate(raw)
+    assert next_requests
     assert req.input_version == 0
     assert req.period == Period(start_date=date(2026, 11, 1), length=30)
     assert req.holidays == []

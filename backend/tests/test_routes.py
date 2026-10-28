@@ -11,7 +11,7 @@ from backend.domain.constants import MAX_CONSTRAINTS, MAX_NURSES, MAX_PROPOSALS,
 from backend.llm.client import LLMConfigError, LLMUnavailableError, ToolCallResult
 from backend.routes import app, get_llm_client
 from backend.solver.model import solve as real_solve
-from backend.tests.test_solver_hard import SAMPLE_PATH
+from backend.tests.test_solver_hard import sample_data
 
 client = TestClient(app)
 
@@ -43,7 +43,7 @@ def llm():
 
 
 def sample() -> dict:
-    data = json.loads(SAMPLE_PATH.read_text(encoding="utf-8"))
+    data = sample_data()
     data["input_version"] = 5
     return data
 

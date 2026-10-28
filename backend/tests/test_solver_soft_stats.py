@@ -1,17 +1,13 @@
 """soft 제약, 목적함수, compute_result(요약·통계)."""
 
-import json
 import time
-from pathlib import Path
 
 from ortools.sat.python import cp_model
 
 from backend.domain.models import ScheduleRequest, SolveOk
 from backend.solver.model import build_model, solve
 from backend.solver.stats import compute_result
-from backend.tests.test_solver_hard import WEEKENDS, con, coverage, nurse, request, solve_ok
-
-SAMPLE_PATH = Path(__file__).resolve().parents[2] / "lib" / "samples" / "ward-15.json"
+from backend.tests.test_solver_hard import WEEKENDS, con, coverage, nurse, request, sample_data, solve_ok
 
 
 def pref(cid: str, nid: str, shift: str, prefer: bool, days: list[int] | None = None,
@@ -219,7 +215,7 @@ def test_compute_result_disabled_soft_not_listed():
 
 def history_sample(constraints: list[dict], history: list[dict] | None = None) -> ScheduleRequest:
     """15명 샘플 병동. N 연속 3일 + N-OFF 2일(hard)이라 나이트 전담 2명만으로는 N을 다 채우지 못한다."""
-    data = json.loads(SAMPLE_PATH.read_text())
+    data = sample_data()
     data["constraints"] += [
         con("mcn", "max_consecutive_nights", {"days": 3}),
         con("noff", "off_after_night_block", {"days": 2}),
@@ -297,7 +293,7 @@ def test_compute_result_fairness_detail_without_history_unchanged():
 
 
 def test_sample_ward_31_days_solves_within_10s():
-    data = json.loads(SAMPLE_PATH.read_text())
+    data = sample_data()
     data["period"] = {"start_date": "2026-12-01", "length": 31}
     data["constraints"] += [
         con("fs-nd", "forbidden_sequence", {"first": "N", "second": "D"}),
@@ -325,7 +321,7 @@ def test_sample_ward_31_days_solves_within_10s():
 
 
 def test_sample_ward_31_days_with_history_solves_within_10s():
-    data = json.loads(SAMPLE_PATH.read_text())
+    data = sample_data()
     data["period"] = {"start_date": "2026-12-01", "length": 31}
     data["constraints"] += [
         con("mcn", "max_consecutive_nights", {"days": 3}),
