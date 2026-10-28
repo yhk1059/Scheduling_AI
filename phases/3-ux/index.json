@@ -61,7 +61,10 @@
     {
       "step": 7,
       "name": "landing",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-10-29T01:30:18+0900",
+      "summary": "랜딩을 수간호사 문구로 재구성: 첫 화면 '말로 설명한 규칙으로 근무표를 짭니다'(주기 무관)+LLM·CP-SAT 없는 보조 문장+'…시작할 수 있어요', 문제 카드 6개(반복 사용: 지난 근무 이어받기·최근 4주 나이트 배려 포함, 재풀이·번역 용어 제거), 동작 방식 4단계(말로 규칙 적기→근무표 만들기→막히면 이유와 해결책→다음 근무표로 이어짐, 반드시/가능하면), 데모 자리표시 유지, 맨 아래 '04 · 만든 방식' 카드 하나(LLM은 말→규칙 카드·설명, CP-SAT는 계산 문단+eval 한 줄 44개·제약 F1 100.0% 3회차+[GitHub에서 자세히 보기]), 옛 설계 요약·eval 표 섹션 제거(README에 검증 장치·eval 표·회차 기록이 이미 있어 README 변경 없음); LandingPreview는 ConstraintCard가 빈 store에서 null이라 규칙 카드가 안 보이던 문제를 PreviewCard(TEMPLATE_NAMES·hardnessLabel·describeParams 재사용, 반드시/가능하면, 적용됨 배지)로 정적 렌더해 해결, 최근 4주 열은 기록이 없어 자동 숨김; pytest 411·vitest 182·build·lint·AC grep 통과, Playwright 수동 확인(API 호출 0·콘솔 오류 0, /app·/privacy·GitHub 링크)",
+      "completed_at": "2026-10-29T01:33:06+0900"
     },
     {
       "step": 8,
