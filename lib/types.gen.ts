@@ -53,6 +53,7 @@ export interface ScheduleRequest {
   previous?: {
     [k: string]: ("D" | "E" | "N" | "O")[];
   } | null;
+  history_load?: HistoryLoad[];
   input_version: number;
 }
 export interface Nurse {
@@ -232,6 +233,14 @@ export interface CarryOverRow {
    * @maxItems 7
    */
   shifts: ("D" | "E" | "N" | "O")[];
+}
+/**
+ * 최근 4주 누적 부담. 클라이언트가 지난 확정본에서 계산해 보낸다(ADR-015).
+ */
+export interface HistoryLoad {
+  nurse_id: string;
+  nights: number;
+  weekends: number;
 }
 export interface SolveOk {
   status: "ok";

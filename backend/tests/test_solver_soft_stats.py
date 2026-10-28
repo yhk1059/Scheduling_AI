@@ -4,6 +4,8 @@ import json
 import time
 from pathlib import Path
 
+from ortools.sat.python import cp_model
+
 from backend.domain.models import ScheduleRequest, SolveOk
 from backend.solver.model import build_model, solve
 from backend.solver.stats import compute_result
@@ -212,6 +214,85 @@ def test_compute_result_disabled_soft_not_listed():
     assert r.soft_violations == []
 
 
+# --- 누적 부담(history_load) ---
+
+
+def history_sample(constraints: list[dict], history: list[dict] | None = None) -> ScheduleRequest:
+    """15명 샘플 병동. N 연속 3일 + N-OFF 2일(hard)이라 나이트 전담 2명만으로는 N을 다 채우지 못한다."""
+    data = json.loads(SAMPLE_PATH.read_text())
+    data["constraints"] += [
+        con("mcn", "max_consecutive_nights", {"days": 3}),
+        con("noff", "off_after_night_block", {"days": 2}),
+        *constraints,
+    ]
+    data["history_load"] = history or []
+    return ScheduleRequest.model_validate(data)
+
+
+def objective(req: ScheduleRequest) -> float:
+    ctx = build_model(req)
+    ctx.model.add_bool_and(list(ctx.hard_literals.values()))
+    ctx.model.minimize(sum(ctx.objective_terms))
+    solver = cp_model.CpSolver()
+    solver.parameters.max_time_in_seconds = 10
+    assert solver.solve(ctx.model) == cp_model.OPTIMAL
+    return solver.objective_value
+
+
+def weekend_work(req: ScheduleRequest, row: list[str]) -> int:
+    return sum(row[d - 1] != "O" for d in range(1, req.period.days + 1) if d in WEEKENDS)
+
+
+def test_night_history_reduces_nights_this_period():
+    nf = [con("nf", "night_fairness", {})]
+    before = solve_ok(history_sample(nf))["n03"].count("N")
+    after = solve_ok(history_sample(nf, [{"nurse_id": "n03", "nights": 8, "weekends": 0}]))["n03"].count("N")
+    assert before >= 1
+    assert after < before
+
+
+def test_night_only_history_is_excluded_from_night_fairness():
+    nf = [con("nf", "night_fairness", {})]
+    base = objective(history_sample(nf))
+    loaded = history_sample(nf, [{"nurse_id": "n14", "nights": 20, "weekends": 0}])
+    assert objective(loaded) == base
+    r = solve(loaded)
+    assert isinstance(r, SolveOk)
+    assert not any(v.constraint_id == "nf" and "20" in v.detail for v in r.result.soft_violations)
+
+
+def test_weekend_history_reduces_weekend_work_this_period():
+    wf = [con("wf", "weekend_fairness", {})]
+    req = history_sample(wf)
+    before = weekend_work(req, solve_ok(req)["n03"])
+    loaded = history_sample(wf, [{"nurse_id": "n03", "nights": 0, "weekends": 8}])
+    after = weekend_work(loaded, solve_ok(loaded)["n03"])
+    assert before >= 1
+    assert after < before
+
+
+def test_empty_or_zero_history_keeps_objective():
+    fair = [con("nf", "night_fairness", {}), con("wf", "weekend_fairness", {})]
+    base = objective(history_sample(fair))
+    zeros = [{"nurse_id": f"n{i:02d}", "nights": 0, "weekends": 0} for i in range(1, 16)]
+    assert objective(history_sample(fair, zeros)) == base
+
+
+def test_compute_result_fairness_includes_history():
+    cons = [con("nf", "night_fairness", {}), con("wf", "weekend_fairness", {})]
+    history = [{"nurse_id": "b", "nights": 3, "weekends": 3}]
+    r = compute_result(stats_request(cons, history_load=history), {"a": A, "b": B, "c": C}, optimal=True)
+    # 나이트: a 3, b 0+3 → 편차 0. 주말: a 3, b 0+3, c 6 → 편차 3
+    assert [x.constraint_id for x in r.soft_violations] == ["wf"]
+    assert "최근 4주 포함" in r.soft_violations[0].detail
+    assert "편차 3" in r.soft_violations[0].detail
+
+
+def test_compute_result_fairness_detail_without_history_unchanged():
+    r = compute_result(stats_request([con("nf", "night_fairness", {})]), {"a": A, "b": B, "c": C}, optimal=True)
+    assert r.soft_violations[0].detail == "나이트 개수 편차 3"
+
+
 # --- 성능 ---
 
 
@@ -241,3 +322,25 @@ def test_sample_ward_31_days_solves_within_10s():
     assert isinstance(res, SolveOk), res
     assert elapsed < 10, elapsed
     assert len(res.result.assignments["n01"]) == 31
+
+
+def test_sample_ward_31_days_with_history_solves_within_10s():
+    data = json.loads(SAMPLE_PATH.read_text())
+    data["period"] = {"start_date": "2026-12-01", "length": 31}
+    data["constraints"] += [
+        con("mcn", "max_consecutive_nights", {"days": 3}),
+        con("noff", "off_after_night_block", {"days": 2}),
+        con("mdo", "min_days_off", {"days": 8}),
+        *[con(f"sm-{s}", "skill_mix", {"shift": s, "min_years": 3, "min_count": 1}) for s in "DEN"],
+        con("nf", "night_fairness", {}),
+        con("wf", "weekend_fairness", {}),
+    ]
+    data["history_load"] = [{"nurse_id": f"n{i:02d}", "nights": i % 9, "weekends": (i * 3) % 8}
+                            for i in range(1, 16)]
+    req = ScheduleRequest.model_validate(data)
+
+    start = time.monotonic()
+    res = solve(req)
+    elapsed = time.monotonic() - start
+    assert isinstance(res, SolveOk), res
+    assert elapsed < 10, elapsed

@@ -5,7 +5,13 @@ from typing import Annotated, Any, Literal, Union
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
-from backend.domain.constants import CARRY_OVER_DAYS, DEFAULT_SOFT_WEIGHTS, DEFAULT_WEIGHT, MAX_PERIOD_DAYS
+from backend.domain.constants import (
+    CARRY_OVER_DAYS,
+    DEFAULT_SOFT_WEIGHTS,
+    DEFAULT_WEIGHT,
+    HISTORY_DAYS,
+    MAX_PERIOD_DAYS,
+)
 
 ShiftCode = Literal["D", "E", "N", "O"]
 WorkShift = Literal["D", "E", "N"]
@@ -211,6 +217,14 @@ class CarryOverRow(_Strict):
     shifts: list[ShiftCode] = Field(max_length=CARRY_OVER_DAYS)
 
 
+class HistoryLoad(_Strict):
+    """최근 4주 누적 부담. 클라이언트가 지난 확정본에서 계산해 보낸다(ADR-015)."""
+
+    nurse_id: str
+    nights: int = Field(ge=0, le=HISTORY_DAYS)  # 최근 28일 N 수
+    weekends: int = Field(ge=0, le=HISTORY_DAYS)  # 최근 28일 주말·공휴일 근무(D/E/N) 수
+
+
 Assignments = dict[str, list[ShiftCode]]
 
 
@@ -241,6 +255,7 @@ class ScheduleRequest(_Strict):
     constraints: list[ConstraintSpec] = []
     carry_over: list[CarryOverRow] = []
     previous: Assignments | None = None
+    history_load: list[HistoryLoad] = []
     input_version: int
 
     @model_validator(mode="after")
@@ -269,6 +284,14 @@ class ScheduleRequest(_Strict):
         for row in self.carry_over:
             if row.nurse_id not in ids:
                 errors.append(f"carry_over: 명단에 없는 nurse_id {row.nurse_id}")
+
+        loaded: set[str] = set()
+        for h in self.history_load:
+            if h.nurse_id not in ids:
+                errors.append(f"history_load: 명단에 없는 nurse_id {h.nurse_id}")
+            elif h.nurse_id in loaded:
+                errors.append(f"history_load: nurse_id {h.nurse_id} 중복")
+            loaded.add(h.nurse_id)
 
         for nurse_id, shifts in (self.previous or {}).items():
             if nurse_id not in ids:
