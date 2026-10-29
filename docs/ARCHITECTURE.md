@@ -11,7 +11,7 @@ lib/
 ├── store.ts          # Zustand + persist(localStorage) — 게스트 저장. 로그인하면 병동 문서와 동기화
 ├── supabase.ts       # (예정) Google 로그인, 병동 문서 load/save/delete — 얇은 래퍼
 ├── api.ts            # /api/py/* fetch 래퍼
-├── roster-import.ts  # 명단/이월 붙여넣기 파싱 (순수 함수)
+├── roster-import.ts  # 지난 근무(이월) 붙여넣기 파싱 (순수 함수)
 ├── csv.ts            # CSV 직렬화 (순수 함수)
 ├── types.gen.ts      # Pydantic JSON Schema에서 생성 (직접 수정 금지)
 └── samples/         # ward-15.json(샘플 병동), demo-schedule.json(데모 근무표, npm run gen:demo)

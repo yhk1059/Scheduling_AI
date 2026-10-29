@@ -268,37 +268,6 @@ describe("간호사 id", () => {
     expect(w.nextNurseNo).toBe(3);
   });
 
-  it("replaceRoster는 같은 이름의 id를 유지하고(순서가 바뀌어도), 새 이름에만 새 id, 빠진 사람은 비활성", () => {
-    const store = fresh();
-    store.getState().startWard();
-    store.getState().addNurses(rows);
-    store.getState().replaceRoster([
-      { name: "김철수", years: 7, night_only: false },
-      { name: "이영희", years: 13, night_only: false },
-    ]);
-    const w = store.getState().ward!;
-    expect(w.nurses).toEqual([
-      { id: "n03", name: "김철수", years: 7, night_only: false, active: true },
-      { id: "n01", name: "이영희", years: 13, night_only: false, active: true },
-      { id: "n02", name: "박민수", years: 9, night_only: false, active: false },
-    ]);
-    expect(w.nextNurseNo).toBe(4);
-  });
-
-  it("replaceRoster에 다시 들어온 비활성 간호사는 원래 id로 다시 활성이 된다", () => {
-    const store = fresh();
-    store.getState().startWard();
-    store.getState().addNurses(rows);
-    store.getState().replaceRoster([rows[0]]);
-    store.getState().replaceRoster(rows);
-    const w = store.getState().ward!;
-    expect(w.nurses.map((n) => [n.id, n.active])).toEqual([
-      ["n01", true],
-      ["n02", true],
-    ]);
-    expect(w.nextNurseNo).toBe(3);
-  });
-
   it("nextNurseNo는 삭제 후에도 줄어들지 않고 지운 번호를 다시 쓰지 않는다", () => {
     const store = fresh();
     store.getState().startWard();

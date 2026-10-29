@@ -157,8 +157,6 @@ export interface AppState extends Data {
   addNurses: (rows: NurseRow[]) => void;
   updateNurse: (id: string, patch: Partial<NurseRow>) => void;
   setNurseActive: (id: string, active: boolean) => void;
-  /** 같은 이름은 id를 유지하고, 새 이름에만 새 id, 빠진 사람은 비활성. */
-  replaceRoster: (rows: NurseRow[]) => void;
   /** 어떤 기간에서도 쓰이지 않은 간호사만 지운다. 아니면 비활성으로 바꾼다. */
   removeNurse: (id: string) => void;
   // 기간
@@ -755,22 +753,6 @@ export function createAppStore(getStorage: () => Storage, now: () => Date = () =
             editWard((w) => ({ ...w, nurses: w.nurses.map((n) => (n.id === id ? { ...n, ...patch } : n)) })),
           setNurseActive: (id, active) =>
             editWard((w) => ({ ...w, nurses: w.nurses.map((n) => (n.id === id ? { ...n, active } : n)) })),
-          replaceRoster: (rows) =>
-            editWard((w) => {
-              const byName = new Map(w.nurses.map((n) => [n.name, n]));
-              let no = w.nextNurseNo;
-              // 붙여넣은 순서를 따르고, 빠진 사람은 뒤에 비활성으로 남긴다
-              const listed = rows.map(({ name, years, night_only }) => ({
-                id: byName.get(name)?.id ?? nurseId(no++),
-                name,
-                years,
-                night_only,
-                active: true,
-              }));
-              const listedIds = new Set(listed.map((n) => n.id));
-              const missing = w.nurses.filter((n) => !listedIds.has(n.id)).map((n) => ({ ...n, active: false }));
-              return { ...w, nurses: [...listed, ...missing], nextNurseNo: no };
-            }),
           removeNurse: (id) => {
             const { ward, periods } = get();
             if (!ward) return;

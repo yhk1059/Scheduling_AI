@@ -60,7 +60,7 @@ export default function StartScreen({ onDone }: { onDone: () => void }) {
     },
     {
       title: "내 병동으로 시작하기",
-      body: "빈 병동에서 명단과 필요 인원부터 입력해요. 엑셀 명단을 붙여넣거나 CSV 파일로 올릴 수 있어요.",
+      body: "빈 병동에서 명단과 필요 인원부터 입력해요.",
       action: "내 병동으로 시작하기",
       onClick: start,
     },
