@@ -11,8 +11,13 @@ from backend.domain.constants import (
     MAX_CONSTRAINTS,
     MAX_FIXED_ASSIGNMENTS,
     MAX_NURSES,
+    MAX_PATTERN_LEN,
+    MAX_PATTERNS,
     MAX_PROPOSALS,
+    MAX_SHIFT_CODES,
+    MAX_TAGS_PER_NURSE,
     MAX_TEXT_CHARS,
+    MAX_WINDOW_DAYS,
     PROPOSAL_VERIFY_TIME_LIMIT_S,
 )
 from backend.llm.client import LLMConfigError, LLMUnavailableError, ToolCallResult
@@ -318,6 +323,73 @@ def test_413_explain_nested_request():
     body = explain_body()
     body["request"]["constraints"] = [{} for _ in range(MAX_CONSTRAINTS + 1)]
     assert_error(client.post("/api/py/explain", json=body), 413, "PAYLOAD_TOO_LARGE")
+
+
+def shift_codes(n: int) -> dict:
+    """D/E/N/O + 추가 코드로 근무 코드 n개인 config."""
+    base = [{"code": c, "name": c, "hours": h} for c, h in (("D", 8), ("E", 8), ("N", 8), ("O", 0))]
+    return {"shifts": base + [{"code": f"X{i}", "name": f"X{i}", "hours": 8} for i in range(n - 4)]}
+
+
+def test_413_too_many_shift_codes():
+    data = sample()
+    data["config"] = shift_codes(MAX_SHIFT_CODES + 1)
+    assert_error(client.post("/api/py/solve", json=data), 413, "PAYLOAD_TOO_LARGE")
+
+
+def test_solve_accepts_shift_codes_at_limit():
+    data = sample()
+    data["config"] = shift_codes(MAX_SHIFT_CODES)
+    r = client.post("/api/py/solve", json=data)
+    assert r.status_code == 200, r.text
+
+
+def test_413_too_many_shift_codes_in_translate_context(llm):
+    body = translate_body()
+    body["context"]["config"] = shift_codes(MAX_SHIFT_CODES + 1)
+    assert_error(client.post("/api/py/translate", json=body), 413, "PAYLOAD_TOO_LARGE")
+    assert llm.calls == []
+
+
+def test_413_too_many_tags_per_nurse():
+    data = sample()
+    data["nurses"][0]["tags"] = [f"t{i}" for i in range(MAX_TAGS_PER_NURSE + 1)]
+    assert_error(client.post("/api/py/solve", json=data), 413, "PAYLOAD_TOO_LARGE")
+
+
+def test_solve_accepts_tags_at_limit():
+    data = sample()
+    data["nurses"][0]["tags"] = [f"t{i}" for i in range(MAX_TAGS_PER_NURSE)]
+    assert client.post("/api/py/solve", json=data).status_code == 200
+
+
+def block(type_: str, params: dict) -> dict:
+    return {"id": "b1", "type": type_, "scope": "ward", "hardness": "hard", "source_text": "원문", "params": params}
+
+
+N_SEL, D_SEL = {"in": ["N"]}, {"in": ["D"]}
+
+
+@pytest.mark.parametrize(
+    "spec, accepted",
+    [
+        (block("sequence", {"forbid": [[N_SEL] + [D_SEL] * (MAX_PATTERN_LEN - 1)]}), True),
+        (block("sequence", {"forbid": [[N_SEL] + [D_SEL] * MAX_PATTERN_LEN]}), False),
+        (block("sequence", {"forbid": [[N_SEL, D_SEL]] * MAX_PATTERNS}), True),
+        (block("sequence", {"forbid": [[N_SEL, D_SEL]] * (MAX_PATTERNS + 1)}), False),
+        (block("count", {"shifts": {"in": ["O"]}, "per": "person_window", "window": MAX_WINDOW_DAYS, "min": 1}), True),
+        (block("count", {"shifts": {"in": ["O"]}, "per": "person_window", "window": MAX_WINDOW_DAYS + 1, "min": 1}), False),
+    ],
+    ids=["pattern-len-at-limit", "pattern-len-over", "patterns-at-limit", "patterns-over", "window-at-limit", "window-over"],
+)
+def test_block_format_limits_are_422(spec, accepted):
+    data = sample()
+    data["constraints"] = data["constraints"] + [spec]
+    r = client.post("/api/py/solve", json=data)
+    if accepted:
+        assert r.status_code == 200, r.text
+    else:
+        assert_error(r, 422, "VALIDATION_ERROR")
 
 
 def test_422_pydantic_error_has_field_path():

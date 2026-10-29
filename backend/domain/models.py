@@ -7,17 +7,19 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 
 from backend.domain.constants import (
     CARRY_OVER_DAYS,
-    COUNT_WINDOW_DAYS,
     DEFAULT_SHIFTS,
     DEFAULT_SOFT_WEIGHTS,
     DEFAULT_WEIGHT,
-    FORBID_PATTERN_LEN,
     HISTORY_DAYS,
-    MAX_FORBID_PATTERNS,
+    MAX_PATTERN_LEN,
+    MAX_PATTERNS,
     MAX_PERIOD_DAYS,
     MAX_SHIFT_CODES,
     MAX_TAG_CHARS,
     MAX_TAGS_PER_NURSE,
+    MAX_WINDOW_DAYS,
+    MIN_PATTERN_LEN,
+    MIN_WINDOW_DAYS,
     OFF_CODE,
     PRIORITY_WEIGHTS,
 )
@@ -307,7 +309,7 @@ class CountParams(_Strict):
     days: Days = Days()
     shifts: Shifts
     per: Literal["day", "person", "person_week", "person_window"]
-    window: int | None = Field(default=None, ge=COUNT_WINDOW_DAYS[0], le=COUNT_WINDOW_DAYS[1])
+    window: int | None = Field(default=None, ge=MIN_WINDOW_DAYS, le=MAX_WINDOW_DAYS)
     measure: Literal["count", "hours"] = "count"
     min: float | None = Field(default=None, ge=0)
     max: float | None = Field(default=None, ge=0)
@@ -323,12 +325,12 @@ class CountParams(_Strict):
         return self
 
 
-ForbidPattern = Annotated[list[Shifts], Field(min_length=FORBID_PATTERN_LEN[0], max_length=FORBID_PATTERN_LEN[1])]
+ForbidPattern = Annotated[list[Shifts], Field(min_length=MIN_PATTERN_LEN, max_length=MAX_PATTERN_LEN)]
 
 
 class SequenceParams(_Strict):
     people: People = People()
-    forbid: list[ForbidPattern] | None = Field(default=None, min_length=1, max_length=MAX_FORBID_PATTERNS)
+    forbid: list[ForbidPattern] | None = Field(default=None, min_length=1, max_length=MAX_PATTERNS)
     run: Shifts | None = None
     min_len: int | None = Field(default=None, ge=1)
     max_len: int | None = Field(default=None, ge=1)

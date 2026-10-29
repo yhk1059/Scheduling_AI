@@ -92,7 +92,7 @@ POST /api/py/explain
 | HTTP | code | 조건 |
 |---|---|---|
 | 413 | `PAYLOAD_TOO_LARGE` | 간호사 40명, 제약 200개(고정 근무 제외), 고정 근무 40×31개, 텍스트 1000자, 근무 코드 8개, 사람당 태그 5개 초과 |
-| 422 | `VALIDATION_ERROR` | Pydantic 또는 참조 무결성 실패(필드 경로 포함) |
+| 422 | `VALIDATION_ERROR` | Pydantic 또는 참조 무결성 실패(필드 경로 포함). 블록 형식 상한(금지 패턴 4칸·4개, 세기 창 14일) 초과 포함 |
 | 502 | `LLM_INVALID_OUTPUT` | 재시도 후에도 스키마 위반 |
 | 503 | `LLM_UNAVAILABLE` | Anthropic 장애 또는 한도 초과 |
 | 500 | `CONFIG_ERROR` / `INTERNAL` | 키 누락이나 401, 예상하지 못한 예외(스택은 로그에만 남김) |
@@ -107,6 +107,7 @@ POST /api/py/explain
 
 - Vercel 함수의 `maxDuration`은 60초다.
 - 솔버에는 항상 `max_time_in_seconds`를 건다.
+- 입력 상한을 꽉 채운 최악 병동(40명 × 31일 × 코드 8개, 블록 60개)이 이 예산 안에 해를 내는지 `npm run bench`로 확인한다(`npm run test`에는 넣지 않는다). 넘으면 예산을 늘리지 않고 상한을 낮춘다.
 - 해는 찾았지만 시간이 초과되면 `optimal: false`로 반환한다.
 
 ## 상태 관리
