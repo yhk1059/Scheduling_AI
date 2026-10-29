@@ -5,7 +5,7 @@ from typing import Annotated, Any, Union, get_args
 from pydantic import BaseModel, ConfigDict, Field, create_model
 
 from backend.domain.constants import MAX_PROPOSALS
-from backend.domain.models import ConstraintChange, ConstraintSpec, Hardness
+from backend.domain.models import ConstraintChange, Hardness, LegacySpec
 
 _STRICT = ConfigDict(extra="forbid")
 
@@ -23,7 +23,7 @@ def _draft(spec_cls: type[BaseModel]) -> type[BaseModel]:
     )
 
 
-_SPEC_CLASSES = get_args(get_args(ConstraintSpec)[0])
+_SPEC_CLASSES = get_args(get_args(LegacySpec)[0])
 ConstraintDraft = Annotated[Union[tuple(_draft(cls) for cls in _SPEC_CLASSES)], Field(discriminator="type")]
 
 

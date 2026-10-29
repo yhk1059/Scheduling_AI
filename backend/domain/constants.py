@@ -8,6 +8,22 @@ CARRY_OVER_DAYS = 7
 MAX_PERIOD_DAYS = 31
 MAX_FIXED_ASSIGNMENTS = MAX_NURSES * MAX_PERIOD_DAYS  # 고정 근무는 칸마다 하나
 HISTORY_DAYS = 28  # 누적 부담 창(일). 최근 4주 나이트·주말 근무 수의 상한
+MAX_SHIFT_CODES = 8  # 병동 근무 코드 수(O 포함)
+MAX_TAGS_PER_NURSE = 5
+MAX_TAG_CHARS = 10
+MAX_FORBID_PATTERNS = 4  # 순서 블록의 금지 패턴 수
+FORBID_PATTERN_LEN = (2, 4)  # 금지 패턴 한 개의 칸 수 범위
+COUNT_WINDOW_DAYS = (2, 14)  # 세기 블록 per=person_window의 창 길이 범위
+
+# 병동 구조 기본값: (코드, 이름, 시간). O는 휴무이고 필수다.
+OFF_CODE = "O"
+DEFAULT_SHIFTS: list[tuple[str, str, float]] = [
+    ("D", "데이", 8),
+    ("E", "이브닝", 8),
+    ("N", "나이트", 8),
+    (OFF_CODE, "휴무", 0),
+]
+NIGHT_ONLY_TAG = "나이트전담"
 
 # LLM
 LLM_MAX_RETRIES = 2
@@ -28,5 +44,7 @@ DEFAULT_SOFT_WEIGHTS: dict[str, int] = {
     "night_fairness": 5,
     "weekend_fairness": 5,
 }
+# 블록의 중요도 → soft 위반 1단위당 페널티(ADR-018). 보통·낮음은 위 기본값과 같다.
+PRIORITY_WEIGHTS: dict[str, int] = {"high": 30, "normal": 10, "low": 5}
 FAIRNESS_TOLERANCE = 1  # 공정성 편차가 이 값 이하면 soft 위반으로 나열하지 않는다
 DIFF_WEIGHT = 20  # 재스케줄 시 변경 칸 1개당 페널티

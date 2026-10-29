@@ -14,6 +14,7 @@ from backend.domain.models import (
     TranslateOk,
     TranslateRequest,
     TranslateUnsupported,
+    _constraint_codes,
     _constraint_refs,
 )
 from backend.llm.client import LLMClient, LLMInvalidOutputError, ToolCallResult
@@ -78,14 +79,17 @@ def _to_specs(output: TranslatorOutput, req: TranslateRequest) -> list:
             {**data, "id": uuid.uuid4().hex[:8], "scope": req.scope, "enabled": True}
         )
         spec = spec.model_copy(update={"weight": _weight(spec)})
-        nurse_id, cdays = _constraint_refs(spec)
-        if nurse_id is not None and nurse_id not in ids:
+        nurse_ids, cdays = _constraint_refs(spec)
+        for nurse_id in (n for n in nurse_ids if n not in ids):
             errors.append(f"constraints.{i}.params.nurse_id: 명단에 없는 id {nurse_id}")
             questions.append(f"명단에 없는 간호사({nurse_id})가 포함되어 있습니다. 이름을 확인해 주세요.")
         out = [d for d in cdays if not 1 <= d <= days]
         if out:
             errors.append(f"constraints.{i}.params: 1..{days} 범위 밖 날짜 {out}")
             questions.append(f"{out}일은 이번 기간(1~{days}일) 밖입니다. 날짜를 확인해 주세요.")
+        unknown = sorted(set(_constraint_codes(spec)) - req.context.config.codes)
+        if unknown:
+            errors.append(f"constraints.{i}.params: 근무 형태에 없는 코드 {unknown}")
         specs.append(spec)
     if errors:
         raise _OutputError("; ".join(errors), clarify=" ".join(questions))
