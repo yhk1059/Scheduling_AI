@@ -594,6 +594,7 @@ describe("confirm", () => {
         changed: [],
         requests: [],
         result: result({ n01: ["D"], n02: ["O"] }),
+        carryOverUsed: [],
       },
     ]);
     expect(p.snapshot!.nurses.map((n) => n.id)).toEqual(["n01", "n02"]);
@@ -635,6 +636,29 @@ describe("변경 취소", () => {
     expect(hasUnconfirmedChanges(p)).toBe(false);
     expect(canRevertToConfirmed(p)).toBe(false);
     expect(p.versions).toHaveLength(1);
+  });
+
+  it("결과를 만든 이월도 확정본의 것으로 되돌린다(지난 근무 변경 판정)", () => {
+    const { store, id, period } = withConfirmed(fill(30, "D"), fill(30, "O"));
+    const nextId = store.getState().createPeriod(TODAY)!;
+    const next = () => store.getState().periods.find((p) => p.id === nextId)!;
+    const req = () => toScheduleRequest(store.getState().ward!, next(), store.getState().periods, TODAY);
+    store.getState().setResult(nextId, result({ n01: fill(31, "D"), n02: fill(31, "O") }), req().carry_over ?? []);
+    store.getState().confirm(nextId);
+
+    const late = fill(30, "D");
+    late[29] = "N";
+    store.getState().setResult(id, result({ n01: late, n02: fill(30, "O") }), []);
+    store.getState().confirm(id);
+    expect(carryOverChanged(next(), store.getState().periods)).toBe(true);
+
+    const changed = fill(31, "D");
+    changed[0] = "O";
+    store.getState().setResult(nextId, result({ n01: changed, n02: fill(31, "O") }), req().carry_over ?? []);
+    expect(carryOverChanged(next(), store.getState().periods)).toBe(false);
+    store.getState().revertToConfirmed(nextId);
+    expect(carryOverChanged(next(), store.getState().periods)).toBe(true);
+    expect(period().status).toBe("confirmed");
   });
 
   it("요청만 바뀌어도(다시 만들기 전) 되돌릴 수 있다", () => {
