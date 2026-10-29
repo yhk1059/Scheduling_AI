@@ -1,10 +1,9 @@
-/** 기간 작업 단계: ① 준비 → ② 요청 → ③ 근무표. */
-export type PeriodStep = 1 | 2 | 3;
+/** 근무표 작성 단계: ① 요청 → ② 근무표. */
+export type PeriodStep = 1 | 2;
 
 const STEPS: { step: PeriodStep; label: string }[] = [
-  { step: 1, label: "준비" },
-  { step: 2, label: "요청" },
-  { step: 3, label: "근무표" },
+  { step: 1, label: "요청" },
+  { step: 2, label: "근무표" },
 ];
 
 export default function Stepper({

@@ -33,6 +33,7 @@ const COVERAGE_WEIGHT = 10; // backend/domain/constants.py DEFAULT_WEIGHT
 // backend/llm/translator.py _weight와 같은 규칙: soft는 템플릿 기본값(없으면 DEFAULT_WEIGHT), hard는 1
 const SOFT_WEIGHTS: Record<string, number> = { shift_preference: 10, night_fairness: 5, weekend_fairness: 5 };
 const ALWAYS_HARD = ["leave", "fixed_assignment"];
+const COVERAGE_COUNT = 6; // D/E/N × 평일/주말·공휴일
 export const SAVE_DEBOUNCE_MS = 1000;
 
 export type Shift = "D" | "E" | "N";
@@ -68,6 +69,9 @@ export interface PeriodVersion {
   assignments: Assignments;
   /** 직전 버전 대비 바뀐 칸 */
   changed: DiffCell[];
+  /** 확정 당시의 요청과 결과([변경 취소]). 옛 버전에는 없다 */
+  requests?: ConstraintSpec[];
+  result?: ScheduleResult;
 }
 
 export interface WorkPeriod extends PeriodRange {
@@ -95,10 +99,14 @@ export interface WorkPeriod extends PeriodRange {
   snapshot: { nurses: WardNurse[]; rules: ConstraintSpec[] } | null;
 }
 
+export type SetupStep = 1 | 2 | 3;
+
 export type View =
   | { screen: "home" }
+  | { screen: "setup"; step: SetupStep }
   | { screen: "settings"; tab: "roster" | "rules" }
-  | { screen: "period"; periodId: string; step: 1 | 2 | 3 };
+  | { screen: "period"; periodId: string; step: 1 | 2 }
+  | { screen: "confirmed"; periodId: string };
 
 interface Data {
   ward: Ward | null;
@@ -170,8 +178,10 @@ export interface AppState extends Data {
   clearFixed: (periodId: string, nurseId: string, day: number) => void;
   /** 응답 버전이 현재와 같을 때만 부른다. resultVersion = 지금의 inputVersion. usedCarryOver = 그 요청의 carry_over. */
   setResult: (periodId: string, result: ScheduleResult, usedCarryOver: CarryOverRow[]) => void;
-  /** 첫 확정은 버전 1개, 이미 확정된 기간은 바뀐 칸이 있을 때만 버전을 추가한다([다시 확정]). */
+  /** 첫 확정은 버전 1개, 이미 확정된 기간은 바뀐 칸이 있을 때만 버전을 추가한다([다시 확정]). 확정 근무표 화면으로 간다. */
   confirm: (periodId: string) => void;
+  /** [변경 취소]: 요청과 결과를 마지막 확정본으로 되돌린다. 되돌릴 수 없으면 아무것도 하지 않는다. */
+  revertToConfirmed: (periodId: string) => void;
   // 화면
   go: (view: View) => void;
   /** 병동이 있거나 기간이 하나라도 있으면 true. */
@@ -335,6 +345,13 @@ export function carryOverChanged(period: WorkPeriod, periods: WorkPeriod[]): boo
   return !sameCarryOver(period.carryOverUsed, carryOverFrom(prev, ids));
 }
 
+/** [변경 취소]를 보여 줄지: 마지막 확정본에 요청이 남아 있고, 배정이나 요청이 그 뒤로 바뀌었다. */
+export function canRevertToConfirmed(period: WorkPeriod): boolean {
+  const last = period.versions.at(-1);
+  if (period.status !== "confirmed" || !last?.requests || !last.result) return false;
+  return hasUnconfirmedChanges(period) || JSON.stringify(last.requests) !== JSON.stringify(period.requests);
+}
+
 /** 확정된 기간에서 현재 결과가 최신 확정본과 다른지([다시 확정] 활성화). */
 export function hasUnconfirmedChanges(period: WorkPeriod): boolean {
   const last = period.versions.at(-1);
@@ -365,6 +382,50 @@ export function homeSummary(
   };
 }
 
+/** 근무표 작성 ①의 준비 요약을 펼칠지: 명단이 지난 확정 근무표와 다르거나, 이어지는 근무가 바뀌었다. */
+export function prepareNeedsReview(ward: Ward, periods: WorkPeriod[], periodId: string): boolean {
+  const period = periods.find((p) => p.id === periodId);
+  if (!period) return false;
+  const { added, deactivated } = rosterChangesFor(ward, periods, periodId);
+  return added.length > 0 || deactivated.length > 0 || carryOverChanged(period, periods);
+}
+
+export function hasCoverage(ward: Ward): boolean {
+  return ward.rules.filter((r) => r.type === "daily_coverage" && r.scope === "ward").length >= COVERAGE_COUNT;
+}
+
+/** 활성 명단과 필요 인원이 모두 있어야 기간을 만들 수 있다. */
+export function isWardReady(ward: Ward): boolean {
+  return ward.nurses.some((n) => n.active) && hasCoverage(ward);
+}
+
+/** 처음 설정에서 아직 못 끝낸 첫 단계: 명단 없음 → ①, 필요 인원 없음 → ②, 그 밖 → ③. */
+export function setupStep(ward: Ward): SetupStep {
+  if (!ward.nurses.some((n) => n.active)) return 1;
+  return hasCoverage(ward) ? 3 : 2;
+}
+
+/** 근무표를 열 때의 화면: 확정 → 확정 근무표, 결과 있음 → 작성 ②, 그 밖 → 작성 ①. */
+export function viewForPeriod(period: WorkPeriod): View {
+  if (period.status === "confirmed") return { screen: "confirmed", periodId: period.id };
+  return { screen: "period", periodId: period.id, step: period.result ? 2 : 1 };
+}
+
+/** 불러온 화면 상태를 지금 화면 구성에 맞춘다(ADR-017). 근무표가 없는 병동은 처음 설정으로 연다. */
+function normalizeView(d: Data): View {
+  const { ward, periods, view } = d;
+  if (ward && periods.length === 0) return { screen: "setup", step: setupStep(ward) };
+  if (view.screen === "setup") return { screen: "home" };
+  if (view.screen === "period" || view.screen === "confirmed") {
+    const { periodId } = view;
+    const period = periods.find((p) => p.id === periodId);
+    if (!period) return { screen: "home" };
+    if (period.status === "confirmed") return { screen: "confirmed", periodId };
+    return view.screen === "period" ? { ...view, step: view.step === 1 ? 1 : 2 } : viewForPeriod(period);
+  }
+  return view;
+}
+
 /** ① 준비의 명단 점검: 이 기간 이전 마지막 확정 기간의 snapshot 대비 추가·비활성화된 간호사. */
 export function rosterChangesFor(
   ward: Ward,
@@ -391,7 +452,7 @@ export function orphanConstraintIds(ward: Ward, period: WorkPeriod | null): stri
 
 /** 지금 화면의 기간. 기간 화면이 아니면 첫 초안, 없으면 마지막 기간. */
 export function currentPeriod(s: Pick<Data, "periods" | "view">): WorkPeriod | null {
-  if (s.view.screen === "period") {
+  if (s.view.screen === "period" || s.view.screen === "confirmed") {
     const { periodId } = s.view;
     const found = s.periods.find((p) => p.id === periodId);
     if (found) return found;
@@ -496,6 +557,12 @@ const persisted = (s: Data): Data => ({
   inputVersion: s.inputVersion,
 });
 
+/** 불러온 문서: Data 필드만 가져오고 옛 화면 상태를 바꾼다. */
+const loaded = (s: Data): Data => {
+  const d = persisted(s);
+  return { ...d, view: normalizeView(d) };
+};
+
 export function createAppStore(getStorage: () => Storage, now: () => Date = () => new Date(), remote?: WardRemote) {
   let markUnavailable = () => {};
   const { storage, available } = safeStorage(getStorage, () => markUnavailable());
@@ -569,7 +636,7 @@ export function createAppStore(getStorage: () => Storage, now: () => Date = () =
         /** 상태를 통째로 바꾼다. 진행 중 요청의 응답을 버리도록 inputVersion은 지금보다 크게 한다. */
         const replace = (data: Data, extra: Partial<AppState> = {}) =>
           set((s) => ({ ...data, inputVersion: Math.max(s.inputVersion, data.inputVersion) + 1, ...extra }));
-        const emptyWardData = (): Data => ({ ...initialData(), ward: emptyWard(), view: { screen: "settings", tab: "roster" } });
+        const emptyWardData = (): Data => ({ ...initialData(), ward: emptyWard(), view: { screen: "setup", step: 1 } });
         /** 게스트 상태를 올린다. */
         const upload = async () => {
           ready = true;
@@ -602,7 +669,7 @@ export function createAppStore(getStorage: () => Storage, now: () => Date = () =
               // 서버 우선
               const d = row.data as { version?: unknown; state?: unknown } | null;
               const ok = d?.version === STORAGE_VERSION && isData(d.state);
-              replace(ok ? persisted(d.state as Data) : initialData(), {
+              replace(ok ? loaded(d.state as Data) : initialData(), {
                 sync: { status: "saved", savedAt: row.updatedAt },
                 loginPrompt: guest ? { kind: "server-replaced-guest" } : null,
                 ...(!ok && { resetNotice: true }),
@@ -638,7 +705,7 @@ export function createAppStore(getStorage: () => Storage, now: () => Date = () =
             ready = true;
           },
 
-          startWard: () => bump({ ward: emptyWard(), periods: [], view: { screen: "settings", tab: "roster" } }),
+          startWard: () => bump({ ward: emptyWard(), periods: [], view: { screen: "setup", step: 1 } }),
           setWardName: (name) => editWard((w) => ({ ...w, name })),
           setUnit: (unit) => editWard((w) => ({ ...w, unit })),
           setCoverage: (shift, dayKind, min, max) =>
@@ -715,7 +782,7 @@ export function createAppStore(getStorage: () => Storage, now: () => Date = () =
             if (!ward) return null;
             const draft = periods.find((p) => p.status === "draft");
             if (draft) {
-              set({ view: { screen: "period", periodId: draft.id, step: 1 } });
+              set({ view: viewForPeriod(draft) });
               return draft.id;
             }
             const period = newPeriod(upcomingRange(ward.unit, periods, today));
@@ -823,7 +890,7 @@ export function createAppStore(getStorage: () => Storage, now: () => Date = () =
           },
           confirm: (periodId) => {
             const { ward } = get();
-            if (!ward) return;
+            if (!ward || !get().periods.find((p) => p.id === periodId)?.result) return;
             editPeriod(
               periodId,
               (p) => {
@@ -831,15 +898,30 @@ export function createAppStore(getStorage: () => Storage, now: () => Date = () =
                 const last = p.versions.at(-1);
                 const changed = p.status === "confirmed" && last ? diffAssignments(last.assignments, p.result.assignments) : [];
                 if (p.status === "confirmed" && last && changed.length === 0) return p;
+                const version = {
+                  confirmed_at: now().toISOString(),
+                  assignments: p.result.assignments,
+                  changed,
+                  requests: p.requests,
+                  result: p.result,
+                };
                 return {
                   ...p,
                   status: "confirmed",
-                  versions: [...p.versions, { confirmed_at: now().toISOString(), assignments: p.result.assignments, changed }],
+                  versions: [...p.versions, version],
                   snapshot: p.snapshot ?? { nurses: ward.nurses.filter((n) => n.active), rules: ward.rules },
                 };
               },
               false,
             );
+            set({ view: { screen: "confirmed", periodId } });
+          },
+          revertToConfirmed: (periodId) => {
+            const period = get().periods.find((p) => p.id === periodId);
+            const last = period?.versions.at(-1);
+            if (!period || !canRevertToConfirmed(period) || !last?.requests || !last.result) return;
+            const { requests, result } = last;
+            editPeriod(periodId, (p) => ({ ...p, requests, result, resultVersion: get().inputVersion + 1 }));
           },
 
           go: (view) => set({ view }),
@@ -860,7 +942,7 @@ export function createAppStore(getStorage: () => Storage, now: () => Date = () =
           saved === undefined
             ? current
             : isData(saved)
-              ? { ...current, ...persisted(saved) }
+              ? { ...current, ...loaded(saved) }
               : { ...current, resetNotice: true },
       },
     ),

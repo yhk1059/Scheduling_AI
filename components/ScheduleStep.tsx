@@ -423,7 +423,7 @@ export default function ScheduleStep() {
       ) : null}
 
       <div>
-        <button type="button" onClick={() => go({ screen: "period", periodId, step: 2 })} className={ui.secondary}>
+        <button type="button" onClick={() => go({ screen: "period", periodId, step: 1 })} className={ui.secondary}>
           이전
         </button>
       </div>

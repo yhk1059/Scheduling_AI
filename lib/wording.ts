@@ -128,3 +128,20 @@ export function nextTask(ward: Ward, periods: WorkPeriod[], today: string): Next
   if (next.state === "confirmed") return { kind: "confirmed", name, confirmedAt: p.versions.at(-1)?.confirmed_at ?? "" };
   return p.result ? { kind: "generated", name } : { kind: "drafting", name, requests: p.requests.length };
 }
+
+/** 홈 지금 할 일 카드의 진행 단계. */
+export const TASK_STEPS = ["요청", "근무표", "확정"] as const;
+
+/** 지금 할 일 카드에서 끝난 단계 수. */
+export function taskDoneSteps(task: NextTask): number {
+  switch (task.kind) {
+    case "none":
+      return 0;
+    case "drafting":
+      return task.requests > 0 ? 1 : 0;
+    case "generated":
+      return 2;
+    case "confirmed":
+      return 3;
+  }
+}
