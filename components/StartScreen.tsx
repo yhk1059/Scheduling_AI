@@ -13,7 +13,7 @@ import Dialog from "./Dialog";
 import { today } from "./RulesStep";
 import { ui } from "./ui";
 
-const SCREEN_LABELS: Record<Exclude<View["screen"], "period">, string> = { home: "병동 홈", settings: "병동 설정" };
+const SCREEN_LABELS: Record<Exclude<View["screen"], "period">, string> = { home: "근무표 목록", settings: "병동 설정" };
 const SAMPLE_NURSES = sample.nurses.length;
 const SAMPLE_RULES = wardRuleCount(sample.constraints as ConstraintSpec[]);
 

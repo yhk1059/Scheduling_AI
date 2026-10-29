@@ -38,7 +38,7 @@ export default function PeriodWork() {
       <div className="flex flex-col gap-2">
         <div>
           <button type="button" onClick={() => go({ screen: "home" })} className={ui.textSm}>
-            ← 홈
+            ← 근무표 목록
           </button>
         </div>
         <div className="flex items-center gap-3">

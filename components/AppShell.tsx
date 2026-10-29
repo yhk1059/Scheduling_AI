@@ -10,7 +10,7 @@ import { AccountBar, LoginPromptDialog } from "./Account";
 import PeriodWork from "./PeriodWork";
 import StartScreen from "./StartScreen";
 import { ui } from "./ui";
-import WardHome from "./WardHome";
+import WardHome, { isWardReady } from "./WardHome";
 import WardSettings from "./WardSettings";
 
 export default function AppShell() {
@@ -23,12 +23,19 @@ export default function AppShell() {
   const auth = useAppStore((s) => s.auth);
   const syncStatus = useAppStore((s) => s.sync.status);
   const retrySave = useAppStore((s) => s.retrySave);
-  // /app에 들어올 때마다 시작 화면을 보여 준다(저장하지 않는다). 로그인 상태면 건너뛴다(PRD J0)
-  const [entered, setEntered] = useState(false);
+  // 병동이 있으면(게스트 입력 포함) 바로 들어간다. 게스트는 [시작 화면]으로 샘플·새로 시작을 다시 고를 수 있다(PRD J0)
+  const [showStart, setShowStart] = useState(false);
   // 첫 세션 확인 전에는 시작 화면을 띄우지 않는다
   const [authChecked, setAuthChecked] = useState(!supabaseConfigured);
   const loading = !authChecked || (auth !== null && syncStatus === "loading");
-  const started = (entered || auth !== null) && ward !== null && !loading;
+  const started = !showStart && ward !== null && !loading;
+
+  // 들어올 때 병동이 준비 전이면 근무표 목록 대신 병동 설정부터 연다
+  useEffect(() => {
+    if (!started) return;
+    const s = useAppStore.getState();
+    if (s.view.screen === "home" && s.ward && !isWardReady(s.ward)) s.go({ screen: "settings", tab: "roster" });
+  }, [started]);
 
   useEffect(() => {
     if (!supabaseConfigured) return;
@@ -43,7 +50,7 @@ export default function AppShell() {
   }, []);
 
   const tabs = [
-    { label: "홈", current: view.screen === "home", onClick: () => go({ screen: "home" }) },
+    { label: "근무표", current: view.screen === "home", onClick: () => go({ screen: "home" }) },
     {
       label: "병동 설정",
       current: view.screen === "settings",
@@ -80,6 +87,11 @@ export default function AppShell() {
                 {t.label}
               </button>
             ))}
+            {auth === null && (
+              <button type="button" onClick={() => setShowStart(true)} className={`${ui.text} ml-auto`}>
+                시작 화면
+              </button>
+            )}
           </div>
         </nav>
       )}
@@ -113,7 +125,7 @@ export default function AppShell() {
             불러오는 중…
           </p>
         ) : !started ? (
-          <StartScreen onDone={() => setEntered(true)} />
+          <StartScreen onDone={() => setShowStart(false)} />
         ) : view.screen === "home" ? (
           <WardHome />
         ) : view.screen === "settings" ? (
