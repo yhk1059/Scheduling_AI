@@ -29,22 +29,24 @@ import {
 
 const NOV: PeriodRange = { start_date: "2026-11-01", length: 30 };
 const NOV_RANGE = "2026.11.1 – 11.30";
-const ROSTER = `이름\t연차\t나이트전담
-이영희\t12
-박민수\t9
-김철수\t7
-정유진\t5
-최지훈\t3
-강서연\t15
-윤지민\t10
-임하늘\t8
-한소율\t6
-오민준\t4
-서예린\t2
-신도윤\t1
-조은비\t2
-문가람\t11\tY
-배수아\t4\tY`;
+// [이름, 연차, 나이트 전담] 15명 · 나이트 전담 2명 (BROWSER_TEST_SCENARIOS D1)
+const ROSTER: [string, number, boolean][] = [
+  ["이영희", 12, false],
+  ["박민수", 9, false],
+  ["김철수", 7, false],
+  ["정유진", 5, false],
+  ["최지훈", 3, false],
+  ["강서연", 15, false],
+  ["윤지민", 10, false],
+  ["임하늘", 8, false],
+  ["한소율", 6, false],
+  ["오민준", 4, false],
+  ["서예린", 2, false],
+  ["신도윤", 1, false],
+  ["조은비", 2, false],
+  ["문가람", 11, true],
+  ["배수아", 4, true],
+];
 const COVERAGE: [string, string, number, number][] = [
   ["평일", "데이", 3, 4],
   ["평일", "이브닝", 3, 3],
@@ -118,9 +120,8 @@ test("S5. 처음 설정 ① 병동·명단 → ② 필요 인원", async () => {
   const unit = page.getByRole("combobox", { name: "근무표 주기" });
   await unit.selectOption({ label: "2주" });
   await expect(page.getByRole("banner")).toContainText("내과 병동 · 2주 단위");
-  await expect(page.getByRole("status").filter({ hasText: "다음에 만드는 근무표부터 적용돼요." })).toContainText(
-    "최소 휴무 일수 같은 규칙 값을 다시 확인하세요.",
-  );
+  // 근무표가 아직 없으니 "다음에 만드는 근무표부터" 안내는 없다
+  await expect(page.getByText("다음에 만드는 근무표부터 적용돼요.")).toHaveCount(0);
   await unit.selectOption({ label: "한 달(1일~말일)" });
   await expect(page.getByRole("banner")).toContainText("내과 병동 · 한 달 단위");
 
@@ -130,22 +131,31 @@ test("S5. 처음 설정 ① 병동·명단 → ② 필요 인원", async () => {
   await expect(page.getByText("바꾼 내용은 바로 저장돼요.")).toBeVisible();
   await expect(page.getByRole("button", { name: "이전" })).toHaveCount(0);
 
-  await page.getByLabel("엑셀에서 복사한 명단 붙여넣기 (이름, 연차, 나이트 전담)").fill(ROSTER);
-  await page.getByRole("button", { name: "표로 만들기" }).click();
-  await expect(page.getByRole("combobox", { name: "이름 열" })).toHaveValue("0");
-  await expect(page.getByRole("combobox", { name: "연차 열" })).toHaveValue("1");
-  await expect(page.getByRole("combobox", { name: "나이트 전담 열" })).toHaveValue("2");
-  await expect(page.getByRole("textbox", { name: "15행 3열", exact: true })).toHaveValue("Y"); // 문가람
-  await expect(page.getByRole("textbox", { name: "16행 3열", exact: true })).toHaveValue("Y"); // 배수아
+  // 맨 아래 입력 줄에 한 명씩 적고 Enter
+  const newName = page.getByRole("textbox", { name: "새 간호사 이름" });
+  const newYears = page.getByRole("textbox", { name: "새 간호사 연차" });
+  const newNight = page.getByRole("checkbox", { name: "새 간호사 나이트 전담" });
+  for (const [name, years, night] of ROSTER) {
+    await newName.fill(name);
+    await newYears.fill(String(years));
+    if (night) await newNight.check();
+    await newYears.press("Enter");
+    await expect(newName).toHaveValue("");
+    await expect(newName).toBeFocused();
+  }
+  await expect(page.getByRole("textbox", { name: "15행 이름", exact: true })).toHaveValue("배수아");
 
-  const leeYears = page.getByRole("textbox", { name: "2행 2열", exact: true });
-  const applyRoster = page.getByRole("button", { name: "명단에 반영" });
-  await leeYears.fill("abc");
-  await expect(leeYears).toHaveAttribute("aria-invalid", "true");
-  await expect(applyRoster).toBeDisabled();
-  await leeYears.fill("12");
-  await expect(leeYears).not.toHaveAttribute("aria-invalid", "true");
-  await applyRoster.click();
+  // 잘못된 줄은 더하지 않고 그 칸에 오류를 보인다
+  await newName.fill("이영희");
+  await newYears.fill("abc");
+  await page.getByRole("button", { name: "추가", exact: true }).click();
+  await expect(newName).toHaveAttribute("aria-invalid", "true");
+  await expect(page.getByText("같은 이름이 이미 있어요")).toBeVisible();
+  await expect(newYears).toHaveAttribute("aria-invalid", "true");
+  await expect(page.getByText("연차는 숫자여야 해요")).toBeVisible();
+  await expect(page.getByRole("textbox", { name: "16행 이름", exact: true })).toHaveCount(0);
+  await newName.fill("");
+  await newYears.fill("");
 
   await expect(page.getByRole("textbox", { name: "1행 이름", exact: true })).toHaveValue("이영희");
   await expect(page.getByRole("textbox", { name: "15행 이름", exact: true })).toHaveValue("배수아");

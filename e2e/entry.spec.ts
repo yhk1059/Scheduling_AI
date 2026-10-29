@@ -37,7 +37,7 @@ test("S1. 랜딩 → 샘플 데모 → 내 병동", async ({ page }) => {
   // 데모의 [내 병동으로 시작하기] → 처음 설정 ①
   await page.getByRole("link", { name: "내 병동으로 시작하기" }).click();
   await expect(page.getByRole("heading", { name: "처음 설정" })).toBeVisible();
-  await expect(page.getByText("아직 명단이 없어요.")).toBeVisible();
+  await expect(page.getByRole("textbox", { name: "새 간호사 이름" })).toBeVisible();
   await expect(page).toHaveURL(/\/app$/);
 
   // 이미 내 병동이 있으면 그대로 들어간다
@@ -93,8 +93,8 @@ test("S2. 시작 화면과 입력 삭제 확인", async ({ page }) => {
   await page.getByRole("button", { name: "내 병동으로 시작하기" }).click();
   await dialog.getByRole("button", { name: "지우고 시작" }).click();
   await expect(page.getByRole("heading", { name: "처음 설정" })).toBeVisible();
-  await expect(page.getByText("아직 명단이 없어요.")).toBeVisible();
-  await expect(page.getByLabel("엑셀에서 복사한 명단 붙여넣기 (이름, 연차, 나이트 전담)")).toHaveValue("");
+  await expect(page.getByRole("textbox", { name: "1행 이름", exact: true })).toHaveCount(0);
+  await expect(page.getByRole("textbox", { name: "새 간호사 이름" })).toHaveValue("");
   await expect(page.getByRole("banner")).toContainText("이름 없는 병동 · 한 달 단위");
   await expectNoDevTerms(page, "처음 설정 ①");
 
