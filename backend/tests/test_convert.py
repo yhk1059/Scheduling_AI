@@ -8,17 +8,19 @@ import pytest
 from pydantic import TypeAdapter
 
 from backend.domain import constants
-from backend.domain.convert import convert_request, legacy_to_block, night_only_rule
+from backend.domain.convert import convert_request, legacy_to_block, night_dedicated_rule
+from backend.domain.legacy import LegacyScheduleRequest, LegacySpec
 from backend.domain.models import ConstraintSpec, Period, ScheduleRequest
 
 CASES = json.loads((Path(__file__).parent / "golden" / "cases.json").read_text(encoding="utf-8"))
 spec_adapter = TypeAdapter(ConstraintSpec)
+legacy_adapter = TypeAdapter(LegacySpec)
 PERIOD = Period(start_date=date(2026, 11, 1), length=14)  # 11/1 일요일: 주말 1, 7, 8, 14
 
 
 def tpl(type_: str, params: dict, **extra) -> object:
     raw = {"id": "c1", "type": type_, "scope": "ward", "source_text": "원문", "params": params, **extra}
-    return spec_adapter.validate_python(raw)
+    return legacy_adapter.validate_python(raw)
 
 
 def dump(spec) -> dict:
@@ -158,8 +160,8 @@ def test_soft_weight_to_priority(weight, priority):
     assert b.weight == constants.PRIORITY_WEIGHTS[priority]
 
 
-def test_night_only_rule():
-    r = night_only_rule("night-only")
+def test_night_dedicated_rule():
+    r = night_dedicated_rule("night-only")
     assert (r.id, r.type, r.hardness, r.scope) == ("night-only", "count", "hard", "ward")
     assert r.source_text == "나이트 전담은 나이트와 휴무만"
     assert params(r) == {
@@ -172,19 +174,20 @@ def test_night_only_rule():
 
 def test_convert_request_tags_night_only():
     raw = CASES[0]["request"]
-    req = ScheduleRequest.model_validate(raw)
+    req = LegacyScheduleRequest.model_validate(raw)
+    assert req.history_load
     out = convert_request(req)
-    night_only = [n for n in out.nurses if n.night_only]
-    assert night_only and all("나이트전담" in n.tags for n in night_only)
-    assert all("나이트전담" not in n.tags for n in out.nurses if not n.night_only)
+    tagged = {n.id for n in out.nurses if "나이트전담" in n.tags}
+    assert tagged and tagged == {n.id for n in req.nurses if n.night_only}
     assert sum(c.type == "count" and c.params.people.tags == ["나이트전담"] for c in out.constraints) == 1
-    assert out.history_load == req.history_load
+    assert out.history is None  # history_load(요약)는 원본으로 되돌릴 수 없어 버린다
+    assert "night_only" not in out.nurses[0].model_dump() and "history_load" not in out.model_dump()
     assert req.nurses[0].tags == []  # 원본은 바꾸지 않는다
 
 
 @pytest.mark.parametrize("case", CASES, ids=[c["id"] for c in CASES])
 def test_golden_requests_convert_to_valid_blocks(case):
-    req = ScheduleRequest.model_validate(case["request"])
+    req = LegacyScheduleRequest.model_validate(case["request"])
     out = convert_request(req)
     assert {c.type for c in out.constraints} <= {"count", "sequence", "balance", "fixed_assignment"}
     assert len(out.constraints) == len(req.constraints) + 1

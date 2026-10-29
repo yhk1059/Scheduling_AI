@@ -4,6 +4,7 @@ import importlib.util
 from pathlib import Path
 
 import pytest
+from pydantic import ValidationError
 
 from backend.llm.client import ToolCallResult
 
@@ -66,9 +67,11 @@ def test_score_fills_defaults():
     assert run.score_constraints([expected], [actual]) == (1, 1, 1)
 
 
-def test_score_converts_template_expected():
+def test_score_rejects_template_expected():
+    """기대값은 블록만 쓴다(템플릿은 step 5에서 모두 바꿨다)."""
     template = {"type": "leave", "hardness": "hard", "params": {"nurse_id": "n01", "days": [15, 16]}}
-    assert run.score_constraints([template], [leave("n01", [16, 15])]) == (1, 1, 1)
+    with pytest.raises(ValidationError):
+        run.score_constraints([template], [leave("n01", [16, 15])])
 
 
 # 같은 규칙의 다른 모양은 일치

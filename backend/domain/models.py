@@ -8,8 +8,6 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 from backend.domain.constants import (
     CARRY_OVER_DAYS,
     DEFAULT_SHIFTS,
-    DEFAULT_SOFT_WEIGHTS,
-    DEFAULT_WEIGHT,
     HISTORY_DAYS,
     MAX_PATTERN_LEN,
     MAX_PATTERNS,
@@ -26,9 +24,6 @@ from backend.domain.constants import (
 
 # 근무 코드는 병동 구조(config)가 정한다. 형식만 여기서 보고, 있는 코드인지는 요청 단위로 검사한다.
 ShiftCode = Annotated[str, Field(pattern=r"^[A-Z0-9]{1,3}$")]
-# 템플릿(ADR-018 이전) params는 LLM tool 스키마가 바뀌지 않도록 기존 Literal을 유지한다. step 6에서 지운다.
-LegacyShift = Literal["D", "E", "N", "O"]
-WorkShift = Literal["D", "E", "N"]
 Scope = Literal["ward", "period"]
 Hardness = Literal["hard", "soft"]
 Priority = Literal["high", "normal", "low"]
@@ -99,7 +94,6 @@ class Nurse(_Strict):
     name: str = Field(min_length=1)
     years: int = Field(ge=0)
     tags: list[Tag] = Field(default=[], max_length=MAX_TAGS_PER_NURSE)
-    night_only: bool = False
 
 
 class Period(_Strict):
@@ -120,40 +114,7 @@ class Period(_Strict):
         return self.date_of(day).weekday()
 
 
-# --- 제약 템플릿 params ---
-
-
-class DailyCoverageParams(_Strict):
-    shift: WorkShift
-    day_kind: Literal["weekday", "weekend"]
-    min: int = Field(ge=0)
-    max: int = Field(ge=0)
-
-    @model_validator(mode="after")
-    def _min_le_max(self):
-        if self.min > self.max:
-            raise ValueError(f"min({self.min})이 max({self.max})보다 큽니다")
-        return self
-
-
-class ForbiddenSequenceParams(_Strict):
-    first: LegacyShift
-    second: LegacyShift
-
-
-class DaysParams(_Strict):
-    days: int = Field(ge=1)
-
-
-class SkillMixParams(_Strict):
-    shift: WorkShift
-    min_years: int = Field(ge=0)
-    min_count: int = Field(ge=1)
-
-
-class LeaveParams(_Strict):
-    nurse_id: str
-    days: list[int] = Field(min_length=1)
+# --- 제약 공통 필드와 칸 고정 ---
 
 
 class FixedAssignmentParams(_Strict):
@@ -162,26 +123,11 @@ class FixedAssignmentParams(_Strict):
     shift: ShiftCode
 
 
-class ShiftPreferenceParams(_Strict):
-    nurse_id: str
-    shift: LegacyShift
-    prefer: bool
-    days: list[int] | None = None
-    weekends_only: bool = False
-
-
-class EmptyParams(_Strict):
-    pass
-
-
-# --- 제약 (type 기반 discriminated union) ---
-
-
 class _ConstraintBase(_Strict):
     id: str = Field(min_length=1)
     scope: Scope
     hardness: Hardness = "hard"
-    weight: int = Field(default=DEFAULT_WEIGHT, gt=0)
+    weight: int = Field(default=PRIORITY_WEIGHTS["normal"], gt=0)
     source_text: str
     enabled: bool = True
 
@@ -193,70 +139,11 @@ class _AlwaysHard(_ConstraintBase):
         return "hard"
 
 
-class DailyCoverage(_ConstraintBase):
-    type: Literal["daily_coverage"]
-    params: DailyCoverageParams
-
-
-class ForbiddenSequence(_ConstraintBase):
-    type: Literal["forbidden_sequence"]
-    params: ForbiddenSequenceParams
-
-
-class MaxConsecutiveWork(_ConstraintBase):
-    type: Literal["max_consecutive_work"]
-    params: DaysParams
-
-
-class MaxConsecutiveNights(_ConstraintBase):
-    type: Literal["max_consecutive_nights"]
-    params: DaysParams
-
-
-class MinDaysOff(_ConstraintBase):
-    type: Literal["min_days_off"]
-    params: DaysParams
-
-
-class OffAfterNightBlock(_ConstraintBase):
-    type: Literal["off_after_night_block"]
-    params: DaysParams
-
-
-class SkillMix(_ConstraintBase):
-    type: Literal["skill_mix"]
-    params: SkillMixParams
-
-
-class Leave(_AlwaysHard):
-    type: Literal["leave"]
-    params: LeaveParams
-
-
 class FixedAssignment(_AlwaysHard):
+    """칸 고정(수동 고정, 지난 날짜 잠금). 규칙이 아니라 데이터라서 항상 hard다."""
+
     type: Literal["fixed_assignment"]
     params: FixedAssignmentParams
-
-
-class ShiftPreference(_ConstraintBase):
-    type: Literal["shift_preference"]
-    hardness: Hardness = "soft"
-    weight: int = Field(default=DEFAULT_SOFT_WEIGHTS["shift_preference"], gt=0)
-    params: ShiftPreferenceParams
-
-
-class NightFairness(_ConstraintBase):
-    type: Literal["night_fairness"]
-    hardness: Hardness = "soft"
-    weight: int = Field(default=DEFAULT_SOFT_WEIGHTS["night_fairness"], gt=0)
-    params: EmptyParams = Field(default_factory=EmptyParams)
-
-
-class WeekendFairness(_ConstraintBase):
-    type: Literal["weekend_fairness"]
-    hardness: Hardness = "soft"
-    weight: int = Field(default=DEFAULT_SOFT_WEIGHTS["weekend_fairness"], gt=0)
-    params: EmptyParams = Field(default_factory=EmptyParams)
 
 
 # --- 셀렉터(ADR-018). 조건은 모두 AND, 비어 있으면 전체 ---
@@ -392,43 +279,7 @@ class BalanceRule(_BlockBase):
     params: BalanceParams
 
 
-_LEGACY_SPECS = (
-    DailyCoverage,
-    ForbiddenSequence,
-    MaxConsecutiveWork,
-    MaxConsecutiveNights,
-    MinDaysOff,
-    OffAfterNightBlock,
-    SkillMix,
-    Leave,
-    FixedAssignment,
-    ShiftPreference,
-    NightFairness,
-    WeekendFairness,
-)
-# 템플릿 12종(ADR-018 이전). LLM 출력은 아직 이것만 쓴다. step 6에서 지운다.
-LegacySpec = Annotated[Union[_LEGACY_SPECS], Field(discriminator="type")]
-
-ConstraintSpec = Annotated[
-    Union[
-        DailyCoverage,
-        ForbiddenSequence,
-        MaxConsecutiveWork,
-        MaxConsecutiveNights,
-        MinDaysOff,
-        OffAfterNightBlock,
-        SkillMix,
-        Leave,
-        FixedAssignment,
-        ShiftPreference,
-        NightFairness,
-        WeekendFairness,
-        CountRule,
-        SequenceRule,
-        BalanceRule,
-    ],
-    Field(discriminator="type"),
-]
+ConstraintSpec = Annotated[Union[CountRule, SequenceRule, BalanceRule, FixedAssignment], Field(discriminator="type")]
 
 
 # --- 요청 ---
@@ -437,14 +288,6 @@ ConstraintSpec = Annotated[
 class CarryOverRow(_Strict):
     nurse_id: str
     shifts: list[ShiftCode] = Field(max_length=CARRY_OVER_DAYS)
-
-
-class HistoryLoad(_Strict):
-    """최근 4주 누적 부담. 클라이언트가 지난 확정본에서 계산해 보낸다(ADR-015)."""
-
-    nurse_id: str
-    nights: int = Field(ge=0, le=HISTORY_DAYS)  # 최근 28일 N 수
-    weekends: int = Field(ge=0, le=HISTORY_DAYS)  # 최근 28일 주말·공휴일 근무(D/E/N) 수
 
 
 class History(_Strict):
@@ -469,31 +312,21 @@ def _check_roster(nurses: list[Nurse]) -> None:
 def _constraint_refs(c: Any) -> tuple[list[str], list[int]]:
     """제약이 참조하는 (nurse_ids, days)."""
     p = c.params
-    if isinstance(p, LeaveParams):
-        return [p.nurse_id], p.days
     if isinstance(p, FixedAssignmentParams):
         return [p.nurse_id], [p.day]
-    if isinstance(p, ShiftPreferenceParams):
-        return [p.nurse_id], p.days or []
-    if isinstance(p, (CountParams, SequenceParams, BalanceParams)):
-        days = getattr(p, "days", None)
-        return p.people.ids or [], (days.days if days else None) or []
-    return [], []
+    days = getattr(p, "days", None)
+    return p.people.ids or [], (days.days if days else None) or []
 
 
 def _constraint_codes(c: Any) -> list[str]:
     """제약이 직접 적은 근무 코드."""
     p = c.params
-    if isinstance(p, (DailyCoverageParams, SkillMixParams, FixedAssignmentParams, ShiftPreferenceParams)):
+    if isinstance(p, FixedAssignmentParams):
         return [p.shift]
-    if isinstance(p, ForbiddenSequenceParams):
-        return [p.first, p.second]
-    if isinstance(p, (CountParams, BalanceParams)):
-        return p.shifts.codes
     if isinstance(p, SequenceParams):
         selectors = [s for pattern in p.forbid or [] for s in pattern] + [s for s in (p.run, p.after) if s]
         return [code for s in selectors for code in s.codes]
-    return []
+    return p.shifts.codes
 
 
 class ScheduleRequest(_Strict):
@@ -504,7 +337,6 @@ class ScheduleRequest(_Strict):
     constraints: list[ConstraintSpec] = []
     carry_over: list[CarryOverRow] = []
     previous: Assignments | None = None
-    history_load: list[HistoryLoad] = []
     history: History | None = None
     input_version: int
 
@@ -543,14 +375,6 @@ class ScheduleRequest(_Strict):
             if unknown:
                 errors.append(f"carry_over: {row.nurse_id} 근무 형태에 없는 코드 {unknown}")
 
-        loaded: set[str] = set()
-        for h in self.history_load:
-            if h.nurse_id not in ids:
-                errors.append(f"history_load: 명단에 없는 nurse_id {h.nurse_id}")
-            elif h.nurse_id in loaded:
-                errors.append(f"history_load: nurse_id {h.nurse_id} 중복")
-            loaded.add(h.nurse_id)
-
         for nurse_id, shifts in (self.previous or {}).items():
             if nurse_id not in ids:
                 errors.append(f"previous: 명단에 없는 nurse_id {nurse_id}")
@@ -576,16 +400,12 @@ class ScheduleRequest(_Strict):
 
 
 class NurseStats(_Strict):
-    D: int
-    E: int
-    N: int
-    O: int
+    counts: dict[str, int]  # 근무 코드별 개수(활성 코드 + 배정된 코드)
+    hours: float  # 근무 시간 합
     weekend_holiday_work: int
     max_consecutive_work: int
     preference_rate: float | None
     deviation: float
-    counts: dict[str, int] = {}  # 근무 코드별 개수(활성 코드 + 배정된 코드)
-    hours: float = 0  # 근무 시간 합
 
 
 class Summary(_Strict):

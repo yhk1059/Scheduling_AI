@@ -6,10 +6,12 @@ from typing import Any
 from pydantic import TypeAdapter
 
 from backend.domain.constants import NIGHT_ONLY_TAG, OFF_CODE, PRIORITY_WEIGHTS
+from backend.domain.legacy import LegacyScheduleRequest
 from backend.domain.models import (
     BalanceRule,
     ConstraintSpec,
     CountRule,
+    Nurse,
     Period,
     ScheduleRequest,
     SequenceRule,
@@ -119,7 +121,7 @@ def legacy_to_block(spec: Any, period: Period | None = None, holidays: Sequence[
     )
 
 
-def night_only_rule(id: str) -> CountRule:
+def night_dedicated_rule(id: str) -> CountRule:
     """기본 규칙 "나이트 전담은 나이트와 휴무만"(솔버 특수 처리를 대신한다)."""
     return CountRule.model_validate(
         {
@@ -138,22 +140,25 @@ def night_only_rule(id: str) -> CountRule:
     )
 
 
-def convert_request(req: ScheduleRequest) -> ScheduleRequest:
-    """요청 전체를 블록 형식으로. night_only 간호사에게 태그를 붙이고 기본 규칙을 더한다.
+def convert_request(req: LegacyScheduleRequest) -> ScheduleRequest:
+    """옛 요청 전체를 블록 형식으로. night_only는 나이트 전담 태그로 바꾸고 기본 규칙을 더한다.
 
-    night_only와 history_load는 아직 그대로 둔다(step 6에서 지운다).
+    history_load(나이트·주말 두 숫자)는 원본으로 되돌릴 수 없어 버린다. 이력이 필요하면 history를 따로 넣는다.
     """
     nurses = [
-        n.model_copy(update={"tags": [*n.tags, NIGHT_ONLY_TAG]})
-        if n.night_only and NIGHT_ONLY_TAG not in n.tags
-        else n
+        Nurse(
+            id=n.id,
+            name=n.name,
+            years=n.years,
+            tags=[*n.tags, NIGHT_ONLY_TAG] if n.night_only and NIGHT_ONLY_TAG not in n.tags else n.tags,
+        )
         for n in req.nurses
     ]
     constraints = [legacy_to_block(c, req.period, req.holidays) for c in req.constraints]
-    constraints.append(night_only_rule(NIGHT_ONLY_RULE_ID))
+    constraints.append(night_dedicated_rule(NIGHT_ONLY_RULE_ID))
     return ScheduleRequest.model_validate(
         {
-            **req.model_dump(mode="json"),
+            **req.model_dump(mode="json", exclude={"history_load"}),
             "nurses": [n.model_dump(mode="json") for n in nurses],
             "constraints": [_spec_adapter.dump_python(c, mode="json") for c in constraints],
         }

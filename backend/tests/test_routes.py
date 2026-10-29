@@ -23,7 +23,7 @@ from backend.domain.constants import (
 from backend.llm.client import LLMConfigError, LLMUnavailableError, ToolCallResult
 from backend.routes import app, get_llm_client
 from backend.solver.model import solve as real_solve
-from backend.tests.test_solver_hard import sample_data
+from backend.tests.blocks import history, sample_data
 
 client = TestClient(app)
 
@@ -135,13 +135,41 @@ def test_solve_ok_returns_input_version():
     assert len(body["result"]["assignments"]) == 15
 
 
-def test_solve_passes_history_load(monkeypatch):
+HISTORY = history("2026-11-01", {"n03": ["N"] * 8})
+
+
+def test_solve_passes_history(monkeypatch):
     seen = []
-    monkeypatch.setattr(routes, "solve", lambda req: seen.append(req.history_load) or real_solve(req))
+    monkeypatch.setattr(routes, "solve", lambda req: seen.append(req.history) or real_solve(req))
     data = sample()
-    data["history_load"] = [{"nurse_id": "n03", "nights": 8, "weekends": 2}]
+    data["history"] = HISTORY
     assert client.post("/api/py/solve", json=data).status_code == 200
-    assert seen[0][0].nights == 8
+    assert seen[0].rows["n03"].count("N") == 8
+
+
+OLD_LEAVE = {"id": "lv", "type": "leave", "scope": "period", "source_text": "x", "params": {"nurse_id": "n01", "days": [3]}}
+
+
+@pytest.mark.parametrize(
+    "make_old",
+    [
+        lambda d: d.update(history_load=[{"nurse_id": "n03", "nights": 8, "weekends": 2}]),
+        lambda d: d["nurses"][0].update(night_only=True),
+        lambda d: d["constraints"].append(OLD_LEAVE),
+    ],
+    ids=["history_load", "night_only", "template"],
+)
+def test_solve_rejects_old_format(make_old):
+    data = sample()
+    make_old(data)
+    assert_error(client.post("/api/py/solve", json=data), 422, "VALIDATION_ERROR")
+
+
+def test_solve_result_stats_use_counts():
+    body = client.post("/api/py/solve", json=sample()).json()
+    stats = body["result"]["stats"]["n01"]
+    assert set(stats["counts"]) == {"D", "E", "N", "O"} and "D" not in stats
+    assert stats["hours"] == 8 * (30 - stats["counts"]["O"])
 
 
 def test_solve_infeasible_with_conflicts():
@@ -316,19 +344,19 @@ def test_explain_verifies_with_time_limit_without_conflict_analysis(llm, monkeyp
     assert calls[0][1] is False
 
 
-def test_explain_verify_passes_history_load(llm, monkeypatch):
+def test_explain_verify_passes_history(llm, monkeypatch):
     seen = []
 
     def fake_solve(req, time_limit_s, analyze_conflicts):
-        seen.append(req.history_load)
+        seen.append(req.history)
         return real_solve(req, time_limit_s=time_limit_s, analyze_conflicts=analyze_conflicts)
 
     monkeypatch.setattr(routes, "solve", fake_solve)
     body = explain_body()
-    body["request"]["history_load"] = [{"nurse_id": "n03", "nights": 8, "weekends": 2}]
+    body["request"]["history"] = HISTORY
     llm.responses = [ok({"text": "설명", "proposals": [GOOD]})]
     assert client.post("/api/py/explain", json=body).status_code == 200
-    assert [[h.model_dump() for h in load] for load in seen] == [[{"nurse_id": "n03", "nights": 8, "weekends": 2}]]
+    assert [h.model_dump(mode="json") for h in seen] == [HISTORY]
 
 
 def test_explain_stops_when_verify_budget_exhausted(llm, monkeypatch):

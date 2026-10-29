@@ -7,15 +7,8 @@ from backend.domain.models import ScheduleRequest, SolveInfeasible
 from backend.solver import model as solver_model
 from backend.solver.conflicts import find_conflicts
 from backend.solver.model import solve
-from backend.tests.test_solver_hard import con, coverage, nurse, request, sample_data
-
-
-def leave(cid: str, nid: str, days: list[int]) -> dict:
-    return con(cid, "leave", {"nurse_id": nid, "days": days})
-
-
-def fixed(cid: str, nid: str, day: int, shift: str) -> dict:
-    return con(cid, "fixed_assignment", {"nurse_id": nid, "day": day, "shift": shift})
+from backend.tests.blocks import coverage, fixed, forbid, leave, max_nights, night_only, sample_data
+from backend.tests.test_solver_hard import nurse, request
 
 
 def basic_coverage() -> list[dict]:
@@ -30,7 +23,7 @@ def overloaded_sample() -> tuple[ScheduleRequest, set[str]]:
     """샘플 병동(주말 7명 필요)에서 토요일 7일에 9명이 휴가 → 6명만 남는다."""
     data = sample_data()
     leaves = [leave(f"lv-n{i:02d}", f"n{i:02d}", [7]) for i in range(1, 10)]
-    data["constraints"] += leaves + [con("mcn", "max_consecutive_nights", {"days": 3})]
+    data["constraints"] += leaves + [max_nights("mcn", 3)]
     return ScheduleRequest.model_validate(data), {c["id"] for c in leaves}
 
 
@@ -48,7 +41,7 @@ def test_excess_leave_conflicts_with_weekend_coverage():
 def test_conflict_carries_type_and_source_text():
     req, _ = overloaded_sample()
     by_id = {c.constraint_id: c for c in find_conflicts(req)}
-    assert by_id["lv-n01"].type == "leave"
+    assert by_id["lv-n01"].type == "count"
     assert by_id["lv-n01"].source_text == "원문"
 
 
@@ -60,15 +53,16 @@ def test_fixed_cells_same_day_conflict():
 def test_fixed_cells_conflict_with_rule():
     req = request(constraints=basic_coverage() + [
         fixed("f1", "n1", 1, "N"), fixed("f2", "n1", 2, "D"),
-        con("fs", "forbidden_sequence", {"first": "N", "second": "D"}),
+        forbid("fs", "N", "D"),
     ])
     assert ids(find_conflicts(req)) == {"f1", "f2", "fs"}
 
 
 def test_night_only_nurse_fixed_day_shift():
-    nurses = [nurse("n1", night_only=True), nurse("n2"), nurse("n3")]
-    req = request(nurses, [fixed("f1", "n1", 3, "D"), con("mcn", "max_consecutive_nights", {"days": 3})])
-    assert ids(find_conflicts(req)) == {"f1"}
+    """나이트 전담은 규칙 블록이라 core에 나온다."""
+    nurses = [nurse("n1", tags=["나이트전담"]), nurse("n2"), nurse("n3")]
+    req = request(nurses, [fixed("f1", "n1", 3, "D"), max_nights("mcn", 3), night_only()])
+    assert ids(find_conflicts(req)) == {"f1", "night-only"}
 
 
 def test_disabled_constraints_are_not_reported():

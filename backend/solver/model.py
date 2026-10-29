@@ -14,7 +14,6 @@ from backend.domain.constants import CONFLICT_TIME_LIMIT_S, DIFF_WEIGHT, SOLVE_T
 from backend.domain.models import ScheduleRequest, Shifts, SolveInfeasible, SolveOk, SolveTimeout
 from backend.solver import hard, select, soft, stats
 from backend.solver.conflicts import find_conflicts
-from backend.solver.stats import TOGGLEABLE  # hard → soft 토글이 가능한 템플릿 1~7과 블록 3종
 
 Cell = cp_model.IntVar | bool | None
 
@@ -122,14 +121,11 @@ def build_model(request: ScheduleRequest) -> ModelContext:
     for n in request.nurses:
         for d in range(1, days + 1):
             model.add_exactly_one(x[n.id, d, s] for s in codes)
-            if n.night_only:
-                model.add(x[n.id, d, "D"] == 0)
-                model.add(x[n.id, d, "E"] == 0)
 
     for c in request.constraints:
         if not c.enabled:
             continue
-        if c.type not in hard.ADDERS or (c.hardness == "soft" and c.type in TOGGLEABLE):
+        if c.hardness == "soft":  # 칸 고정은 항상 hard다
             soft.ADDERS[c.type](ctx, c)
             continue
         lit = model.new_bool_var(f"hard_{c.id}")

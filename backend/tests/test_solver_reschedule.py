@@ -4,7 +4,8 @@ import pytest
 
 from backend.domain.models import ScheduleRequest, SolveOk
 from backend.solver.model import solve
-from backend.tests.test_solver_hard import con, nurse, sample_data
+from backend.tests.blocks import fixed, leave, sample_data
+from backend.tests.test_solver_hard import nurse
 
 
 def sample() -> dict:
@@ -54,7 +55,7 @@ def test_sick_leave_changes_few_cells(base):
     nid = "n03"
     raw = sample()
     raw["previous"] = base
-    raw["constraints"].append(con("sick", "leave", {"nurse_id": nid, "days": [10, 11, 12]}))
+    raw["constraints"].append(leave("sick", nid, [10, 11, 12]))
     result = solve_result(raw)
     assert all(result.assignments[nid][d - 1] == "O" for d in (10, 11, 12))
     assert len(result.diff) <= 12
@@ -66,7 +67,7 @@ def test_fixed_assignment_edit_is_applied_with_few_changes(base):
     target = "N" if base[nid][day - 1] != "N" else "D"
     raw = sample()
     raw["previous"] = base
-    raw["constraints"].append(con("fix", "fixed_assignment", {"nurse_id": nid, "day": day, "shift": target}))
+    raw["constraints"].append(fixed("fix", nid, day, target))
     result = solve_result(raw)
     assert result.assignments[nid][day - 1] == target
     assert (nid, day) in {(c.nurse_id, c.day) for c in result.diff}

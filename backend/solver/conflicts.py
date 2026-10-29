@@ -2,7 +2,7 @@
 
 hard 리터럴을 assumptions로 걸고 unsat core를 얻은 뒤, 남은 시간 예산 안에서 deletion 기반으로 줄인다.
 assumption에 없는 hard 제약은 리터럴이 자유라서 꺼진 것과 같다.
-기본 제약(하루 하나, 나이트 전담)은 assumption이 아니라서 core에 나오지 않는다.
+기본 제약(하루 하나)은 assumption이 아니라서 core에 나오지 않는다. 나이트 전담은 규칙 블록이라 core에 나올 수 있다.
 """
 
 import time

@@ -23,7 +23,7 @@ from backend.domain.constants import (
     NIGHT_ONLY_TAG,
     SOLVE_TIME_LIMIT_S,
 )
-from backend.domain.convert import night_only_rule
+from backend.domain.convert import night_dedicated_rule
 from backend.domain.models import ScheduleRequest, SolveInfeasible, SolveOk
 from backend.solver.conflicts import find_conflicts
 from backend.solver.model import solve
@@ -94,7 +94,7 @@ def count(cid: str, shifts: dict, per: str, lo=None, hi=None, hardness: str = "h
 def rules(people: list[dict]) -> list[dict]:
     """블록 60개."""
     general = {"exclude_tags": [NIGHT_ONLY_TAG]}
-    rows: list[dict] = [night_only_rule("night-only").model_dump(by_alias=True)]
+    rows: list[dict] = [night_dedicated_rule("night-only").model_dump(by_alias=True)]
     # 필요 인원: 근무조 4개 × 평일/주말 (8)
     staffing = {"D": (7, 6), "E": (7, 6), "N": (5, 5), "M": (2, 1)}
     for code, (weekday, weekend) in staffing.items():
