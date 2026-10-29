@@ -5,7 +5,10 @@
     {
       "step": 0,
       "name": "golden-record",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-10-29T23:33:56+0900",
+      "summary": "backend/gen_golden.py(npm run gen:golden, --check)와 test_golden.py, golden/cases.json 9케이스 기록: sample-2w(15명×14일, 공휴일·이월·history_raw), sample-1w-requests(15×7), soft-a(7×7), soft-b(7×5), night-only-rules(8×10), weekday-holiday(7×7), reschedule(7×7, previous), infeasible 2개(6×7, 4×5). 모두 OPTIMAL, 생성 약 1초, 테스트 약 1초. 결정: 샘플 병동 최소 휴무는 기간에 맞춰 14일 4일·7일 2일로 줄임; history_load는 0인 간호사 제외; soft min_days_off는 단일 워커가 하한을 증명하지 못해 평일 5일 케이스로 줄임",
+      "completed_at": "2026-10-29T23:39:59+0900"
     },
     {
       "step": 1,
@@ -57,5 +60,6 @@
       "name": "samples-e2e",
       "status": "pending"
     }
-  ]
+  ],
+  "created_at": "2026-10-29T23:33:56+0900"
 }
