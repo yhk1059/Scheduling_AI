@@ -16,6 +16,7 @@ import {
   interpret,
   interpretOk,
   leaveOf,
+  leavesOf,
   NURSE_COUNT,
   nurseId,
   pendingCards,
@@ -135,11 +136,11 @@ test("S5. 처음 설정 ① 병동·명단 → ② 필요 인원", async () => {
   // 맨 아래 입력 줄에 한 명씩 적고 Enter
   const newName = page.getByRole("textbox", { name: "새 간호사 이름" });
   const newYears = page.getByRole("textbox", { name: "새 간호사 연차" });
-  const newNight = page.getByRole("checkbox", { name: "새 간호사 나이트 전담" });
+  const newNight = page.getByRole("button", { name: "새 간호사 태그 나이트전담 붙이기" });
   for (const [name, years, night] of ROSTER) {
     await newName.fill(name);
     await newYears.fill(String(years));
-    if (night) await newNight.check();
+    if (night) await newNight.click();
     await newYears.press("Enter");
     await expect(newName).toHaveValue("");
     await expect(newName).toBeFocused();
@@ -160,9 +161,10 @@ test("S5. 처음 설정 ① 병동·명단 → ② 필요 인원", async () => {
 
   await expect(page.getByRole("textbox", { name: "1행 이름", exact: true })).toHaveValue("이영희");
   await expect(page.getByRole("textbox", { name: "15행 이름", exact: true })).toHaveValue("배수아");
-  await expect(page.getByRole("checkbox", { name: "14행 나이트 전담" })).toBeChecked();
-  await expect(page.getByRole("checkbox", { name: "15행 나이트 전담" })).toBeChecked();
-  await expect(page.getByRole("checkbox", { name: "13행 나이트 전담" })).not.toBeChecked();
+  // 나이트 전담은 태그 칩이다. 붙은 사람에게는 [빼기], 아닌 사람에게는 추천 칩 [+ 나이트전담]이 보인다
+  await expect(page.getByRole("button", { name: "14행 태그 나이트전담 빼기" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "15행 태그 나이트전담 빼기" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "13행 태그 나이트전담 붙이기" })).toBeVisible();
 
   // 근무표에서 빼기 → 제외 → 다시 넣기
   const idsBefore = (await readState(page)).ward.nurses.map((n) => n.id);
@@ -226,7 +228,10 @@ test("S6. 처음 설정 ③ 병동 규칙 → 첫 근무표 만들기", async ()
   await expect(setupStepper().locator('[aria-current="step"]')).toContainText("병동 규칙");
   const createFirst = page.getByRole("button", { name: "첫 근무표 만들기" });
   await expect(createFirst).toBeEnabled();
-  await expect(page.getByText("규칙 없이 만들면 필요 인원만 지켜요")).toBeVisible();
+  // 새 병동에는 기본 규칙 "나이트 전담은 나이트와 휴무만"이 적용돼 있다
+  await expect(appliedCards(page)).toHaveCount(1);
+  await expect(appliedCards(page)).toContainText("나이트 전담은 나이트와 휴무만");
+  await expect(page.getByText("규칙 없이 만들면 필요 인원만 지켜요")).toHaveCount(0);
   const examples = page.getByRole("button", { name: "나이트는 3일 넘게 연속으로 하지 않게" });
   await examples.click();
   await expect(page.getByRole("textbox", { name: RULE_INPUT })).toHaveValue("나이트는 3일 넘게 연속으로 하지 않게");
@@ -255,7 +260,10 @@ test("S6. 처음 설정 ③ 병동 규칙 → 첫 근무표 만들기", async ()
   await expect(pendingCards(page)).toHaveCount(total);
   for (const card of await pendingCards(page).all()) await expectCardChrome(card, "반드시");
   await expect(pendingCards(page).filter({ hasText: "최대 연속 나이트" })).toContainText("나이트 연속 3일까지");
-  await expect(pendingCards(page).filter({ hasText: "연차별 배치" }).first()).toContainText("3년차 이상 1명 이상");
+  // 문장 틀 "[날짜·묶음] [사람] [근무] [수]"(예: "매일 3년차 이상 데이 1명 이상")에서 핵심 낱말만 본다
+  const skillCard = pendingCards(page).filter({ hasText: "연차별 배치" }).first();
+  await expect(skillCard).toContainText("3년차 이상");
+  await expect(skillCard).toContainText("1명 이상");
   await expect(page.getByText(`적용하지 않은 규칙 ${total}개는 빠져요`)).toBeVisible();
   await expect(createFirst).toBeEnabled();
   await expectNoDevTerms(page, "처음 설정 ③(적용 대기)");
@@ -268,9 +276,8 @@ test("S6. 처음 설정 ③ 병동 규칙 → 첫 근무표 만들기", async ()
   await expect(toggle.getByRole("button", { name: "반드시" })).toHaveAttribute("aria-pressed", "true");
 
   await applyAllPending(page);
-  await expect(appliedCards(page)).toHaveCount(total);
+  await expect(appliedCards(page)).toHaveCount(total + 1);
   await expect(page.getByText(/적용하지 않은 규칙/)).toHaveCount(0);
-  await expect(page.getByText("규칙 없이 만들면 필요 인원만 지켜요")).toHaveCount(0);
 
   // S6-b. 적용된 카드 수정
   for (const days of ["4", "3"]) {
@@ -297,8 +304,8 @@ test("S6. 처음 설정 ③ 병동 규칙 → 첫 근무표 만들기", async ()
     }
     await deleteAllPending(page);
   }
-  await expect(page.locator("article")).toHaveCount(total);
-  ruleCount = total;
+  await expect(page.locator("article")).toHaveCount(total + 1);
+  ruleCount = total + 1; // 기본 규칙 포함
 
   // S6-d. [첫 근무표 만들기] → 근무표 작성 ① 요청. 처음 설정은 다시 보이지 않는다
   await createFirst.click();
@@ -323,7 +330,9 @@ test("S7. 첫 근무표 ① 요청: 준비 요약", async () => {
   await expect(prepare).toHaveAttribute("aria-expanded", "false");
   await prepare.click();
   await expect(page.getByRole("button", { name: "접기" }).first()).toHaveAttribute("aria-expanded", "true");
-  await expect(sectionWith("날짜")).toContainText(`${NOV_RANGE} · 30일`);
+  // 첫 근무표는 시작일을 고른다(기본값: 달력 월 단위라 다음 달 1일)
+  await expect(page.getByLabel("시작일")).toHaveValue(NOV.start_date);
+  await expect(page.getByRole("main")).toContainText("2026.11.30 · 30일");
   await expect(page.getByText("2026년 11월")).toBeVisible();
   await expect(page.getByRole("button", { name: /^\d+월 \d+일 공휴일 (지정|해제)$/ })).toHaveCount(30);
   await page.getByRole("button", { name: `11월 ${HOLIDAY}일 공휴일 지정` }).click();
@@ -351,25 +360,22 @@ test("S8. ① 요청: 요청 카드", async () => {
   const park = await nurseId(page, "박민수");
 
   const q1 = await interpretOk(page, REQUEST_INPUT, "요청 만들기", "이영희 11월 15~17일 휴가");
-  expect(q1.map((c) => c.type)).toEqual(["leave"]);
-  expect(q1[0].params).toEqual({ nurse_id: lee, days: [15, 16, 17] });
+  expect(q1.map(leaveOf)).toEqual([{ nurse_id: lee, days: [15, 16, 17] }]);
+  expect(q1[0].hardness ?? "hard").toBe("hard");
   const leaveCard = pendingCards(page).filter({ hasText: "이영희 · 11/15~11/17 · 휴무" });
   await expect(leaveCard.getByRole("heading", { name: "휴가" })).toBeVisible();
-  await expectCardChrome(leaveCard, "반드시");
-  const leaveToggle = leaveCard.getByRole("group", { name: "반드시/가능하면" });
-  await expect(leaveToggle).toHaveAttribute("title", "휴가와 고정 근무는 항상 반드시 지켜요");
-  await expect(leaveToggle.getByRole("button", { name: "반드시" })).toBeDisabled();
-  await expect(leaveToggle.getByRole("button", { name: "가능하면" })).toBeDisabled();
+  // 휴가는 항상 반드시라 토글을 보이지 않는다
+  await expectCardChrome(leaveCard, null);
 
   const q2 = await interpretOk(page, REQUEST_INPUT, "요청 만들기", "박민수는 주말에 쉬고 싶대요");
   expect(q2.map((c) => c.type)).toEqual(["count"]);
   const pref = q2[0];
   if (pref.type === "count") {
-    expect({ ids: pref.params.people?.ids, shifts: pref.params.shifts.in, hardness: pref.hardness }).toEqual({
-      ids: [park],
-      shifts: ["O"],
-      hardness: "soft",
-    });
+    expect({ ids: pref.params.people?.ids, hardness: pref.hardness }).toEqual({ ids: [park], hardness: "soft" });
+    // 같은 뜻의 두 모양: 휴무를 대상 날짜 수만큼(in O, min) 또는 근무를 0번(not_in O, max 0)
+    const { shifts, min, max } = pref.params;
+    const offWish = (shifts.in?.join() === "O" && min != null) || (shifts.not_in?.join() === "O" && max === 0);
+    expect(offWish, `휴무 희망 모양: ${JSON.stringify(pref.params)}`).toBe(true);
     const weekendOnly =
       pref.params.days?.kind === "weekend" || (pref.params.days?.days ?? []).every((d) => NOV_WEEKEND_DAYS.includes(d));
     expect(weekendOnly, "주말·공휴일만 대상").toBe(true);
@@ -417,7 +423,7 @@ test("S9. ② 근무표 만들기", async () => {
 
   const stats = sectionWith("개인별 통계");
   await expect(stats.locator("tbody tr")).toHaveCount(NURSE_COUNT);
-  for (const h of ["D", "E", "N", "O", "주말·공휴일 근무", "최대 연속 근무", "희망 반영률", "평균보다 많은 근무일"]) {
+  for (const h of ["D", "E", "N", "O", "근무 시간", "주말·공휴일 근무", "최대 연속 근무", "희망 반영률", "평균보다 많은 근무일"]) {
     await expect(stats.getByRole("columnheader", { name: h, exact: true })).toBeVisible();
   }
   // 첫 근무표: 최근 4주 기록이 없어 열과 근거 한 줄을 그리지 않는다
@@ -434,11 +440,12 @@ test("S10. 근무표 없음 → 설명과 검증된 제안", async () => {
   await expect(page.getByRole("heading", { name: "요청", exact: true })).toBeVisible();
   for (const text of ["이영희, 박민수, 김철수, 정유진 20일 휴가", "최지훈, 강서연, 윤지민, 임하늘 20일 휴가"]) {
     const cards = await interpretOk(page, REQUEST_INPUT, "요청 만들기", text);
-    expect(cards.every((c) => leaveOf(c) !== null), `${text} → 휴가 카드`).toBe(true);
+    // 사람마다 한 장이어도, 여러 사람을 한 장에 묶어도 휴가 모양이면 된다
+    expect(cards.every((c) => leavesOf(c).length > 0), `${text} → 휴가 카드`).toBe(true);
     await applyAllPending(page);
   }
   const requests = (await periodByStart(page, NOV.start_date)).requests;
-  const offOn20 = new Set(requests.flatMap((c) => (leaveOf(c)?.days.includes(20) ? [leaveOf(c)!.nurse_id] : [])));
+  const offOn20 = new Set(requests.flatMap((c) => leavesOf(c).flatMap((l) => (l.days.includes(20) ? [l.nurse_id] : []))));
   expect(offOn20.size, "11/20 휴가 인원").toBe(8);
   const lee = await nurseId(page, "이영희");
   const leeLeave15 = (list: ConstraintSpec[]) =>

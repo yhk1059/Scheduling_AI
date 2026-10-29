@@ -8,9 +8,9 @@ import pytest
 from pydantic import TypeAdapter, ValidationError
 
 from backend.domain import constants
-from backend.domain.convert import convert_request
-from backend.domain.legacy import LegacyScheduleRequest
+from backend.domain.convert import NIGHT_ONLY_RULE_ID
 from backend.domain.models import (
+    DEFAULT_CONFIG,
     ConstraintSpec,
     ErrorBody,
     ExplainRequest,
@@ -233,13 +233,13 @@ def test_negative_years_rejected():
 # --- 샘플 ---
 
 
-def test_sample_ward_is_old_format_and_converts():
+def test_sample_ward_is_block_format():
     raw = json.loads(SAMPLE_PATH.read_text(encoding="utf-8"))
-    next_requests = raw.pop("next_requests")
-    assert next_requests
-    with pytest.raises(ValidationError):  # 샘플 파일은 아직 옛 형식(night_only, 템플릿)이다(step 10에서 바꾼다)
-        ScheduleRequest.model_validate(raw)
-    req = convert_request(LegacyScheduleRequest.model_validate(raw))
+    next_requests = TypeAdapter(list[ConstraintSpec]).validate_python(raw.pop("next_requests"))
+    assert next_requests and all(c.scope == "period" for c in next_requests)
+    req = ScheduleRequest.model_validate(raw)
+    assert req.config == DEFAULT_CONFIG
+    assert req.constraints[-1].id == NIGHT_ONLY_RULE_ID
     assert req.input_version == 0
     assert req.period == Period(start_date=date(2026, 11, 1), length=30)
     assert req.holidays == []

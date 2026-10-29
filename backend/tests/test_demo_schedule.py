@@ -1,11 +1,9 @@
-"""샘플 데모 근무표(lib/samples/demo-schedule.json): 샘플 병동의 고정된 한 달을 병동 규칙대로 풀어 둔 것(ADR-016).
-
-두 파일은 아직 옛 형식이다(step 10에서 바꾼다). 병동은 convert로 블록으로 바꿔 쓰고, 근무표는 배정만 읽는다.
-"""
+"""샘플 데모 근무표(lib/samples/demo-schedule.json): 샘플 병동의 고정된 한 달을 병동 규칙대로 풀어 둔 것(ADR-016)."""
 
 import json
 from pathlib import Path
 
+from backend.domain.constants import NIGHT_ONLY_TAG
 from backend.domain.convert import NIGHT_ONLY_RULE_ID
 from backend.domain.models import ScheduleRequest, SolveOk
 from backend.gen_demo import DEMO_PERIOD, demo_request
@@ -14,7 +12,7 @@ from backend.solver.model import solve
 ROOT = Path(__file__).resolve().parents[2]
 WARD = json.loads((ROOT / "lib" / "samples" / "ward-15.json").read_text(encoding="utf-8"))
 DEMO = json.loads((ROOT / "lib" / "samples" / "demo-schedule.json").read_text(encoding="utf-8"))
-NIGHT_ONLY = {n["id"] for n in WARD["nurses"] if n["night_only"]}
+NIGHT_ONLY = {n["id"] for n in WARD["nurses"] if NIGHT_ONLY_TAG in n["tags"]}
 
 
 def _assignments() -> dict[str, list[str]]:
@@ -30,25 +28,30 @@ def _max_run(row: list[str]) -> int:
 
 
 def test_sample_ward_rules():
-    rules = {c["type"]: c for c in WARD["constraints"] if c["type"] != "daily_coverage"}
+    rules = {c["id"]: c for c in WARD["constraints"] if not c["id"].startswith("cov-")}
     assert all(c["scope"] == "ward" for c in WARD["constraints"])
-    assert {t: (c["hardness"], c["params"].get("days")) for t, c in rules.items()} == {
-        "off_after_night_block": ("hard", 1),
-        "max_consecutive_work": ("hard", 5),
-        "max_consecutive_nights": ("hard", 3),
-        "min_days_off": ("hard", 8),
-        "night_fairness": ("soft", None),
-        "weekend_fairness": ("soft", None),
+    assert {cid: (c["type"], c["hardness"]) for cid, c in rules.items()} == {
+        "rule-noff": ("sequence", "hard"),
+        "rule-max-work": ("sequence", "hard"),
+        "rule-max-nights": ("sequence", "hard"),
+        "rule-min-off": ("count", "hard"),
+        "rule-night-fair": ("balance", "soft"),
+        "rule-weekend-fair": ("balance", "soft"),
+        NIGHT_ONLY_RULE_ID: ("count", "hard"),
     }
+    assert rules["rule-noff"]["params"]["then_off"] == 1
+    assert rules["rule-max-work"]["params"]["max_len"] == 5
+    assert rules["rule-max-nights"]["params"]["max_len"] == 3
+    assert rules["rule-min-off"]["params"]["min"] == 8
 
 
 def test_demo_request_uses_ward_rules_only():
     req = demo_request()
     assert req.period.model_dump(mode="json") == DEMO_PERIOD
     assert req.holidays == [] and req.carry_over == [] and req.previous is None
-    assert [c.id for c in req.constraints] == [c["id"] for c in WARD["constraints"]] + [NIGHT_ONLY_RULE_ID]
+    assert [c.id for c in req.constraints] == [c["id"] for c in WARD["constraints"]]
     assert {c.type for c in req.constraints} <= {"count", "sequence", "balance"}
-    assert {n.id for n in req.nurses if "나이트전담" in n.tags} == NIGHT_ONLY
+    assert {n.id for n in req.nurses if NIGHT_ONLY_TAG in n.tags} == NIGHT_ONLY
 
 
 def test_file_records_period():

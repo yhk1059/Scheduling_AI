@@ -160,7 +160,13 @@ function isPreference(c: ConstraintSpec): c is Extract<ConstraintSpec, { type: "
   if (c.type !== "count" || c.hardness !== "soft") return false;
   const p = c.params;
   const bounded = (p.max === 0 && p.min == null) || (p.min != null && p.max == null);
-  return p.per === "person" && (p.measure ?? "count") === "count" && p.people?.ids?.length === 1 && !!p.shifts.in && bounded;
+  return p.per === "person" && (p.measure ?? "count") === "count" && p.people?.ids?.length === 1 && (!!p.shifts.in || isOffWish(c)) && bounded;
+}
+
+/** 가능하면 + 휴가 모양(휴무 말고 0번) = 휴무 희망. */
+function isOffWish(c: Extract<ConstraintSpec, { type: "count" }>): boolean {
+  const p = c.params;
+  return c.hardness === "soft" && p.shifts.not_in?.length === 1 && p.shifts.not_in[0] === OFF && p.max === 0 && p.min == null;
 }
 
 /** 카드 제목: 블록 모양의 이름. 맞는 이름이 없으면 세는 규칙·순서 규칙·고르게 규칙. */
@@ -209,7 +215,7 @@ function describeCount(c: Extract<Block, { type: "count" }>, config: WardConfig,
   const shifts = shiftsLabel(p.shifts, config);
   if (isLeaveRule(c) || isPreference(c)) {
     const name = nurseLabel(p.people!.ids![0], nurses);
-    const what = isLeaveRule(c) ? "휴무" : `${shifts} ${p.max === 0 ? "피하기" : "희망"}`;
+    const what = isLeaveRule(c) ? "휴무" : isOffWish(c) ? "휴무 희망" : `${shifts} ${p.max === 0 ? "피하기" : "희망"}`;
     return `${name} · ${when || "근무표 전체"} · ${what}`;
   }
   const hours = p.measure === "hours";

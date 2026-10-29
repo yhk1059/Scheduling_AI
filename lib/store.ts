@@ -284,7 +284,8 @@ const nurseId = (no: number) => `n${String(no).padStart(2, "0")}`;
 
 /** 휴가 모양: 한 사람 × 날짜에 근무 없음(per=person, not_in [O], max 0). 항상 hard로 다룬다. */
 export function isLeaveRule(c: ConstraintSpec): boolean {
-  if (c.type !== "count") return false;
+  // 가능하면이면 휴가가 아니라 휴무 희망이다(휴가는 항상 반드시)
+  if (c.type !== "count" || (c.hardness ?? "hard") !== "hard") return false;
   const p = c.params;
   return (
     p.per === "person" &&

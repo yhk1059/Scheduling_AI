@@ -7,6 +7,7 @@ import wardOct from "./fixtures/ward-oct.json";
 import type { PeriodRange } from "../lib/period";
 import { historyLoadFor, type HistoryLoad } from "../lib/continuity";
 import { DEFAULT_CONFIG } from "../lib/migrate";
+import type { Ward } from "../lib/store";
 import type { ScheduleRequest } from "../lib/types.gen";
 import {
   CARRY_OVER_DAYS,
@@ -93,7 +94,22 @@ test("S3. 운영 중인 병동: 다음 근무표 만들기와 게스트 확정",
 
   // 병동 홈
   await expect(page.getByRole("heading", { name: "외과 병동", level: 1 })).toBeVisible();
-  await expect(page.getByRole("main")).toContainText("간호사 15명 · 병동 규칙 6개 · 한 달 단위");
+
+  // D3은 옛 저장본(v4)이다. 열면 v5로 바뀐다: 옛 규칙이 모두 같은 id의 블록이 되고, 바꾸지 못한 규칙이 없다
+  const stored = await page.evaluate(() => JSON.parse(localStorage.getItem("nurse-scheduler")!));
+  expect(wardOct.version, "fixture는 v4").toBe(4);
+  expect(stored.version, "저장본 버전").toBe(5);
+  const oldRules = wardOct.state.ward.rules;
+  const rules = (stored.state as { ward: Ward }).ward.rules;
+  expect(rules.map((r) => r.id), "옛 규칙 + 기본 규칙").toEqual([...oldRules.map((r) => r.id), "night-only"]);
+  expect(rules.every((r) => ["count", "sequence", "balance"].includes(r.type)), "모두 블록").toBe(true);
+  expect(stored.state.ward.unconverted ?? [], "바꾸지 못한 규칙").toEqual([]);
+  expect(stored.state.ward.config).toEqual(DEFAULT_CONFIG);
+  expect(
+    stored.state.ward.nurses.filter((n: { tags: string[] }) => n.tags.includes("나이트전담")).map((n: { name: string }) => n.name),
+  ).toEqual(["문가람", "배수아"]);
+  // 옛 규칙 6개가 모두 변환되고 기본 규칙(나이트 전담은 나이트와 휴무만)이 더해진다
+  await expect(page.getByRole("main")).toContainText("간호사 15명 · 병동 규칙 7개 · 한 달 단위");
   const operating = sectionWith("10월 근무표");
   await expect(operating.getByText("운영 중", { exact: true })).toBeVisible();
   await expect(operating).toContainText("2026.10.1 – 10.31");
@@ -217,6 +233,10 @@ test("S4. 운영 중 변경 → 최소 변경 → 다시 확정 → 다음 근�
   await expect(page.getByRole("list", { name: "근무표 작성 단계" })).toHaveCount(0);
   await expect(scheduleTitle(page)).toBeVisible();
   await expect(primaryButtons(page)).toHaveCount(1); // [요청 만들기]만. [CSV 받기]는 Secondary
+  // 변환 전에 확정한 결과는 배정으로 통계를 다시 세고, 희망 반영·못 지킨 규칙을 숨긴다
+  const legacyNote = page.getByText("변환 전에 확정한 근무표예요. 희망 반영과 못 지킨 규칙은 보여 주지 않아요.");
+  await expect(legacyNote).toBeVisible();
+  await expect(sectionWith("개인별 통계").locator("tbody tr")).toHaveCount(NURSE_COUNT);
   await expect(page.getByRole("button", { name: "CSV 받기" })).toBeVisible();
 
   // 지난 날짜(10/1~10/27) 잠금
@@ -248,6 +268,7 @@ test("S4. 운영 중 변경 → 최소 변경 → 다시 확정 → 다음 근�
 
   await expect(page.getByText("규칙을 모두 지켰어요", { exact: true })).toBeVisible();
   await expect(page.getByText("작성 중", { exact: true })).toBeVisible();
+  await expect(legacyNote, "다시 만든 결과는 새 형식").toHaveCount(0);
   await expect(page.getByText("확정본에서 바뀐 칸", { exact: true })).toBeVisible();
   const locks = (lastSolve!.constraints ?? []).filter((c) => c.id.startsWith("lock-"));
   expect(locks, "지난 날짜 잠금이 요청에 들어감").toHaveLength(NURSE_COUNT * (TODAY - 1));
