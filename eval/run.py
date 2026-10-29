@@ -1,18 +1,23 @@
 """LLM 번역 정확도 eval.
 
-uv run python eval/run.py [--dry-run] [--limit N] [--ids r01,r02]
+uv run python eval/run.py [--dry-run] [--gate] [--limit N] [--ids r01,r02]
 
 --dry-run은 API를 호출하지 않고 데이터셋만 검증한다. 실행 모드는 결과를 eval/results.md에 쓴다.
+--gate는 set별 완전 일치율과 스키마 유효율이 목표(GATE_*) 미만이면 exit 1.
+
+채점은 의미 기준이다(설계 §7). 고정 시드 무작위 근무표와, 기대 블록의 대상 칸을 뒤집은 근무표에서
+stats.violations의 위반 집합이 모두 같고 hardness(soft면 priority도)가 같으면 같은 규칙으로 본다.
 """
 
 import argparse
 import json
 import math
 import os
+import random
 import sys
 import time
 from collections import Counter
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import date, datetime
 from pathlib import Path
 from typing import Any
@@ -23,31 +28,67 @@ if str(ROOT) not in sys.path:
 
 from pydantic import BaseModel, TypeAdapter, ValidationError  # noqa: E402
 
+from backend.domain.constants import CARRY_OVER_DAYS, NIGHT_ONLY_TAG, OFF_CODE  # noqa: E402
 from backend.domain.convert import legacy_to_block  # noqa: E402
 from backend.domain.models import (  # noqa: E402
+    DEFAULT_CONFIG,
     ConstraintSpec,
     Nurse,
     Period,
     ScheduleRequest,
+    ShiftChange,
+    Shifts,
     TranslateContext,
     TranslateRequest,
+    WardConfig,
 )
 from backend.env import load_local_env  # noqa: E402
-from backend.llm.client import AnthropicClient, LLMClient, LLMConfigError, ToolCallResult  # noqa: E402
+from backend.llm.client import (  # noqa: E402
+    AnthropicClient,
+    LLMClient,
+    LLMConfigError,
+    ToolCallResult,
+)
 from backend.llm.translator import translate  # noqa: E402
+from backend.solver import select  # noqa: E402
+from backend.solver.stats import violations  # noqa: E402
 
 DATASET = ROOT / "eval" / "dataset.jsonl"
 RESULTS = ROOT / "eval" / "results.md"
 SAMPLE = ROOT / "lib" / "samples" / "ward-15.json"
 STATUSES = ("ok", "clarify", "unsupported")
 SCOPES = ("ward", "period")
+SETS = ("legacy", "new")
+EXPECTED_TYPES = ("count", "sequence", "balance", "fixed_assignment")
+
+# 게이트 목표(사용자 결정 ★9). 낮추지 않는다
+GATE_EXACT = {"legacy": 0.95, "new": 0.85}
+GATE_SCHEMA_VALID = 1.0
+
+# 의미 판정: 무작위 근무표 수, 기대 블록마다 대상 칸을 뒤집은 근무표 수, 시드
+K_RANDOM = 50
+FLIPS_PER_BLOCK = 4
+SEED = 20261030
+
+# eval 병동 = 샘플 병동 + 태그(책임 2명, 신규 3명). night_only는 나이트전담 태그로 바꾼다
+EVAL_TAGS = {"n01": ["책임"], "n06": ["책임"], "n11": ["신규"], "n12": ["신규"], "n13": ["신규"]}
 
 _spec_adapter = TypeAdapter(ConstraintSpec)
 _FILLER = {"id": "eval", "scope": "ward", "source_text": "eval", "weight": 1}
+_DUMP_EXCLUDE = {"id", "scope", "source_text", "enabled", "weight"}
 
 
 def _ward() -> dict:
-    return json.loads(SAMPLE.read_text(encoding="utf-8"))
+    ward = json.loads(SAMPLE.read_text(encoding="utf-8"))
+    nurses = []
+    for n in ward["nurses"]:
+        tags = EVAL_TAGS.get(n["id"], []) + ([NIGHT_ONLY_TAG] if n.get("night_only") else [])
+        nurses.append({k: v for k, v in n.items() if k != "night_only"} | {"tags": tags})
+    return {**ward, "nurses": nurses}
+
+
+def _known_tags(ward: dict) -> set[str]:
+    return {t for n in ward["nurses"] for t in n["tags"]} | {NIGHT_ONLY_TAG}
 
 
 def load_dataset(path: Path) -> list[dict]:
@@ -55,49 +96,148 @@ def load_dataset(path: Path) -> list[dict]:
     return [json.loads(line) for line in lines if line.strip()]
 
 
+# --- 근무 형태 ---
+
+
+def _apply_changes(config: WardConfig, changes: list, only_new: bool = False) -> tuple[WardConfig, list[str]]:
+    """설정 변경을 적용한다. only_new면 아직 없는 코드의 add만(실제 출력의 코드를 판정 근무표에 넣을 때)."""
+    shifts = {s.code: s for s in config.shifts}
+    errors = []
+    for i, ch in enumerate(changes):
+        ch = ch if isinstance(ch, ShiftChange) else ShiftChange.model_validate(ch)
+        code = ch.shift.code
+        if only_new:
+            if ch.action == "add" and code not in shifts:
+                shifts[code] = ch.shift
+            continue
+        if code == OFF_CODE:
+            errors.append(f"config_changes.{i}: {OFF_CODE}는 바꿀 수 없음")
+        elif (ch.action == "add") == (code in shifts):
+            errors.append(f"config_changes.{i}: {ch.action} {code}")
+        else:
+            shifts[code] = ch.shift
+    return WardConfig(shifts=list(shifts.values())), errors
+
+
+def judge_config(expected_changes: list, actual_changes: list = ()) -> WardConfig:
+    """판정 근무표의 근무 형태: 기본 + 기대 설정 변경 + 실제 출력이 새로 더한 코드."""
+    config, _ = _apply_changes(DEFAULT_CONFIG, expected_changes)
+    try:
+        config, _ = _apply_changes(config, list(actual_changes), only_new=True)
+    except ValidationError:  # 실제 출력이 근무 형태를 깨면 기대 근무 형태로만 판정한다(블록은 불일치가 된다)
+        pass
+    return config
+
+
 # --- 채점 ---
 
 
-def _spec(c: dict | BaseModel) -> Any:
-    if isinstance(c, BaseModel):
-        return c
-    return _spec_adapter.validate_python({**_FILLER, **c})
+def _period(case: dict | None, ward: dict) -> tuple[Period, list[int]]:
+    case = case or {}
+    return Period(**case.get("period", ward["period"])), case.get("holidays", ward["holidays"])
 
 
-def _sorted(v: Any) -> Any:
-    """리스트를 (셀렉터 안쪽까지) 정렬한다. 금지 패턴 한 개(셀렉터 리스트)는 순서가 뜻이라 그대로 둔다."""
-    if isinstance(v, dict):
-        return {k: _sorted(x) for k, x in v.items()}
-    if not isinstance(v, list):
-        return v
-    items = [_sorted(x) for x in v]
-    if any(isinstance(x, dict) for x in items):
-        return items
+def _spec(c: dict | BaseModel, period: Period | None = None, holidays: list[int] = ()) -> Any:
+    """기대·실제 제약을 스펙으로. 템플릿이면 변환표로 블록을 만든다."""
+    spec = c if isinstance(c, BaseModel) else _spec_adapter.validate_python({**_FILLER, **c})
+    return legacy_to_block(spec, period, holidays)
+
+
+def _dump(spec: Any) -> dict:
+    return _spec_adapter.dump_python(spec, mode="json", exclude=_DUMP_EXCLUDE, exclude_defaults=True)
+
+
+def _with_cells(assignments: dict[str, list[str]], cells: list[tuple[str, int]], codes: list[str], rng: random.Random, mode: str) -> dict:
+    out = {nid: list(row) for nid, row in assignments.items()}
+    for nid, d in cells:
+        if mode == "half" and rng.random() < 0.5:
+            continue
+        out[nid][d - 1] = rng.choice(codes)
+    return out
+
+
+def _target(request: ScheduleRequest, spec: Any) -> tuple[list[tuple[str, int]], Shifts]:
+    """블록의 대상 칸(기간 안)과 그 칸을 세는 근무 셀렉터."""
+    p = spec.params
+    if spec.type == "fixed_assignment":
+        return [(p.nurse_id, p.day)], Shifts(in_=[p.shift])
+    if spec.type == "count":
+        cells = [cell for _, _, cs in select.count_groups(request, p) for cell in cs if cell[1] >= 1]
+        return cells, p.shifts
+    if spec.type == "balance":
+        return [(n, d) for n, ds in select.balance_cells(request, p).items() for d in ds], p.shifts
+    sel = p.run or p.after or p.forbid[0][0]
+    return [(n, d) for n in select.people(request, p.people) for d in range(1, request.period.days + 1)], sel
+
+
+def judge_schedules(case: dict | None, config: WardConfig, expected: list) -> list[tuple[ScheduleRequest, dict]]:
+    """판정 근무표: 무작위 K_RANDOM개(이월 포함) + 기대 블록마다 대상 칸을 뒤집은 FLIPS_PER_BLOCK개. 고정 시드."""
+    ward = _ward()
+    period, holidays = _period(case, ward)
+    rng = random.Random(SEED)
+    codes = [s.code for s in config.shifts if s.active]
+    ids = [n["id"] for n in ward["nurses"]]
+    base = {"config": config, "nurses": ward["nurses"], "period": period, "holidays": holidays, "input_version": 0}
+
+    out = []
+    for _ in range(K_RANDOM):
+        carry = [{"nurse_id": nid, "shifts": rng.choices(codes, k=CARRY_OVER_DAYS)} for nid in ids]
+        assignments = {nid: rng.choices(codes, k=period.days) for nid in ids}
+        out.append((ScheduleRequest.model_validate({**base, "carry_over": carry}), assignments))
+
+    for i, spec in enumerate(expected):
+        request, assignments = out[i % K_RANDOM]
+        cells, sel = _target(request, spec)
+        match = [c for c in codes if select.matches(config, c, sel)]
+        other = [c for c in codes if c not in match]
+        for mode, pool in (("all", match), ("all", other), ("half", match), ("half", other))[:FLIPS_PER_BLOCK]:
+            if cells and pool:
+                out.append((request, _with_cells(assignments, cells, pool, rng, mode)))
+    return out
+
+
+def _signature(spec: Any, schedules: list[tuple[ScheduleRequest, dict]]) -> Any:
+    """근무표마다 위반 집합 {(사람 묶음, 날)}. 사람 없는 위반(날마다·고르게)은 블록이 고른 사람 전체로 본다."""
     try:
-        return sorted(items)
-    except TypeError:  # 금지 패턴 목록(리스트의 리스트)
-        return sorted(items, key=lambda x: json.dumps(x, sort_keys=True, ensure_ascii=False))
+        sig = []
+        for request, assignments in schedules:
+            if spec.type == "fixed_assignment":
+                everyone = frozenset({spec.params.nurse_id})
+            else:
+                everyone = frozenset(select.people(request, spec.params.people))
+            found = violations(request, assignments, spec)
+            sig.append(frozenset((frozenset({v.nurse_id}) if v.nurse_id else everyone, v.day) for v in found))
+        return tuple(sig)
+    except (KeyError, StopIteration, ValueError):  # 판정 근무 형태에 없는 코드 등: 어떤 것과도 같지 않다
+        return object()
 
 
-def _block(spec: Any) -> Any:
-    """템플릿 기대값을 블록으로 바꿔 블록 출력과 비교한다. 기간이 필요한 희망 근무는 그대로 둔다."""
-    try:
-        return legacy_to_block(spec)
-    except ValueError:
-        return spec
+def _judge_key(spec: Any, schedules: list) -> tuple:
+    priority = getattr(spec, "priority", None) if spec.hardness == "soft" else None
+    return (_signature(spec, schedules), spec.hardness, priority)
 
 
-def _key(c: dict | BaseModel) -> str:
-    """비교 키: type, hardness, params(리스트는 정렬). id·source_text·weight·scope는 무시한다."""
-    spec = _block(_spec(c))
-    params = _sorted(spec.params.model_dump(mode="json"))
-    return json.dumps({"type": spec.type, "hardness": spec.hardness, "params": params}, sort_keys=True, ensure_ascii=False)
+def score_constraints(expected: list, actual: list, case: dict | None = None, config: WardConfig | None = None) -> tuple[int, int, int]:
+    """의미 기준 일대일 매칭. (일치 수, 기대 수, 실제 수)."""
+    period, holidays = _period(case, _ward())
+    config = config or judge_config([])
+    exp = [_spec(c, period, holidays) for c in expected]
+    act = [_spec(c, period, holidays) for c in actual]
+    schedules = judge_schedules(case, config, exp)
+    e = Counter(_judge_key(s, schedules) for s in exp)
+    a = Counter(_judge_key(s, schedules) for s in act)
+    return sum((e & a).values()), len(exp), len(act)
 
 
-def score_constraints(expected: list, actual: list) -> tuple[int, int, int]:
-    """순서 무관 다중집합 매칭. (일치 수, 기대 수, 실제 수)."""
-    exp, act = Counter(map(_key, expected)), Counter(map(_key, actual))
-    return sum((exp & act).values()), len(expected), len(actual)
+def _change_key(ch: dict | ShiftChange) -> tuple:
+    shift = (ch if isinstance(ch, ShiftChange) else ShiftChange.model_validate(ch)).shift
+    return (shift.code, shift.hours, tuple(sorted(shift.parts)))
+
+
+def score_config_changes(expected: list, actual: list) -> tuple[int, int, int]:
+    """근무 형태 변경: 코드·hours·parts가 같으면 일치."""
+    e, a = Counter(map(_change_key, expected)), Counter(map(_change_key, actual))
+    return sum((e & a).values()), len(expected), len(actual)
 
 
 # --- 데이터셋 검증 ---
@@ -105,6 +245,7 @@ def score_constraints(expected: list, actual: list) -> tuple[int, int, int]:
 
 def validate_dataset(cases: list[dict]) -> list[str]:
     ward = _ward()
+    known_tags = _known_tags(ward)
     errors: list[str] = []
     ids = [c.get("id") for c in cases]
     dups = sorted({i for i in ids if ids.count(i) > 1})
@@ -116,6 +257,9 @@ def validate_dataset(cases: list[dict]) -> list[str]:
         expected = c.get("expected", {})
         status = expected.get("status")
         constraints = expected.get("constraints", [])
+        changes = expected.get("config_changes", [])
+        if c.get("set") not in SETS:
+            errors.append(f"{cid}: set 값 {c.get('set')!r}")
         if status not in STATUSES:
             errors.append(f"{cid}: status 값 {status!r}")
         if c.get("scope") not in SCOPES:
@@ -126,15 +270,22 @@ def validate_dataset(cases: list[dict]) -> list[str]:
             errors.append(f"{cid}: today 형식 {c.get('today')!r}")
         if not c.get("text"):
             errors.append(f"{cid}: text 없음")
-        if status == "ok" and not constraints:
-            errors.append(f"{cid}: ok인데 constraints가 비었음")
-        if status in ("clarify", "unsupported") and constraints:
-            errors.append(f"{cid}: {status}인데 constraints가 있음")
+        if status == "ok" and not constraints and not changes:
+            errors.append(f"{cid}: ok인데 constraints와 config_changes가 비었음")
+        if status in ("clarify", "unsupported") and (constraints or changes):
+            errors.append(f"{cid}: {status}인데 constraints나 config_changes가 있음")
+        bad_types = [x.get("type") for x in constraints if x.get("type") not in EXPECTED_TYPES]
+        if bad_types:
+            errors.append(f"{cid}: 블록이 아닌 type {bad_types}")
+            continue
 
         try:
+            config, change_errors = _apply_changes(DEFAULT_CONFIG, changes)
+            errors += [f"{cid}: {e}" for e in change_errors]
             specs = [{**_FILLER, **x, "id": f"{cid}-{i}", "scope": c.get("scope")} for i, x in enumerate(constraints)]
-            ScheduleRequest.model_validate(
+            req = ScheduleRequest.model_validate(
                 {
+                    "config": config,
                     "nurses": ward["nurses"],
                     "period": c.get("period", ward["period"]),
                     "holidays": c.get("holidays", ward["holidays"]),
@@ -145,6 +296,12 @@ def validate_dataset(cases: list[dict]) -> list[str]:
         except ValidationError as e:
             msgs = "; ".join(f"{'.'.join(map(str, err['loc']))}: {err['msg']}" for err in e.errors(include_input=False))
             errors.append(f"{cid}: {msgs}")
+            continue
+        for spec in req.constraints:
+            people = getattr(spec.params, "people", None)
+            tags = set(people.tags or []) | set(people.exclude_tags) if people else set()
+            if tags - known_tags:
+                errors.append(f"{cid}: eval 병동에 없는 태그 {sorted(tags - known_tags)}")
     return errors
 
 
@@ -172,17 +329,19 @@ class CaseResult:
     text: str
     expected: dict
     status: str | None  # 예외면 None
-    actual: list[dict]  # 비교 키 기준 제약(type·hardness·params)
+    actual: list[dict]  # 블록(id·scope·source_text·enabled·weight 제외)
     detail: str | None  # clarify 질문, unsupported 이유
     error: str | None
     retries: int
     latency_s: float
     input_tokens: int
     output_tokens: int
-    tp: int
+    tp: int  # 제약 + 근무 형태 변경
     n_expected: int
     n_actual: int
     exact: bool
+    set: str = "legacy"
+    actual_changes: list[dict] = field(default_factory=list)  # 실제 근무 형태 변경(ShiftDef)
 
 
 def _request(case: dict, ward: dict) -> TranslateRequest:
@@ -203,13 +362,14 @@ def run_case(case: dict, client: LLMClient, ward: dict) -> CaseResult:
     metered = _MeteredClient(client)
     expected = case["expected"]
     exp_constraints = expected.get("constraints", [])
-    status, actual, detail, error = None, [], None, None
+    exp_changes = expected.get("config_changes", [])
+    status, actual, changes, detail, error = None, [], [], None, None
     start = time.perf_counter()
     try:
         res = translate(_request(case, ward), metered)
         status = res.status
         if status == "ok":
-            actual = res.constraints
+            actual, changes = res.constraints, res.config_changes
         else:
             detail = res.question if status == "clarify" else res.reason
     except LLMConfigError:
@@ -218,14 +378,17 @@ def run_case(case: dict, client: LLMClient, ward: dict) -> CaseResult:
         error = f"{type(e).__name__}: {e}"
     latency = time.perf_counter() - start
 
-    tp, n_exp, n_act = score_constraints(exp_constraints, actual)
+    config = judge_config(exp_changes, changes)
+    tp, n_exp, n_act = score_constraints(exp_constraints, actual, case, config)
+    ctp, cn_exp, cn_act = score_config_changes(exp_changes, changes)
+    tp, n_exp, n_act = tp + ctp, n_exp + cn_exp, n_act + cn_act
     exact = status == expected["status"] and tp == n_exp == n_act
     return CaseResult(
         id=case["id"],
         text=case["text"],
         expected=expected,
         status=status,
-        actual=[json.loads(_key(c)) for c in actual],
+        actual=[_dump(c) for c in actual],
         detail=detail,
         error=error,
         retries=max(metered.calls - 1, 0),
@@ -236,6 +399,8 @@ def run_case(case: dict, client: LLMClient, ward: dict) -> CaseResult:
         n_expected=n_exp,
         n_actual=n_act,
         exact=exact,
+        set=case.get("set", "legacy"),
+        actual_changes=[ch.shift.model_dump(mode="json") for ch in changes],
     )
 
 
@@ -293,6 +458,22 @@ def aggregate(results: list[CaseResult]) -> dict[str, Any]:
     }
 
 
+def aggregate_by_set(results: list[CaseResult]) -> dict[str, dict[str, Any]]:
+    return {s: aggregate([r for r in results if r.set == s]) for s in SETS if any(r.set == s for r in results)}
+
+
+def gate_failures(metrics: dict, by_set: dict[str, dict]) -> list[str]:
+    """목표 미달 항목. 비어 있으면 통과."""
+    out = []
+    if (metrics["schema_valid_rate"] or 0) < GATE_SCHEMA_VALID:
+        out.append(f"스키마 유효율 {metrics['schema_valid_rate']:.1%} < {GATE_SCHEMA_VALID:.0%}")
+    for s, target in GATE_EXACT.items():
+        rate = by_set.get(s, {}).get("exact_match_rate")
+        if rate is None or rate < target:
+            out.append(f"{s} 완전 일치율 {'-' if rate is None else f'{rate:.1%}'} < {target:.0%}")
+    return out
+
+
 # --- 결과 파일 ---
 
 _LABELS = [
@@ -318,19 +499,31 @@ def _cell(value: Any) -> str:
     return text.replace("|", "\\|").replace("\n", " ")
 
 
-def write_results(path: Path, metrics: dict, results: list[CaseResult], model: str) -> None:
+def _pct(v: float | None) -> str:
+    return "-" if v is None else f"{v:.1%}"
+
+
+def write_results(path: Path, metrics: dict, results: list[CaseResult], model: str, by_set: dict | None = None) -> None:
+    by_set = by_set if by_set is not None else aggregate_by_set(results)
     lines = [
         "# 번역 eval 결과",
         "",
         f"- 실행 시각: {datetime.now().astimezone().isoformat(timespec='seconds')}",
         f"- 모델: `{model}`",
         f"- 데이터셋: `eval/dataset.jsonl` ({metrics['cases']}개)",
+        f"- 판정: 의미 기준(무작위 근무표 {K_RANDOM}개 + 기대 블록마다 대상 칸을 뒤집은 근무표 {FLIPS_PER_BLOCK}개, 시드 {SEED})",
         "",
-        "## 지표",
+        "## set별 지표",
         "",
-        "| 지표 | 값 |",
-        "|---|---|",
+        "| set | 케이스 | 완전 일치율 | 목표 | status 정확도 | 제약 F1 | 스키마 유효율 |",
+        "|---|---|---|---|---|---|---|",
     ]
+    for s, m in by_set.items():
+        lines.append(
+            f"| {s} | {m['cases']} | {_pct(m['exact_match_rate'])} | ≥ {GATE_EXACT[s]:.0%} | {_pct(m['status_accuracy'])} "
+            f"| {_pct(m['f1'])} | {_pct(m['schema_valid_rate'])} |"
+        )
+    lines += ["", "## 전체 지표", "", "| 지표 | 값 |", "|---|---|"]
     for key, label, fmt in _LABELS:
         value = metrics[key]
         lines.append(f"| {label} | {'-' if value is None else fmt.format(value)} |")
@@ -338,18 +531,22 @@ def write_results(path: Path, metrics: dict, results: list[CaseResult], model: s
     failures = [r for r in results if not r.exact]
     lines += ["", f"## 실패 케이스 ({len(failures)}개)", ""]
     if failures:
-        lines += ["| id | 입력 | 기대값 | 실제값 |", "|---|---|---|---|"]
+        lines += ["| id | set | 입력 | 기대값 | 실제값 |", "|---|---|---|---|---|"]
         for r in failures:
             expected = r.expected["status"]
             if expected == "ok":
-                expected = f"ok {_cell(r.expected['constraints'])}"
+                expected = f"ok {_cell(r.expected.get('constraints', []))}"
+                if r.expected.get("config_changes"):
+                    expected += f" 설정 {_cell(r.expected['config_changes'])}"
             if r.error:
                 actual = f"오류 {r.error}"
             elif r.status == "ok":
                 actual = f"ok {_cell(r.actual)}"
+                if r.actual_changes:
+                    actual += f" 설정 {_cell(r.actual_changes)}"
             else:
                 actual = f"{r.status}: {r.detail}"
-            lines.append(f"| {r.id} | {_cell(r.text)} | {_cell(expected)} | {_cell(actual)} |")
+            lines.append(f"| {r.id} | {r.set} | {_cell(r.text)} | {_cell(expected)} | {_cell(actual)} |")
     else:
         lines.append("없음")
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
@@ -368,6 +565,7 @@ def _select(cases: list[dict], ids: str | None, limit: int | None) -> list[dict]
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="LLM 번역 정확도 eval")
     parser.add_argument("--dry-run", action="store_true", help="API를 호출하지 않고 데이터셋만 검증")
+    parser.add_argument("--gate", action="store_true", help="목표(GATE_*) 미만이면 exit 1")
     parser.add_argument("--limit", type=int)
     parser.add_argument("--ids", help="쉼표로 구분한 케이스 id")
     args = parser.parse_args(argv)
@@ -381,8 +579,9 @@ def main(argv: list[str] | None = None) -> int:
     cases = _select(cases, args.ids, args.limit)
 
     if args.dry_run:
-        counts = Counter(c["expected"]["status"] for c in cases)
-        print(f"dry-run 통과: {len(cases)}개 케이스 {dict(counts)}")
+        statuses = Counter(c["expected"]["status"] for c in cases)
+        sets = Counter(c["set"] for c in cases)
+        print(f"dry-run 통과: {len(cases)}개 케이스 {dict(sets)} {dict(statuses)}")
         return 0
 
     load_local_env(str(ROOT / ".env.local"))
@@ -397,8 +596,15 @@ def main(argv: list[str] | None = None) -> int:
         return 2
 
     metrics = aggregate(results)
-    write_results(RESULTS, metrics, results, model=client.model)
-    print(f"결과: {RESULTS.relative_to(ROOT)} (완전 일치 {metrics['exact_match_rate']:.1%}, F1 {metrics['f1']:.1%})")
+    by_set = aggregate_by_set(results)
+    write_results(RESULTS, metrics, results, model=client.model, by_set=by_set)
+    rates = ", ".join(f"{s} {_pct(m['exact_match_rate'])}" for s, m in by_set.items())
+    print(f"결과: {os.path.relpath(RESULTS, ROOT)} (완전 일치 {rates}, 스키마 유효율 {_pct(metrics['schema_valid_rate'])})")
+    if args.gate:
+        failures = gate_failures(metrics, by_set)
+        for f in failures:
+            print(f"게이트 미달: {f}", file=sys.stderr)
+        return 1 if failures else 0
     return 0
 
 
