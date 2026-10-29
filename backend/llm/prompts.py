@@ -91,6 +91,8 @@ TRANSLATE_SYSTEM = f"""\
 - 휴가 "n01 15~17일 휴가": count {{people {{ids [n01]}}, days {{days [15,16,17]}}, shifts {{not_in [O]}}, per person, max 0}}, hard
 - 희망 "n02 20일 데이 희망": count {{people {{ids [n02]}}, days {{days [20]}}, shifts {{in [D]}}, per person, min 1}}, soft
   (희망은 min = 대상 날짜 수, 기피 "n02 주말 나이트 빼 주세요"는 days {{kind weekend}}, shifts {{in [N]}}, max 0, soft. days를 생략하면 기간 전체)
+- 고정 "n03 25일 나이트로 고정", "n05 4일 데이로 박아줘": count {{people {{ids [n03]}}, days {{days [25]}}, shifts {{in [N]}}, per person, min 1}}, hard.
+  "고정", "박아", "넣어 줘"처럼 그 날 근무를 정하는 말은 희망이 아니라 hard다(priority 없음)
 - 금지 순서 "나이트 다음 날 데이 금지": sequence {{forbid [[{{in [N]}}, {{in [D]}}]]}}
 - 연속 근무 "5일 넘게 연속 근무 안 하게": sequence {{run {{not_in [O]}}, max_len 5}}
 - 연속 나이트 "나이트 3연속까지": sequence {{run {{in [N]}}, max_len 3}}
@@ -99,6 +101,7 @@ TRANSLATE_SYSTEM = f"""\
 - 나이트 고르게: balance {{people {{exclude_tags [{NIGHT_ONLY_TAG}]}}, shifts {{in [N]}}}}
 - 주말·공휴일 근무 고르게: balance {{days {{kind weekend}}, shifts {{not_in [O]}}}}
 - 주 52시간: count {{shifts {{not_in [O]}}, per person_week, measure hours, max 52}}
+- 기간 전체 근무 시간 "근무표마다 160시간 이하": count {{shifts {{not_in [O]}}, per person, measure hours, max 160}}
 - 7일 중 휴무 1일 이상: count {{shifts {{in [O]}}, per person_window, window 7, min 1}}
 - 요일 "금요일엔 이브닝 3명": count {{days {{weekdays [4]}}, shifts {{in [E]}}, per day, min 3, max 3}}
 병동 규칙(scope "ward")은 모든 기간에 적용되고, 요청(scope "period")은 이번 기간에만 적용되는 요청이다. scope는 서버가 정하므로 출력하지 않는다.
@@ -110,8 +113,10 @@ TRANSLATE_SYSTEM = f"""\
 - "가능하면", "되도록", "희망", "웬만하면" → hardness "soft"
 - 강도 표현이 없으면 hardness를 생략한다(기본값: count와 sequence는 hard, balance는 soft). 희망·기피 요청은 soft로 낸다.
 - 휴가는 항상 hard다.
-- priority(high|normal|low)는 soft 규칙끼리의 중요도다. "제일 중요", "되도록이면 꼭" → high, "웬만하면", "가능하면" → normal,
-  "여유 되면", "그다지 중요하지 않은" → low. 표현이 없으면 생략한다(기본값: count·sequence는 normal, balance는 low).
+- priority(high|normal|low)는 soft 규칙끼리의 중요도다. 중요도를 따로 말했을 때만 쓴다.
+  "제일 중요해요", "이건 꼭 좀 들어줬으면", "되도록이면 꼭"(soft 말 + 꼭) 같은 중요도 말 → high, "여유 되면", "그다지 중요하지 않은" → low.
+  "되도록", "되도록이면", "가능하면", "웬만하면"은 soft라는 뜻일 뿐 중요도가 아니다. 중요도 말이 없으면 priority를 생략한다
+  (기본값: count·sequence는 normal, balance는 low).
 
 ## 근무 형태 변경 (config_changes)
 - "미드 근무 M 11시~19시 추가" → {{action add, shift {{code M, name 미드, hours 8, start "11:00"}}}}
