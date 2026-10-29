@@ -53,7 +53,10 @@
     {
       "step": 6,
       "name": "backend-cleanup",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-10-30T00:31:42+0900",
+      "summary": "백엔드를 블록 형식으로 정리: 템플릿 12종·LegacyShift·HistoryLoad·LegacyNurse(night_only)·LegacyScheduleRequest를 backend/domain/legacy.py로 옮김(convert·gen_golden·gen_demo·테스트만 import, solver·llm·routes는 안 씀), ConstraintSpec = count|sequence|balance|fixed_assignment; Nurse.night_only·ScheduleRequest.history_load 삭제(extra=forbid로 422), NurseStats는 counts·hours(필수) + 주말·공휴일 근무·최대 연속 근무·희망 반영률·편차(D/E/N/O 삭제); 솔버 템플릿 함수·TOGGLEABLE·CLAUSE_TEMPLATES·나이트 전담 특수 처리·history()/preference_days 삭제, hard/soft ADDERS는 블록 3종(+hard fixed_assignment), soft 여부는 hardness만 봄; DEFAULT_WEIGHT·DEFAULT_SOFT_WEIGHTS 삭제(_ConstraintBase 기본 weight = PRIORITY_WEIGHTS normal, legacy 공정성 기본은 low); llm의 night_only 태그 보정 삭제; convert_request(LegacyScheduleRequest) → ScheduleRequest(night_only → 나이트전담 태그 + 기본 규칙, history_load 버림); gen_golden은 solve_case + convert-cases.json만 쓰고 --check도 그것만 비교(케이스 빌더 삭제, cases.json 그대로); test_golden은 옛 솔버 재풀이 3종·summary 비교 삭제, 블록 동등성(목적값·hard 위반 0·infeasible 유지)은 convert_request + history_raw로 유지, 옛 요청이 새 ScheduleRequest에서 거부되는지 확인; gen_demo·test_demo_schedule은 옛 샘플을 legacy+convert로 풀고 demo-schedule.json은 배정만 읽음; eval/run.py 템플릿 변환 경로 삭제(--dry-run 79건 통과); 테스트: backend/tests/blocks.py(템플릿 이름의 블록 dict 빌더·history·sample_data)로 solver·domain·routes·conflicts·reschedule 테스트를 블록으로 바꾸고 옛 형식 422 테스트 추가(night_only, history_load, 템플릿 type, NurseStats D/E/N/O), gen_types union 4종. pytest 541·vitest 172, gen_golden --check·bench(10.5s ok, 충돌 4개에 night-only 포함)·build·lint·AC grep 통과. 결정: night_only_rule → night_dedicated_rule로 이름 변경(AC grep에 bench·explainer가 걸려서); 기본 규칙 함수는 convert.py에 그대로 둠; 나이트 전담 충돌은 이제 core에 night-only 규칙이 함께 나옴(test 기대값 갱신); 블록으로 푼 샘플 데모는 기록과 다른 동점 최적해가 나와 demo-schedule.json 재현은 검사하지 않음(step 10에서 다시 만듦); docs의 history_load 언급(BROWSER_TEST_SCENARIOS)과 lib/types.gen.ts는 step 7·10 범위라 그대로",
+      "completed_at": "2026-10-30T00:44:46+0900"
     },
     {
       "step": 7,
