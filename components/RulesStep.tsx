@@ -94,13 +94,17 @@ export default function RulesStep({ scope, pendingNote = true }: { scope: "ward"
       const { nurses, period: range, holidays } = period
         ? toScheduleRequest(ward, period, useAppStore.getState().periods, today())
         : {
-            nurses: ward.nurses.filter((n) => n.active).map(({ id, name, years, night_only }) => ({ id, name, years, night_only })),
+            nurses: ward.nurses.filter((n) => n.active).map(({ id, name, years, tags }) => ({ id, name, years, tags })),
             period: previewRange(ward.unit),
             holidays: [],
           };
-      const res = await translate({ text: input, scope, context: { nurses, period: range, holidays, today: today() } });
+      const res = await translate({
+        text: input,
+        scope,
+        context: { config: ward.config, nurses, period: range, holidays, today: today() },
+      });
       if (res.status === "ok") {
-        if (scope === "ward") addPendingRules(res.constraints);
+        if (scope === "ward") addPendingRules(res.constraints, res.config_changes ?? []);
         else addPendingRequests(period!.id, res.constraints);
         setText("");
       } else if (res.status === "clarify") {

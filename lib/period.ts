@@ -1,6 +1,6 @@
 // 기간 날짜 계산 (ADR-015). "YYYY-MM-DD"를 UTC 자정 기준 일수로만 다뤄 브라우저 타임존과 무관하게 한다.
 
-/** 병동의 기간 단위. 주 단위는 월요일에 시작한다. */
+/** 병동의 기간 단위. 첫 기간은 아무 날에서 시작할 수 있고(달력 월은 1~28일), 이후는 연속이다(ADR-018). */
 export type PeriodUnit = "1w" | "2w" | "4w" | "month";
 /** 백엔드 Period와 같은 모양. start_date는 "YYYY-MM-DD". */
 export interface PeriodRange {
@@ -23,6 +23,8 @@ export const PERIOD_UNITS: { value: PeriodUnit; label: string }[] = [
   { value: "month", label: "달력 월" },
 ];
 export const MAX_PERIOD_DAYS = 31; // backend/domain/constants.py와 같은 값
+/** 달력 월 단위의 시작일 상한(★11) */
+export const MAX_MONTH_START_DAY = 28;
 
 const WEEK_DAYS: Record<Exclude<PeriodUnit, "month">, number> = { "1w": 7, "2w": 14, "4w": 28 };
 const MS_PER_DAY = 86_400_000;
@@ -46,7 +48,7 @@ function daysInMonth(year: number, month: number): number {
   return new Date(Date.UTC(year, month, 0)).getUTCDate();
 }
 
-/** today 또는 그 이후의 첫 기간 시작일. 주 단위는 월요일, 달력 월은 1일. today가 이미 시작일이면 today. */
+/** 첫 근무표 시작일 기본 제안값: today 또는 그 이후의 첫 월요일(주 단위)·1일(달력 월). */
 export function firstPeriodStart(unit: PeriodUnit, today: string): string {
   const s = toSerial(today);
   const { year, month, dom, weekday } = parts(s);
@@ -57,19 +59,32 @@ export function firstPeriodStart(unit: PeriodUnit, today: string): string {
   return fromSerial(s + ((8 - weekday) % 7)); // 월요일(1)까지 남은 날
 }
 
-/** after(포함) 이후의 첫 유효 시작일에서 시작하는 기간. 달력 월이면 그 달의 일수, 주 단위면 7·14·28. */
-export function periodFrom(unit: PeriodUnit, after: string): PeriodRange {
-  const start_date = firstPeriodStart(unit, after);
-  if (unit === "month") {
-    const { year, month } = parts(toSerial(start_date));
-    return { start_date, length: daysInMonth(year, month) };
-  }
-  return { start_date, length: WEEK_DAYS[unit] };
+/** 시작일로 쓸 수 있는지. 달력 월은 1~28일만(다음 달에 같은 날이 있어야 한다). 주 단위는 아무 날. */
+export function validStart(unit: PeriodUnit, date: string): boolean {
+  return unit !== "month" || parts(toSerial(date)).dom <= MAX_MONTH_START_DAY;
 }
 
-/** 직전 기간 다음 날 이후의 첫 기간(연속한 다음 기간). */
+/**
+ * start에서 시작하는 기간. 주 단위는 7·14·28일, 달력 월은 다음 달 같은 날 전날까지(1일이면 그 달 전체).
+ * start가 유효한 시작일인지는 validStart로 따로 본다.
+ */
+export function periodFrom(unit: PeriodUnit, start: string): PeriodRange {
+  if (unit === "month") {
+    const { year, month } = parts(toSerial(start));
+    return { start_date: start, length: daysInMonth(year, month) };
+  }
+  return { start_date: start, length: WEEK_DAYS[unit] };
+}
+
+/** 직전 기간 다음 날에 시작하는 기간. 달력 월인데 그날이 29~31일이면 다음 달 1일에서 시작한다. */
 export function nextPeriod(unit: PeriodUnit, prev: PeriodRange): PeriodRange {
-  return periodFrom(unit, dateOfDay(prev, prev.length + 1));
+  const after = dateOfDay(prev, prev.length + 1);
+  return periodFrom(unit, validStart(unit, after) ? after : firstPeriodStart(unit, after));
+}
+
+/** 브라우저 시간대의 오늘 "YYYY-MM-DD". */
+export function localDate(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
 /** 마지막 날짜(포함). */

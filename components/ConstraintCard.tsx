@@ -2,67 +2,72 @@
 
 import { useState } from "react";
 
-import { type CardPatch, currentPeriod, type Hardness, useAppStore } from "@/lib/store";
-import type { ConstraintSpec } from "@/lib/types.gen";
-import { dayRanges, describeParams, hardnessLabel, TEMPLATE_NAMES } from "@/lib/wording";
+import { type CardPatch, currentPeriod, type Hardness, isLeaveRule, useAppStore } from "@/lib/store";
+import type { ConstraintSpec, WardConfig } from "@/lib/types.gen";
+import { dayRanges, describeBlock, hardnessLabel, presetName } from "@/lib/wording";
 
 import { previewRange } from "./RulesStep";
 import { ui } from "./ui";
 
-const ALWAYS_HARD: ConstraintSpec["type"][] = ["leave", "fixed_assignment"];
+/** 휴가 모양과 칸 고정은 항상 반드시다(토글을 막는다). */
+const alwaysHard = (c: ConstraintSpec) => c.type === "fixed_assignment" || isLeaveRule(c);
 
-// --- 수정 폼 ---
+// --- 수정 폼: 블록의 수와 날짜만 고친다(셀렉터는 다시 말로 입력) ---
 
-type FieldKind = "int" | "shift" | "shiftDEN" | "dayKind" | "days" | "daysOptional" | "prefer" | "bool";
+type FieldKind = "int" | "intOptional" | "days" | "code";
 interface Field {
+  /** params 안의 경로. "days.days"처럼 점으로 잇는다 */
   key: string;
   label: string;
   kind: FieldKind;
 }
 
-const FIELDS: Record<ConstraintSpec["type"], Field[]> = {
-  daily_coverage: [
-    { key: "shift", label: "근무", kind: "shiftDEN" },
-    { key: "day_kind", label: "요일 종류", kind: "dayKind" },
-    { key: "min", label: "최소", kind: "int" },
-    { key: "max", label: "최대", kind: "int" },
-  ],
-  forbidden_sequence: [
-    { key: "first", label: "앞 근무", kind: "shift" },
-    { key: "second", label: "다음 날 근무", kind: "shift" },
-  ],
-  max_consecutive_work: [{ key: "days", label: "일수", kind: "int" }],
-  max_consecutive_nights: [{ key: "days", label: "일수", kind: "int" }],
-  min_days_off: [{ key: "days", label: "일수", kind: "int" }],
-  off_after_night_block: [{ key: "days", label: "일수", kind: "int" }],
-  skill_mix: [
-    { key: "shift", label: "근무", kind: "shiftDEN" },
-    { key: "min_years", label: "최소 연차", kind: "int" },
-    { key: "min_count", label: "최소 인원", kind: "int" },
-  ],
-  leave: [{ key: "days", label: "날짜 (예: 15-17, 20)", kind: "days" }],
-  fixed_assignment: [
-    { key: "day", label: "날짜", kind: "int" },
-    { key: "shift", label: "근무", kind: "shift" },
-  ],
-  shift_preference: [
-    { key: "shift", label: "근무", kind: "shift" },
-    { key: "prefer", label: "희망/기피", kind: "prefer" },
-    { key: "days", label: "날짜 (비우면 근무표 전체)", kind: "daysOptional" },
-    { key: "weekends_only", label: "주말·공휴일만", kind: "bool" },
-  ],
-  night_fairness: [],
-  weekend_fairness: [],
-};
+function fieldsOf(c: ConstraintSpec): Field[] {
+  switch (c.type) {
+    case "fixed_assignment":
+      return [
+        { key: "day", label: "날짜", kind: "int" },
+        { key: "shift", label: "근무", kind: "code" },
+      ];
+    case "count":
+      return [
+        ...(c.params.days?.days ? [{ key: "days.days", label: "날짜 (예: 15-17, 20)", kind: "days" as const }] : []),
+        ...(isLeaveRule(c)
+          ? []
+          : [
+              { key: "min", label: "최소", kind: "intOptional" as const },
+              { key: "max", label: "최대", kind: "intOptional" as const },
+            ]),
+      ];
+    case "sequence":
+      if (c.params.after) return [{ key: "then_off", label: "휴무 일수", kind: "int" }];
+      if (!c.params.run) return [];
+      return [
+        ...(c.params.min_len != null ? [{ key: "min_len", label: "최소 일수", kind: "intOptional" as const }] : []),
+        ...(c.params.max_len != null ? [{ key: "max_len", label: "일수", kind: "intOptional" as const }] : []),
+      ];
+    case "balance":
+      return [];
+  }
+}
 
 type Draft = Record<string, string>;
 
+function getPath(params: unknown, key: string): unknown {
+  return key.split(".").reduce<unknown>((v, k) => (v as Record<string, unknown> | undefined)?.[k], params);
+}
+
+function setPath(params: Record<string, unknown>, key: string, value: unknown): Record<string, unknown> {
+  const [head, ...rest] = key.split(".");
+  if (rest.length === 0) return { ...params, [head]: value };
+  return { ...params, [head]: setPath({ ...((params[head] as Record<string, unknown>) ?? {}) }, rest.join("."), value) };
+}
+
 function toDraft(c: ConstraintSpec): Draft {
-  const p = (c.params ?? {}) as Record<string, unknown>;
   return Object.fromEntries(
-    FIELDS[c.type].map(({ key, kind }) => {
-      const v = p[key];
-      if (kind === "days" || kind === "daysOptional") return [key, Array.isArray(v) ? dayRanges(v).map(([a, b]) => (a === b ? `${a}` : `${a}-${b}`)).join(", ") : ""];
+    fieldsOf(c).map(({ key, kind }) => {
+      const v = getPath(c.params, key);
+      if (kind === "days") return [key, Array.isArray(v) ? dayRanges(v).map(([a, b]) => (a === b ? `${a}` : `${a}-${b}`)).join(", ") : ""];
       return [key, v === undefined || v === null ? "" : String(v)];
     }),
   );
@@ -83,91 +88,72 @@ function parseDays(text: string, last: number): number[] | null {
 }
 
 /** 폼 값을 params로 바꾼다. 잘못된 값이 있으면 오류 문구를 돌려준다. */
-function fromDraft(c: ConstraintSpec, draft: Draft, last: number): { params: ConstraintSpec["params"] } | { error: string } {
-  const params: Record<string, unknown> = { ...(c.params ?? {}) };
-  for (const { key, label, kind } of FIELDS[c.type]) {
+function fromDraft(
+  c: ConstraintSpec,
+  draft: Draft,
+  last: number,
+  config: WardConfig,
+): { params: ConstraintSpec["params"] } | { error: string } {
+  let params = { ...(c.params as unknown as Record<string, unknown>) };
+  for (const { key, label, kind } of fieldsOf(c)) {
     const v = draft[key].trim();
-    if (kind === "int") {
-      if (!/^\d+$/.test(v)) return { error: `${label}: 0 이상의 정수를 입력해 주세요` };
-      if (key === "day" && (Number(v) < 1 || Number(v) > last)) return { error: `${label}: 1~${last}일 사이로 입력해 주세요` };
-      params[key] = Number(v);
-    } else if (kind === "days" || kind === "daysOptional") {
-      if (v === "" && kind === "daysOptional") {
-        params[key] = null;
+    if (kind === "int" || kind === "intOptional") {
+      if (v === "" && kind === "intOptional") {
+        params = setPath(params, key, null);
         continue;
       }
+      if (!/^\d+$/.test(v)) return { error: `${label}: 0 이상의 정수를 입력해 주세요` };
+      if (key === "day" && (Number(v) < 1 || Number(v) > last)) return { error: `${label}: 1~${last}일 사이로 입력해 주세요` };
+      params = setPath(params, key, Number(v));
+    } else if (kind === "days") {
       const days = parseDays(v, last);
       if (!days || days.length === 0) return { error: `${label}: 1~${last} 사이 날짜를 쉼표로 구분해 주세요` };
-      params[key] = days;
-    } else if (kind === "prefer" || kind === "bool") {
-      params[key] = v === "true";
+      params = setPath(params, key, days);
     } else {
-      params[key] = v;
+      if (!config.shifts.some((s) => s.code === v)) return { error: `${label}: 근무를 골라 주세요` };
+      params = setPath(params, key, v);
     }
   }
-  if (c.type === "daily_coverage" && (params.min as number) > (params.max as number)) {
-    return { error: "최소 인원이 최대 인원보다 많아요" };
+  const pairs: [string, string][] = c.type === "count" ? [["min", "max"]] : c.type === "sequence" && c.params.run ? [["min_len", "max_len"]] : [];
+  for (const [lo, hi] of pairs) {
+    const a = params[lo] as number | null | undefined;
+    const b = params[hi] as number | null | undefined;
+    if (a == null && b == null) return { error: "숫자를 하나 이상 입력해 주세요" };
+    if (a != null && b != null && a > b) return { error: "최소가 최대보다 커요" };
   }
-  return { params: params as ConstraintSpec["params"] };
+  return { params: params as unknown as ConstraintSpec["params"] };
 }
 
-const SHIFT_OPTIONS: [string, string][] = [
-  ["D", "데이"],
-  ["E", "이브닝"],
-  ["N", "나이트"],
-  ["O", "휴무"],
-];
-
-function FieldInput({ field, value, onChange }: { field: Field; value: string; onChange: (v: string) => void }) {
-  const select = (options: [string, string][]) => (
-    <select value={value} onChange={(e) => onChange(e.target.value)} className={`${ui.input} h-8`}>
-      {options.map(([v, label]) => (
-        <option key={v} value={v}>
-          {label}
-        </option>
-      ))}
-    </select>
-  );
-  const control = (() => {
-    switch (field.kind) {
-      case "shift":
-        return select(SHIFT_OPTIONS);
-      case "shiftDEN":
-        return select(SHIFT_OPTIONS.slice(0, 3));
-      case "dayKind":
-        return select([
-          ["weekday", "평일"],
-          ["weekend", "주말·공휴일"],
-        ]);
-      case "prefer":
-        return select([
-          ["true", "희망"],
-          ["false", "기피"],
-        ]);
-      case "bool":
-        return (
-          <input
-            type="checkbox"
-            checked={value === "true"}
-            onChange={(e) => onChange(String(e.target.checked))}
-            className="size-4 accent-[#155E75]"
-          />
-        );
-      case "int":
-        return (
-          <input
-            inputMode="numeric"
-            value={value}
-            onChange={(e) => onChange(e.target.value)}
-            className={`${ui.input} h-8 w-20 font-mono`}
-          />
-        );
-      default:
-        return (
-          <input value={value} onChange={(e) => onChange(e.target.value)} className={`${ui.input} h-8 w-48 font-mono`} />
-        );
-    }
-  })();
+function FieldInput({
+  field,
+  value,
+  config,
+  onChange,
+}: {
+  field: Field;
+  value: string;
+  config: WardConfig;
+  onChange: (v: string) => void;
+}) {
+  const control =
+    field.kind === "code" ? (
+      <select value={value} onChange={(e) => onChange(e.target.value)} className={`${ui.input} h-8`}>
+        {config.shifts.map((s) => (
+          <option key={s.code} value={s.code}>
+            {s.name}
+          </option>
+        ))}
+      </select>
+    ) : field.kind === "days" ? (
+      <input value={value} onChange={(e) => onChange(e.target.value)} className={`${ui.input} h-8 w-48 font-mono`} />
+    ) : (
+      <input
+        inputMode="numeric"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className={`${ui.input} h-8 w-20 font-mono`}
+      />
+    );
   return (
     <label className="flex flex-col gap-1">
       <span className={ui.label}>{field.label}</span>
@@ -256,14 +242,15 @@ export default function ConstraintCard({
     isRule ? store.updateRule(id, patch) : store.updateRequest(period!.id, id, patch);
   const removeCard = (id: string) => (isRule ? store.removeRule(id) : store.removeRequest(period!.id, id));
 
-  const nurseId = (card.params as { nurse_id?: string } | undefined)?.nurse_id;
-  const orphan = nurseId !== undefined && !nurses.some((n) => n.id === nurseId);
-  const editable = FIELDS[card.type].length > 0;
+  const refs = card.type === "fixed_assignment" ? [card.params.nurse_id] : (card.params.people?.ids ?? []);
+  const orphan = refs.some((id) => !nurses.some((n) => n.id === id));
+  const fields = fieldsOf(card);
+  const editable = fields.length > 0;
   const lastDay = range.length;
 
   const save = () => {
     if (!draft) return;
-    const out = fromDraft(card, draft, lastDay);
+    const out = fromDraft(card, draft, lastDay, ward.config);
     if ("error" in out) {
       setError(out.error);
       return;
@@ -278,10 +265,10 @@ export default function ConstraintCard({
       className={`flex flex-col gap-2.5 rounded-lg border bg-white px-[18px] py-4 ${pending ? "border-[#C9C9C1]" : "border-[#E2E2DC]"}`}
     >
       <div className="flex items-center justify-between gap-3">
-        <h3 className="text-[13px] font-semibold text-[#1B1B18]">{TEMPLATE_NAMES[card.type]}</h3>
+        <h3 className="text-[13px] font-semibold text-[#1B1B18]">{presetName(card)}</h3>
         <HardnessToggle
-          value={ALWAYS_HARD.includes(card.type) ? "hard" : (card.hardness ?? "hard")}
-          disabled={readOnly || ALWAYS_HARD.includes(card.type)}
+          value={alwaysHard(card) ? "hard" : (card.hardness ?? (card.type === "balance" ? "soft" : "hard"))}
+          disabled={readOnly || alwaysHard(card)}
           onChange={(hardness) => updateCard(card.id, { hardness })}
         />
       </div>
@@ -290,15 +277,21 @@ export default function ConstraintCard({
       {draft ? (
         <div className="flex flex-col gap-2.5 rounded-sm bg-[#F6F6F3] px-2.5 py-2">
           <div className="flex flex-wrap items-end gap-3">
-            {FIELDS[card.type].map((f) => (
-              <FieldInput key={f.key} field={f} value={draft[f.key]} onChange={(v) => setDraft({ ...draft, [f.key]: v })} />
+            {fields.map((f) => (
+              <FieldInput
+                key={f.key}
+                field={f}
+                value={draft[f.key]}
+                config={ward.config}
+                onChange={(v) => setDraft({ ...draft, [f.key]: v })}
+              />
             ))}
           </div>
           {error && <p className={ui.error}>{error}</p>}
         </div>
       ) : (
         <p className={`rounded-sm bg-[#F6F6F3] px-2.5 py-2 text-xs ${off ? "text-[#66665E]" : "text-[#3D3D38]"}`}>
-          {describeParams(card, nurses, range)}
+          {describeBlock(card, ward.config, nurses, range)}
         </p>
       )}
 

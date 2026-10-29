@@ -7,59 +7,89 @@ import { persist, type PersistStorage, type StorageValue } from "zustand/middlew
 import {
   carryOverFrom,
   diffAssignments,
-  historyLoadFor,
+  historyFor,
   isOperating,
   pastDayLocks,
   previousConfirmedPeriod,
   rosterChanges,
   sameCarryOver,
 } from "./continuity";
-import { firstPeriodStart, monthDay, nextPeriod, periodFrom, type PeriodRange, type PeriodUnit } from "./period";
+import { DEFAULT_CONFIG, migrateV4, nightOnlyRule, normalizeBlock, OFF_CODE, type Priority } from "./migrate";
+import {
+  dateOfDay,
+  dayOfDate,
+  firstPeriodStart,
+  localDate,
+  monthDay,
+  nextPeriod,
+  periodFrom,
+  validStart,
+  type PeriodRange,
+  type PeriodUnit,
+} from "./period";
 import { deleteWard, loadWard, saveWard, supabaseConfigured, type AuthUser } from "./supabase";
 import type {
   CarryOverRow,
   ConstraintChange,
   ConstraintSpec,
+  CountRule,
   DiffCell,
   Nurse,
   ScheduleRequest,
   ScheduleResult,
+  ShiftChange,
+  ShiftDef,
+  WardConfig,
 } from "./types.gen";
 
 export const STORAGE_KEY = "nurse-scheduler";
-const STORAGE_VERSION = 4;
+const STORAGE_VERSION = 5;
 const COVERAGE_SOURCE_TEXT = "필요 인원 설정";
-const COVERAGE_WEIGHT = 10; // backend/domain/constants.py DEFAULT_WEIGHT
-// backend/llm/translator.py _weight와 같은 규칙: soft는 템플릿 기본값(없으면 DEFAULT_WEIGHT), hard는 1
-const SOFT_WEIGHTS: Record<string, number> = { shift_preference: 10, night_fairness: 5, weekend_fairness: 5 };
-const ALWAYS_HARD = ["leave", "fixed_assignment"];
-const COVERAGE_COUNT = 6; // D/E/N × 평일/주말·공휴일
+export const MAX_SHIFT_CODES = 8; // backend/domain/constants.py MAX_SHIFT_CODES
+export const MAX_TAGS_PER_NURSE = 5; // backend/domain/constants.py MAX_TAGS_PER_NURSE
+export const MAX_TAG_CHARS = 10; // backend/domain/constants.py MAX_TAG_CHARS
 export const SAVE_DEBOUNCE_MS = 1000;
 
-export type Shift = "D" | "E" | "N";
 export type DayKind = "weekday" | "weekend";
 export type Assignments = ScheduleResult["assignments"];
 export type Hardness = "hard" | "soft";
-export type Code = "D" | "E" | "N" | "O";
+/** 근무 코드. 병동 근무 형태(config)가 정한다 */
+export type Code = string;
 export interface CardPatch {
   hardness?: Hardness;
+  priority?: Priority;
   params?: ConstraintSpec["params"];
 }
 
 export interface WardNurse extends Nurse {
+  tags: string[];
   active: boolean;
 }
 export type NurseRow = Omit<Nurse, "id">;
 
+/** 설정 변경 카드(ADR-018 설계 §5.3). ruleIds는 이 카드에 딸린 대기 규칙 카드(새 코드를 쓰는 카드). */
+export interface ShiftChangeCard {
+  id: string;
+  source_text: string;
+  change: ShiftChange;
+  ruleIds: string[];
+}
+
 export interface Ward {
   name: string;
   unit: PeriodUnit;
+  /** 근무 형태(근무 코드). 한 번 쓰인 코드는 지우지 않고 끈다 */
+  config: WardConfig;
   nurses: WardNurse[];
   /** 다음에 부여할 번호. 줄어들지 않는다 */
   nextNurseNo: number;
-  /** scope "ward". 필요 인원(daily_coverage)도 여기 */
+  /** scope "ward". 필요 인원(세기 블록 cov-*)도 여기 */
   rules: ConstraintSpec[];
   pendingRules: ConstraintSpec[];
+  /** 적용 대기 중인 설정 변경 카드 */
+  pendingConfig: ShiftChangeCard[];
+  /** v4 → v5 변환에 실패한 제약의 원문(다시 입력해 달라고 보여 준다) */
+  unconverted: { source_text: string }[];
   /** 카드 표시 순서(새 카드가 앞). 적용해도 바뀌지 않는다. 옛 저장본에는 없다 */
   cardOrder?: string[];
 }
@@ -109,7 +139,7 @@ export type View =
   | { screen: "period"; periodId: string; step: 1 | 2 }
   | { screen: "confirmed"; periodId: string };
 
-interface Data {
+export interface Data {
   ward: Ward | null;
   /** start_date 오름차순 */
   periods: WorkPeriod[];
@@ -147,21 +177,42 @@ export interface AppState extends Data {
   startWard: () => void;
   setWardName: (name: string) => void;
   setUnit: (unit: PeriodUnit) => void;
-  setCoverage: (shift: Shift, dayKind: DayKind, min: number, max: number) => void;
-  addPendingRules: (cards: ConstraintSpec[]) => void;
+  /** 필요 인원: 세기 블록(날마다, 평일/주말·공휴일, 그 코드, 정확히 min~max). */
+  setCoverage: (code: Code, dayKind: DayKind, min: number, max: number) => void;
+  // 근무 형태
+  /** 코드의 이름·시간·시작 시각·세는 근무조를 바꾼다. O는 바꾸지 않는다. */
+  setShift: (code: Code, patch: Partial<Omit<ShiftDef, "code" | "active">>) => void;
+  /** 새 코드를 O 앞에 더한다. 이미 있거나 코드가 MAX_SHIFT_CODES개면 아무것도 하지 않는다. */
+  addShift: (def: ShiftDef) => void;
+  /** 끄면 그 코드를 세는 복합 코드도 끈다. 켜는 복합 코드의 근무조가 꺼져 있으면 아무것도 하지 않는다. */
+  setShiftActive: (code: Code, active: boolean) => void;
+  /** 쓰인 적 없는 코드만 지우고, 쓰였으면 끈다. */
+  removeShift: (code: Code) => void;
+  /** 대기 카드를 더한다. changes는 설정 변경 카드가 되고, 새 코드를 쓰는 규칙 카드가 거기에 딸린다. */
+  addPendingRules: (cards: ConstraintSpec[], changes?: ShiftChange[]) => void;
+  /** 규칙 카드: 딸린 설정 카드도 함께 적용한다. 설정 카드: 근무 형태만 바꾼다. */
   applyRule: (id: string) => void;
   /** 대기 카드는 그대로, 적용된 규칙은 inputVersion을 올리며 바꾼다. */
   updateRule: (id: string, patch: CardPatch) => void;
+  /** 설정 카드를 지우면 딸린 대기 규칙 카드도 지운다. */
   removeRule: (id: string) => void;
   // 명단
   addNurses: (rows: NurseRow[]) => void;
   updateNurse: (id: string, patch: Partial<NurseRow>) => void;
+  /** 앞뒤 공백을 지운 1~MAX_TAG_CHARS자, 사람당 MAX_TAGS_PER_NURSE개까지. 이미 있으면 아무것도 하지 않는다. */
+  addTag: (nurseId: string, tag: string) => void;
+  removeTag: (nurseId: string, tag: string) => void;
   setNurseActive: (id: string, active: boolean) => void;
   /** 어떤 기간에서도 쓰이지 않은 간호사만 지운다. 아니면 비활성으로 바꾼다. */
   removeNurse: (id: string) => void;
   // 기간
-  /** 초안이 있으면 그 기간을, 없으면 새 기간을 만들어 ①로 간다. 병동이 없으면 null. */
-  createPeriod: (today: string) => string | null;
+  /**
+   * 초안이 있으면 그 기간을, 없으면 새 기간을 만들어 ①로 간다. 병동이 없으면 null.
+   * 첫 기간은 start(기본: 오늘 이후 첫 시작일)에서 시작하고, 달력 월인데 29~31일이면 null. 다음 기간은 직전 다음 날.
+   */
+  createPeriod: (today: string, start?: string) => string | null;
+  /** 작성 중 기간의 시작일을 바꾼다. 직전 기간 끝 다음 날보다 앞이거나 유효한 시작일이 아니면 false. */
+  postponeStart: (periodId: string, date: string) => boolean;
   toggleHoliday: (periodId: string, day: number) => void;
   setCarryOver: (periodId: string, rows: CarryOverRow[]) => void;
   addPendingRequests: (periodId: string, cards: ConstraintSpec[]) => void;
@@ -195,7 +246,17 @@ function initialData(): Data {
 }
 
 function emptyWard(): Ward {
-  return { name: "", unit: "month", nurses: [], nextNurseNo: 1, rules: [], pendingRules: [] };
+  return {
+    name: "",
+    unit: "month",
+    config: DEFAULT_CONFIG,
+    nurses: [],
+    nextNurseNo: 1,
+    rules: [nightOnlyRule()],
+    pendingRules: [],
+    pendingConfig: [],
+    unconverted: [],
+  };
 }
 
 function newPeriod(range: PeriodRange): WorkPeriod {
@@ -219,24 +280,71 @@ function newPeriod(range: PeriodRange): WorkPeriod {
 
 const nurseId = (no: number) => `n${String(no).padStart(2, "0")}`;
 
+/** 휴가 모양: 한 사람 × 날짜에 근무 없음(per=person, not_in [O], max 0). 항상 hard로 다룬다. */
+export function isLeaveRule(c: ConstraintSpec): boolean {
+  if (c.type !== "count") return false;
+  const p = c.params;
+  return (
+    p.per === "person" &&
+    (p.measure ?? "count") === "count" &&
+    p.people?.ids?.length === 1 &&
+    p.shifts.not_in?.length === 1 &&
+    p.shifts.not_in[0] === OFF_CODE &&
+    p.max === 0 &&
+    (p.min ?? null) === null
+  );
+}
+
+/** 필요 인원 모양: 병동 규칙, 날마다 모든 사람, 평일 또는 주말·공휴일, 코드 하나의 개수. */
+export function isCoverageRule(c: ConstraintSpec): c is CountRule {
+  if (c.type !== "count" || c.scope !== "ward") return false;
+  const { people = {}, days = {}, shifts, per, measure = "count" } = c.params;
+  const noPeople = !people.ids && !people.tags && !people.exclude_tags?.length && people.min_years == null && people.max_years == null;
+  return (
+    per === "day" &&
+    measure === "count" &&
+    noPeople &&
+    (days.kind === "weekday" || days.kind === "weekend") &&
+    !days.weekdays &&
+    !days.days &&
+    shifts.in?.length === 1
+  );
+}
+
+/** 필요 인원 규칙(코드·요일 종류). */
+export function coverageRule(rules: ConstraintSpec[], code: Code, kind: DayKind): CountRule | undefined {
+  return rules.find((c): c is CountRule => isCoverageRule(c) && c.params.shifts.in![0] === code && c.params.days!.kind === kind);
+}
+
+/** 필요 인원 폼의 행: 활성 기본 코드(복합·휴무 제외). */
+export function coverageCodes(config: WardConfig): ShiftDef[] {
+  return config.shifts.filter((s) => s.active !== false && !s.parts?.length && s.code !== OFF_CODE);
+}
+
+/** 키를 정렬한 JSON(교체 기준 비교용). */
+function stableJson(v: unknown): string {
+  if (Array.isArray(v)) return `[${v.map(stableJson).join(",")}]`;
+  if (v && typeof v === "object") {
+    return `{${Object.keys(v)
+      .sort()
+      .map((k) => `${JSON.stringify(k)}:${stableJson((v as Record<string, unknown>)[k])}`)
+      .join(",")}}`;
+  }
+  return JSON.stringify(v);
+}
+
+const BOUND_KEYS = ["min", "max", "min_len", "max_len", "then_off", "max_gap"];
+
 /**
- * 교체 기준: 같은 type·scope·대상. 대상은 nurse_id(고정 배정은 nurse_id·day, 희망 근무는 nurse_id·shift·대상 날짜),
- * 없으면 shift·day_kind(금지 순서는 first·second). 휴가는 날짜별 요청이 공존해야 하므로 교체하지 않는다(null).
+ * 교체 기준: 같은 type·scope와, 수(min·max·길이·휴무 일수·차이)를 뺀 같은 params.
+ * 칸 고정은 같은 칸(nurse_id·day). 휴가는 날짜별 요청이 공존해야 하므로 교체하지 않는다(null).
  */
 function replaceKey(c: ConstraintSpec): string | null {
-  if (c.type === "leave") return null;
-  const p = (c.params ?? {}) as Record<string, unknown>;
-  const target =
-    c.type === "fixed_assignment"
-      ? `${p.nurse_id}@${p.day}`
-      : c.type === "shift_preference"
-        ? `${p.nurse_id}|${p.shift}|${[...((p.days as number[] | null) ?? [])].sort((a, b) => a - b)}|${p.weekends_only === true}`
-        : "nurse_id" in p
-        ? p.nurse_id
-        : "first" in p
-          ? `${p.first}>${p.second}`
-          : `${p.shift ?? ""}|${p.day_kind ?? ""}`;
-  return `${c.type}|${c.scope}|${target}`;
+  if (c.type === "fixed_assignment") return `${c.type}|${c.scope}|${c.params.nurse_id}@${c.params.day}`;
+  if (isLeaveRule(c)) return null;
+  const n = normalizeBlock(c);
+  const shape = Object.fromEntries(Object.entries(n.params).filter(([k]) => !BOUND_KEYS.includes(k)));
+  return `${n.type}|${n.scope}|${stableJson(shape)}`;
 }
 
 function upsert(list: ConstraintSpec[], card: ConstraintSpec): ConstraintSpec[] {
@@ -260,7 +368,7 @@ export function cardsInOrder(
 }
 
 /** 새 카드 id를 순서 맨 앞에 붙인다. */
-const prependOrder = (order: string[] | undefined, cards: ConstraintSpec[]) => [...cards.map((c) => c.id), ...(order ?? [])];
+const prependOrder = (order: string[] | undefined, cards: { id: string }[]) => [...cards.map((c) => c.id), ...(order ?? [])];
 
 /** card가 적용되면 대체할 기존 제약(같은 type·scope·대상, 다른 id). */
 export function findReplaced(constraints: ConstraintSpec[], card: ConstraintSpec): ConstraintSpec | undefined {
@@ -271,14 +379,18 @@ export function findReplaced(constraints: ConstraintSpec[], card: ConstraintSpec
 
 function patched(c: ConstraintSpec, patch: CardPatch): ConstraintSpec {
   const next = { ...c, ...(patch.params !== undefined && { params: patch.params }) } as ConstraintSpec;
-  if (patch.hardness === undefined || ALWAYS_HARD.includes(c.type)) return next;
-  const weight = patch.hardness === "soft" ? (SOFT_WEIGHTS[c.type] ?? COVERAGE_WEIGHT) : 1;
-  return { ...next, hardness: patch.hardness, weight };
+  if (next.type === "fixed_assignment") return next;
+  return normalizeBlock({
+    ...next,
+    ...(patch.hardness !== undefined && !isLeaveRule(c) && { hardness: patch.hardness }),
+    ...(patch.priority !== undefined && { priority: patch.priority }),
+  } as ConstraintSpec);
 }
 
-function changePatch(ch: ConstraintChange): CardPatch {
+/** 제안의 update는 params 최상위 키 단위로 바꾼다(셀렉터는 통째로). */
+function changePatch(ch: ConstraintChange, c: ConstraintSpec): CardPatch {
   return {
-    ...(ch.params && { params: ch.params as ConstraintSpec["params"] }),
+    ...(ch.params && { params: { ...c.params, ...ch.params } as ConstraintSpec["params"] }),
     ...(ch.hardness && { hardness: ch.hardness }),
   };
 }
@@ -287,8 +399,51 @@ function isFixedCell(c: ConstraintSpec, nurseId: string, day: number): boolean {
   return c.type === "fixed_assignment" && c.params.nurse_id === nurseId && c.params.day === day;
 }
 
-function refNurse(c: ConstraintSpec): string | undefined {
-  return (c.params as { nurse_id?: string } | undefined)?.nurse_id;
+/** 제약이 직접 가리키는 간호사 id(칸 고정의 nurse_id, 블록의 people.ids). */
+function refNurses(c: ConstraintSpec): string[] {
+  return c.type === "fixed_assignment" ? [c.params.nurse_id] : (c.params.people?.ids ?? []);
+}
+
+/** 제약이 직접 적은 근무 코드. */
+export function ruleCodes(c: ConstraintSpec): Code[] {
+  const sel = (x: { in?: string[] | null; not_in?: string[] | null } | null | undefined) => [...(x?.in ?? []), ...(x?.not_in ?? [])];
+  switch (c.type) {
+    case "fixed_assignment":
+      return [c.params.shift];
+    case "sequence":
+      return [...(c.params.forbid ?? []).flat().flatMap(sel), ...sel(c.params.run), ...sel(c.params.after)];
+    default:
+      return sel(c.params.shifts);
+  }
+}
+
+/** 근무 형태에 설정 변경 하나를 반영한다. 추가는 O 앞에, 수정은 같은 코드 자리에. */
+export function applyShiftChange(config: WardConfig, change: ShiftChange): WardConfig {
+  const shift = { ...change.shift, active: change.shift.active ?? true };
+  const i = config.shifts.findIndex((s) => s.code === shift.code);
+  if (i !== -1) return { shifts: config.shifts.map((s, j) => (j === i ? shift : s)) as WardConfig["shifts"] };
+  if (change.action !== "add") return config;
+  const off = config.shifts.findIndex((s) => s.code === OFF_CODE);
+  const at = off === -1 ? config.shifts.length : off;
+  return { shifts: [...config.shifts.slice(0, at), shift, ...config.shifts.slice(at)] as WardConfig["shifts"] };
+}
+
+/** 근무 코드가 병동 규칙·기간 요청·이월·결과·확정본·복합 코드에서 쓰였는지. */
+export function isShiftUsed(code: Code, ward: Ward, periods: WorkPeriod[]): boolean {
+  const inRules = (list: ConstraintSpec[]) => list.some((c) => ruleCodes(c).includes(code));
+  const inRows = (rows: Record<string, string[]>) => Object.values(rows).some((r) => r.includes(code));
+  if (ward.config.shifts.some((s) => s.parts?.includes(code))) return true;
+  if (inRules(ward.rules) || inRules(ward.pendingRules)) return true;
+  return periods.some(
+    (p) =>
+      inRules(p.requests) ||
+      inRules(p.pendingRequests) ||
+      inRules(Object.values(p.ruleOverrides)) ||
+      p.carryOver.some((r) => r.shifts.includes(code)) ||
+      (p.result !== null && inRows(p.result.assignments)) ||
+      p.versions.some((v) => inRows(v.assignments) || inRules(v.requests ?? [])) ||
+      inRules(p.snapshot?.rules ?? []),
+  );
 }
 
 /** 이 기간을 풀 때 쓰는 명단과 병동 규칙 원본. 확정된 기간은 확정 시점의 것을 쓴다(PRD J1). */
@@ -311,12 +466,9 @@ export function toScheduleRequest(
   const activeIds = active.map((n) => n.id);
   const ids = new Set(activeIds);
   const locks = isOperating(period, today) ? pastDayLocks(period, active, today) : [];
-  const locked = new Set(locks.map((c) => `${refNurse(c)}@${(c.params as { day: number }).day}`));
+  const locked = new Set(locks.map((c) => `${refNurses(c)[0]}@${(c.params as { day: number }).day}`));
   const constraints = [...rules.map((r) => period.ruleOverrides[r.id] ?? r), ...period.requests]
-    .filter((c) => {
-      const ref = refNurse(c);
-      return ref === undefined || ids.has(ref);
-    })
+    .filter((c) => refNurses(c).every((id) => ids.has(id)))
     // 지난 날짜 잠금이 같은 칸의 수동 고정보다 우선한다
     .filter((c) => !(c.type === "fixed_assignment" && locked.has(`${c.params.nurse_id}@${c.params.day}`)))
     .map((c) => (period.disabledIds.includes(c.id) ? { ...c, enabled: false } : c));
@@ -325,12 +477,13 @@ export function toScheduleRequest(
     : null;
   const prev = previousConfirmedPeriod(periods, period);
   return {
-    nurses: active.map(({ id, name, years, night_only }) => ({ id, name, years, night_only })) as ScheduleRequest["nurses"],
+    config: ward.config,
+    nurses: active.map(({ id, name, years, tags }) => ({ id, name, years, tags })) as ScheduleRequest["nurses"],
     period: { start_date: period.start_date, length: period.length },
     holidays: period.holidays,
     constraints: [...constraints, ...locks],
     carry_over: prev ? carryOverFrom(prev, activeIds) : period.carryOver.filter((r) => ids.has(r.nurse_id)),
-    history_load: historyLoadFor(periods, period, activeIds),
+    history: historyFor(periods, period, activeIds),
     ...(previous && { previous }),
   };
 }
@@ -358,10 +511,9 @@ export function hasUnconfirmedChanges(period: WorkPeriod): boolean {
   return diffAssignments(last.assignments, period.result.assignments).length > 0;
 }
 
-/** 새로 만들 기간 범위. 마지막 기간 다음, 기간이 없으면 today 이후 첫 기간. */
+/** 새로 만들 기간 범위. 마지막 기간 다음 날부터, 기간이 없으면 today 이후 첫 시작일(기본 제안값)부터. */
 export function upcomingRange(unit: PeriodUnit, periods: WorkPeriod[], today: string): PeriodRange {
   const last = periods.at(-1);
-  // nextPeriod는 마지막 끝 + 1일 이후의 새 단위 첫 시작일이다(단위를 바꿨어도 맞춰진다)
   return last ? nextPeriod(unit, last) : periodFrom(unit, firstPeriodStart(unit, today));
 }
 
@@ -389,8 +541,11 @@ export function prepareNeedsReview(ward: Ward, periods: WorkPeriod[], periodId: 
   return added.length > 0 || deactivated.length > 0 || carryOverChanged(period, periods);
 }
 
+/** 필요 인원 폼의 모든 행(활성 기본 코드 × 평일/주말·공휴일)이 채워졌는지. */
 export function hasCoverage(ward: Ward): boolean {
-  return ward.rules.filter((r) => r.type === "daily_coverage" && r.scope === "ward").length >= COVERAGE_COUNT;
+  return coverageCodes(ward.config).every(
+    (s) => coverageRule(ward.rules, s.code, "weekday") && coverageRule(ward.rules, s.code, "weekend"),
+  );
 }
 
 /** 활성 명단과 필요 인원이 모두 있어야 기간을 만들 수 있다. */
@@ -442,10 +597,7 @@ export function rosterChangesFor(
 export function orphanConstraintIds(ward: Ward, period: WorkPeriod | null): string[] {
   const ids = new Set(ward.nurses.filter((n) => n.active).map((n) => n.id));
   return [...ward.rules, ...(period?.requests ?? [])]
-    .filter((c) => {
-      const ref = refNurse(c);
-      return ref !== undefined && !ids.has(ref);
-    })
+    .filter((c) => refNurses(c).some((id) => !ids.has(id)))
     .map((c) => c.id);
 }
 
@@ -461,7 +613,7 @@ export function currentPeriod(s: Pick<Data, "periods" | "view">): WorkPeriod | n
 
 /** 어떤 기간의 요청·결과·확정본·이월에서 쓰이거나, 병동 규칙이 참조하는 간호사인지. */
 export function isNurseUsed(id: string, ward: Ward, periods: WorkPeriod[]): boolean {
-  const refs = (list: ConstraintSpec[]) => list.some((c) => refNurse(c) === id);
+  const refs = (list: ConstraintSpec[]) => list.some((c) => refNurses(c).includes(id));
   if (refs(ward.rules) || refs(ward.pendingRules)) return true;
   return periods.some(
     (p) =>
@@ -483,7 +635,8 @@ function isData(v: unknown): v is Data {
     w === null ||
     (typeof w === "object" &&
       w !== undefined &&
-      ["nurses", "rules", "pendingRules"].every((k) => Array.isArray(w[k])) &&
+      ["nurses", "rules", "pendingRules", "pendingConfig", "unconverted"].every((k) => Array.isArray(w[k])) &&
+      Array.isArray((w.config as { shifts?: unknown } | undefined)?.shifts) &&
       typeof w.nextNurseNo === "number" &&
       typeof w.unit === "string");
   const periodsOk =
@@ -597,15 +750,25 @@ export function createAppStore(getStorage: () => Storage, now: () => Date = () =
           ...w,
           nurses: [
             ...w.nurses,
-            ...rows.map(({ name, years, night_only }, i) => ({
+            ...rows.map(({ name, years, tags }, i) => ({
               id: nurseId(w.nextNurseNo + i),
               name,
               years,
-              night_only,
+              tags: tags ?? [],
               active: true,
             })),
           ],
           nextNurseNo: w.nextNurseNo + rows.length,
+        });
+        const editNurse = (id: string, fn: (n: WardNurse) => WardNurse) =>
+          editWard((w) => ({ ...w, nurses: w.nurses.map((n) => (n.id === id ? fn(n) : n)) }));
+        const editShifts = (fn: (shifts: ShiftDef[]) => ShiftDef[]) =>
+          editWard((w) => ({ ...w, config: { shifts: fn(w.config.shifts) as WardConfig["shifts"] } }));
+        /** 설정 카드를 적용한다: 근무 형태를 바꾸고 대기 목록에서 뺀다. */
+        const withConfigCard = (w: Ward, card: ShiftChangeCard): Ward => ({
+          ...w,
+          config: applyShiftChange(w.config, card.change),
+          pendingConfig: w.pendingConfig.filter((c) => c.id !== card.id),
         });
 
         /** 서버에 저장하는 문서. persist와 같은 모양이다. */
@@ -667,8 +830,9 @@ export function createAppStore(getStorage: () => Storage, now: () => Date = () =
             if (row) {
               // 서버 우선
               const d = row.data as { version?: unknown; state?: unknown } | null;
-              const ok = d?.version === STORAGE_VERSION && isData(d.state);
-              replace(ok ? loaded(d.state as Data) : initialData(), {
+              const state = d?.version === STORAGE_VERSION ? d.state : d?.version === 4 ? migrateV4(d.state, localDate(now())) : null;
+              const ok = isData(state);
+              replace(ok ? loaded(state) : initialData(), {
                 sync: { status: "saved", savedAt: row.updatedAt },
                 loginPrompt: guest ? { kind: "server-replaced-guest" } : null,
                 ...(!ok && { resetNotice: true }),
@@ -707,29 +871,86 @@ export function createAppStore(getStorage: () => Storage, now: () => Date = () =
           startWard: () => bump({ ward: emptyWard(), periods: [], view: { screen: "setup", step: 1 } }),
           setWardName: (name) => editWard((w) => ({ ...w, name })),
           setUnit: (unit) => editWard((w) => ({ ...w, unit })),
-          setCoverage: (shift, dayKind, min, max) =>
+          setCoverage: (code, dayKind, min, max) =>
             editWard((w) => ({
               ...w,
-              rules: upsert(w.rules, {
-                id: `cov-${dayKind}-${shift}`,
-                type: "daily_coverage",
-                scope: "ward",
-                hardness: "hard",
-                weight: COVERAGE_WEIGHT,
-                source_text: COVERAGE_SOURCE_TEXT,
-                enabled: true,
-                params: { shift, day_kind: dayKind, min, max },
-              }),
+              rules: upsert(
+                w.rules,
+                normalizeBlock({
+                  id: `cov-${dayKind}-${code}`,
+                  type: "count",
+                  scope: "ward",
+                  hardness: "hard",
+                  source_text: COVERAGE_SOURCE_TEXT,
+                  params: { days: { kind: dayKind }, shifts: { in: [code] }, per: "day", min, max },
+                }),
+              ),
             })),
-          addPendingRules: (cards) =>
-            editWard(
-              (w) => ({ ...w, pendingRules: [...w.pendingRules, ...cards], cardOrder: prependOrder(w.cardOrder, cards) }),
-              false,
-            ),
+          setShift: (code, patch) => {
+            if (code === OFF_CODE) return;
+            editShifts((shifts) => shifts.map((s) => (s.code === code ? { ...s, ...patch } : s)));
+          },
+          addShift: (def) => {
+            const shifts = get().ward?.config.shifts ?? [];
+            if (shifts.length >= MAX_SHIFT_CODES || shifts.some((s) => s.code === def.code)) return;
+            editWard((w) => ({ ...w, config: applyShiftChange(w.config, { action: "add", shift: def }) }));
+          },
+          setShiftActive: (code, active) => {
+            const shifts = get().ward?.config.shifts ?? [];
+            const shift = shifts.find((s) => s.code === code);
+            if (!shift || code === OFF_CODE) return;
+            const parts = shift.parts ?? [];
+            if (active && parts.some((p) => shifts.find((s) => s.code === p)?.active === false)) return;
+            editShifts((list) =>
+              list.map((s) => (s.code === code || (!active && s.parts?.includes(code)) ? { ...s, active } : s)),
+            );
+          },
+          removeShift: (code) => {
+            const { ward, periods } = get();
+            if (!ward || code === OFF_CODE) return;
+            if (isShiftUsed(code, ward, periods)) get().setShiftActive(code, false);
+            else editShifts((shifts) => shifts.filter((s) => s.code !== code));
+          },
+          addPendingRules: (cards, changes = []) =>
+            editWard((w) => {
+              const blocks = cards.map(normalizeBlock);
+              const taken = new Set(w.pendingConfig.map((c) => c.id));
+              const configCards = changes.map((change): ShiftChangeCard => {
+                const base = `cfg-${change.shift.code}`;
+                let id = base;
+                for (let n = 2; taken.has(id); n++) id = `${base}-${n}`;
+                taken.add(id);
+                return {
+                  id,
+                  source_text: cards[0]?.source_text ?? "",
+                  change,
+                  ruleIds:
+                    change.action === "add"
+                      ? blocks.filter((c) => ruleCodes(c).includes(change.shift.code)).map((c) => c.id)
+                      : [],
+                };
+              });
+              return {
+                ...w,
+                pendingRules: [...w.pendingRules, ...blocks],
+                pendingConfig: [...w.pendingConfig, ...configCards],
+                cardOrder: prependOrder(w.cardOrder, [...configCards, ...blocks]),
+              };
+            }, false),
           applyRule: (id) => {
-            const card = get().ward?.pendingRules.find((c) => c.id === id);
+            const ward = get().ward;
+            const config = ward?.pendingConfig.find((c) => c.id === id);
+            if (config) {
+              editWard((w) => withConfigCard(w, config));
+              return;
+            }
+            const card = ward?.pendingRules.find((c) => c.id === id);
             if (!card) return;
-            editWard((w) => ({ ...w, pendingRules: w.pendingRules.filter((c) => c.id !== id), rules: upsert(w.rules, card) }));
+            const parent = ward!.pendingConfig.find((c) => c.ruleIds.includes(id));
+            editWard((w) => {
+              const next = parent ? withConfigCard(w, parent) : w;
+              return { ...next, pendingRules: next.pendingRules.filter((c) => c.id !== id), rules: upsert(next.rules, card) };
+            });
           },
           updateRule: (id, patch) => {
             const w = get().ward;
@@ -741,7 +962,17 @@ export function createAppStore(getStorage: () => Storage, now: () => Date = () =
           },
           removeRule: (id) => {
             const w = get().ward;
-            if (w?.pendingRules.some((c) => c.id === id)) {
+            const config = w?.pendingConfig.find((c) => c.id === id);
+            if (config) {
+              editWard(
+                (w) => ({
+                  ...w,
+                  pendingConfig: w.pendingConfig.filter((c) => c.id !== id),
+                  pendingRules: w.pendingRules.filter((c) => !config.ruleIds.includes(c.id)),
+                }),
+                false,
+              );
+            } else if (w?.pendingRules.some((c) => c.id === id)) {
               editWard((w) => ({ ...w, pendingRules: w.pendingRules.filter((c) => c.id !== id) }), false);
             } else if (w?.rules.some((c) => c.id === id)) {
               editWard((w) => ({ ...w, rules: w.rules.filter((c) => c.id !== id) }));
@@ -749,10 +980,18 @@ export function createAppStore(getStorage: () => Storage, now: () => Date = () =
           },
 
           addNurses: (rows) => editWard((w) => withIds(w, rows)),
-          updateNurse: (id, patch) =>
-            editWard((w) => ({ ...w, nurses: w.nurses.map((n) => (n.id === id ? { ...n, ...patch } : n)) })),
-          setNurseActive: (id, active) =>
-            editWard((w) => ({ ...w, nurses: w.nurses.map((n) => (n.id === id ? { ...n, active } : n)) })),
+          updateNurse: (id, patch) => editNurse(id, (n) => ({ ...n, ...patch, tags: patch.tags ?? n.tags })),
+          setNurseActive: (id, active) => editNurse(id, (n) => ({ ...n, active })),
+          addTag: (nurseId, tag) => {
+            const t = tag.trim();
+            const nurse = get().ward?.nurses.find((n) => n.id === nurseId);
+            if (!nurse || !t || t.length > MAX_TAG_CHARS || nurse.tags.includes(t) || nurse.tags.length >= MAX_TAGS_PER_NURSE) return;
+            editNurse(nurseId, (n) => ({ ...n, tags: [...n.tags, t] }));
+          },
+          removeTag: (nurseId, tag) => {
+            if (!get().ward?.nurses.find((n) => n.id === nurseId)?.tags.includes(tag)) return;
+            editNurse(nurseId, (n) => ({ ...n, tags: n.tags.filter((t) => t !== tag) }));
+          },
           removeNurse: (id) => {
             const { ward, periods } = get();
             if (!ward) return;
@@ -760,7 +999,7 @@ export function createAppStore(getStorage: () => Storage, now: () => Date = () =
             else editWard((w) => ({ ...w, nurses: w.nurses.filter((n) => n.id !== id) }));
           },
 
-          createPeriod: (today) => {
+          createPeriod: (today, start) => {
             const { ward, periods } = get();
             if (!ward) return null;
             const draft = periods.find((p) => p.status === "draft");
@@ -768,9 +1007,34 @@ export function createAppStore(getStorage: () => Storage, now: () => Date = () =
               set({ view: viewForPeriod(draft) });
               return draft.id;
             }
-            const period = newPeriod(upcomingRange(ward.unit, periods, today));
+            if (periods.length === 0 && start !== undefined && !validStart(ward.unit, start)) return null;
+            const range =
+              periods.length === 0 && start !== undefined
+                ? periodFrom(ward.unit, start)
+                : upcomingRange(ward.unit, periods, today);
+            const period = newPeriod(range);
             bump({ periods: [...periods, period], view: { screen: "period", periodId: period.id, step: 1 } });
             return period.id;
+          },
+          postponeStart: (periodId, date) => {
+            const { ward, periods } = get();
+            const period = periods.find((p) => p.id === periodId);
+            if (!ward || !period || period.status !== "draft" || !validStart(ward.unit, date)) return false;
+            const prev = periods.filter((p) => p.id !== periodId && p.start_date < period.start_date).at(-1);
+            if (prev && date < dateOfDay(prev, prev.length + 1)) return false;
+            const range = periodFrom(ward.unit, date);
+            editPeriod(periodId, (p) => ({
+              ...p,
+              ...range,
+              // 공휴일은 같은 날짜를 새 인덱스로 옮긴다
+              holidays: p.holidays
+                .map((d) => dayOfDate(range, dateOfDay(p, d)))
+                .filter((d): d is number => d !== null),
+              result: null,
+              resultVersion: null,
+              carryOverUsed: null,
+            }));
+            return true;
           },
           toggleHoliday: (periodId, day) =>
             editPeriod(periodId, (p) => ({
@@ -783,7 +1047,10 @@ export function createAppStore(getStorage: () => Storage, now: () => Date = () =
           addPendingRequests: (periodId, cards) =>
             editPeriod(
               periodId,
-              (p) => ({ ...p, pendingRequests: [...p.pendingRequests, ...cards], cardOrder: prependOrder(p.cardOrder, cards) }),
+              (p) => {
+                const blocks = cards.map(normalizeBlock);
+                return { ...p, pendingRequests: [...p.pendingRequests, ...blocks], cardOrder: prependOrder(p.cardOrder, blocks) };
+              },
               false,
             ),
           applyRequest: (periodId, id) => {
@@ -835,12 +1102,12 @@ export function createAppStore(getStorage: () => Storage, now: () => Date = () =
                 } else if (next.requests.some((c) => c.id === ch.constraint_id)) {
                   next = {
                     ...next,
-                    requests: next.requests.map((c) => (c.id === ch.constraint_id ? patched(c, changePatch(ch)) : c)),
+                    requests: next.requests.map((c) => (c.id === ch.constraint_id ? patched(c, changePatch(ch, c)) : c)),
                   };
                 } else {
                   const rule = next.ruleOverrides[ch.constraint_id] ?? rules.find((r) => r.id === ch.constraint_id);
                   if (rule)
-                    next = { ...next, ruleOverrides: { ...next.ruleOverrides, [rule.id]: patched(rule, changePatch(ch)) } };
+                    next = { ...next, ruleOverrides: { ...next.ruleOverrides, [rule.id]: patched(rule, changePatch(ch, rule)) } };
                 }
               }
               return next;
@@ -920,8 +1187,8 @@ export function createAppStore(getStorage: () => Storage, now: () => Date = () =
         version: STORAGE_VERSION,
         storage,
         partialize: (s): Data => persisted(s),
-        // 버전이 다르거나 파싱에 실패하면 버리고, merge에서 초기 상태 + resetNotice로 처리한다
-        migrate: () => null as unknown as Data,
+        // v4는 v5로 바꾼다. 그 밖의 버전이나 파싱 실패는 버리고, merge에서 초기 상태 + resetNotice로 처리한다
+        migrate: (state, version) => (version === 4 ? migrateV4(state, localDate(now())) : null) as unknown as Data,
         // 지금은 쓰지 않는 옛 필드는 버리고 Data 필드만 가져온다
         merge: (saved, current) =>
           saved === undefined

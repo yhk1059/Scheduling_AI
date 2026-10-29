@@ -3,8 +3,9 @@
 // 랜딩 첫 화면의 실제 제품 화면 조각. 앱의 그리드 컴포넌트와 카드 문구(lib/wording)를 샘플 데이터로 정적 렌더한다(조작 불가).
 import { isWeekendDay } from "@/lib/period";
 import type { Code } from "@/lib/store";
+import { DEFAULT_CONFIG } from "@/lib/migrate";
 import type { ConstraintSpec, Nurse, Period, ScheduleResult } from "@/lib/types.gen";
-import { describeParams, hardnessLabel, TEMPLATE_NAMES } from "@/lib/wording";
+import { describeBlock, hardnessLabel, presetName } from "@/lib/wording";
 
 import { ScheduleGrid } from "./ScheduleStep";
 import { ui } from "./ui";
@@ -12,33 +13,31 @@ import { ui } from "./ui";
 const CARDS: ConstraintSpec[] = [
   {
     id: "landing-n-off",
-    type: "off_after_night_block",
+    type: "sequence",
     scope: "ward",
     hardness: "hard",
-    weight: 1,
     enabled: true,
     source_text: "나이트 다음 날은 무조건 쉬게",
-    params: { days: 1 },
+    params: { after: { in: ["N"] }, then_off: 1 },
   },
   {
     id: "landing-skill-mix",
-    type: "skill_mix",
+    type: "count",
     scope: "ward",
     hardness: "hard",
-    weight: 1,
     enabled: true,
     source_text: "나이트 조마다 3년차 이상 1명은 꼭",
-    params: { shift: "N", min_years: 3, min_count: 1 },
+    params: { people: { min_years: 3 }, shifts: { in: ["N"] }, per: "day", min: 1 },
   },
 ];
 
 // 2026년 11월 1~7일(일~토), lib/samples/ward-15.json 명단 앞 5명.
 const NURSES: Nurse[] = [
-  { id: "n01", name: "이영희", years: 12, night_only: false },
-  { id: "n02", name: "박민수", years: 9, night_only: false },
-  { id: "n03", name: "김철수", years: 7, night_only: false },
-  { id: "n04", name: "정유진", years: 5, night_only: false },
-  { id: "n05", name: "최지훈", years: 3, night_only: false },
+  { id: "n01", name: "이영희", years: 12 },
+  { id: "n02", name: "박민수", years: 9 },
+  { id: "n03", name: "김철수", years: 7 },
+  { id: "n04", name: "정유진", years: 5 },
+  { id: "n05", name: "최지훈", years: 3 },
 ];
 const ROWS: Record<string, Code[]> = {
   n01: ["D", "D", "E", "E", "O", "O", "D"],
@@ -64,7 +63,7 @@ export function PreviewCard({ card, nurses, period }: { card: ConstraintSpec; nu
   return (
     <article className="flex flex-col gap-2.5 rounded-lg border border-[#E2E2DC] bg-white px-[18px] py-4">
       <div className="flex items-center justify-between gap-3">
-        <h3 className="text-[13px] font-semibold text-[#1B1B18]">{TEMPLATE_NAMES[card.type]}</h3>
+        <h3 className="text-[13px] font-semibold text-[#1B1B18]">{presetName(card)}</h3>
         <div role="group" aria-label="반드시/가능하면" className="inline-flex overflow-hidden rounded-md border border-[#C9C9C1]">
           {(["hard", "soft"] as const).map((h) => (
             <span
@@ -77,7 +76,7 @@ export function PreviewCard({ card, nurses, period }: { card: ConstraintSpec; nu
         </div>
       </div>
       <p className="text-sm text-[#1B1B18]">“{card.source_text}”</p>
-      <p className="rounded-sm bg-[#F6F6F3] px-2.5 py-2 text-xs text-[#3D3D38]">{describeParams(card, nurses, period)}</p>
+      <p className="rounded-sm bg-[#F6F6F3] px-2.5 py-2 text-xs text-[#3D3D38]">{describeBlock(card, DEFAULT_CONFIG, nurses, period)}</p>
       <div>
         <span className={`${ui.badge} bg-[#E6F2EA] text-[#1E6B3F]`}>적용됨</span>
       </div>

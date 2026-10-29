@@ -15,6 +15,7 @@ import {
   type Grid,
   interpret,
   interpretOk,
+  leaveOf,
   NURSE_COUNT,
   nurseId,
   pendingCards,
@@ -205,10 +206,13 @@ test("S5. 처음 설정 ① 병동·명단 → ② 필요 인원", async () => {
   expect(ward.unit).toBe("month");
   expect(ward.nurses.map((n) => n.id), "간호사 id 유지").toEqual(idsBefore);
   expect(ward.nurses.filter((n) => n.active)).toHaveLength(NURSE_COUNT);
-  expect(ward.nurses.filter((n) => n.night_only).map((n) => n.name)).toEqual(["문가람", "배수아"]);
-  const coverage = ward.rules.filter((c) => c.type === "daily_coverage");
+  expect(ward.nurses.filter((n) => n.tags.includes("나이트전담")).map((n) => n.name)).toEqual(["문가람", "배수아"]);
+  const coverage = ward.rules.filter((c) => c.id.startsWith("cov-"));
   expect(coverage).toHaveLength(6);
-  expect(coverage.every((c) => c.params.min === c.params.max), "숫자 하나 = 정확히 그 인원").toBe(true);
+  expect(
+    coverage.every((c) => c.type === "count" && c.params.min === c.params.max),
+    "숫자 하나 = 정확히 그 인원",
+  ).toBe(true);
   await expect(next).toBeEnabled();
   await expectNoDevTerms(page, "처음 설정 ②");
   // [이전]으로 ①에 돌아가도 입력은 그대로다
@@ -231,22 +235,20 @@ test("S6. 처음 설정 ③ 병동 규칙 → 첫 근무표 만들기", async ()
   const r1 = await interpretOk(page, RULE_INPUT, "규칙 만들기", "나이트 다음 날은 무조건 쉬게");
   expect(r1.length).toBeGreaterThan(0);
   for (const c of r1) {
-    expect(["off_after_night_block", "forbidden_sequence"]).toContain(c.type);
-    if (c.type === "forbidden_sequence") {
-      expect(c.params.first).toBe("N");
-      expect(["D", "E"]).toContain(c.params.second);
-    }
+    expect(c.type, "나이트 다음 휴무 또는 금지 순서").toBe("sequence");
+    if (c.type === "sequence" && c.params.forbid) expect(c.params.forbid.every((pattern) => pattern[0].in?.join() === "N")).toBe(true);
+    if (c.type === "sequence" && !c.params.forbid) expect(c.params).toMatchObject({ after: { in: ["N"] } });
   }
   const r2 = await interpretOk(page, RULE_INPUT, "규칙 만들기", "나이트는 3일 넘게 연속으로 하지 않게");
-  expect(r2.map((c) => c.type)).toEqual(["max_consecutive_nights"]);
-  expect(r2[0].params).toEqual({ days: 3 });
+  expect(r2.map((c) => c.type)).toEqual(["sequence"]);
+  expect(r2[0].params).toMatchObject({ run: { in: ["N"] }, max_len: 3 });
   const r3 = await interpretOk(page, RULE_INPUT, "규칙 만들기", "근무조마다 3년차 이상 한 명은 꼭 있어야 해");
   expect(r3.length).toBeGreaterThan(0);
   for (const c of r3) {
-    expect(c.type).toBe("skill_mix");
-    if (c.type === "skill_mix") expect({ min_years: c.params.min_years, min_count: c.params.min_count }).toEqual({ min_years: 3, min_count: 1 });
+    expect(c.type).toBe("count");
+    if (c.type === "count") expect({ min_years: c.params.people?.min_years, min: c.params.min }).toEqual({ min_years: 3, min: 1 });
   }
-  const shifts = r3.flatMap((c) => (c.type === "skill_mix" ? [c.params.shift] : []));
+  const shifts = r3.flatMap((c) => (c.type === "count" ? (c.params.shifts.in ?? []) : []));
   expect([...shifts].sort(), "연차별 배치가 D/E/N을 모두 덮는다").toEqual(["D", "E", "N"]);
 
   const total = r1.length + r2.length + r3.length;
@@ -360,16 +362,16 @@ test("S8. ① 요청: 요청 카드", async () => {
   await expect(leaveToggle.getByRole("button", { name: "가능하면" })).toBeDisabled();
 
   const q2 = await interpretOk(page, REQUEST_INPUT, "요청 만들기", "박민수는 주말에 쉬고 싶대요");
-  expect(q2.map((c) => c.type)).toEqual(["shift_preference"]);
+  expect(q2.map((c) => c.type)).toEqual(["count"]);
   const pref = q2[0];
-  if (pref.type === "shift_preference") {
-    expect({ nurse_id: pref.params.nurse_id, shift: pref.params.shift, prefer: pref.params.prefer }).toEqual({
-      nurse_id: park,
-      shift: "O",
-      prefer: true,
+  if (pref.type === "count") {
+    expect({ ids: pref.params.people?.ids, shifts: pref.params.shifts.in, hardness: pref.hardness }).toEqual({
+      ids: [park],
+      shifts: ["O"],
+      hardness: "soft",
     });
     const weekendOnly =
-      pref.params.weekends_only === true || (pref.params.days ?? []).every((d) => NOV_WEEKEND_DAYS.includes(d));
+      pref.params.days?.kind === "weekend" || (pref.params.days?.days ?? []).every((d) => NOV_WEEKEND_DAYS.includes(d));
     expect(weekendOnly, "주말·공휴일만 대상").toBe(true);
   }
   const prefCard = pendingCards(page).filter({ hasText: "희망·기피 근무" });
@@ -419,7 +421,7 @@ test("S9. ② 근무표 만들기", async () => {
     await expect(stats.getByRole("columnheader", { name: h, exact: true })).toBeVisible();
   }
   // 첫 근무표: 최근 4주 기록이 없어 열과 근거 한 줄을 그리지 않는다
-  expect(lastSolve!.history_load ?? []).toEqual([]);
+  expect(lastSolve!.history ?? null).toBeNull();
   await expect(page.getByText(/최근 4주/)).toHaveCount(0);
 
   await expectHardRulesHold(page, NOV, lastSolve);
@@ -432,16 +434,16 @@ test("S10. 근무표 없음 → 설명과 검증된 제안", async () => {
   await expect(page.getByRole("heading", { name: "요청", exact: true })).toBeVisible();
   for (const text of ["이영희, 박민수, 김철수, 정유진 20일 휴가", "최지훈, 강서연, 윤지민, 임하늘 20일 휴가"]) {
     const cards = await interpretOk(page, REQUEST_INPUT, "요청 만들기", text);
-    expect(cards.every((c) => c.type === "leave"), `${text} → 휴가 카드`).toBe(true);
+    expect(cards.every((c) => leaveOf(c) !== null), `${text} → 휴가 카드`).toBe(true);
     await applyAllPending(page);
   }
   const requests = (await periodByStart(page, NOV.start_date)).requests;
-  const offOn20 = new Set(requests.flatMap((c) => (c.type === "leave" && c.params.days.includes(20) ? [c.params.nurse_id] : [])));
+  const offOn20 = new Set(requests.flatMap((c) => (leaveOf(c)?.days.includes(20) ? [leaveOf(c)!.nurse_id] : [])));
   expect(offOn20.size, "11/20 휴가 인원").toBe(8);
   const lee = await nurseId(page, "이영희");
   const leeLeave15 = (list: ConstraintSpec[]) =>
-    list.find((c) => c.type === "leave" && c.params.nurse_id === lee && c.params.days.includes(15));
-  expect(leeLeave15(requests)?.params, "S8의 이영희 15~17일 휴가가 남아 있음").toEqual({ nurse_id: lee, days: [15, 16, 17] });
+    list.find((c) => leaveOf(c)?.nurse_id === lee && leaveOf(c)!.days.includes(15));
+  expect(leaveOf(leeLeave15(requests)!), "S8의 이영희 15~17일 휴가가 남아 있음").toEqual({ nurse_id: lee, days: [15, 16, 17] });
 
   await page.getByRole("button", { name: "다음" }).click();
   const stale = page.getByRole("status").filter({ hasText: "입력이 바뀌었어요. 다시 만들어 주세요" });
@@ -553,7 +555,7 @@ test("S13. 저장과 다시 들어오기", async () => {
   const p = await periodByStart(page, NOV.start_date);
   expect(p.holidays).toEqual([HOLIDAY]);
   const lee = await nurseId(page, "이영희");
-  expect(p.requests.some((c) => c.type === "leave" && c.params.nurse_id === lee && c.params.days.join() === "15,16,17")).toBe(true);
+  expect(p.requests.some((c) => leaveOf(c)?.nurse_id === lee && leaveOf(c)!.days.join() === "15,16,17")).toBe(true);
 
   // 병동 설정은 고칠 때만 쓴다([첫 근무표 만들기] 없음)
   await page.getByRole("button", { name: "병동 설정", exact: true }).click();

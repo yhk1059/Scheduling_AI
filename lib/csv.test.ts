@@ -1,28 +1,16 @@
 import { describe, expect, it } from "vitest";
 
 import { toScheduleCsv } from "./csv";
-import type { Nurse, NurseStats } from "./types.gen";
+import { DEFAULT_CONFIG } from "./migrate";
+import type { Nurse, WardConfig } from "./types.gen";
 
-type Code = "D" | "E" | "N" | "O";
+type Code = string;
+const config = DEFAULT_CONFIG;
 
 const nurses: Nurse[] = [
-  { id: "n01", name: "이영희", years: 12, night_only: false },
-  { id: "n02", name: "박민수", years: 3, night_only: false },
+  { id: "n01", name: "이영희", years: 12 },
+  { id: "n02", name: "박민수", years: 3 },
 ];
-
-function stats(row: Code[], weekend: number): NurseStats {
-  const count = (c: Code) => row.filter((s) => s === c).length;
-  return {
-    D: count("D"),
-    E: count("E"),
-    N: count("N"),
-    O: count("O"),
-    weekend_holiday_work: weekend,
-    max_consecutive_work: 0,
-    preference_rate: null,
-    deviation: 0,
-  };
-}
 
 /** 2026-02: 28일, 1일이 일요일. */
 function feb(over: { nurses?: Nurse[]; holidays?: number[] } = {}) {
@@ -34,7 +22,7 @@ function feb(over: { nurses?: Nurse[]; holidays?: number[] } = {}) {
     period: { start_date: "2026-02-01", length: 28 },
     holidays: over.holidays ?? [],
     assignments: { [list[0].id]: a, [list[1].id]: b },
-    stats: { [list[0].id]: stats(a, 4), [list[1].id]: stats(b, 8) },
+    config,
   };
 }
 
@@ -68,7 +56,7 @@ describe("toScheduleCsv", () => {
   it("간호사 행은 이름, 연차, 근무 코드, 합계다", () => {
     const r = rows(toScheduleCsv(feb()));
     expect(r[2].slice(0, 6)).toEqual(["이영희", "12", "D", "E", "N", "O"]);
-    expect(r[2].slice(-5)).toEqual(["7", "7", "7", "7", "4"]);
+    expect(r[2].slice(-5)).toEqual(["7", "7", "7", "7", "6"]); // 주말 1·7·8·14·15·21·22·28일 중 휴무가 아닌 날
     expect(r[3].slice(0, 2)).toEqual(["박민수", "3"]);
     expect(r[3].slice(-5)).toEqual(["28", "0", "0", "0", "8"]);
   });
@@ -90,7 +78,7 @@ describe("toScheduleCsv", () => {
       period: { start_date: "2026-12-01", length: 31 },
       holidays: [25],
       assignments: { n01: row },
-      stats: { n01: stats(row, 0) },
+      config,
     });
     const [head, dates, nurse] = rows(csv);
     expect(head).toHaveLength(2 + 31 + 5);
@@ -100,6 +88,31 @@ describe("toScheduleCsv", () => {
     expect(nurse.slice(2, 33)).toEqual(row);
   });
 
+  it("합계 열은 활성 코드, 하단 합계는 근무조별이고 복합 코드는 세는 근무조마다 더한다", () => {
+    const withDouble = {
+      shifts: [
+        ...DEFAULT_CONFIG.shifts,
+        { code: "M", name: "미드", hours: 8, active: false },
+        { code: "DE", name: "더블", hours: 16, parts: ["D", "E"] },
+      ],
+    } as WardConfig;
+    const csv = toScheduleCsv({
+      nurses,
+      period: { start_date: "2026-11-02", length: 3 },
+      holidays: [],
+      assignments: { n01: ["DE", "D", "M"], n02: ["E", "O", "DE"] },
+      config: withDouble,
+    });
+    const r = rows(csv);
+    expect(r[0].slice(-6)).toEqual(["D", "E", "N", "O", "DE", "주말근무"]);
+    expect(r[2].slice(-6)).toEqual(["1", "0", "0", "0", "1", "0"]);
+    expect(r.slice(-3).map((x) => x.slice(0, 5))).toEqual([
+      ["D 합계", "", "1", "1", "1"],
+      ["E 합계", "", "2", "0", "1"],
+      ["N 합계", "", "0", "0", "0"],
+    ]);
+  });
+
   it("월을 넘는 기간은 날짜 행에 실제 일(日)을 쓰고 요일도 날짜마다 계산한다", () => {
     const row: Code[] = Array.from({ length: 14 }, () => "O");
     const csv = toScheduleCsv({
@@ -107,7 +120,7 @@ describe("toScheduleCsv", () => {
       period: { start_date: "2026-11-23", length: 14 },
       holidays: [],
       assignments: { n01: row },
-      stats: { n01: stats(row, 0) },
+      config,
     });
     const [head, dates] = rows(csv);
     expect(head.slice(2, 9)).toEqual(["월", "화", "수", "목", "금", "토", "일"]);

@@ -8,6 +8,7 @@ import {
   dayOfDate,
   firstPeriodStart,
   formatRange,
+  localDate,
   isWeekendDay,
   monthDay,
   nextPeriod,
@@ -15,6 +16,7 @@ import {
   periodEnd,
   periodFrom,
   unitLabel,
+  validStart,
 } from "./period";
 
 // 기준: 2026-11-01 일요일, 2026-11-02 월요일, 2026-10-28 수요일
@@ -42,25 +44,56 @@ describe("firstPeriodStart", () => {
 });
 
 describe("periodFrom", () => {
-  it("주 단위 길이는 7·14·28", () => {
-    expect(periodFrom("1w", "2026-10-28")).toEqual({ start_date: "2026-11-02", length: 7 });
-    expect(periodFrom("2w", "2026-10-28")).toEqual({ start_date: "2026-11-02", length: 14 });
-    expect(periodFrom("4w", "2026-10-28")).toEqual({ start_date: "2026-11-02", length: 28 });
+  it("주 단위는 아무 날에서 시작하고 길이는 7·14·28", () => {
+    expect(periodFrom("1w", "2026-10-28")).toEqual({ start_date: "2026-10-28", length: 7 });
+    expect(periodFrom("2w", "2026-11-02")).toEqual({ start_date: "2026-11-02", length: 14 });
+    expect(periodFrom("4w", "2026-10-28")).toEqual({ start_date: "2026-10-28", length: 28 });
   });
 
-  it("달력 월 길이는 그 달의 일수", () => {
-    expect(periodFrom("month", "2026-10-28")).toEqual({ start_date: "2026-11-01", length: 30 });
+  it("달력 월: 1일이면 그 달 전체", () => {
+    expect(periodFrom("month", "2026-11-01")).toEqual({ start_date: "2026-11-01", length: 30 });
+    expect(periodFrom("month", "2027-02-01")).toEqual({ start_date: "2027-02-01", length: 28 });
   });
 
-  it("달력 월 기간 뒤에 단위를 1주로 바꾸면 다음 날 이후 첫 월요일에서 시작", () => {
-    const nov = { start_date: "2026-11-01", length: 30 };
-    const after = dateOfDay(nov, nov.length + 1); // 2026-12-01 화요일
-    expect(after).toBe("2026-12-01");
-    expect(periodFrom("1w", after)).toEqual({ start_date: "2026-12-07", length: 7 });
+  it("달력 월: 1일이 아니면 다음 달 같은 날 전날까지", () => {
+    const p = periodFrom("month", "2026-11-15");
+    expect(p).toEqual({ start_date: "2026-11-15", length: 30 });
+    expect(periodEnd(p)).toBe("2026-12-14");
+    expect(periodEnd(periodFrom("month", "2027-01-28"))).toBe("2027-02-27");
+    expect(periodEnd(periodFrom("month", "2026-12-20"))).toBe("2027-01-19");
+  });
+});
+
+describe("validStart", () => {
+  it("달력 월은 1~28일만, 주 단위는 아무 날", () => {
+    expect(validStart("month", "2026-11-01")).toBe(true);
+    expect(validStart("month", "2026-11-28")).toBe(true);
+    expect(validStart("month", "2026-11-29")).toBe(false);
+    expect(validStart("month", "2026-12-31")).toBe(false);
+    expect(validStart("1w", "2026-11-29")).toBe(true);
+    expect(validStart("2w", "2026-12-31")).toBe(true);
+  });
+});
+
+describe("localDate", () => {
+  it("브라우저 시간대의 날짜", () => {
+    expect(localDate(new Date(2026, 9, 28, 23, 59))).toBe("2026-10-28");
+    expect(localDate(new Date(2027, 0, 5, 0, 0))).toBe("2027-01-05");
   });
 });
 
 describe("nextPeriod", () => {
+  it("직전 기간 다음 날에 시작한다(단위를 바꿔도 맞추지 않는다)", () => {
+    const nov = { start_date: "2026-11-01", length: 30 };
+    expect(dateOfDay(nov, nov.length + 1)).toBe("2026-12-01"); // 화요일
+    expect(nextPeriod("1w", nov)).toEqual({ start_date: "2026-12-01", length: 7 });
+    expect(nextPeriod("month", { start_date: "2026-11-15", length: 30 })).toEqual({ start_date: "2026-12-15", length: 31 });
+  });
+
+  it("달력 월인데 다음 날이 29~31일이면 다음 달 1일에서 시작한다", () => {
+    expect(nextPeriod("month", { start_date: "2026-12-02", length: 28 })).toEqual({ start_date: "2027-01-01", length: 31 });
+  });
+
   it("2주 단위가 월 경계를 넘는다", () => {
     const p = { start_date: "2026-11-23", length: 14 };
     expect(periodEnd(p)).toBe("2026-12-06");

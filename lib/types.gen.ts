@@ -3,19 +3,7 @@
 
 export type SolveResponse = SolveOk | SolveInfeasible | SolveTimeout;
 export type TranslateResponse = TranslateOk | TranslateClarify | TranslateUnsupported;
-export type ConstraintSpec =
-  | DailyCoverage
-  | ForbiddenSequence
-  | MaxConsecutiveWork
-  | MaxConsecutiveNights
-  | MinDaysOff
-  | OffAfterNightBlock
-  | SkillMix
-  | Leave
-  | FixedAssignment
-  | ShiftPreference
-  | NightFairness
-  | WeekendFairness;
+export type ConstraintSpec = CountRule | SequenceRule | BalanceRule | FixedAssignment;
 
 export interface ApiTypes {
   ScheduleRequest: ScheduleRequest;
@@ -29,38 +17,44 @@ export interface ApiTypes {
   [k: string]: unknown;
 }
 export interface ScheduleRequest {
+  config?: WardConfig;
   /**
    * @minItems 1
    */
   nurses: [Nurse, ...Nurse[]];
   period: Period;
   holidays?: number[];
-  constraints?: (
-    | DailyCoverage
-    | ForbiddenSequence
-    | MaxConsecutiveWork
-    | MaxConsecutiveNights
-    | MinDaysOff
-    | OffAfterNightBlock
-    | SkillMix
-    | Leave
-    | FixedAssignment
-    | ShiftPreference
-    | NightFairness
-    | WeekendFairness
-  )[];
+  constraints?: (CountRule | SequenceRule | BalanceRule | FixedAssignment)[];
   carry_over?: CarryOverRow[];
   previous?: {
-    [k: string]: ("D" | "E" | "N" | "O")[];
+    [k: string]: string[];
   } | null;
-  history_load?: HistoryLoad[];
+  history?: History | null;
   input_version: number;
+}
+export interface WardConfig {
+  /**
+   * @minItems 1
+   * @maxItems 8
+   */
+  shifts: [ShiftDef, ...ShiftDef[]];
+}
+export interface ShiftDef {
+  code: string;
+  name: string;
+  hours: number;
+  parts?: string[];
+  start?: string | null;
+  active?: boolean;
 }
 export interface Nurse {
   id: string;
   name: string;
   years: number;
-  night_only?: boolean;
+  /**
+   * @maxItems 5
+   */
+  tags?: string[];
 }
 /**
  * 시작일 + 길이(ADR-015). 날짜는 기간 안의 1..length 인덱스로 다룬다.
@@ -69,111 +63,107 @@ export interface Period {
   start_date: string;
   length: number;
 }
-export interface DailyCoverage {
+export interface CountRule {
   id: string;
   scope: "ward" | "period";
   hardness?: "hard" | "soft";
   weight?: number;
   source_text: string;
   enabled?: boolean;
-  type: "daily_coverage";
-  params: DailyCoverageParams;
+  priority?: "high" | "normal" | "low";
+  type: "count";
+  params: CountParams;
 }
-export interface DailyCoverageParams {
-  shift: "D" | "E" | "N";
-  day_kind: "weekday" | "weekend";
-  min: number;
-  max: number;
+export interface CountParams {
+  people?: People;
+  days?: Days;
+  shifts: Shifts;
+  per: "day" | "person" | "person_week" | "person_window";
+  window?: number | null;
+  measure?: "count" | "hours";
+  min?: number | null;
+  max?: number | null;
 }
-export interface ForbiddenSequence {
+export interface People {
+  ids?: string[] | null;
+  tags?: string[] | null;
+  exclude_tags?: string[];
+  min_years?: number | null;
+  max_years?: number | null;
+}
+export interface Days {
+  kind?: "all" | "weekday" | "weekend" | "holiday";
+  weekdays?: number[] | null;
+  days?: number[] | null;
+}
+/**
+ * 칸이 맞는다 = 그 칸 코드의 covers가 in과 겹친다(또는 not_in과 겹치지 않는다).
+ */
+export interface Shifts {
+  in?: [string, ...string[]] | null;
+  not_in?: [string, ...string[]] | null;
+}
+export interface SequenceRule {
   id: string;
   scope: "ward" | "period";
   hardness?: "hard" | "soft";
   weight?: number;
   source_text: string;
   enabled?: boolean;
-  type: "forbidden_sequence";
-  params: ForbiddenSequenceParams;
+  priority?: "high" | "normal" | "low";
+  type: "sequence";
+  params: SequenceParams;
 }
-export interface ForbiddenSequenceParams {
-  first: "D" | "E" | "N" | "O";
-  second: "D" | "E" | "N" | "O";
+export interface SequenceParams {
+  people?: People1;
+  forbid?: [[Shifts, Shifts, ...Shifts[]], ...[Shifts, Shifts, ...Shifts[]][]] | null;
+  run?: Shifts | null;
+  min_len?: number | null;
+  max_len?: number | null;
+  after?: Shifts | null;
+  then_off?: number | null;
 }
-export interface MaxConsecutiveWork {
+export interface People1 {
+  ids?: string[] | null;
+  tags?: string[] | null;
+  exclude_tags?: string[];
+  min_years?: number | null;
+  max_years?: number | null;
+}
+export interface BalanceRule {
   id: string;
   scope: "ward" | "period";
   hardness?: "hard" | "soft";
   weight?: number;
   source_text: string;
   enabled?: boolean;
-  type: "max_consecutive_work";
-  params: DaysParams;
+  priority?: "high" | "normal" | "low";
+  type: "balance";
+  params: BalanceParams;
 }
-export interface DaysParams {
-  days: number;
+export interface BalanceParams {
+  people?: People2;
+  days?: Days1;
+  shifts: Shifts;
+  measure?: "count" | "hours";
+  with_history?: boolean;
+  max_gap?: number;
 }
-export interface MaxConsecutiveNights {
-  id: string;
-  scope: "ward" | "period";
-  hardness?: "hard" | "soft";
-  weight?: number;
-  source_text: string;
-  enabled?: boolean;
-  type: "max_consecutive_nights";
-  params: DaysParams;
+export interface People2 {
+  ids?: string[] | null;
+  tags?: string[] | null;
+  exclude_tags?: string[];
+  min_years?: number | null;
+  max_years?: number | null;
 }
-export interface MinDaysOff {
-  id: string;
-  scope: "ward" | "period";
-  hardness?: "hard" | "soft";
-  weight?: number;
-  source_text: string;
-  enabled?: boolean;
-  type: "min_days_off";
-  params: DaysParams;
+export interface Days1 {
+  kind?: "all" | "weekday" | "weekend" | "holiday";
+  weekdays?: number[] | null;
+  days?: number[] | null;
 }
-export interface OffAfterNightBlock {
-  id: string;
-  scope: "ward" | "period";
-  hardness?: "hard" | "soft";
-  weight?: number;
-  source_text: string;
-  enabled?: boolean;
-  type: "off_after_night_block";
-  params: DaysParams;
-}
-export interface SkillMix {
-  id: string;
-  scope: "ward" | "period";
-  hardness?: "hard" | "soft";
-  weight?: number;
-  source_text: string;
-  enabled?: boolean;
-  type: "skill_mix";
-  params: SkillMixParams;
-}
-export interface SkillMixParams {
-  shift: "D" | "E" | "N";
-  min_years: number;
-  min_count: number;
-}
-export interface Leave {
-  id: string;
-  scope: "ward" | "period";
-  hardness?: "hard" | "soft";
-  weight?: number;
-  source_text: string;
-  enabled?: boolean;
-  type: "leave";
-  params: LeaveParams;
-}
-export interface LeaveParams {
-  nurse_id: string;
-  /**
-   * @minItems 1
-   */
-  days: [number, ...number[]];
-}
+/**
+ * 칸 고정(수동 고정, 지난 날짜 잠금). 규칙이 아니라 데이터라서 항상 hard다.
+ */
 export interface FixedAssignment {
   id: string;
   scope: "ward" | "period";
@@ -187,60 +177,27 @@ export interface FixedAssignment {
 export interface FixedAssignmentParams {
   nurse_id: string;
   day: number;
-  shift: "D" | "E" | "N" | "O";
-}
-export interface ShiftPreference {
-  id: string;
-  scope: "ward" | "period";
-  hardness?: "hard" | "soft";
-  weight?: number;
-  source_text: string;
-  enabled?: boolean;
-  type: "shift_preference";
-  params: ShiftPreferenceParams;
-}
-export interface ShiftPreferenceParams {
-  nurse_id: string;
-  shift: "D" | "E" | "N" | "O";
-  prefer: boolean;
-  days?: number[] | null;
-  weekends_only?: boolean;
-}
-export interface NightFairness {
-  id: string;
-  scope: "ward" | "period";
-  hardness?: "hard" | "soft";
-  weight?: number;
-  source_text: string;
-  enabled?: boolean;
-  type: "night_fairness";
-  params?: EmptyParams;
-}
-export interface EmptyParams {}
-export interface WeekendFairness {
-  id: string;
-  scope: "ward" | "period";
-  hardness?: "hard" | "soft";
-  weight?: number;
-  source_text: string;
-  enabled?: boolean;
-  type: "weekend_fairness";
-  params?: EmptyParams;
+  shift: string;
 }
 export interface CarryOverRow {
   nurse_id: string;
   /**
    * @maxItems 7
    */
-  shifts: ("D" | "E" | "N" | "O")[];
+  shifts: string[];
 }
 /**
- * 최근 4주 누적 부담. 클라이언트가 지난 확정본에서 계산해 보낸다(ADR-015).
+ * 최근 28일 확정 배정 원본. 고르게 블록마다 세는 일은 백엔드가 한다(ADR-018).
  */
-export interface HistoryLoad {
-  nurse_id: string;
-  nights: number;
-  weekends: number;
+export interface History {
+  start_date: string;
+  rows: {
+    /**
+     * @maxItems 28
+     */
+    [k: string]: string[];
+  };
+  holidays?: string[];
 }
 export interface SolveOk {
   status: "ok";
@@ -249,7 +206,7 @@ export interface SolveOk {
 }
 export interface ScheduleResult {
   assignments: {
-    [k: string]: ("D" | "E" | "N" | "O")[];
+    [k: string]: string[];
   };
   summary: Summary;
   stats: {
@@ -265,10 +222,10 @@ export interface Summary {
   soft_violation_count: number;
 }
 export interface NurseStats {
-  D: number;
-  E: number;
-  N: number;
-  O: number;
+  counts: {
+    [k: string]: number;
+  };
+  hours: number;
   weekend_holiday_work: number;
   max_consecutive_work: number;
   preference_rate: number | null;
@@ -283,8 +240,8 @@ export interface SoftViolation {
 export interface DiffCell {
   nurse_id: string;
   day: number;
-  before: "D" | "E" | "N" | "O";
-  after: "D" | "E" | "N" | "O";
+  before: string;
+  after: string;
 }
 export interface SolveInfeasible {
   status: "infeasible";
@@ -307,28 +264,31 @@ export interface TranslateRequest {
   input_version: number;
 }
 export interface TranslateContext {
+  config?: WardConfig1;
   nurses: Nurse[];
   period: Period;
   holidays?: number[];
   today: string;
 }
+export interface WardConfig1 {
+  /**
+   * @minItems 1
+   * @maxItems 8
+   */
+  shifts: [ShiftDef, ...ShiftDef[]];
+}
 export interface TranslateOk {
   status: "ok";
   input_version: number;
-  constraints: (
-    | DailyCoverage
-    | ForbiddenSequence
-    | MaxConsecutiveWork
-    | MaxConsecutiveNights
-    | MinDaysOff
-    | OffAfterNightBlock
-    | SkillMix
-    | Leave
-    | FixedAssignment
-    | ShiftPreference
-    | NightFairness
-    | WeekendFairness
-  )[];
+  constraints: (CountRule | SequenceRule | BalanceRule | FixedAssignment)[];
+  config_changes?: ShiftChange[];
+}
+/**
+ * 설정 변경 카드(ADR-018): 근무 코드 추가·수정. 삭제는 설정 화면에서만 한다.
+ */
+export interface ShiftChange {
+  action: "add" | "update";
+  shift: ShiftDef;
 }
 export interface TranslateClarify {
   status: "clarify";

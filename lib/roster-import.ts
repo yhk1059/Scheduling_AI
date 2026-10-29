@@ -1,10 +1,8 @@
 // 지난 근무(이월) 붙여넣기 파싱 (순수 함수).
-import type { CarryOverRow, Nurse } from "./types.gen";
+import type { CarryOverRow, Nurse, WardConfig } from "./types.gen";
 
 export const MAX_NURSES = 40; // backend/domain/constants.py MAX_NURSES
 export const CARRY_OVER_DAYS = 7; // backend/domain/constants.py CARRY_OVER_DAYS
-
-type Shift = CarryOverRow["shifts"][number];
 
 /** row·col은 입력 rows 기준 인덱스. row가 null이면 표 전체, col이 null이면 행 전체 오류. */
 export interface CellError {
@@ -61,37 +59,52 @@ export function parseDelimited(text: string): string[][] {
 
 const NAME_HEADERS = ["이름", "성명", "간호사"];
 
-const SHIFT_SYNONYMS: Record<string, Shift> = {
-  d: "D", 데이: "D",
-  e: "E", 이브: "E", 이브닝: "E",
-  n: "N", 나: "N", 나이트: "N",
-  o: "O", off: "O", 휴: "O", 오프: "O",
+/** 기본 코드의 다른 표기. 그 코드가 근무 형태에 있을 때만 쓴다. */
+const SHIFT_SYNONYMS: Record<string, string> = {
+  이브: "E",
+  나: "N",
+  off: "O", 휴: "O", 오프: "O",
 };
 
-/** 전월 마지막 근무 붙여넣기. 첫 열은 이름, 나머지는 오래된 날부터 근무 코드. */
+/** 근무 형태의 코드(대소문자 무시)·이름과 기본 코드의 다른 표기 → 코드. */
+function codeLookup(config: WardConfig): Map<string, string> {
+  const map = new Map<string, string>();
+  for (const [word, code] of Object.entries(SHIFT_SYNONYMS)) {
+    if (config.shifts.some((s) => s.code === code)) map.set(word, code);
+  }
+  for (const s of config.shifts) {
+    map.set(s.name.toLowerCase(), s.code);
+    map.set(s.code.toLowerCase(), s.code);
+  }
+  return map;
+}
+
+/** 지난 근무 붙여넣기. 첫 열은 이름, 나머지는 오래된 날부터 근무 코드(근무 형태의 코드나 이름). */
 export function parseCarryOver(
   text: string,
   nurses: Nurse[],
+  config: WardConfig,
 ): { rows: CarryOverRow[]; warnings: string[]; errors: CellError[] } {
   const byName = new Map(nurses.map((n) => [n.name, n.id]));
+  const codes = codeLookup(config);
   const rows: CarryOverRow[] = [];
   const warnings: string[] = [];
   const errors: CellError[] = [];
 
   parseDelimited(text).forEach((cells, r) => {
-    const [name, ...codes] = cells;
+    const [name, ...cellCodes] = cells;
     if (NAME_HEADERS.includes(name.replace(/\s+/g, ""))) return;
     const nurseId = byName.get(name);
     if (nurseId === undefined) {
       warnings.push(`명단에 없는 이름이라 무시했어요: ${name}`);
       return;
     }
-    while (codes.length > 0 && codes.at(-1) === "") codes.pop();
+    while (cellCodes.length > 0 && cellCodes.at(-1) === "") cellCodes.pop();
 
-    const shifts: Shift[] = [];
+    const shifts: string[] = [];
     let ok = true;
-    codes.forEach((code, i) => {
-      const shift = SHIFT_SYNONYMS[code.toLowerCase()];
+    cellCodes.forEach((code, i) => {
+      const shift = codes.get(code.toLowerCase());
       if (shift) shifts.push(shift);
       else {
         errors.push({ row: r, col: i + 1, message: `알 수 없는 근무 코드: ${code || "(빈칸)"}` });

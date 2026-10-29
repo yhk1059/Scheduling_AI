@@ -1,14 +1,10 @@
 "use client";
 
-import { type DayKind, type Shift, useAppStore } from "@/lib/store";
+import { type Code, coverageCodes, coverageRule, type DayKind, useAppStore } from "@/lib/store";
 
 import { ui } from "./ui";
 
-const SHIFTS: { shift: Shift; label: string }[] = [
-  { shift: "D", label: "데이" },
-  { shift: "E", label: "이브닝" },
-  { shift: "N", label: "나이트" },
-];
+type Shift = Code;
 const DAY_KINDS: { kind: DayKind; label: string }[] = [
   { kind: "weekday", label: "평일" },
   { kind: "weekend", label: "주말·공휴일" },
@@ -18,7 +14,7 @@ const DAY_KINDS: { kind: DayKind; label: string }[] = [
 export type CoverageDrafts = Record<string, string>;
 const keyOf = (shift: Shift, kind: DayKind) => `${shift}|${kind}`;
 
-/** 필요 인원 폼. 칸마다 숫자 하나(정확히 그 인원)를 받아 daily_coverage 제약의 최소·최대에 같은 값으로 저장한다. */
+/** 필요 인원 폼. 행은 활성 기본 근무 코드. 칸마다 숫자 하나(정확히 그 인원)를 받아 필요 인원 블록의 최소·최대에 같은 값으로 저장한다. */
 export default function CoverageForm({
   drafts,
   setDrafts,
@@ -30,12 +26,14 @@ export default function CoverageForm({
   const constraints = ward?.rules ?? [];
   const active = ward?.nurses.filter((n) => n.active).length ?? 0;
   const setCoverage = useAppStore((s) => s.setCoverage);
+  const SHIFTS = coverageCodes(ward?.config ?? { shifts: [{ code: "O", name: "휴무", hours: 0 }] }).map((s) => ({
+    shift: s.code,
+    label: s.name,
+  }));
 
   const stored = (shift: Shift, kind: DayKind) => {
-    const c = constraints.find(
-      (c) => c.type === "daily_coverage" && c.scope === "ward" && c.params.shift === shift && c.params.day_kind === kind,
-    );
-    return c?.type === "daily_coverage" ? c.params : null;
+    const p = coverageRule(constraints, shift, kind)?.params;
+    return p ? { min: p.min ?? 0, max: p.max ?? p.min ?? 0 } : null;
   };
   // 예전에 범위(최소~최대)로 저장한 값은 그대로 보여 주고, 고치면 숫자 하나로 바뀐다
   const shown = (shift: Shift, kind: DayKind) => {
@@ -57,7 +55,7 @@ export default function CoverageForm({
     });
   };
 
-  // 하루에 일하는 사람 수(최소 기준). 세 근무조가 모두 있을 때만 센다
+  // 하루에 일하는 사람 수(최소 기준). 모든 근무조가 있을 때만 센다
   const dailyTotal = (kind: DayKind) => {
     const ps = SHIFTS.map(({ shift }) => stored(shift, kind));
     return ps.every((p) => p !== null) ? ps.reduce((sum, p) => sum + p!.min, 0) : null;

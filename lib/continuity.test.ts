@@ -4,6 +4,7 @@ import {
   HISTORY_DAYS,
   carryOverFrom,
   diffAssignments,
+  historyFor,
   historyLoadFor,
   isOperating,
   latestConfirmed,
@@ -12,6 +13,7 @@ import {
   rosterChanges,
   sameCarryOver,
 } from "./continuity";
+import { DEFAULT_CONFIG } from "./migrate";
 import type { Assignments, Code, WardNurse, WorkPeriod } from "./store";
 
 // 기준: 2026-11-02 월요일, 2026-11-01 일요일
@@ -46,7 +48,7 @@ function confirmed(start_date: string, length: number, ...versions: Assignments[
 
 /** "DENO..." 문자열 → 코드 배열 */
 const row = (s: string) => s.split("") as Code[];
-const nurse = (id: string, name: string, active = true): WardNurse => ({ id, name, years: 3, active });
+const nurse = (id: string, name: string, active = true): WardNurse => ({ id, name, years: 3, tags: [], active });
 
 describe("HISTORY_DAYS", () => {
   it("백엔드와 같은 28일", () => {
@@ -116,7 +118,7 @@ describe("carryOverFrom", () => {
   });
 });
 
-describe("historyLoadFor", () => {
+describe("historyFor / historyLoadFor", () => {
   // 창: 2026-10-12 ~ 11-08 (target 11-09 시작)
   // A 10-05~10-18: 창에 10-12~10-18(인덱스 8~14)만 들어간다
   const A = confirmed("2026-10-05", 14, {
@@ -139,22 +141,56 @@ describe("historyLoadFor", () => {
   });
   const target = { start_date: "2026-11-09", length: 7 };
 
-  it("28일 창이 여러 기간에 걸치고 지난 기간 일부만 센다, 최신 버전과 공휴일 주말", () => {
-    expect(historyLoadFor([A, B, C], target, ["n01", "n02"])).toEqual([
+  it("최근 28일 확정본 원본: 여러 기간에 걸치고, 최신 버전과 그 날짜의 공휴일", () => {
+    expect(historyFor([A, B, C], target, ["n01", "n02"])).toEqual({
+      start_date: "2026-10-12",
+      rows: {
+        n01: row("NOOOOOO" + "NNOOOOO" + "OOOOOOO" + "OOOOOOO"),
+        n02: row("DDDDDDD" + "OOOOODD" + "OOOOODD" + "OODOOOO"),
+      },
+      holidays: ["2026-11-04"],
+    });
+  });
+
+  it("창의 앞이 비면 확정본이 있는 첫날부터, 사이가 비거나 행이 없는 날은 휴무로 채운다", () => {
+    const gap = confirmed("2026-11-02", 3, { n01: row("NDE") });
+    const late = confirmed("2026-11-07", 2, { n01: row("DD"), n02: row("NN") });
+    expect(historyFor([gap, late], target, ["n01", "n02"])).toEqual({
+      start_date: "2026-11-02",
+      rows: { n01: row("NDEOODD"), n02: row("OOOOONN") },
+      holidays: [],
+    });
+  });
+
+  it("초안 기간과 target 이후 기간은 쓰지 않고, 없으면 null", () => {
+    const draft = period("2026-11-02", 7, { result: null });
+    const later = confirmed("2026-11-09", 7, { n01: row("NNNNNNN") });
+    expect(historyFor([draft, later], target, ["n01"])).toBeNull();
+  });
+
+  it("nurseIds 밖 간호사와 확정본에 없는 간호사는 행이 없다", () => {
+    const p = confirmed("2026-11-02", 7, { n01: row("DDDDDOO"), n03: row("NNNNNNN") });
+    expect(historyFor([p], target, ["n01", "n02"])!.rows).toEqual({ n01: row("DDDDDOO") });
+  });
+
+  it("historyLoadFor: 원본에서 나이트(세는 근무조 N)와 주말·공휴일 근무를 센다, 둘 다 0이면 뺀다", () => {
+    expect(historyLoadFor(historyFor([A, B, C], target, ["n01", "n02"]), DEFAULT_CONFIG)).toEqual([
       { nurse_id: "n01", nights: 3, weekends: 0 },
       { nurse_id: "n02", nights: 0, weekends: 2 + 4 + 1 }, // A 10-17·18 D, B 4회, C 공휴일 D
     ]);
+    const p = confirmed("2026-11-02", 7, { n01: row("DDDDDOO"), n02: row("NOOOOOO") });
+    expect(historyLoadFor(historyFor([p], target, ["n01", "n02"]), DEFAULT_CONFIG)).toEqual([
+      { nurse_id: "n02", nights: 1, weekends: 0 },
+    ]);
+    expect(historyLoadFor(null, DEFAULT_CONFIG)).toEqual([]);
   });
 
-  it("초안 기간과 target 이후 기간은 세지 않는다", () => {
-    const draft = period("2026-11-02", 7, { result: null });
-    const later = confirmed("2026-11-09", 7, { n01: row("NNNNNNN") });
-    expect(historyLoadFor([draft, later], target, ["n01"])).toEqual([]);
-  });
-
-  it("둘 다 0인 간호사와 nurseIds 밖 간호사는 뺀다", () => {
-    const p = confirmed("2026-11-02", 7, { n01: row("DDDDDOO"), n02: row("NOOOOOO"), n03: row("NNNNNNN") });
-    expect(historyLoadFor([p], target, ["n01", "n02"])).toEqual([{ nurse_id: "n02", nights: 1, weekends: 0 }]);
+  it("historyLoadFor: 복합 코드는 세는 근무조로 나이트를 센다", () => {
+    const config = {
+      shifts: [...DEFAULT_CONFIG.shifts, { code: "EN", name: "더블", hours: 16, parts: ["E", "N"] }],
+    } as typeof DEFAULT_CONFIG;
+    const history = { start_date: "2026-11-02", rows: { n01: ["EN", "N", "D", "O", "O", "EN", "O"] }, holidays: [] };
+    expect(historyLoadFor(history, config)).toEqual([{ nurse_id: "n01", nights: 3, weekends: 1 }]);
   });
 });
 
