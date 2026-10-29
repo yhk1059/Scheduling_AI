@@ -1,4 +1,4 @@
-// docs/BROWSER_TEST_SCENARIOS.md S1, S2. 테스트마다 새 브라우저 컨텍스트라 localStorage가 비어 있다.
+// docs/BROWSER_TEST_SCENARIOS.md S1, S1-b, S2. 테스트마다 새 브라우저 컨텍스트라 localStorage가 비어 있다.
 import { expect, test } from "@playwright/test";
 
 import { expectNoDevTerms, T0 } from "./test-helpers";
@@ -15,12 +15,34 @@ test("S1. 랜딩에서 앱으로 진입", async ({ page }) => {
 
   await page.goto("/");
   await expect(page.getByRole("heading", { level: 1 })).toHaveText(/말로 설명한 규칙으로\s*근무표를 짭니다/);
-  const cta = page.getByRole("link", { name: "근무표 만들기" });
-  await expect(cta).toHaveAttribute("href", "/app");
+  const sampleCta = page.getByRole("link", { name: "샘플로 체험하기" });
+  const ownCta = page.getByRole("link", { name: "내 병동으로 시작하기" });
+  await expect(sampleCta).toHaveAttribute("href", "/app?start=sample");
+  await expect(ownCta).toHaveAttribute("href", "/app?start=new");
   expect(apiCalls, "랜딩은 API를 부르지 않는다").toEqual([]);
 
-  await cta.click();
+  // 저장된 입력이 없으면 시작 화면 없이 고른 쪽으로 바로 들어간다
+  await sampleCta.click();
+  await expect(page.getByRole("heading", { name: "샘플 병동", level: 1 })).toBeVisible();
   await expect(page).toHaveURL(/\/app$/);
+
+  // 샘플 입력이 있는 채로 [내 병동으로 시작하기]를 고르면 지우기 전에 확인한다
+  await page.goto("/");
+  await ownCta.click();
+  const dialog = page.getByRole("dialog", { name: "지금 입력을 지우고 새로 시작할까요?" });
+  await dialog.getByRole("button", { name: "지우고 시작" }).click();
+  await expect(page.getByRole("heading", { name: "병동 설정" })).toBeVisible();
+  await expect(page.getByText("아직 명단이 없어요.")).toBeVisible();
+
+  // 이미 내 병동이면 확인 없이 그대로 들어간다
+  await page.goto("/");
+  await ownCta.click();
+  await expect(page.getByRole("heading", { name: "병동 설정" })).toBeVisible();
+  await expect(dialog).toHaveCount(0);
+});
+
+test("S1-b. 앱을 바로 열면 시작 화면", async ({ page }) => {
+  await page.goto("/app");
   const main = page.getByRole("main");
   await expect(page.getByRole("heading", { name: "시작 방법" })).toBeVisible();
   await expect(main.getByRole("heading", { level: 2 })).toHaveCount(2);

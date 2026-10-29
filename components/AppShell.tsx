@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { useAppStore } from "@/lib/store";
 import { onAuthChange, supabaseConfigured } from "@/lib/supabase";
@@ -8,7 +8,8 @@ import { unitShort } from "@/lib/wording";
 
 import { AccountBar, LoginPromptDialog } from "./Account";
 import PeriodWork from "./PeriodWork";
-import StartScreen from "./StartScreen";
+import { today } from "./RulesStep";
+import StartScreen, { type StartIntent } from "./StartScreen";
 import { ui } from "./ui";
 import WardHome, { isWardReady } from "./WardHome";
 import WardSettings from "./WardSettings";
@@ -28,7 +29,26 @@ export default function AppShell() {
   // 첫 세션 확인 전에는 시작 화면을 띄우지 않는다
   const [authChecked, setAuthChecked] = useState(!supabaseConfigured);
   const loading = !authChecked || (auth !== null && syncStatus === "loading");
-  const started = !showStart && ward !== null && !loading;
+  // 랜딩의 [샘플로 체험하기] / [내 병동으로 시작하기]: /app?start=sample|new
+  const [intent, setIntent] = useState<StartIntent | null>(() => {
+    const v = new URLSearchParams(window.location.search).get("start");
+    return v === "sample" || v === "new" ? v : null;
+  });
+  // 게스트가 다른 쪽(샘플 / 내 병동) 입력을 갖고 있으면 지우기 전에 확인한다. 로그인 사용자는 내 병동으로 들어간다
+  const confirmIntent =
+    intent !== null && auth === null && ward !== null && (intent === "sample") !== ward.isSample ? intent : null;
+  const started = !showStart && confirmIntent === null && ward !== null && !loading;
+  const intentHandled = useRef(false);
+
+  useEffect(() => {
+    if (!intent || loading || intentHandled.current) return;
+    intentHandled.current = true;
+    window.history.replaceState(null, "", "/app");
+    const s = useAppStore.getState();
+    if (s.auth !== null || s.hasInput()) return;
+    if (intent === "sample") s.loadSample(today());
+    else s.startWard();
+  }, [intent, loading]);
 
   // 들어올 때 병동이 준비 전이면 근무표 목록 대신 병동 설정부터 연다
   useEffect(() => {
@@ -125,7 +145,13 @@ export default function AppShell() {
             불러오는 중…
           </p>
         ) : !started ? (
-          <StartScreen onDone={() => setShowStart(false)} />
+          <StartScreen
+            intent={confirmIntent}
+            onDone={() => {
+              setShowStart(false);
+              setIntent(null);
+            }}
+          />
         ) : view.screen === "home" ? (
           <WardHome />
         ) : view.screen === "settings" ? (
