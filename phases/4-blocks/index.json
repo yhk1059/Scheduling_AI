@@ -29,7 +29,10 @@
     {
       "step": 3,
       "name": "perf-limits",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-10-29T23:56:52+0900",
+      "summary": "입력 상한: constants에 MAX_PATTERNS=4·MIN/MAX_PATTERN_LEN=2/4·MIN/MAX_WINDOW_DAYS=2/14(step 1의 MAX_FORBID_PATTERNS·FORBID_PATTERN_LEN·COUNT_WINDOW_DAYS 이름 변경), _check_limits가 근무 코드 > MAX_SHIFT_CODES(8)·사람당 태그 > MAX_TAGS_PER_NURSE(5)를 413(solve·translate context·explain request), 패턴 길이·개수·window는 Pydantic 422, test_routes에 경계 테스트 11개; backend/bench.py(npm run bench): 40명×31일, 코드 8개(D/E/N/M/S + 더블 DE·ME), 태그 3종, 공휴일 2, 이월 7일, history 28일, 블록 60개 → solve ok(optimal=false) 10.5s(솔버 10s 상한), 휴가 충돌 변형 infeasible 0.6s, find_conflicts 5.0s에 4개(leave-crowd 포함); 상한은 낮추지 않음. ARCHITECTURE 422 행·시간 예산에 반영. pytest 493·vitest 172, build·lint 통과. 결정: 크기 상한은 Pydantic max_length도 그대로 둠(모델 직접 검증용); 벤치 시간 판정은 모델 만들기·통계 여유 1초(OVERHEAD_S); 위험: 개발 기기(다중 워커) 기준이며 단일 워커(deterministic)로는 같은 병동이 10초 안에 해를 못 냄(2워커는 해 있음, 금지 패턴 블록 2개를 빼면 단일 워커도 해 있음) — Vercel vCPU 수에서 재확인 필요",
+      "completed_at": "2026-10-30T00:03:40+0900"
     },
     {
       "step": 4,
