@@ -76,6 +76,10 @@ const HEADER_SYNONYMS: Record<RosterField, string[]> = {
   night_only: ["나이트전담", "n전담", "나이트"],
 };
 
+export const ROSTER_HEADER = ["이름", "연차", "나이트전담"];
+/** 내려받는 명단 양식. 엑셀에서 한글이 깨지지 않도록 UTF-8 BOM + CRLF. */
+export const ROSTER_TEMPLATE_CSV = "﻿" + ROSTER_HEADER.join(",") + "\r\n";
+
 const normalizeHeader = (s: string) => s.replace(/\s+/g, "").toLowerCase();
 
 export function mapHeaders(header: string[]): { mapping: ColumnMapping; unmatched: string[] } {
@@ -108,8 +112,11 @@ export function buildRoster(
   const start = firstRowIsData ? 0 : 1;
 
   const parsed: { row: number; name: string; years: number; night_only: boolean }[] = [];
+  let total = 0;
   for (let r = start; r < rows.length; r++) {
     const cells = rows[r];
+    if (cells.every((c) => c.trim() === "")) continue; // 직접 입력·행 추가 중인 빈 행
+    total++;
     const before = errors.length;
 
     const name = (cells[nameCol] ?? "").trim();
@@ -141,7 +148,6 @@ export function buildRoster(
   });
   errors.sort((a, b) => (a.row ?? -1) - (b.row ?? -1));
 
-  const total = rows.length - start;
   if (total === 0) errors.push({ row: null, col: null, message: "명단이 비어 있어요" });
   if (total > MAX_NURSES) {
     errors.push({ row: null, col: null, message: `간호사는 최대 ${MAX_NURSES}명까지예요` });

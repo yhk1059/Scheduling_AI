@@ -1,7 +1,28 @@
 import { describe, expect, it } from "vitest";
 
 import type { Nurse } from "./types.gen";
-import { buildRoster, decodeText, mapHeaders, parseCarryOver, parseDelimited } from "./roster-import";
+import {
+  buildRoster,
+  decodeText,
+  mapHeaders,
+  parseCarryOver,
+  parseDelimited,
+  ROSTER_HEADER,
+  ROSTER_TEMPLATE_CSV,
+} from "./roster-import";
+
+describe("ROSTER_TEMPLATE_CSV", () => {
+  it("엑셀용 BOM으로 시작한다", () => {
+    expect(ROSTER_TEMPLATE_CSV.startsWith("﻿")).toBe(true);
+  });
+
+  it("내려받은 양식을 그대로 올리면 세 열이 모두 인식된다", () => {
+    const text = decodeText(new TextEncoder().encode(ROSTER_TEMPLATE_CSV).buffer as ArrayBuffer);
+    const rows = parseDelimited(text);
+    expect(rows).toEqual([ROSTER_HEADER]);
+    expect(mapHeaders(rows[0])).toEqual({ mapping: { name: 0, years: 1, night_only: 2 }, unmatched: [] });
+  });
+});
 
 describe("decodeText", () => {
   it("UTF-8을 읽고 BOM을 떼어낸다", () => {
@@ -142,6 +163,23 @@ describe("buildRoster", () => {
     const { nurses, errors } = buildRoster([["이영희", "12"]], { name: 0 }, true);
     expect(nurses).toEqual([]);
     expect(errors).toEqual([{ row: null, col: null, message: expect.any(String) }]);
+  });
+
+  it("모든 칸이 빈 행은 오류 없이 건너뛴다(직접 입력·행 추가 중)", () => {
+    const rows = [
+      ["이름", "연차", "나이트전담"],
+      ["이영희", "12", ""],
+      ["", " ", ""],
+    ];
+    expect(buildRoster(rows, mapping, false)).toEqual({
+      nurses: [{ id: "n01", name: "이영희", years: 12, night_only: false }],
+      errors: [],
+    });
+  });
+
+  it("빈 행만 있으면 0명 오류 하나만 낸다", () => {
+    const { errors } = buildRoster([["이름", "연차"], ["", ""]], { name: 0, years: 1 }, false);
+    expect(errors).toEqual([{ row: null, col: null, message: "명단이 비어 있어요" }]);
   });
 
   it("0명이면 오류다", () => {
