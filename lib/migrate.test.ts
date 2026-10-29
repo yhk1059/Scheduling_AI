@@ -10,6 +10,7 @@ import {
   NIGHT_ONLY_RULE_ID,
   NIGHT_ONLY_TAG,
   nightOnlyRule,
+  tagged,
   normalizeBlock,
   type LegacySpec,
 } from "./migrate";
@@ -182,5 +183,13 @@ describe("migrateV4", () => {
     expect(migrateV4(null, today)).toBeNull();
     expect(migrateV4({ ward: { nurses: "x" }, periods: [], view: { screen: "home" }, inputVersion: 1 }, today)).toBeNull();
     expect(migrateV4({ step: 3 }, today)).toBeNull();
+  });
+});
+
+describe("tagged", () => {
+  it("옛 명단의 나이트 전담 표시를 태그로 바꾸고 다른 필드는 그대로 둔다", () => {
+    expect(tagged({ id: "n01", name: "가", years: 3, night_only: true })).toEqual({ id: "n01", name: "가", years: 3, tags: [NIGHT_ONLY_TAG] });
+    expect(tagged({ id: "n02", name: "나", years: 1, night_only: false, tags: ["책임"] })).toEqual({ id: "n02", name: "나", years: 1, tags: ["책임"] });
+    expect(tagged({ id: "n03", name: "다", years: 1, night_only: true, tags: [NIGHT_ONLY_TAG] }).tags).toEqual([NIGHT_ONLY_TAG]);
   });
 });

@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { isWardReady, setupStep, useAppStore, type SetupStep } from "@/lib/store";
-import { wardRuleCount } from "@/lib/wording";
+import { configSummary, wardRuleCount } from "@/lib/wording";
 
 import RulesStep, { today } from "./RulesStep";
+import ShiftTable from "./ShiftTable";
 import Stepper from "./Stepper";
 import { ui } from "./ui";
 import { BasicSection, CoverageSection, RosterSection } from "./WardSettings";
@@ -57,6 +58,7 @@ export default function SetupFlow() {
       ) : step === 2 ? (
         <>
           {title("필요 인원")}
+          <ShiftSummary />
           <CoverageSection />
         </>
       ) : (
@@ -100,5 +102,25 @@ export default function SetupFlow() {
         </div>
       </div>
     </div>
+  );
+}
+
+/** ② 맨 위 근무 형태 요약 한 줄. [바꾸기]로 펼치면 근무 형태 표가 나와 필요 인원을 넣기 전에 코드를 더할 수 있다. */
+function ShiftSummary() {
+  const config = useAppStore((s) => s.ward?.config);
+  const [open, setOpen] = useState(false);
+  if (!config) return null;
+  return (
+    <section className={`${ui.card} flex flex-col gap-3`}>
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-sm text-[#3D3D38]">
+          <span className="font-medium text-[#1B1B18]">근무 형태</span> · {configSummary(config)}
+        </p>
+        <button type="button" aria-expanded={open} onClick={() => setOpen((o) => !o)} className={ui.textSm}>
+          {open ? "접기" : "바꾸기"}
+        </button>
+      </div>
+      {open && <ShiftTable />}
+    </section>
   );
 }

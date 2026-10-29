@@ -262,9 +262,10 @@ function isV4(v: unknown): boolean {
   return wardOk && periodsOk && typeof view?.screen === "string" && typeof d.inputVersion === "number";
 }
 
-function tagged({ night_only, tags, ...n }: LegacyNurse): WardNurse {
+/** 옛 명단 한 사람: night_only를 나이트전담 태그로 바꾼다(저장 문서 이전, 샘플 병동 파일). */
+export function tagged<T extends object>({ night_only, tags, ...n }: T & { night_only?: boolean; tags?: string[] }): Omit<T, "night_only" | "tags"> & { tags: string[] } {
   const base = tags ?? [];
-  return { ...n, tags: night_only && !base.includes(NIGHT_ONLY_TAG) ? [...base, NIGHT_ONLY_TAG] : base };
+  return { ...(n as Omit<T, "night_only" | "tags">), tags: night_only && !base.includes(NIGHT_ONLY_TAG) ? [...base, NIGHT_ONLY_TAG] : base };
 }
 
 /**

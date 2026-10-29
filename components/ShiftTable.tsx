@@ -1,0 +1,303 @@
+"use client";
+
+import { useRef, useState } from "react";
+
+import { OFF_CODE } from "@/lib/migrate";
+import { isShiftUsed, MAX_SHIFT_CODES, useAppStore } from "@/lib/store";
+import type { ShiftDef } from "@/lib/types.gen";
+
+import { ui } from "./ui";
+
+const CODE_RE = /^[A-Z0-9]{1,3}$/; // backend/domain/models.py ShiftCode
+
+/** 0.5시간 단위, 0 초과 24 이하. 맞지 않으면 null. */
+function parseHours(v: string): number | null {
+  if (!/^\d+(\.\d+)?$/.test(v.trim())) return null;
+  const h = Number(v.trim());
+  return h > 0 && h <= 24 && Number.isInteger(h * 2) ? h : null;
+}
+const HOURS_MSG = "시간은 0.5~24 사이로 0.5 단위로 적어 주세요";
+
+/** 세는 근무조 칸: 기본 코드는 그 코드, 더블은 "D + E", 휴무는 없음. */
+function partsText(s: ShiftDef): string {
+  if (s.code === OFF_CODE) return "–";
+  return s.parts?.length ? s.parts.join(" + ") : s.code;
+}
+
+/** 근무 형태(근무 코드 표). 맨 아래 줄에 적어 하나씩 더한다. 병동 설정 [근무 형태] 탭과 처음 설정 ②에서 쓴다. */
+export default function ShiftTable() {
+  const shifts = useAppStore((s) => s.ward?.config.shifts ?? []);
+
+  return (
+    <div className="flex flex-col gap-2">
+      <p className={ui.help}>말로 &lsquo;미드 근무 11시~19시 추가&rsquo;라고 적어도 돼요.</p>
+      <div className="overflow-x-auto rounded-lg border border-[#E2E2DC] bg-white">
+        <table className="w-full border-collapse text-[13px]">
+          <thead>
+            <tr className="border-b border-[#E2E2DC] text-left text-xs font-medium text-[#66665E]">
+              <th className="px-2 py-2 font-medium">코드</th>
+              <th className="px-2 py-2 font-medium">이름</th>
+              <th className="px-2 py-2 font-medium">시작 시각</th>
+              <th className="px-2 py-2 font-medium">시간</th>
+              <th className="px-2 py-2 font-medium">세는 근무조</th>
+              <th />
+            </tr>
+          </thead>
+          <tbody>
+            {shifts.map((s) => (
+              <ShiftRow key={s.code} shift={s} shifts={shifts} />
+            ))}
+            <NewShiftRow shifts={shifts} />
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+/** 유효한 값은 바로 저장하고, 아니면 입력 중인 값과 오류를 행에 남긴다. 코드와 세는 근무조는 고치지 않는다. */
+function ShiftRow({ shift, shifts }: { shift: ShiftDef; shifts: ShiftDef[] }) {
+  const setShift = useAppStore((s) => s.setShift);
+  const setShiftActive = useAppStore((s) => s.setShiftActive);
+  const removeShift = useAppStore((s) => s.removeShift);
+  const used = useAppStore((s) => (s.ward ? isShiftUsed(shift.code, s.ward, s.periods) : true));
+  const [name, setName] = useState<string | null>(null);
+  const [hours, setHours] = useState<string | null>(null);
+
+  const off = shift.code === OFF_CODE;
+  const active = shift.active !== false;
+  const partOff = (shift.parts ?? []).some((p) => shifts.find((s) => s.code === p)?.active === false);
+  const editable = !off && active;
+
+  const onName = (v: string) => {
+    if (v.trim() === "") return setName(v);
+    setShift(shift.code, { name: v.trim() });
+    setName(null);
+  };
+  const onHours = (v: string) => {
+    const h = parseHours(v);
+    if (h === null) return setHours(v);
+    setShift(shift.code, { hours: h });
+    setHours(null);
+  };
+
+  const muted = editable ? "" : "text-[#66665E]";
+  return (
+    <tr className="border-b border-[#EFEFEB]">
+      <td className={`px-2 py-1 font-mono font-semibold ${muted}`}>
+        <span className="flex items-center gap-2">
+          {shift.code}
+          {!active && <span className={`${ui.badge} bg-[#EFEFEB] font-sans text-[#66665E]`}>꺼짐</span>}
+        </span>
+      </td>
+      {editable ? (
+        <>
+          <td className="px-1 py-1">
+            <input
+              value={name ?? shift.name}
+              onChange={(e) => onName(e.target.value)}
+              aria-label={`${shift.code} 이름`}
+              aria-invalid={name !== null || undefined}
+              className={`${ui.cell} w-32 ${name !== null ? ui.cellErr : ui.cellOk}`}
+            />
+            {name !== null && <p className={`${ui.error} mt-0.5`}>이름을 적어 주세요</p>}
+          </td>
+          <td className="px-1 py-1">
+            <input
+              type="time"
+              value={shift.start ?? ""}
+              onChange={(e) => setShift(shift.code, { start: e.target.value || null })}
+              aria-label={`${shift.code} 시작 시각`}
+              className={`${ui.cell} w-28 font-mono ${ui.cellOk}`}
+            />
+          </td>
+          <td className="px-1 py-1">
+            <input
+              inputMode="decimal"
+              value={hours ?? String(shift.hours)}
+              onChange={(e) => onHours(e.target.value)}
+              aria-label={`${shift.code} 시간`}
+              aria-invalid={hours !== null || undefined}
+              className={`${ui.cell} w-16 font-mono ${hours !== null ? ui.cellErr : ui.cellOk}`}
+            />
+            {hours !== null && <p className={`${ui.error} mt-0.5`}>{HOURS_MSG}</p>}
+          </td>
+        </>
+      ) : (
+        <>
+          <td className={`px-2 py-1 ${muted}`}>{shift.name}</td>
+          <td className={`px-2 py-1 font-mono ${muted}`}>{shift.start ?? "–"}</td>
+          <td className={`px-2 py-1 font-mono ${muted}`}>{shift.hours}</td>
+        </>
+      )}
+      <td className={`px-2 py-1 font-mono ${muted}`}>{partsText(shift)}</td>
+      <td className="px-1 py-1">
+        <div className="flex items-center justify-end gap-1">
+          {off ? null : !active ? (
+            <button
+              type="button"
+              disabled={partOff}
+              onClick={() => setShiftActive(shift.code, true)}
+              className={`${ui.textSm} disabled:cursor-not-allowed disabled:text-[#9A9A91] disabled:hover:bg-transparent`}
+            >
+              다시 켜기
+            </button>
+          ) : used ? (
+            <button type="button" onClick={() => setShiftActive(shift.code, false)} className={ui.textSm}>
+              끄기
+            </button>
+          ) : (
+            <button type="button" onClick={() => removeShift(shift.code)} className={ui.danger}>
+              삭제
+            </button>
+          )}
+        </div>
+        {!active && partOff && <p className={`${ui.help} text-right`}>세는 근무조를 먼저 켜야 해요</p>}
+      </td>
+    </tr>
+  );
+}
+
+/** 표 맨 아래 입력 줄. Enter나 [추가]로 코드 하나를 더하고 다시 코드 칸으로 돌아간다. 세는 근무조를 둘 고르면 더블이다. */
+function NewShiftRow({ shifts }: { shifts: ShiftDef[] }) {
+  const addShift = useAppStore((s) => s.addShift);
+  const [code, setCode] = useState("");
+  const [name, setName] = useState("");
+  const [start, setStart] = useState("");
+  const [hours, setHours] = useState("");
+  const [parts, setParts] = useState<string[]>([]);
+  const [tried, setTried] = useState(false);
+  const codeRef = useRef<HTMLInputElement>(null);
+
+  const bases = shifts.filter((s) => s.active !== false && !s.parts?.length && s.code !== OFF_CODE);
+  const full = shifts.length >= MAX_SHIFT_CODES;
+  const codeMsg =
+    code === ""
+      ? "코드를 적어 주세요"
+      : !CODE_RE.test(code)
+        ? "코드는 영문 대문자·숫자 3자까지예요"
+        : shifts.some((s) => s.code === code)
+          ? "같은 코드가 이미 있어요"
+          : null;
+  const nameMsg = name.trim() === "" ? "이름을 적어 주세요" : null;
+  const hoursMsg = parseHours(hours) === null ? HOURS_MSG : null;
+  const partsMsg = parts.length === 0 || parts.length === 2 ? null : "더블은 근무조를 두 개 골라 주세요";
+
+  const add = () => {
+    if (full) return;
+    if (codeMsg || nameMsg || hoursMsg || partsMsg) return setTried(true);
+    addShift({
+      code,
+      name: name.trim(),
+      hours: parseHours(hours)!,
+      ...(start && { start }),
+      ...(parts.length && { parts: bases.map((b) => b.code).filter((c) => parts.includes(c)) }),
+    });
+    setCode("");
+    setName("");
+    setStart("");
+    setHours("");
+    setParts([]);
+    setTried(false);
+    codeRef.current?.focus();
+  };
+  const onEnter = (e: React.KeyboardEvent) => {
+    if (e.key !== "Enter" || e.nativeEvent.isComposing) return;
+    e.preventDefault();
+    add();
+  };
+
+  if (full) {
+    return (
+      <tr>
+        <td colSpan={6} className={`${ui.help} px-2 py-2`}>
+          근무 코드는 휴무를 포함해 최대 {MAX_SHIFT_CODES}개까지 넣을 수 있어요.
+        </td>
+      </tr>
+    );
+  }
+  const show = (msg: string | null) => (tried ? msg : null);
+  const cls = (msg: string | null) => (show(msg) ? ui.cellErr : ui.cellOk);
+  const placeholder = "placeholder:font-sans placeholder:text-[#707068]";
+  return (
+    <tr className="bg-[#FAFAF7] align-top">
+      <td className="px-1 py-1">
+        <input
+          ref={codeRef}
+          value={code}
+          onChange={(e) => setCode(e.target.value.toUpperCase().trim())}
+          onKeyDown={onEnter}
+          placeholder="예: M"
+          maxLength={3}
+          aria-label="새 근무 코드"
+          aria-invalid={show(codeMsg) ? true : undefined}
+          className={`${ui.cell} w-16 font-mono ${placeholder} ${cls(codeMsg)}`}
+        />
+        {show(codeMsg) && <p className={`${ui.error} mt-0.5`}>{codeMsg}</p>}
+      </td>
+      <td className="px-1 py-1">
+        <input
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          onKeyDown={onEnter}
+          placeholder="예: 미드"
+          aria-label="새 근무 이름"
+          aria-invalid={show(nameMsg) ? true : undefined}
+          className={`${ui.cell} w-32 ${placeholder} ${cls(nameMsg)}`}
+        />
+        {show(nameMsg) && <p className={`${ui.error} mt-0.5`}>{nameMsg}</p>}
+      </td>
+      <td className="px-1 py-1">
+        <input
+          type="time"
+          value={start}
+          onChange={(e) => setStart(e.target.value)}
+          onKeyDown={onEnter}
+          aria-label="새 근무 시작 시각"
+          className={`${ui.cell} w-28 font-mono ${ui.cellOk}`}
+        />
+      </td>
+      <td className="px-1 py-1">
+        <input
+          inputMode="decimal"
+          value={hours}
+          onChange={(e) => setHours(e.target.value)}
+          onKeyDown={onEnter}
+          placeholder="8"
+          aria-label="새 근무 시간"
+          aria-invalid={show(hoursMsg) ? true : undefined}
+          className={`${ui.cell} w-16 font-mono ${placeholder} ${cls(hoursMsg)}`}
+        />
+        {show(hoursMsg) && <p className={`${ui.error} mt-0.5 max-w-40`}>{hoursMsg}</p>}
+      </td>
+      <td className="px-2 py-1">
+        <fieldset className="flex flex-wrap items-center gap-x-3 gap-y-1 pt-1.5">
+          <legend className="sr-only">새 근무 세는 근무조</legend>
+          {bases.map((b) => (
+            <label key={b.code} className="flex items-center gap-1 text-[13px] text-[#3D3D38]">
+              <input
+                type="checkbox"
+                checked={parts.includes(b.code)}
+                onChange={(e) => setParts((p) => (e.target.checked ? [...p, b.code] : p.filter((c) => c !== b.code)))}
+                className="size-4 accent-[#155E75]"
+              />
+              <span className="font-mono">{b.code}</span>
+            </label>
+          ))}
+        </fieldset>
+        {show(partsMsg) ? (
+          <p className={`${ui.error} mt-0.5`}>{partsMsg}</p>
+        ) : (
+          <p className={`${ui.help} mt-0.5`}>두 개를 고르면 더블이에요</p>
+        )}
+      </td>
+      <td className="px-1 py-1">
+        <div className="flex justify-end">
+          <button type="button" onClick={add} className={ui.textSm}>
+            추가
+          </button>
+        </div>
+      </td>
+    </tr>
+  );
+}
