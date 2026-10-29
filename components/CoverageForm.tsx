@@ -14,18 +14,11 @@ const DAY_KINDS: { kind: DayKind; label: string }[] = [
   { kind: "weekend", label: "주말·공휴일" },
 ];
 
-type Bound = "min" | "max";
 /** 입력 중이거나 잘못된 칸만 담는다. 키는 `${shift}|${day_kind}`. */
-export type CoverageDrafts = Record<string, Record<Bound, string>>;
+export type CoverageDrafts = Record<string, string>;
 const keyOf = (shift: Shift, kind: DayKind) => `${shift}|${kind}`;
-const minOverMax = (v: Record<Bound, string>) =>
-  /^\d+$/.test(v.min) && /^\d+$/.test(v.max) && Number(v.min) > Number(v.max);
 
-export function hasCoverageError(drafts: CoverageDrafts): boolean {
-  return Object.values(drafts).some(minOverMax);
-}
-
-/** 필요 인원 폼. 유효한 값은 바로 daily_coverage 제약으로 저장하고, 아니면 drafts에 남긴다. */
+/** 필요 인원 폼. 칸마다 숫자 하나(정확히 그 인원)를 받아 daily_coverage 제약의 최소·최대에 같은 값으로 저장한다. */
 export default function CoverageForm({
   drafts,
   setDrafts,
@@ -35,68 +28,103 @@ export default function CoverageForm({
 }) {
   const ward = useAppStore((s) => s.ward);
   const constraints = ward?.rules ?? [];
+  const active = ward?.nurses.filter((n) => n.active).length ?? 0;
   const setCoverage = useAppStore((s) => s.setCoverage);
 
   const stored = (shift: Shift, kind: DayKind) => {
     const c = constraints.find(
       (c) => c.type === "daily_coverage" && c.scope === "ward" && c.params.shift === shift && c.params.day_kind === kind,
     );
-    return c?.type === "daily_coverage" ? { min: String(c.params.min), max: String(c.params.max) } : { min: "", max: "" };
+    return c?.type === "daily_coverage" ? c.params : null;
+  };
+  // 예전에 범위(최소~최대)로 저장한 값은 그대로 보여 주고, 고치면 숫자 하나로 바뀐다
+  const shown = (shift: Shift, kind: DayKind) => {
+    const draft = drafts[keyOf(shift, kind)];
+    if (draft !== undefined) return draft;
+    const p = stored(shift, kind);
+    return p === null ? "" : p.min === p.max ? String(p.min) : `${p.min}~${p.max}`;
   };
 
-  const change = (shift: Shift, kind: DayKind, bound: Bound, value: string) => {
+  const change = (shift: Shift, kind: DayKind, value: string) => {
     const key = keyOf(shift, kind);
-    const next = { ...stored(shift, kind), ...drafts[key], [bound]: value };
-    const min = Number(next.min);
-    const max = Number(next.max);
-    const valid = /^\d+$/.test(next.min) && /^\d+$/.test(next.max) && min <= max;
-    if (valid) setCoverage(shift, kind, min, max);
+    const valid = /^\d+$/.test(value);
+    if (valid) setCoverage(shift, kind, Number(value), Number(value));
     setDrafts((d) => {
       const rest = { ...d };
       if (valid) delete rest[key];
-      else rest[key] = next;
+      else rest[key] = value;
       return rest;
     });
   };
 
+  // 하루에 일하는 사람 수(최소 기준). 세 근무조가 모두 있을 때만 센다
+  const dailyTotal = (kind: DayKind) => {
+    const ps = SHIFTS.map(({ shift }) => stored(shift, kind));
+    return ps.every((p) => p !== null) ? ps.reduce((sum, p) => sum + p!.min, 0) : null;
+  };
+
   return (
-    <table className="border-collapse text-sm">
-      <thead>
-        <tr>
-          <th />
-          {DAY_KINDS.map(({ kind, label }) => (
-            <th key={kind} colSpan={2} className="px-2 pb-1 text-left text-xs font-medium text-[#3D3D38]">
-              {label} <span className="text-[#66665E]">최소 ~ 최대</span>
-            </th>
+    <div className="flex flex-col gap-2">
+      <table className="border-collapse text-sm">
+        <thead>
+          <tr>
+            <th />
+            {DAY_KINDS.map(({ kind, label }) => (
+              <th key={kind} className="px-2 pb-1 text-left text-xs font-medium text-[#3D3D38]">
+                {label}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {SHIFTS.map(({ shift, label }) => (
+            <tr key={shift}>
+              <th className="py-1 pr-3 text-left text-[13px] font-medium text-[#1B1B18]">
+                <span className="font-mono">{shift}</span> {label}
+              </th>
+              {DAY_KINDS.map(({ kind, label: kindLabel }) => {
+                const value = shown(shift, kind);
+                const bad = drafts[keyOf(shift, kind)] !== undefined && drafts[keyOf(shift, kind)] !== "";
+                return (
+                  <td key={kind} className="px-2 py-1">
+                    <span className="flex items-center gap-1.5">
+                      <input
+                        inputMode="numeric"
+                        value={value}
+                        onChange={(e) => change(shift, kind, e.target.value.trim())}
+                        aria-label={`${kindLabel} ${label} 인원`}
+                        aria-invalid={bad || undefined}
+                        className={`${ui.input} w-16 font-mono ${bad ? "border-[#B42318] text-[#9F1F14]" : ""}`}
+                      />
+                      <span className="text-[13px] text-[#66665E]">명</span>
+                    </span>
+                  </td>
+                );
+              })}
+            </tr>
           ))}
-        </tr>
-      </thead>
-      <tbody>
-        {SHIFTS.map(({ shift, label }) => (
-          <tr key={shift}>
-            <th className="py-1 pr-3 text-left text-[13px] font-medium text-[#1B1B18]">
-              <span className="font-mono">{shift}</span> {label}
-            </th>
-            {DAY_KINDS.map(({ kind, label: kindLabel }) => {
-              const value = { ...stored(shift, kind), ...drafts[keyOf(shift, kind)] };
-              const bad = minOverMax(value);
-              return (["min", "max"] as const).map((bound) => (
-                <td key={`${kind}-${bound}`} className="px-1 py-1">
-                  <input
-                    inputMode="numeric"
-                    value={value[bound]}
-                    onChange={(e) => change(shift, kind, bound, e.target.value.trim())}
-                    aria-label={`${kindLabel} ${label} ${bound === "min" ? "최소" : "최대"}`}
-                    aria-invalid={bad || undefined}
-                    className={`${ui.input} w-16 font-mono ${bad ? "border-[#B42318] text-[#9F1F14]" : ""}`}
-                  />
+          <tr className="border-t border-[#EFEFEB]">
+            <th className="pt-2 pr-3 text-left text-xs font-medium text-[#66665E]">하루</th>
+            {DAY_KINDS.map(({ kind }) => {
+              const total = dailyTotal(kind);
+              return (
+                <td key={kind} className="px-2 pt-2 text-xs text-[#3D3D38]">
+                  {total === null ? "–" : `${total}명 근무 · ${Math.max(active - total, 0)}명 쉼`}
                 </td>
-              ));
+              );
             })}
           </tr>
-        ))}
-      </tbody>
-    </table>
+        </tbody>
+      </table>
+      {Object.values(drafts).some((v) => v !== "") && <p className={ui.error}>인원은 숫자로 적어 주세요.</p>}
+      {DAY_KINDS.map(({ kind, label }) => {
+        const total = dailyTotal(kind);
+        return total !== null && total >= active ? (
+          <p key={kind} className={ui.error}>
+            {label}에 하루 {total}명이 일해야 해서 쉴 사람이 없어요. 명단은 {active}명이에요.
+          </p>
+        ) : null;
+      })}
+    </div>
   );
 }
-

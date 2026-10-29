@@ -47,13 +47,13 @@ const ROSTER: [string, number, boolean][] = [
   ["문가람", 11, true],
   ["배수아", 4, true],
 ];
-const COVERAGE: [string, string, number, number][] = [
-  ["평일", "데이", 3, 4],
-  ["평일", "이브닝", 3, 3],
-  ["평일", "나이트", 2, 2],
-  ["주말·공휴일", "데이", 3, 3],
-  ["주말·공휴일", "이브닝", 2, 2],
-  ["주말·공휴일", "나이트", 2, 2],
+const COVERAGE: [string, string, number][] = [
+  ["평일", "데이", 3],
+  ["평일", "이브닝", 3],
+  ["평일", "나이트", 2],
+  ["주말·공휴일", "데이", 3],
+  ["주말·공휴일", "이브닝", 2],
+  ["주말·공휴일", "나이트", 2],
 ];
 const HOLIDAY = 18;
 const NOV_WEEKEND_DAYS = [1, 7, 8, 14, 15, 18, 21, 22, 28, 29];
@@ -184,15 +184,21 @@ test("S5. 처음 설정 ① 병동·명단 → ② 필요 인원", async () => {
   await expect(page.getByRole("heading", { name: "필요 인원", exact: true })).toBeFocused();
   await expect(next).toBeDisabled();
   await expect(page.getByText("필요 인원을 모두 입력하면 다음으로 넘어갈 수 있어요")).toBeVisible();
-  for (const [kind, shift, min, max] of COVERAGE) {
-    await page.getByRole("textbox", { name: `${kind} ${shift} 최소` }).fill(String(min));
-    await page.getByRole("textbox", { name: `${kind} ${shift} 최대` }).fill(String(max));
+  for (const [kind, shift, count] of COVERAGE) {
+    await page.getByRole("textbox", { name: `${kind} ${shift} 인원` }).fill(String(count));
   }
-  const weekdayDayMin = page.getByRole("textbox", { name: "평일 데이 최소" });
-  await weekdayDayMin.fill("5");
-  await expect(page.getByText("최소 인원이 최대 인원보다 많아요.")).toBeVisible();
-  await weekdayDayMin.fill("3");
-  await expect(page.getByText("최소 인원이 최대 인원보다 많아요.")).toHaveCount(0);
+  // 하루 근무·쉬는 사람 수(명단 15명)
+  await expect(page.getByText("8명 근무 · 7명 쉼")).toBeVisible();
+  await expect(page.getByText("7명 근무 · 8명 쉼")).toBeVisible();
+  const weekdayDay = page.getByRole("textbox", { name: "평일 데이 인원" });
+  await weekdayDay.fill("abc");
+  await expect(weekdayDay).toHaveAttribute("aria-invalid", "true");
+  await expect(page.getByText("인원은 숫자로 적어 주세요.")).toBeVisible();
+  await weekdayDay.fill("10");
+  await expect(page.getByText("평일에 하루 15명이 일해야 해서 쉴 사람이 없어요. 명단은 15명이에요.")).toBeVisible();
+  await weekdayDay.fill("3");
+  await expect(page.getByText("인원은 숫자로 적어 주세요.")).toHaveCount(0);
+  await expect(page.getByText("쉴 사람이 없어요", { exact: false })).toHaveCount(0);
 
   const { ward } = await readState(page);
   expect(ward.name).toBe("내과 병동");
@@ -200,7 +206,9 @@ test("S5. 처음 설정 ① 병동·명단 → ② 필요 인원", async () => {
   expect(ward.nurses.map((n) => n.id), "간호사 id 유지").toEqual(idsBefore);
   expect(ward.nurses.filter((n) => n.active)).toHaveLength(NURSE_COUNT);
   expect(ward.nurses.filter((n) => n.night_only).map((n) => n.name)).toEqual(["문가람", "배수아"]);
-  expect(ward.rules.filter((c) => c.type === "daily_coverage")).toHaveLength(6);
+  const coverage = ward.rules.filter((c) => c.type === "daily_coverage");
+  expect(coverage).toHaveLength(6);
+  expect(coverage.every((c) => c.params.min === c.params.max), "숫자 하나 = 정확히 그 인원").toBe(true);
   await expect(next).toBeEnabled();
   await expectNoDevTerms(page, "처음 설정 ②");
   // [이전]으로 ①에 돌아가도 입력은 그대로다
