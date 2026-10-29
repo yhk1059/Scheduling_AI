@@ -1,6 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import sample from "./samples/ward-15.json";
 import {
   carryOverChanged,
   cardsInOrder,
@@ -66,6 +65,13 @@ function fresh(storage: Storage = new MemoryStorage()) {
   return createAppStore(() => storage, () => CONFIRMED_AT);
 }
 
+/** 게스트 입력: 병동(이영희 n01, 박민수 n02, 월 단위) + 첫 기간. */
+function addInput(store: ReturnType<typeof createAppStore>) {
+  store.getState().startWard();
+  store.getState().addNurses(rows);
+  store.getState().createPeriod(TODAY);
+}
+
 /** 병동(이영희 n01, 박민수 n02, 월 단위) + 첫 기간. */
 function withPeriod() {
   const store = fresh();
@@ -94,34 +100,10 @@ describe("병동", () => {
     const store = fresh();
     store.getState().startWard();
     const s = store.getState();
-    expect(s.ward).toMatchObject({ name: "", unit: "month", nurses: [], nextNurseNo: 1, rules: [], isSample: false });
+    expect(s.ward).toMatchObject({ name: "", unit: "month", nurses: [], nextNurseNo: 1, rules: [] });
     expect(s.view).toEqual({ screen: "settings", tab: "roster" });
     expect(s.hasInput()).toBe(true);
     expect(s.inputVersion).toBe(1);
-  });
-
-  it("loadSample은 샘플 병동, 운영 중인 이번 달 확정본, 다음 달 초안을 만들고 홈으로 간다", () => {
-    const store = fresh();
-    store.getState().loadSample(TODAY);
-    const s = store.getState();
-    expect(s.ward!.isSample).toBe(true);
-    expect(s.ward!.nurses).toEqual(sample.nurses.map((n) => ({ ...n, active: true })));
-    expect(s.ward!.nextNurseNo).toBe(sample.nurses.length + 1);
-    expect(s.ward!.rules).toHaveLength(sample.constraints.length);
-    expect(s.periods).toHaveLength(2);
-    expect(s.periods[0]).toMatchObject({ start_date: "2026-10-01", length: 31, status: "confirmed" });
-    expect(s.periods[1]).toMatchObject({ start_date: "2026-11-01", length: 30, status: "draft", result: null });
-    expect(new Set(s.periods.map((p) => p.id)).size).toBe(2);
-    expect(s.view).toEqual({ screen: "home" });
-    expect(s.inputVersion).toBe(1);
-  });
-
-  it("loadSample 뒤 createPeriod는 다음 달 초안을 연다", () => {
-    const store = fresh();
-    store.getState().loadSample(TODAY);
-    const id = store.getState().createPeriod(TODAY);
-    expect(id).toBe(store.getState().periods[1].id);
-    expect(store.getState().periods).toHaveLength(2);
   });
 
   it("setWardName·setUnit·setCoverage는 inputVersion을 올리고 필요 인원은 ward.rules의 daily_coverage다", () => {
@@ -820,7 +802,7 @@ describe("currentPeriod·orphanConstraintIds", () => {
 describe("reset", () => {
   it("병동과 기간을 모두 지우고 홈으로, inputVersion은 올린다", () => {
     const store = fresh();
-    store.getState().loadSample(TODAY);
+    addInput(store);
     const before = store.getState().inputVersion;
     store.getState().reset();
     const s = store.getState();
@@ -836,7 +818,7 @@ describe("persist", () => {
   it("localStorage에 저장하고 다시 만들면 복원한다", () => {
     const storage = new MemoryStorage();
     const a = fresh(storage);
-    a.getState().loadSample(TODAY);
+    addInput(a);
     const saved = JSON.parse(storage.getItem(STORAGE_KEY)!);
     expect(saved.version).toBe(4);
     expect(saved.state).not.toHaveProperty("storageAvailable");
@@ -976,7 +958,7 @@ describe("로그인 분기", () => {
   it("서버에 병동이 있고 게스트 입력도 있으면 서버 문서로 바꾸고 안내한다", async () => {
     const f = fakeRemote({ data: serverDoc(), updatedAt: SERVER_AT });
     const store = synced(f.remote);
-    store.getState().loadSample(TODAY);
+    addInput(store);
     await store.getState().signedIn(USER);
     const s = store.getState();
     expect(s.ward!.name).toBe("서버 병동");
@@ -1000,41 +982,6 @@ describe("로그인 분기", () => {
     expect(f.calls.save).toHaveLength(0);
   });
 
-  it("서버에 없고 샘플이면 묻고, keep이면 샘플을 내 병동으로 올린다", async () => {
-    const f = fakeRemote();
-    const store = synced(f.remote);
-    store.getState().loadSample(TODAY);
-    await store.getState().signedIn(USER);
-    expect(store.getState().loginPrompt).toEqual({ kind: "sample-choice" });
-    expect(f.calls.save).toHaveLength(0);
-
-    await store.getState().chooseSample(true);
-    const s = store.getState();
-    expect(s.loginPrompt).toBeNull();
-    expect(s.ward!.isSample).toBe(false);
-    expect(s.ward!.nurses).toHaveLength(sample.nurses.length);
-    expect(f.calls.save).toHaveLength(1);
-    const doc = f.calls.save[0] as { version: number; state: Record<string, unknown> };
-    expect(doc.version).toBe(4);
-    expect((doc.state.ward as { name: string }).name).toBe("샘플 병동");
-    expect(doc.state.periods).toHaveLength(2);
-    expect(s.sync.status).toBe("saved");
-  });
-
-  it("샘플을 버리면 빈 병동으로 바꾸고 병동 설정으로 가서 올린다", async () => {
-    const f = fakeRemote();
-    const store = synced(f.remote);
-    store.getState().loadSample(TODAY);
-    await store.getState().signedIn(USER);
-    await store.getState().chooseSample(false);
-    const s = store.getState();
-    expect(s.ward).toMatchObject({ name: "", nurses: [], isSample: false });
-    expect(s.periods).toEqual([]);
-    expect(s.view).toEqual({ screen: "settings", tab: "roster" });
-    expect(f.calls.save).toHaveLength(1);
-    expect((savedState(f.calls.save[0]).ward as { nurses: unknown[] }).nurses).toEqual([]);
-  });
-
   it("서버에 없고 게스트 입력이 있으면 그대로 올린다", async () => {
     const f = fakeRemote();
     const { store } = withPeriodSynced(f.remote);
@@ -1042,8 +989,7 @@ describe("로그인 분기", () => {
     expect(store.getState().loginPrompt).toBeNull();
     expect(f.calls.save).toHaveLength(1);
     const state = savedState(f.calls.save[0]);
-    expect((state.ward as { nurses: unknown[]; isSample: boolean }).nurses).toHaveLength(2);
-    expect((state.ward as { isSample: boolean }).isSample).toBe(false);
+    expect((state.ward as { nurses: unknown[] }).nurses).toHaveLength(2);
     expect(state.periods).toHaveLength(1);
     expect(store.getState().sync).toEqual({ status: "saved", savedAt: "2026-10-28T07:00:00.000Z" });
   });
@@ -1053,7 +999,7 @@ describe("로그인 분기", () => {
     const store = synced(f.remote);
     await store.getState().signedIn(USER);
     const s = store.getState();
-    expect(s.ward).toMatchObject({ name: "", nurses: [], isSample: false });
+    expect(s.ward).toMatchObject({ name: "", nurses: [] });
     expect(s.view).toEqual({ screen: "settings", tab: "roster" });
     expect(f.calls.save).toHaveLength(1);
   });
@@ -1131,7 +1077,7 @@ describe("옛 pendingAfterLogin 필드", () => {
   it("localStorage에 남아 있어도 resetNotice 없이 불러오고 필드는 버린다", () => {
     const storage = new MemoryStorage();
     const a = fresh(storage);
-    a.getState().loadSample(TODAY);
+    addInput(a);
     const saved = JSON.parse(storage.getItem(STORAGE_KEY)!);
     saved.state.pendingAfterLogin = { action: "confirm", periodId: a.getState().periods[0].id };
     storage.setItem(STORAGE_KEY, JSON.stringify(saved));

@@ -149,7 +149,6 @@ describe("nextTask", () => {
     nextNurseNo: 4,
     rules: [],
     pendingRules: [],
-    isSample: false,
   };
   const TODAY = "2026-10-28";
   const result = { assignments: {} } as unknown as NonNullable<WorkPeriod["result"]>;

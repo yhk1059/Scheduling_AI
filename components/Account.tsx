@@ -52,26 +52,11 @@ export function LoginButton({ className = ui.secondary }: { className?: string }
   );
 }
 
-/** 로그인 직후 스토어가 묻는 것: 샘플 저장 선택, 서버 우선 안내. */
+/** 로그인 직후 스토어가 알리는 것: 서버 우선 안내. */
 export function LoginPromptDialog() {
   const prompt = useAppStore((s) => s.loginPrompt);
-  const chooseSample = useAppStore((s) => s.chooseSample);
   const dismiss = useAppStore((s) => s.dismissLoginPrompt);
   if (!prompt) return null;
-  if (prompt.kind === "sample-choice") {
-    // Esc는 지우지 않는 쪽(샘플 저장)으로 닫는다
-    const keep = () => void chooseSample(true);
-    return (
-      <Dialog
-        title="샘플 병동 저장"
-        onClose={keep}
-        secondary={{ label: "빈 병동으로 시작", onClick: () => void chooseSample(false) }}
-        primary={{ label: "샘플 저장", onClick: keep }}
-      >
-        샘플 병동을 내 병동으로 저장할까요, 빈 병동으로 시작할까요?
-      </Dialog>
-    );
-  }
   return (
     <Dialog title="내 병동을 불러왔어요" onClose={dismiss} primary={{ label: "닫기", onClick: dismiss }}>
       저장된 내 병동을 불러왔어요. 이 브라우저에서 입력한 내용은 지웠어요.
