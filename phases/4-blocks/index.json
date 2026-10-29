@@ -69,7 +69,10 @@
     {
       "step": 8,
       "name": "ui-settings-roster",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-10-30T01:07:18+0900",
+      "completed_at": "2026-10-30T01:14:42+0900",
+      "summary": "병동 쪽 화면을 블록 형식으로: components/ShiftTable.tsx 새로(코드·이름·시작 시각(time)·시간·세는 근무조 표, 맨 아래 입력 줄 Enter·[추가], 칸별 오류: 코드 형식 ^[A-Z0-9]{1,3}$·중복·이름·시간 0.5~24(0.5 단위)·더블은 근무조 2개, 8개 상한이면 입력 줄 대신 안내, O 읽기 전용, 쓰인 코드 [끄기]/[다시 켜기](세는 근무조가 꺼졌으면 비활성)·안 쓰인 코드 [삭제], 표 위 '말로 ‘미드 근무 11시~19시 추가’라고 적어도 돼요'); WardSettings 탭 [명단·필요 인원][근무 형태][병동 규칙](View tab에 shifts), 병동 규칙 탭 위 ward.unconverted 주의 배너(원문 목록 + 항목별 [지우기] Text, store.dismissUnconverted는 입력 버전 그대로); 명단 표 나이트 전담 체크박스 → 태그 칩 입력(Enter·쉼표, datalist 자동 완성=병동 태그+나이트전담, '+ 나이트전담' 추천 칩, 10자·5개 오류, 입력 줄 아래 '태그에는 이름을 쓰지 마세요', 입력 줄은 칸에 적다 만 태그도 함께 넣음); 처음 설정 ② 위에 근무 형태 요약 한 줄(wording.configSummary: '데이·이브닝·나이트 3교대, 각 8시간', 시간 다르면 근무조별, 더블은 '· 더블 DE') + [바꾸기]/[접기](aria-expanded)로 ShiftTable; CoverageForm은 step 7에서 이미 coverageCodes(활성 기본 코드) 행이라 바꾸지 않음; ui.ts에 cell·cellOk·cellErr. 버그 수정: 꺼진 코드의 필요 인원 규칙이 요청에 남아 근무표가 반드시 없음이 되던 것 → toScheduleRequest가 coverageCodes에 없는 코드의 필요 인원 규칙을 enabled=false로 보냄(원본 유지, 다시 켜면 값 복원). AC grep을 위해 SampleDemo는 migrate.tagged(옛 night_only→태그, 제네릭으로 export)를 쓰고, 근무표 행 이름 옆 '나이트 전담' 고정 문구는 간호사 태그 표시로 바꿈. vitest 286·pytest 541, build·lint(0 errors, types.gen.ts 경고 1개 그대로)·AC grep 통과. 동작 확인(dev, 임시 Playwright): 빈 병동 → 태그 붙여 3명(책임·추천 칩 나이트전담, 행 태그 추가·빼기) → ② 요약 aria-expanded false→true, D 중복·빈 이름 오류, M 11:00 8시간 추가 → 요약 '4교대'·필요 인원 미드 행 생김 → 첫 근무표 → 병동 설정 [근무 형태]에서 M [끄기](꺼짐 배지·[다시 켜기]) → 필요 인원 미드 행 사라짐 → 근무표 만들기 ok(cov-*-M enabled=false), 콘솔 오류 없음, 서버 끔. 결정: 기존 코드의 코드·세는 근무조는 고치지 않음(참조 보호, 바꾸려면 끄고 새로 추가); 세는 근무조 칸은 기본 코드면 자기 코드, 더블이면 'D + E', O는 –; 꺼진 코드는 '꺼짐' 배지(제외 배지 색); 쓰인 코드 판정은 isShiftUsed라 필요 인원이 있는 기본 코드도 [끄기]; 하루 합계는 기본 코드 인원 합 그대로; 태그 칩 aria-label '{n}행 태그 {태그} 빼기'·'{n}행 태그 나이트전담 붙이기', 입력 '{n}행 태그'/'새 간호사 태그'(combobox) → step 10 시나리오의 'checkbox \"14행 나이트 전담\"' 갱신 필요"
     },
     {
       "step": 9,
