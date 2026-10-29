@@ -257,7 +257,7 @@ test("S6. 병동 설정: 병동 규칙", async () => {
   ruleCount = total;
 
   // S6-d. 병동 홈
-  const homeTab = page.getByRole("button", { name: "홈", exact: true });
+  const homeTab = page.getByRole("button", { name: "근무표", exact: true });
   await homeTab.click();
   await expect(homeTab).toHaveAttribute("aria-current", "page");
   await expect(page.getByRole("heading", { name: "내과 병동", level: 1 })).toBeVisible();
@@ -485,7 +485,7 @@ test("S12. 확정(게스트)", async () => {
   expect((await periodByStart(page, NOV.start_date)).versions).toHaveLength(1);
   await expectNoDevTerms(page, "③ 근무표(확정)");
 
-  await page.getByRole("button", { name: "← 홈" }).click();
+  await page.getByRole("button", { name: "← 근무표 목록" }).click();
   await expect(page.getByText("운영 중", { exact: true })).toHaveCount(0); // 11월은 아직 시작 전
   const task = sectionWith("11월 근무표");
   await expect(task).toContainText("확정했어요 · 10/28 09:00");
@@ -496,12 +496,11 @@ test("S12. 확정(게스트)", async () => {
   await expectNoDevTerms(page, "병동 홈(11월 확정 후)");
 });
 
-test("S13. 저장과 이어서 하기", async () => {
+test("S13. 저장과 다시 들어오기", async () => {
   await sectionWith("11월 근무표").getByRole("button", { name: "열기" }).click();
   await expect(scheduleTitle(page)).toBeVisible();
+  // 시작 화면 없이 마지막 화면으로 바로 들어간다
   await page.reload();
-  await expect(page.getByText(`11월 근무표 · 간호사 ${NURSE_COUNT}명`)).toBeVisible();
-  await page.getByRole("button", { name: "이어서 하기" }).click();
   await expect(page.getByRole("heading", { level: 1 })).toHaveText("11월 근무표");
   await expect(scheduleTitle(page)).toBeVisible();
   expect(await readGrid(page, NOV)).toEqual(finalGrid);

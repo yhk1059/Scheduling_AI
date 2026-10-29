@@ -179,7 +179,7 @@ test("S3. 샘플 체험: 다음 근무표 만들기와 게스트 확정", async 
   await expectNoDevTerms(page, "③ 근무표(확정)");
 
   // 홈: [12월 근무표 만들기]가 유일한 Primary
-  await page.getByRole("button", { name: "← 홈" }).click();
+  await page.getByRole("button", { name: "← 근무표 목록" }).click();
   await expect(task).toContainText("확정했어요 · 10/28 09:00");
   await expect(task.getByRole("button", { name: "열기" })).toBeVisible();
   await expect(primaryButtons(page)).toHaveCount(1);
@@ -266,7 +266,7 @@ test("S4. 샘플 운영 중 변경 → 최소 변경 → 다시 확정 → 다�
   const octFinal = await confirmedGrid(page, OCT.start_date);
 
   // 11월: 지난 근무표가 바뀌었다는 배너 → 다시 만들면 새 지난 근무로 반영
-  await page.getByRole("button", { name: "← 홈" }).click();
+  await page.getByRole("button", { name: "← 근무표 목록" }).click();
   await sectionWith("11월 근무표").getByRole("button", { name: "열기" }).click();
   const changed = page.getByRole("status").filter({ hasText: "지난 근무표가 바뀌어 이어지는 근무가 달라졌어요. 다시 만들면 반영돼요" });
   await expect(changed).toBeVisible();
