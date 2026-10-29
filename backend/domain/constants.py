@@ -46,5 +46,10 @@ DEFAULT_SOFT_WEIGHTS: dict[str, int] = {
 }
 # 블록의 중요도 → soft 위반 1단위당 페널티(ADR-018). 보통·낮음은 위 기본값과 같다.
 PRIORITY_WEIGHTS: dict[str, int] = {"high": 30, "normal": 10, "low": 5}
+# 근무 시간(measure=hours)은 분 단위 정수로 계산한다(근무 시간은 0.5시간 단위라 정수가 된다).
+MINUTES_PER_HOUR = 60
+# 시간 기준 soft 블록의 위반량 단위: 기본 근무 하나(8시간). 위반 분 ÷ 480을 올림한 정수 × 가중치가 페널티다
+# (8시간 초과 = 1단위, 1분~8시간 초과도 1단위, 8시간 1분 초과 = 2단위). 개수 기준 블록은 1개 = 1단위.
+BASE_SHIFT_HOURS = 8
 FAIRNESS_TOLERANCE = 1  # 공정성 편차가 이 값 이하면 soft 위반으로 나열하지 않는다
 DIFF_WEIGHT = 20  # 재스케줄 시 변경 칸 1개당 페널티

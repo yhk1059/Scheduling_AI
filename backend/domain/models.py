@@ -582,6 +582,8 @@ class NurseStats(_Strict):
     max_consecutive_work: int
     preference_rate: float | None
     deviation: float
+    counts: dict[str, int] = {}  # 근무 코드별 개수(활성 코드 + 배정된 코드)
+    hours: float = 0  # 근무 시간 합
 
 
 class Summary(_Strict):

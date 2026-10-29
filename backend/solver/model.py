@@ -6,16 +6,15 @@ assumptions로 unsat core를 따로 구한다.
 """
 
 from dataclasses import dataclass, field
+from functools import cached_property
 
 from ortools.sat.python import cp_model
 
 from backend.domain.constants import CONFLICT_TIME_LIMIT_S, DIFF_WEIGHT, SOLVE_TIME_LIMIT_S
-from backend.domain.models import ScheduleRequest, SolveInfeasible, SolveOk, SolveTimeout
-from backend.solver import hard, soft, stats
+from backend.domain.models import ScheduleRequest, Shifts, SolveInfeasible, SolveOk, SolveTimeout
+from backend.solver import hard, select, soft, stats
 from backend.solver.conflicts import find_conflicts
-from backend.solver.stats import TOGGLEABLE  # hard → soft 토글이 가능한 템플릿 1~7
-
-SHIFTS = ("D", "E", "N", "O")
+from backend.solver.stats import TOGGLEABLE  # hard → soft 토글이 가능한 템플릿 1~7과 블록 3종
 
 Cell = cp_model.IntVar | bool | None
 
@@ -27,10 +26,16 @@ class ModelContext:
     x: dict[tuple[str, int, str], cp_model.IntVar]
     hard_literals: dict[str, cp_model.IntVar] = field(default_factory=dict)
     objective_terms: list = field(default_factory=list)
+    _literals: dict[tuple[str, int, tuple[str, ...]], cp_model.IntVar] = field(default_factory=dict)
 
     @property
     def days(self) -> int:
         return self.request.period.days
+
+    @cached_property
+    def codes(self) -> list[str]:
+        """변수를 만드는 활성 근무 코드(config 순서)."""
+        return active_codes(self.request)
 
     def is_weekend(self, day: int) -> bool:
         return stats.is_weekend(self.request, day)
@@ -49,21 +54,74 @@ class ModelContext:
     def _carry(self) -> dict[str, list[str]]:
         return {r.nurse_id: r.shifts for r in self.request.carry_over}
 
+    def _carry_code(self, nurse_id: str, day: int) -> str | None:
+        carry = self._carry().get(nurse_id, [])
+        idx = len(carry) - 1 + day
+        return carry[idx] if idx >= 0 else None
+
+    def value(self, nurse_id: str, day: int, sel: Shifts, measure: str):
+        """칸 하나의 값(개수 또는 분): 변수 합, 이월이면 상수, 이월이 없는 날이면 None."""
+        config = self.request.config
+        if day >= 1:
+            return sum(
+                select.value(config, c, sel, measure) * self.x[nurse_id, day, c]
+                for c in self.codes
+                if select.matches(config, c, sel)
+            )
+        code = self._carry_code(nurse_id, day)
+        return None if code is None else select.value(config, code, sel, measure)
+
+    def match(self, nurse_id: str, day: int, sel: Shifts):
+        """칸이 셀렉터에 맞으면 1: 맞는 코드 변수의 합(하루 하나라 0/1), 이월이면 상수."""
+        return self.value(nurse_id, day, sel, "count")
+
+    def minutes(self, nurse_id: str, day: int, sel: Shifts):
+        """칸이 셀렉터에 맞으면 그 코드의 근무 시간(분)."""
+        return self.value(nurse_id, day, sel, "hours")
+
+    def literal(self, nurse_id: str, day: int, sel: Shifts) -> Cell:
+        """match를 리터럴로(절에 쓴다). 코드 하나면 그 변수, 나머지가 하나면 그 부정, 그 밖은 보조 변수."""
+        if day < 1:
+            m = self.match(nurse_id, day, sel)
+            return None if m is None else bool(m)
+        config = self.request.config
+        hit = [c for c in self.codes if select.matches(config, c, sel)]
+        miss = [c for c in self.codes if c not in hit]
+        if not hit:
+            return False
+        if not miss:
+            return True
+        if len(hit) == 1:
+            return self.x[nurse_id, day, hit[0]]
+        if len(miss) == 1:
+            return self.x[nurse_id, day, miss[0]].Not()
+        key = (nurse_id, day, tuple(hit))
+        if key not in self._literals:
+            b = self.model.new_bool_var("")
+            self.model.add(b == sum(self.x[nurse_id, day, c] for c in hit))
+            self._literals[key] = b
+        return self._literals[key]
+
+
+def active_codes(request: ScheduleRequest) -> list[str]:
+    return [s.code for s in request.config.shifts if s.active]
+
 
 def build_model(request: ScheduleRequest) -> ModelContext:
     model = cp_model.CpModel()
     days = request.period.days
+    codes = active_codes(request)
     x = {
         (n.id, d, s): model.new_bool_var(f"x_{n.id}_{d}_{s}")
         for n in request.nurses
         for d in range(1, days + 1)
-        for s in SHIFTS
+        for s in codes
     }
     ctx = ModelContext(model=model, request=request, x=x)
 
     for n in request.nurses:
         for d in range(1, days + 1):
-            model.add_exactly_one(x[n.id, d, s] for s in SHIFTS)
+            model.add_exactly_one(x[n.id, d, s] for s in codes)
             if n.night_only:
                 model.add(x[n.id, d, "D"] == 0)
                 model.add(x[n.id, d, "E"] == 0)
@@ -79,7 +137,8 @@ def build_model(request: ScheduleRequest) -> ModelContext:
         hard.ADDERS[c.type](ctx, c, lit)
 
     for nid, d, before in stats.common_cells(request):
-        ctx.objective_terms.append(DIFF_WEIGHT * x[nid, d, before].Not())
+        # 끈 코드는 다시 배정할 수 없어 반드시 바뀐다
+        ctx.objective_terms.append(DIFF_WEIGHT * x[nid, d, before].Not() if before in codes else DIFF_WEIGHT)
     return ctx
 
 
@@ -105,7 +164,7 @@ def solve(
     if status in (cp_model.OPTIMAL, cp_model.FEASIBLE):
         assignments = {
             n.id: [
-                next(s for s in SHIFTS if solver.boolean_value(ctx.x[n.id, d, s]))
+                next(s for s in ctx.codes if solver.boolean_value(ctx.x[n.id, d, s]))
                 for d in range(1, ctx.days + 1)
             ]
             for n in request.nurses
