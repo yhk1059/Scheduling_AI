@@ -12,6 +12,7 @@ from backend.domain.models import (
     ConstraintSpec,
     RelaxationProposal,
     ScheduleRequest,
+    _constraint_codes,
     _constraint_refs,
 )
 from backend.llm.client import LLMClient, LLMInvalidOutputError, ToolCallResult
@@ -88,10 +89,12 @@ def _check_change(change: ConstraintChange, request: ScheduleRequest, spec: Any)
         updated = _spec_adapter.validate_python(data)
     except ValidationError:
         return None
-    nurse_id, cdays = _constraint_refs(updated)
-    if nurse_id is not None and nurse_id not in {n.id for n in request.nurses}:
+    nurse_ids, cdays = _constraint_refs(updated)
+    if any(i not in {n.id for n in request.nurses} for i in nurse_ids):
         return None
     if any(not 1 <= d <= request.period.days for d in cdays):
+        return None
+    if not set(_constraint_codes(updated)) <= request.config.codes:
         return None
     return ConstraintChange(
         action="update",
