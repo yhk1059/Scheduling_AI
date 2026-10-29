@@ -17,7 +17,10 @@ const SCREEN_LABELS: Record<Exclude<View["screen"], "period">, string> = { home:
 const SAMPLE_NURSES = sample.nurses.length;
 const SAMPLE_RULES = wardRuleCount(sample.constraints as ConstraintSpec[]);
 
-export default function StartScreen({ onDone }: { onDone: () => void }) {
+export type StartIntent = "sample" | "new";
+
+/** intent가 있으면(랜딩에서 고르고 왔는데 다른 입력이 있으면) 지우기 확인부터 연다. */
+export default function StartScreen({ intent, onDone }: { intent: StartIntent | null; onDone: () => void }) {
   const hasInput = useAppStore((s) => s.hasInput());
   // 이어서 갈 화면 이름. 근무표 화면이면 "11월 근무표"
   const screenLabel = useAppStore((s) => {
@@ -29,7 +32,7 @@ export default function StartScreen({ onDone }: { onDone: () => void }) {
   const loadSample = useAppStore((s) => s.loadSample);
   const startWard = useAppStore((s) => s.startWard);
   const showLogin = useAppStore((s) => supabaseConfigured && s.auth === null);
-  const [pending, setPending] = useState<(() => void) | null>(null);
+  const [pending, setPending] = useState<StartIntent | null>(intent);
 
   const sample = () => {
     loadSample(today());
@@ -39,8 +42,9 @@ export default function StartScreen({ onDone }: { onDone: () => void }) {
     startWard();
     onDone();
   };
+  const run = (kind: StartIntent) => (kind === "sample" ? sample() : fresh());
   // 입력이 있으면 지우기 전에 확인한다
-  const start = (load: () => void) => (hasInput ? setPending(() => load) : load());
+  const start = (kind: StartIntent) => (hasInput ? setPending(kind) : run(kind));
 
   const options = [
     ...(hasInput
@@ -57,13 +61,13 @@ export default function StartScreen({ onDone }: { onDone: () => void }) {
       title: "샘플로 체험하기",
       body: `간호사 ${SAMPLE_NURSES}명과 병동 규칙 ${SAMPLE_RULES}개, 이번 달 확정 근무표가 들어 있어요. 다음 달 근무표를 바로 만들어 볼 수 있어요.`,
       action: "샘플로 체험하기",
-      onClick: () => start(sample),
+      onClick: () => start("sample"),
     },
     {
       title: "내 병동으로 시작하기",
       body: "빈 병동에서 명단과 필요 인원부터 입력해요. 엑셀 명단을 붙여넣거나 CSV 파일로 올릴 수 있어요.",
       action: "내 병동으로 시작하기",
-      onClick: () => start(fresh),
+      onClick: () => start("new"),
     },
   ];
 
@@ -100,9 +104,9 @@ export default function StartScreen({ onDone }: { onDone: () => void }) {
           primary={{
             label: "지우고 시작",
             onClick: () => {
-              const load = pending;
+              const kind = pending;
               setPending(null);
-              load();
+              run(kind);
             },
           }}
         >

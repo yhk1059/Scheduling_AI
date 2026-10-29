@@ -71,19 +71,24 @@ export default function Home() {
           </p>
           <div className="flex items-center gap-2">
             <Link
-              href="/app"
+              href="/app?start=sample"
               className="inline-flex h-11 items-center gap-2 rounded-md border border-[#155E75] bg-[#155E75] px-[18px] text-[15px] font-medium text-white transition-colors duration-[120ms] hover:bg-[#0E4A5C]"
             >
-              근무표 만들기
+              샘플로 체험하기
             </Link>
-            <a
-              href={REPO_URL}
+            <Link
+              href="/app?start=new"
               className="inline-flex h-11 items-center gap-2 rounded-md border border-[#C9C9C1] bg-white px-[18px] text-[15px] font-medium text-[#1B1B18] transition-colors duration-[120ms] hover:bg-[#EFEFEB]"
             >
+              내 병동으로 시작하기
+            </Link>
+            <a href={REPO_URL} className="px-2 text-sm font-medium text-[#155E75] hover:text-[#0E4A5C]">
               GitHub
             </a>
           </div>
-          <p className="text-xs font-medium text-[#66665E]">로그인 없이 샘플 병동(15명)으로 체험하거나, 내 명단으로 바로 시작할 수 있어요.</p>
+          <p className="text-xs font-medium text-[#66665E]">
+            로그인 없이 바로 써 볼 수 있어요. 샘플 병동에는 간호사 15명과 이번 달 근무표가 들어 있어요.
+          </p>
         </div>
         <LandingPreview />
       </section>
