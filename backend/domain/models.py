@@ -669,10 +669,18 @@ class TranslateRequest(_Strict):
     input_version: int
 
 
+class ShiftChange(_Strict):
+    """설정 변경 카드(ADR-018): 근무 코드 추가·수정. 삭제는 설정 화면에서만 한다."""
+
+    action: Literal["add", "update"]
+    shift: ShiftDef
+
+
 class TranslateOk(_Strict):
     status: Literal["ok"]
     input_version: int
     constraints: list[ConstraintSpec]
+    config_changes: list[ShiftChange] = []
 
 
 class TranslateClarify(_Strict):

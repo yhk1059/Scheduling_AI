@@ -15,21 +15,21 @@ from backend.llm.prompts import EXPLAIN_SYSTEM, EXPLAIN_TOOL
 NURSES = [
     Nurse(id="n01", name="이영희", years=12),
     Nurse(id="n02", name="박민수", years=9),
-    Nurse(id="n03", name="김지훈", years=2),
+    Nurse(id="n03", name="김지훈", years=2, tags=["나이트전담"]),
 ]
 
 COVERAGE = {
     "id": "cov",
     "scope": "ward",
-    "type": "daily_coverage",
-    "params": {"shift": "D", "day_kind": "weekend", "min": 3, "max": 3},
+    "type": "count",
+    "params": {"days": {"kind": "weekend"}, "shifts": {"in": ["D"]}, "per": "day", "min": 3, "max": 3},
     "source_text": "주말 D 최소 3명",
 }
 LEAVE = {
     "id": "lv1",
     "scope": "period",
-    "type": "leave",
-    "params": {"nurse_id": "n01", "days": [14, 15]},
+    "type": "count",
+    "params": {"people": {"ids": ["n01"]}, "days": {"days": [14, 15]}, "shifts": {"not_in": ["O"]}, "per": "person", "max": 0},
     "source_text": "이영희 14~15일 휴가",
 }
 FIXED = {
@@ -42,22 +42,30 @@ FIXED = {
 UNRELATED = {
     "id": "seq",
     "scope": "ward",
-    "type": "forbidden_sequence",
-    "params": {"first": "N", "second": "D"},
+    "type": "sequence",
+    "params": {"forbid": [[{"in": ["N"]}, {"in": ["D"]}]]},
     "source_text": "나이트 다음 날 데이 금지",
+}
+NIGHT_ONLY = {
+    "id": "night-only",
+    "scope": "ward",
+    "type": "count",
+    "params": {"people": {"tags": ["나이트전담"]}, "shifts": {"not_in": ["N", "O"]}, "per": "person", "max": 0},
+    "source_text": "나이트 전담은 나이트와 휴무만",
 }
 
 REQUEST = ScheduleRequest(
     nurses=NURSES,
     period=Period(start_date=date(2026, 11, 1), length=30),
     holidays=[5],
-    constraints=[COVERAGE, LEAVE, FIXED, UNRELATED],
+    constraints=[COVERAGE, LEAVE, FIXED, UNRELATED, NIGHT_ONLY],
     input_version=3,
 )
 CONFLICTS = [
-    Conflict(constraint_id="cov", type="daily_coverage", source_text="주말 D 최소 3명"),
-    Conflict(constraint_id="lv1", type="leave", source_text="이영희 14~15일 휴가"),
+    Conflict(constraint_id="cov", type="count", source_text="주말 D 최소 3명"),
+    Conflict(constraint_id="lv1", type="count", source_text="이영희 14~15일 휴가"),
     Conflict(constraint_id="fx1", type="fixed_assignment", source_text="박민수 14일 N 고정"),
+    Conflict(constraint_id="night-only", type="count", source_text="나이트 전담은 나이트와 휴무만"),
 ]
 
 TEXT = "n01의 14~15일 휴가 때문에 주말 데이 인원 3명을 채울 수 없습니다. n02도 14일 나이트로 고정되어 있습니다."
@@ -117,11 +125,33 @@ def test_explain_text_and_three_proposals():
     assert len(client.calls) == 1
 
 
-def test_update_params_are_merged_into_full_template_params():
+def test_update_params_are_merged_into_full_block_params():
     client = FakeClient(ok({"text": TEXT, "proposals": [proposal("완화", update("cov", {"min": 2}))]}))
     _, proposals = explain(REQUEST, CONFLICTS, client)
 
-    assert proposals[0].changes[0].params == {"shift": "D", "day_kind": "weekend", "min": 2, "max": 3}
+    params = proposals[0].changes[0].params
+    assert params["min"] == 2 and params["max"] == 3 and params["per"] == "day"
+    assert params["shifts"] == {"in": ["D"], "not_in": None}
+    assert params["days"]["kind"] == "weekend"
+
+
+def test_update_replaces_selector_whole():
+    # 최상위 키 단위 교체: days 셀렉터는 통째로 바뀌고 kind는 기본값(all)으로 돌아간다
+    change = update("lv1", {"days": {"days": [15]}})
+    client = FakeClient(ok({"text": TEXT, "proposals": [proposal("하루 줄이기", change)]}))
+    _, proposals = explain(REQUEST, CONFLICTS, client)
+
+    params = proposals[0].changes[0].params
+    assert params["days"] == {"kind": "all", "weekdays": None, "days": [15]}
+    assert params["people"]["ids"] == ["n01"] and params["max"] == 0
+
+
+def test_update_changes_selector_people():
+    change = update("cov", {"people": {"min_years": 3}, "min": 1, "max": None})
+    client = FakeClient(ok({"text": TEXT, "proposals": [proposal("연차로", change)]}))
+    _, proposals = explain(REQUEST, CONFLICTS, client)
+    params = proposals[0].changes[0].params
+    assert params["people"]["min_years"] == 3 and params["max"] is None
 
 
 def test_request_is_pseudonymized_and_uses_tool():
@@ -136,9 +166,10 @@ def test_request_is_pseudonymized_and_uses_tool():
     assert "n01 14~15일 휴가" in body
     # 충돌 제약만 넣고, 충돌과 무관한 제약은 넣지 않는다
     assert '"cov"' in body and '"lv1"' in body and '"fx1"' in body
-    assert "seq" not in body
+    assert '"seq"' not in body
     assert '"hardness": "hard"' in body
     assert '"nurse_count": 3' in body
+    assert '"not_in": ["O"]' in body  # 블록 params(셀렉터 별칭 그대로)
     context = json.loads(body.split("<context>\n")[1].split("\n</context>")[0])
     assert context["period"] == {"start": "2026-11-01", "end": "2026-11-30", "length": 30}
     assert len(context["days"]) == 30
@@ -146,6 +177,9 @@ def test_request_is_pseudonymized_and_uses_tool():
     for old in ("target_month", "days_in_month", "period_start", "period_end", "period_length"):
         assert old not in context
     assert context["weekend_and_holiday_days"][:4] == [1, 5, 7, 8]
+    assert [s["code"] for s in context["config"]["shifts"]] == ["D", "E", "N", "O"]
+    assert context["config"]["shifts"][2] == {"code": "N", "name": "나이트", "hours": 8, "parts": [], "active": True}
+    assert {"id": "n03", "years": 2, "tags": ["나이트전담"]} in context["nurses"]
 
 
 def test_context_days_cross_month():
@@ -166,9 +200,14 @@ def test_tool_schema_from_pydantic():
 
 
 def test_prompt_instructions():
-    assert "leave" in EXPLAIN_SYSTEM and "마지막 수단" in EXPLAIN_SYSTEM
+    assert "휴가" in EXPLAIN_SYSTEM and "마지막 수단" in EXPLAIN_SYSTEM
     assert "fixed_assignment" in EXPLAIN_SYSTEM and "disable" in EXPLAIN_SYSTEM
-    assert "update" in EXPLAIN_SYSTEM
+    assert "update" in EXPLAIN_SYSTEM and "최상위 키" in EXPLAIN_SYSTEM
+    assert "나이트전담" in EXPLAIN_SYSTEM and "config.shifts" in EXPLAIN_SYSTEM
+    for word in ("count", "sequence", "balance", "not_in"):
+        assert word in EXPLAIN_SYSTEM
+    for old in ("daily_coverage", "night_fairness"):
+        assert old not in EXPLAIN_SYSTEM
     assert "11/30" in EXPLAIN_SYSTEM and "days" in EXPLAIN_SYSTEM
     assert "대상 월" not in EXPLAIN_SYSTEM and "이번 달" not in EXPLAIN_SYSTEM
 
@@ -194,16 +233,31 @@ def test_drop_update_with_invalid_params():
         proposal("min > max", update("cov", {"min": 5, "max": 3})),
         proposal("모르는 키", update("cov", {"minimum": 2})),
         proposal("잘못된 근무", update("fx1", {"shift": "X"})),
-        proposal("범위 밖 날짜", update("lv1", {"days": [40]})),
-        proposal("명단에 없는 간호사", update("lv1", {"nurse_id": "n99"})),
+        proposal("없는 근무 코드", update("cov", {"shifts": {"in": ["M"]}})),
+        proposal("셀렉터 형식", update("cov", {"shifts": {"in": ["D"], "not_in": ["O"]}})),
+        proposal("범위 밖 날짜", update("lv1", {"days": {"days": [40]}})),
+        proposal("명단에 없는 간호사", update("lv1", {"people": {"ids": ["n99"]}})),
+        proposal("없는 태그", update("cov", {"people": {"tags": ["책임"]}})),
         proposal("빈 update", update("cov")),
-        proposal("정상", update("lv1", {"days": [15]})),
+        proposal("정상", update("lv1", {"days": {"days": [15]}})),
     ]
     client = FakeClient(ok({"text": TEXT, "proposals": props}))
     _, proposals = explain(REQUEST, CONFLICTS, client)
 
     assert [p.title for p in proposals] == ["정상"]
-    assert proposals[0].changes[0].params == {"nurse_id": "n01", "days": [15]}
+    assert proposals[0].changes[0].params["days"]["days"] == [15]
+
+
+def test_drop_proposal_disabling_night_only_rule():
+    props = [
+        proposal("나이트 전담 규칙 끄기", disable("night-only")),
+        proposal("함께 끄기", disable("fx1"), disable("night-only")),
+        proposal("정상", disable("fx1")),
+    ]
+    client = FakeClient(ok({"text": TEXT, "proposals": props}))
+    _, proposals = explain(REQUEST, CONFLICTS, client)
+
+    assert [p.title for p in proposals] == ["정상"]
 
 
 def test_proposals_truncated_to_max():
@@ -259,15 +313,15 @@ def test_retries_exhausted_raises():
 
 
 def test_names_restored_in_text_title_description():
-    props = [proposal("n01 휴가 하루 줄이기", update("lv1", {"days": [15]}), description="n01의 14일을 근무로 돌립니다.")]
+    props = [proposal("n01 휴가 하루 줄이기", update("lv1", {"days": {"days": [15]}}), description="n01의 14일을 근무로 돌립니다.")]
     client = FakeClient(ok({"text": "n01과 n02가 겹칩니다. n03은 무관합니다.", "proposals": props}))
     text, proposals = explain(REQUEST, CONFLICTS, client)
 
     assert text == "이영희과 박민수가 겹칩니다. 김지훈은 무관합니다."
     assert proposals[0].title == "이영희 휴가 하루 줄이기"
     assert proposals[0].description == "이영희의 14일을 근무로 돌립니다."
-    # params의 nurse_id는 id로 남는다
-    assert proposals[0].changes[0].params["nurse_id"] == "n01"
+    # params의 간호사 id는 id로 남는다
+    assert proposals[0].changes[0].params["people"]["ids"] == ["n01"]
 
 
 # --- 결정적 대체 경로 ---
@@ -275,7 +329,10 @@ def test_names_restored_in_text_title_description():
 
 def test_fallback_lists_conflict_source_texts():
     text = fallback_explanation(REQUEST, CONFLICTS)
-    assert text == "다음 규칙들이 동시에 지켜질 수 없습니다: “주말 D 최소 3명”, “이영희 14~15일 휴가”, “박민수 14일 N 고정”."
+    assert text == (
+        "다음 규칙들이 동시에 지켜질 수 없습니다: “주말 D 최소 3명”, “이영희 14~15일 휴가”, “박민수 14일 N 고정”, "
+        "“나이트 전담은 나이트와 휴무만”."
+    )
 
 
 def test_fallback_empty_conflicts():
