@@ -1,0 +1,61 @@
+{
+  "project": "nurse-scheduler",
+  "phase": "4-blocks",
+  "steps": [
+    {
+      "step": 0,
+      "name": "golden-record",
+      "status": "pending"
+    },
+    {
+      "step": 1,
+      "name": "domain-blocks",
+      "status": "pending"
+    },
+    {
+      "step": 2,
+      "name": "solver-blocks",
+      "status": "pending"
+    },
+    {
+      "step": 3,
+      "name": "perf-limits",
+      "status": "pending"
+    },
+    {
+      "step": 4,
+      "name": "llm-blocks",
+      "status": "pending"
+    },
+    {
+      "step": 5,
+      "name": "eval-blocks",
+      "status": "pending"
+    },
+    {
+      "step": 6,
+      "name": "backend-cleanup",
+      "status": "pending"
+    },
+    {
+      "step": 7,
+      "name": "client-lib",
+      "status": "pending"
+    },
+    {
+      "step": 8,
+      "name": "ui-settings-roster",
+      "status": "pending"
+    },
+    {
+      "step": 9,
+      "name": "ui-cards-period",
+      "status": "pending"
+    },
+    {
+      "step": 10,
+      "name": "samples-e2e",
+      "status": "pending"
+    }
+  ]
+}

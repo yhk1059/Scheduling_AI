@@ -14,6 +14,10 @@
       "dir": "3-ux",
       "status": "completed",
       "completed_at": "2026-10-29T01:48:44+0900"
+    },
+    {
+      "dir": "4-blocks",
+      "status": "pending"
     }
   ]
 }
