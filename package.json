@@ -12,7 +12,8 @@
     "test": "uv run pytest backend/tests scripts/test_hooks.py && vitest run",
     "test:e2e": "playwright test",
     "gen:types": "uv run python -m backend.gen_types",
-    "gen:demo": "uv run python -m backend.gen_demo"
+    "gen:demo": "uv run python -m backend.gen_demo",
+    "gen:golden": "uv run python -m backend.gen_golden"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.118.0",
