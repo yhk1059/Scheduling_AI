@@ -69,7 +69,7 @@ K_RANDOM = 50
 FLIPS_PER_BLOCK = 4
 SEED = 20261030
 
-# eval 병동 = 샘플 병동 + 태그(책임 2명, 신규 3명). night_only는 나이트전담 태그로 바꾼다
+# eval 병동 = 샘플 병동 + 태그(책임 2명, 신규 3명). 샘플의 나이트전담 태그는 그대로 둔다
 EVAL_TAGS = {"n01": ["책임"], "n06": ["책임"], "n11": ["신규"], "n12": ["신규"], "n13": ["신규"]}
 
 _spec_adapter = TypeAdapter(ConstraintSpec)
@@ -81,8 +81,7 @@ def _ward() -> dict:
     ward = json.loads(SAMPLE.read_text(encoding="utf-8"))
     nurses = []
     for n in ward["nurses"]:
-        tags = EVAL_TAGS.get(n["id"], []) + ([NIGHT_ONLY_TAG] if n.get("night_only") else [])
-        nurses.append({k: v for k, v in n.items() if k != "night_only"} | {"tags": tags})
+        nurses.append(n | {"tags": EVAL_TAGS.get(n["id"], []) + n["tags"]})
     return {**ward, "nurses": nurses}
 
 

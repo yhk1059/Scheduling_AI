@@ -7,8 +7,6 @@ import json
 from pathlib import Path
 
 from backend.domain.constants import SOLVE_TIME_LIMIT_S
-from backend.domain.convert import convert_request
-from backend.domain.legacy import LegacyScheduleRequest
 from backend.domain.models import ScheduleRequest, SolveOk
 from backend.solver.model import solve
 
@@ -19,15 +17,11 @@ DEMO_PERIOD = {"start_date": "2026-11-01", "length": 30}  # 공휴일 없는 달
 
 
 def demo_request() -> ScheduleRequest:
-    """샘플 간호사와 병동 규칙만으로 만든 요청. 공휴일·이월·요청 없음.
-
-    샘플 파일은 아직 옛 형식이라 블록으로 바꿔 쓴다(나이트 전담 태그 + 기본 규칙).
-    """
+    """샘플 간호사와 병동 규칙만으로 만든 요청. 공휴일·이월·요청 없음."""
     ward = json.loads(WARD.read_text(encoding="utf-8"))
-    legacy = LegacyScheduleRequest(
-        nurses=ward["nurses"], period=DEMO_PERIOD, constraints=ward["constraints"], input_version=0
+    return ScheduleRequest(
+        config=ward["config"], nurses=ward["nurses"], period=DEMO_PERIOD, constraints=ward["constraints"], input_version=0
     )
-    return convert_request(legacy)
 
 
 def main() -> None:

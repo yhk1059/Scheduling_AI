@@ -4,48 +4,20 @@
 import { isWeekendDay } from "@/lib/period";
 import type { Code } from "@/lib/store";
 import { DEFAULT_CONFIG } from "@/lib/migrate";
+import demo from "@/lib/samples/demo-schedule.json";
+import ward from "@/lib/samples/ward-15.json";
 import type { ConstraintSpec, Nurse, Period, ScheduleResult } from "@/lib/types.gen";
 import { describeBlock, hardnessLabel, presetName } from "@/lib/wording";
 
 import { ScheduleGrid } from "./ScheduleStep";
 import { ui } from "./ui";
 
-const CARDS: ConstraintSpec[] = [
-  {
-    id: "landing-n-off",
-    type: "sequence",
-    scope: "ward",
-    hardness: "hard",
-    enabled: true,
-    source_text: "나이트 다음 날은 무조건 쉬게",
-    params: { after: { in: ["N"] }, then_off: 1 },
-  },
-  {
-    id: "landing-skill-mix",
-    type: "count",
-    scope: "ward",
-    hardness: "hard",
-    enabled: true,
-    source_text: "나이트 조마다 3년차 이상 1명은 꼭",
-    params: { people: { min_years: 3 }, shifts: { in: ["N"] }, per: "day", min: 1 },
-  },
-];
-
-// 2026년 11월 1~7일(일~토), lib/samples/ward-15.json 명단 앞 5명.
-const NURSES: Nurse[] = [
-  { id: "n01", name: "이영희", years: 12 },
-  { id: "n02", name: "박민수", years: 9 },
-  { id: "n03", name: "김철수", years: 7 },
-  { id: "n04", name: "정유진", years: 5 },
-  { id: "n05", name: "최지훈", years: 3 },
-];
-const ROWS: Record<string, Code[]> = {
-  n01: ["D", "D", "E", "E", "O", "O", "D"],
-  n02: ["E", "E", "O", "N", "N", "O", "O"],
-  n03: ["N", "N", "O", "O", "D", "D", "E"],
-  n04: ["O", "D", "D", "O", "E", "E", "N"],
-  n05: ["D", "O", "N", "N", "O", "D", "D"],
-};
+// 샘플 데모(/demo)와 같은 데이터: 병동 규칙 두 장과 근무표 첫 주(2026년 11월 1~7일, 일~토)의 앞 5명.
+const CARDS = (ward.constraints as unknown as ConstraintSpec[]).filter((c) => ["rule-noff", "rule-max-nights"].includes(c.id));
+const NURSES: Nurse[] = ward.nurses.slice(0, 5);
+const ROWS: Record<string, Code[]> = Object.fromEntries(
+  NURSES.map((n) => [n.id, (demo.result.assignments as Record<string, Code[]>)[n.id].slice(0, 7)]),
+);
 const RESULT: ScheduleResult = {
   assignments: ROWS,
   summary: { preferences_total: 0, preferences_met: 0, soft_violation_count: 0 },
@@ -56,7 +28,7 @@ const RESULT: ScheduleResult = {
 };
 const PERIOD = { start_date: "2026-11-01", length: 7 };
 const isWeekend = (d: number) => isWeekendDay(PERIOD, d, []);
-const FIXED = new Map<string, Code>([["n04-2", "D"]]);
+const FIXED = new Map<string, Code>([["n04-2", ROWS.n04[1]]]);
 
 // ConstraintCard는 store의 병동을 읽어 랜딩·데모(빈 store)에서는 그려지지 않으므로, 같은 모양의 적용된 카드를 직접 그린다.
 export function PreviewCard({ card, nurses, period }: { card: ConstraintSpec; nurses: Nurse[]; period: Period }) {

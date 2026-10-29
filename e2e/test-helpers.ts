@@ -6,7 +6,8 @@ import type { Ward, WorkPeriod } from "../lib/store";
 import { DEFAULT_CONFIG } from "../lib/migrate";
 import type { ConstraintSpec, Days, People, ScheduleRequest, Shifts, TranslateResponse } from "../lib/types.gen";
 
-export type Code = "D" | "E" | "N" | "O";
+/** 근무 코드. 기본은 D/E/N/O이고 병동이 더한 코드(M, DE 등)도 온다. */
+export type Code = "D" | "E" | "N" | "O" | (string & {});
 export type Grid = Record<string, Code[]>;
 export type Load = { nights: number; weekends: number };
 type StoredState = { ward: Ward; periods: WorkPeriod[]; view: { screen: string; periodId?: string } };
@@ -46,6 +47,9 @@ export async function confirmedGrid(page: Page, start: string): Promise<Grid> {
   return Object.fromEntries(ward.nurses.map((n) => [n.name, assignments[n.id] as Code[]]));
 }
 
+/** 근무 칸 aria-label 끝의 근무 코드(대문자·숫자 1~3자). */
+const CODE = "[A-Z0-9]{1,3}";
+
 /** 근무 칸 버튼의 aria-label("{이름} {M}월 {D}일 {코드}")로 근무표를 읽는다. */
 export async function readGrid(page: Page, period: PeriodRange): Promise<Grid> {
   const index = Object.fromEntries(periodDays(period).map((d) => [`${d.month}-${d.dom}`, d.day]));
@@ -54,7 +58,7 @@ export async function readGrid(page: Page, period: PeriodRange): Promise<Grid> {
   );
   const grid: Grid = {};
   for (const label of labels) {
-    const m = /^(.+) (\d+)월 (\d+)일 ([DENO])$/.exec(label);
+    const m = new RegExp(`^(.+) (\\d+)월 (\\d+)일 (${CODE})$`).exec(label);
     const day = m && index[`${m[2]}-${m[3]}`];
     if (m && day) (grid[m[1]] ??= [])[day - 1] = m[4] as Code;
   }
@@ -70,7 +74,7 @@ export async function readCarryOver(page: Page, prev: PeriodRange): Promise<Grid
   );
   const carry: Grid = {};
   for (const label of labels) {
-    const m = /^(.+) (\d+)\/(\d+) ([DENO])$/.exec(label);
+    const m = new RegExp(`^(.+) (\\d+)/(\\d+) (${CODE})$`).exec(label);
     if (m && Number(m[2]) === month) (carry[m[1]] ??= [])[Number(m[3]) - first] = m[4] as Code;
   }
   return carry;
@@ -101,13 +105,19 @@ export function expectedHistory(grid: Grid, period: PeriodRange, holidays: numbe
   return out;
 }
 
-/** 휴가 모양 블록(한 사람 × 날짜에 근무 없음)이면 { nurse_id, days }. */
-export function leaveOf(c: ConstraintSpec): { nurse_id: string; days: number[] } | null {
-  if (c.type !== "count") return null;
+/** 휴가 모양 블록(고른 사람 × 날짜에 근무 없음)이면 사람마다 { nurse_id, days }. 아니면 빈 목록. */
+export function leavesOf(c: ConstraintSpec): { nurse_id: string; days: number[] }[] {
+  if (c.type !== "count") return [];
   const p = c.params;
   const ids = p.people?.ids;
-  if (p.per !== "person" || p.max !== 0 || !p.shifts.not_in?.includes("O") || ids?.length !== 1 || !p.days?.days) return null;
-  return { nurse_id: ids[0], days: p.days.days };
+  if (p.per !== "person" || p.max !== 0 || !p.shifts.not_in?.includes("O") || !ids?.length || !p.days?.days) return [];
+  return ids.map((nurse_id) => ({ nurse_id, days: p.days!.days! }));
+}
+
+/** 한 사람의 휴가 모양 블록이면 { nurse_id, days }. */
+export function leaveOf(c: ConstraintSpec): { nurse_id: string; days: number[] } | null {
+  const list = leavesOf(c);
+  return list.length === 1 ? list[0] : null;
 }
 
 /**
@@ -224,8 +234,8 @@ export function hardViolations(req: ScheduleRequest, grid: Grid): string[] {
 /** 근무 칸이 모두 있고 마지막 /solve 요청의 반드시 규칙을 지키는지 본다. */
 export async function expectHardRulesHold(page: Page, period: PeriodRange, lastSolve: ScheduleRequest | undefined) {
   const grid = await readGrid(page, period);
-  expect(cellCount(grid), "근무 칸 수").toBe(NURSE_COUNT * period.length);
   expect(lastSolve, "마지막 /solve 요청").toBeTruthy();
+  expect(cellCount(grid), "근무 칸 수").toBe(lastSolve!.nurses.length * period.length);
   expect(lastSolve!.period).toEqual(period);
   expect(hardViolations(lastSolve!, grid), "반드시 규칙 위반").toEqual([]);
 }
@@ -283,14 +293,14 @@ export async function applyAllPending(page: Page) {
   expect(await cardOrder(page), "적용해도 카드 순서가 그대로").toEqual(before);
 }
 
-export async function expectCardChrome(card: Locator, hardness: "반드시" | "가능하면") {
+/** 대기 카드의 배지·버튼과 반드시/가능하면 토글. 휴가 카드는 토글이 없다(null). */
+export async function expectCardChrome(card: Locator, hardness: "반드시" | "가능하면" | null) {
   await expect(card.getByText("적용 대기")).toBeVisible();
   await expect(card.getByRole("button", { name: "삭제" })).toBeVisible();
   await expect(card.getByRole("button", { name: "적용" })).toBeVisible();
-  await expect(card.getByRole("group", { name: "반드시/가능하면" }).getByRole("button", { name: hardness })).toHaveAttribute(
-    "aria-pressed",
-    "true",
-  );
+  const toggle = card.getByRole("group", { name: "반드시/가능하면" });
+  if (hardness === null) await expect(toggle).toHaveCount(0);
+  else await expect(toggle.getByRole("button", { name: hardness })).toHaveAttribute("aria-pressed", "true");
 }
 
 /** 근무표 행 끝의 최근 4주 열과 통계 표의 최근 4주 열을 읽고 서로 같은지 확인한다. */
@@ -298,7 +308,7 @@ export async function readHistoryColumns(page: Page): Promise<Record<string, Loa
   const { grid, stats } = await page.evaluate(() => {
     const grid: Record<string, [string, string]> = {};
     for (const b of document.querySelectorAll("button[aria-label]")) {
-      const m = /^(.+) \d+월 \d+일 [DENO]$/.exec(b.getAttribute("aria-label") ?? "");
+      const m = /^(.+) \d+월 \d+일 [A-Z0-9]{1,3}$/.exec(b.getAttribute("aria-label") ?? "");
       if (!m || grid[m[1]] || !b.parentElement) continue;
       const kids = [...b.parentElement.children];
       grid[m[1]] = [kids.at(-2)!.textContent ?? "", kids.at(-1)!.textContent ?? ""];

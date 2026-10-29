@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
 import { DEFAULT_CONFIG, legacyToBlock, nightOnlyRule, type LegacySpec } from "./migrate";
-import type { Ward, WorkPeriod } from "./store";
+import { isLeaveRule, type Ward, type WorkPeriod } from "./store";
 import type { ConstraintSpec, Nurse, WardConfig } from "./types.gen";
 import {
   configSummary,
@@ -241,6 +241,14 @@ describe("presetName / describeBlock: 새 모양", () => {
   it("명단에 없는 간호사", () => {
     const leave = { people: { ids: ["n99"] }, days: { days: [20] }, shifts: { not_in: ["O"] }, per: "person", max: 0 };
     expect(d(block("count", leave))).toEqual(["휴가", "(명단에 없는 간호사) · 11/20 · 휴무"]);
+  });
+
+  it("휴가 모양이어도 가능하면이면 휴무 희망(토글을 숨기지 않는다)", () => {
+    const offWish = { people: { ids: ["n02"] }, days: { kind: "weekend" }, shifts: { not_in: ["O"] }, per: "person", max: 0 };
+    const soft = block("count", offWish, { hardness: "soft" });
+    expect(d(soft)).toEqual(["희망·기피 근무", "박민수 · 주말·공휴일 · 휴무 희망"]);
+    expect(isLeaveRule(soft)).toBe(false);
+    expect(isLeaveRule(block("count", offWish, { hardness: "hard" }))).toBe(true);
   });
 });
 

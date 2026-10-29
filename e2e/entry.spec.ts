@@ -26,7 +26,8 @@ test("S1. 랜딩 → 샘플 데모 → 내 병동", async ({ page }) => {
   await expect(page).toHaveURL(/\/demo$/);
   await expect(page.getByRole("heading", { name: "샘플 병동", level: 1 })).toBeVisible();
   await expect(page.getByRole("heading", { name: "병동 규칙", level: 2 })).toBeVisible();
-  await expect(page.getByText("“나이트 끝나면 다음 날은 무조건 쉬게”")).toBeVisible();
+  // 랜딩 조각도 같은 샘플 규칙을 보여 주고, 지나온 랜딩은 숨겨진 채 DOM에 남을 수 있어 main 안에서 찾는다
+  await expect(page.getByRole("main").getByText("“나이트 끝나면 다음 날은 무조건 쉬게”")).toBeVisible();
   for (const name of ["이영희", "문가람", "배수아"]) {
     await expect(page.getByRole("button", { name: new RegExp(`^${name} 11월 1일 [DENO]$`) })).toBeVisible();
   }

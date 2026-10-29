@@ -6,17 +6,16 @@ import Link from "next/link";
 import { isWeekendDay } from "@/lib/period";
 import demo from "@/lib/samples/demo-schedule.json";
 import ward from "@/lib/samples/ward-15.json";
-import { DEFAULT_CONFIG, legacyToBlock, tagged, type LegacySpec } from "@/lib/migrate";
-import type { Nurse, Period, ScheduleResult } from "@/lib/types.gen";
+import type { ConstraintSpec, Nurse, Period, ScheduleResult, WardConfig } from "@/lib/types.gen";
 import { describeBlock, presetName } from "@/lib/wording";
 
 import { PreviewCard } from "./LandingPreview";
 import { ScheduleGrid } from "./ScheduleStep";
 import { ui } from "./ui";
 
-// 샘플 파일은 아직 템플릿 형식이라 블록으로 바꿔 보여 준다(샘플 재생성 전까지)
-const NURSES: Nurse[] = ward.nurses.map((n) => tagged(n));
-const RULES = (ward.constraints as LegacySpec[]).map((c) => legacyToBlock(c));
+const CONFIG = ward.config as unknown as WardConfig;
+const NURSES: Nurse[] = ward.nurses;
+const RULES = ward.constraints as unknown as ConstraintSpec[];
 const COVERAGE = RULES.filter((r) => presetName(r) === "필요 인원");
 const WARD_RULES = RULES.filter((r) => presetName(r) !== "필요 인원");
 const PERIOD = demo.period as Period;
@@ -68,7 +67,7 @@ export default function SampleDemo() {
           <h2 className={h2}>필요 인원</h2>
           <ul className={`${card} grid grid-cols-3 gap-x-6 gap-y-1.5 text-sm text-[#3D3D38]`}>
             {COVERAGE.map((r) => (
-              <li key={r.id}>{describeBlock(r, DEFAULT_CONFIG, NURSES, PERIOD)}</li>
+              <li key={r.id}>{describeBlock(r, CONFIG, NURSES, PERIOD)}</li>
             ))}
           </ul>
         </section>
