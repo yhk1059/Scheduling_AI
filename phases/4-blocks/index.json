@@ -37,7 +37,10 @@
     {
       "step": 4,
       "name": "llm-blocks",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-10-30T00:04:09+0900",
+      "summary": "LLM 출력을 블록으로: prompts.py TranslatorOutput(constraints: BlockDraft = count|sequence|balance에서 id·scope·enabled·weight를 뺀 것, hardness·priority 생략 가능, config_changes: list[ShiftChange]), models.py에 ShiftChange(add|update, ShiftDef)와 TranslateOk.config_changes; TRANSLATE_SYSTEM 재작성(config.shifts·복합 코드, 셀렉터와 in/not_in, §2.5 모양별 예시 + 태그 배치·주 52시간·7일 중 휴무·나이트 블록 길이·요일, priority 표현, config_changes, unsupported 3종, 날짜·가명·인젝션 규칙 유지); context에 config.shifts·nurses.tags·known_tags; translator 검증: Pydantic → 설정 변경(add 중복·update 없는 코드·O 변경 금지, 병합 WardConfig로 parts·MAX_SHIFT_CODES) → 참조(id, 태그 ⊂ known_tags, 코드 ⊂ config ∪ config_changes, 날짜) → 빈 대상(사람 0명·날 0일) → 모순(count per=day 개수 min > 대상 인원), 모두 재시도 메시지 후 clarify; explain: context에 config.shifts·nurses(tags), conflicts params는 mode=json(셀렉터 별칭 in), update는 최상위 키 교체 후 Pydantic·참조(id·날짜·코드·태그) 검사, 나이트전담 태그 규칙 disable 제안 거부, EXPLAIN_SYSTEM 블록 설명·휴가 마지막 수단·고정 칸 해제; routes 테스트(/translate config_changes, /explain 블록 update 재풀이 검증); eval/run.py는 비교 함수만 넓힘(_key가 템플릿 기대값을 legacy_to_block으로 바꿔 비교, 셀렉터 안 리스트 정렬, 금지 패턴 순서 유지). pytest 519·vitest 172, build·lint 통과. 결정: known_tags = 명단 태그 ∪ 나이트전담(추천 태그라 늘 허용, 아무도 없으면 tags 대상은 빈 대상 clarify, exclude_tags는 통과); 옛 night_only는 컨텍스트·셀렉터 평가에서 나이트전담 태그로 봄; 빈 대상 셀렉터 평가는 llm이 solver를 import하지 않도록 translator에 작은 순수 함수로 둠(select.py와 같은 규칙); 모순 검사는 measure=count만; config_changes만 있어도 ok; 설정 변경 오류는 일반 질문 하나로 clarify; 기간 필요한 희망 템플릿은 eval 비교에서 변환하지 않고 그대로(step 5에서 기대값 재작성); lib/types.gen.ts는 재생성하지 않음(클라이언트는 step 7)",
+      "completed_at": "2026-10-30T00:11:36+0900"
     },
     {
       "step": 5,
