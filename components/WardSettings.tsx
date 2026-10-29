@@ -4,10 +4,10 @@ import { useEffect, useRef, useState } from "react";
 
 import type { PeriodUnit } from "@/lib/period";
 import { MAX_NURSES } from "@/lib/roster-import";
-import { hasCoverage, isNurseUsed, orphanConstraintIds, useAppStore, type WardNurse } from "@/lib/store";
+import { isNurseUsed, orphanConstraintIds, useAppStore, type WardNurse } from "@/lib/store";
 import { unitName } from "@/lib/wording";
 
-import CoverageForm, { type CoverageDrafts, hasCoverageError } from "./CoverageForm";
+import CoverageForm, { type CoverageDrafts } from "./CoverageForm";
 import RulesStep from "./RulesStep";
 import { ui } from "./ui";
 
@@ -133,16 +133,16 @@ export function RosterSection() {
 
 /** 근무조별 필요 인원. 처음 설정 ②에서도 쓴다. */
 export function CoverageSection() {
-  const ward = useAppStore((s) => s.ward)!;
   const [coverageDrafts, setCoverageDrafts] = useState<CoverageDrafts>({});
   return (
     <section className={`${ui.card} flex flex-col gap-3`}>
-      <h2 className={ui.cardTitle}>근무조별 필요 인원</h2>
+      <div className="flex flex-col gap-1">
+        <h2 className={ui.cardTitle}>근무조별 필요 인원</h2>
+        <p className={ui.help}>하루에 그 근무조에 들어갈 간호사 수예요. 근무표는 날마다 이 인원을 그대로 맞춰요.</p>
+      </div>
       <div className="self-start">
         <CoverageForm drafts={coverageDrafts} setDrafts={setCoverageDrafts} />
       </div>
-      {hasCoverageError(coverageDrafts) && <p className={ui.error}>최소 인원이 최대 인원보다 많아요.</p>}
-      {!hasCoverage(ward) && <p className={ui.help}>필요 인원을 입력하면 근무표를 만들 수 있어요.</p>}
     </section>
   );
 }

@@ -103,13 +103,13 @@
       "scope": "ward",
       "hardness": "hard",
       "weight": 10,
-      "source_text": "평일 데이 3~4명",
+      "source_text": "평일 데이 3명",
       "enabled": true,
       "params": {
         "shift": "D",
         "day_kind": "weekday",
         "min": 3,
-        "max": 4
+        "max": 3
       }
     },
     {
