@@ -782,7 +782,7 @@ export function ScheduleGrid({
             <div key={n.id} className={rowClass} style={grid}>
               <span className="flex h-7 items-center truncate text-sm text-[#1B1B18]">
                 {n.name}
-                {n.tags?.includes(NIGHT_ONLY_TAG) && <span className="ml-1.5 text-xs font-medium text-[#66665E]">나이트 전담</span>}
+                {n.tags?.length ? <span className="ml-1.5 truncate text-xs font-medium text-[#66665E]">{n.tags.join(" · ")}</span> : null}
               </span>
               <span className="flex h-7 items-center font-mono text-[13px] text-[#3D3D38]">{n.years}</span>
               {row.map((code, i) => {

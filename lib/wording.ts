@@ -22,6 +22,23 @@ export function unitShort(unit: PeriodUnit): string {
   return `${unit === "month" ? "한 달" : UNIT_NAMES[unit]} 단위`;
 }
 
+/** 근무 형태 요약 한 줄: "데이·이브닝·나이트 3교대, 각 8시간"(활성 코드만, 더블은 뒤에 코드로). */
+export function configSummary(config: WardConfig): string {
+  const live = config.shifts.filter((s) => s.active !== false && s.hours > 0);
+  const base = live.filter((s) => !s.parts?.length);
+  const doubles = live.filter((s) => s.parts?.length);
+  const names = base.map((s) => s.name).join("·");
+  const sameHours = base.every((s) => s.hours === base[0]?.hours);
+  const hours =
+    base.length === 1
+      ? `${base[0].hours}시간`
+      : sameHours
+        ? `각 ${base[0]?.hours ?? 0}시간`
+        : base.map((s) => `${s.name} ${s.hours}시간`).join("·");
+  const kind = base.length === 1 ? `${names} 근무` : `${names} ${base.length}교대`;
+  return `${kind}, ${hours}${doubles.length ? ` · 더블 ${doubles.map((s) => s.code).join(", ")}` : ""}`;
+}
+
 /** "반드시" | "가능하면". */
 export function hardnessLabel(h: "hard" | "soft"): string {
   return h === "hard" ? "반드시" : "가능하면";

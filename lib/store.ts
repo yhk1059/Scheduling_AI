@@ -135,7 +135,7 @@ export type SetupStep = 1 | 2 | 3;
 export type View =
   | { screen: "home" }
   | { screen: "setup"; step: SetupStep }
-  | { screen: "settings"; tab: "roster" | "rules" }
+  | { screen: "settings"; tab: "roster" | "shifts" | "rules" }
   | { screen: "period"; periodId: string; step: 1 | 2 }
   | { screen: "confirmed"; periodId: string };
 
@@ -188,6 +188,8 @@ export interface AppState extends Data {
   setShiftActive: (code: Code, active: boolean) => void;
   /** 쓰인 적 없는 코드만 지우고, 쓰였으면 끈다. */
   removeShift: (code: Code) => void;
+  /** 옮기지 못한 옛 규칙 원문 하나를 목록에서 지운다(다시 입력한 뒤). */
+  dismissUnconverted: (index: number) => void;
   /** 대기 카드를 더한다. changes는 설정 변경 카드가 되고, 새 코드를 쓰는 규칙 카드가 거기에 딸린다. */
   addPendingRules: (cards: ConstraintSpec[], changes?: ShiftChange[]) => void;
   /** 규칙 카드: 딸린 설정 카드도 함께 적용한다. 설정 카드: 근무 형태만 바꾼다. */
@@ -465,13 +467,19 @@ export function toScheduleRequest(
   const active = nurses.filter((n) => n.active);
   const activeIds = active.map((n) => n.id);
   const ids = new Set(activeIds);
+  const liveCoverage = new Set(coverageCodes(ward.config).map((s) => s.code));
   const locks = isOperating(period, today) ? pastDayLocks(period, active, today) : [];
   const locked = new Set(locks.map((c) => `${refNurses(c)[0]}@${(c.params as { day: number }).day}`));
   const constraints = [...rules.map((r) => period.ruleOverrides[r.id] ?? r), ...period.requests]
     .filter((c) => refNurses(c).every((id) => ids.has(id)))
     // 지난 날짜 잠금이 같은 칸의 수동 고정보다 우선한다
     .filter((c) => !(c.type === "fixed_assignment" && locked.has(`${c.params.nurse_id}@${c.params.day}`)))
-    .map((c) => (period.disabledIds.includes(c.id) ? { ...c, enabled: false } : c));
+    // 필요 인원 폼에 행이 없는 코드(꺼진 코드)의 필요 인원은 지킬 수 없으므로 끈다
+    .map((c) =>
+      period.disabledIds.includes(c.id) || (isCoverageRule(c) && !liveCoverage.has(c.params.shifts.in![0]))
+        ? { ...c, enabled: false }
+        : c,
+    );
   const previous = period.result
     ? Object.fromEntries(Object.entries(period.result.assignments).filter(([id]) => ids.has(id)))
     : null;
@@ -911,6 +919,8 @@ export function createAppStore(getStorage: () => Storage, now: () => Date = () =
             if (isShiftUsed(code, ward, periods)) get().setShiftActive(code, false);
             else editShifts((shifts) => shifts.filter((s) => s.code !== code));
           },
+          dismissUnconverted: (index) =>
+            editWard((w) => ({ ...w, unconverted: w.unconverted.filter((_, i) => i !== index) }), false),
           addPendingRules: (cards, changes = []) =>
             editWard((w) => {
               const blocks = cards.map(normalizeBlock);

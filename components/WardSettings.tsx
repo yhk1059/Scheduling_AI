@@ -5,15 +5,17 @@ import { useEffect, useRef, useState } from "react";
 import { NIGHT_ONLY_TAG } from "@/lib/migrate";
 import type { PeriodUnit } from "@/lib/period";
 import { MAX_NURSES } from "@/lib/roster-import";
-import { isNurseUsed, orphanConstraintIds, useAppStore, type WardNurse } from "@/lib/store";
+import { isNurseUsed, MAX_TAG_CHARS, MAX_TAGS_PER_NURSE, orphanConstraintIds, useAppStore, type WardNurse } from "@/lib/store";
 import { unitName } from "@/lib/wording";
 
 import CoverageForm, { type CoverageDrafts } from "./CoverageForm";
 import RulesStep from "./RulesStep";
+import ShiftTable from "./ShiftTable";
 import { ui } from "./ui";
 
 const TABS = [
   { tab: "roster", label: "명단·필요 인원" },
+  { tab: "shifts", label: "근무 형태" },
   { tab: "rules", label: "병동 규칙" },
 ] as const;
 
@@ -53,10 +55,40 @@ export default function WardSettings() {
           <RosterSection />
           <CoverageSection />
         </>
+      ) : tab === "shifts" ? (
+        <section className={`${ui.card} flex flex-col gap-3`}>
+          <h2 className={ui.cardTitle}>근무 형태</h2>
+          <ShiftTable />
+        </section>
       ) : (
-        <RulesStep key="ward" scope="ward" />
+        <>
+          <UnconvertedNotice />
+          <RulesStep key="ward" scope="ward" />
+        </>
       )}
     </div>
+  );
+}
+
+/** 옛 저장 문서에서 새 형식으로 옮기지 못한 규칙 원문. 다시 입력한 뒤 하나씩 지운다. */
+function UnconvertedNotice() {
+  const items = useAppStore((s) => s.ward?.unconverted ?? []);
+  const dismiss = useAppStore((s) => s.dismissUnconverted);
+  if (items.length === 0) return null;
+  return (
+    <section role="status" className="flex flex-col gap-2 rounded-lg border border-[#F1D3A8] bg-[#FDF0DC] px-4 py-2.5 text-sm text-[#7A4506]">
+      <p>옛 규칙 {items.length}개를 새 형식으로 옮기지 못했어요. 다시 입력해 주세요</p>
+      <ul className="flex flex-col gap-1">
+        {items.map((u, i) => (
+          <li key={i} className="flex items-center justify-between gap-3">
+            <span className="text-[#1B1B18]">“{u.source_text}”</span>
+            <button type="button" onClick={() => dismiss(i)} className={ui.textSm}>
+              지우기
+            </button>
+          </li>
+        ))}
+      </ul>
+    </section>
   );
 }
 
@@ -152,9 +184,16 @@ function NurseTable({ nurses }: { nurses: WardNurse[] }) {
   const [showInactive, setShowInactive] = useState(false);
   const active = nurses.filter((n) => n.active);
   const inactive = nurses.filter((n) => !n.active);
+  // 자동 완성 후보: 병동에 있는 태그 + 추천 태그
+  const knownTags = [...new Set([NIGHT_ONLY_TAG, ...nurses.flatMap((n) => n.tags)])];
 
   return (
     <div className="flex flex-col gap-2">
+      <datalist id={TAG_LIST_ID}>
+        {knownTags.map((t) => (
+          <option key={t} value={t} />
+        ))}
+      </datalist>
       <div className="overflow-x-auto rounded-lg border border-[#E2E2DC] bg-white">
         <table className="w-full border-collapse text-[13px]">
           <thead>
@@ -162,7 +201,7 @@ function NurseTable({ nurses }: { nurses: WardNurse[] }) {
               <th className="w-10 px-2 py-2 font-mono font-medium">#</th>
               <th className="px-2 py-2 font-medium">이름</th>
               <th className="px-2 py-2 font-medium">연차</th>
-              <th className="px-2 py-2 font-medium">나이트 전담</th>
+              <th className="px-2 py-2 font-medium">태그</th>
               <th />
             </tr>
           </thead>
@@ -187,8 +226,110 @@ function NurseTable({ nurses }: { nurses: WardNurse[] }) {
   );
 }
 
-const cellInput =
-  "h-8 rounded-md border bg-white px-2 text-[13px] text-[#1B1B18] focus:outline-2 focus:outline-[#155E75] focus:-outline-offset-1";
+const cellInput = ui.cell;
+const TAG_LIST_ID = "ward-tags";
+
+/** 태그 칩 입력. Enter나 쉼표로 칩을 만들고, 병동 태그를 자동 완성하며, 추천 태그(나이트전담)는 늘 보인다. */
+function TagInput({
+  tags,
+  onAdd,
+  onRemove,
+  label,
+  onEnterEmpty,
+  draft,
+  setDraft,
+}: {
+  tags: string[];
+  onAdd: (tag: string) => void;
+  onRemove: (tag: string) => void;
+  label: string;
+  /** 칸이 빈 채로 Enter를 누르면(입력 줄에서 한 명을 더할 때) */
+  onEnterEmpty?: () => void;
+  draft: string;
+  setDraft: (v: string) => void;
+}) {
+  const [msg, setMsg] = useState<string | null>(null);
+  const full = tags.length >= MAX_TAGS_PER_NURSE;
+
+  /** 칩 하나를 만든다. 만들 수 없으면 오류를 보이고 false. */
+  const commit = (raw: string) => {
+    const t = raw.trim();
+    const error =
+      t.length > MAX_TAG_CHARS
+        ? `태그는 ${MAX_TAG_CHARS}자까지예요`
+        : full && t !== "" && !tags.includes(t)
+          ? `태그는 한 사람에 ${MAX_TAGS_PER_NURSE}개까지예요`
+          : null;
+    setMsg(error);
+    if (error) return false;
+    if (t !== "" && !tags.includes(t)) onAdd(t);
+    setDraft("");
+    return true;
+  };
+  const onChange = (v: string) => {
+    if (!v.includes(",")) {
+      setDraft(v);
+      setMsg(null);
+      return;
+    }
+    const parts = v.split(",");
+    const rest = parts.pop() ?? "";
+    for (const p of parts) if (!commit(p)) return setDraft(p);
+    setDraft(rest);
+  };
+  const onKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key !== "Enter" || e.nativeEvent.isComposing) return;
+    e.preventDefault();
+    if (draft.trim() === "") onEnterEmpty?.();
+    else commit(draft);
+  };
+
+  return (
+    <div className="flex flex-col gap-0.5">
+      <div className="flex flex-wrap items-center gap-1">
+        {tags.map((t) => (
+          <span key={t} className="inline-flex h-6 items-center gap-1 rounded-sm border border-[#C9C9C1] bg-white pr-0.5 pl-2 text-xs text-[#1B1B18]">
+            {t}
+            <button
+              type="button"
+              onClick={() => onRemove(t)}
+              aria-label={`${label} ${t} 빼기`}
+              className="inline-flex size-5 items-center justify-center rounded-xs text-[#66665E] hover:bg-[#EFEFEB] hover:text-[#1B1B18]"
+            >
+              <svg aria-hidden="true" viewBox="0 0 12 12" className="size-3" fill="none" stroke="currentColor" strokeWidth="1.6">
+                <path d="M3 3l6 6M9 3l-6 6" />
+              </svg>
+            </button>
+          </span>
+        ))}
+        {!tags.includes(NIGHT_ONLY_TAG) && !full && (
+          <button
+            type="button"
+            onClick={() => onAdd(NIGHT_ONLY_TAG)}
+            aria-label={`${label} ${NIGHT_ONLY_TAG} 붙이기`}
+            className="inline-flex h-6 items-center rounded-sm border border-dashed border-[#C9C9C1] px-2 text-xs text-[#3D3D38] hover:bg-[#EFEFEB]"
+          >
+            + {NIGHT_ONLY_TAG}
+          </button>
+        )}
+        {!full && (
+          <input
+            value={draft}
+            onChange={(e) => onChange(e.target.value)}
+            onKeyDown={onKeyDown}
+            onBlur={() => commit(draft)}
+            list={TAG_LIST_ID}
+            placeholder="태그"
+            aria-label={label}
+            aria-invalid={msg !== null || undefined}
+            className={`${cellInput} w-24 placeholder:text-[#707068] ${msg ? ui.cellErr : ui.cellOk}`}
+          />
+        )}
+      </div>
+      {msg && <p className={ui.error}>{msg}</p>}
+    </div>
+  );
+}
 
 /** 유효한 값은 바로 저장하고, 아니면 입력 중인 값과 오류를 행에 남긴다(id는 바뀌지 않는다). */
 function NurseRow({ nurse, index, nurses }: { nurse: WardNurse; index: number; nurses: WardNurse[] }) {
@@ -200,6 +341,7 @@ function NurseRow({ nurse, index, nurses }: { nurse: WardNurse; index: number; n
   const deletable = useAppStore((s) => (s.ward ? !isNurseUsed(nurse.id, s.ward, s.periods) : false));
   const [name, setName] = useState<string | null>(null);
   const [years, setYears] = useState<string | null>(null);
+  const [tagDraft, setTagDraft] = useState("");
 
   const nameError = (v: string) =>
     v.trim() === ""
@@ -222,7 +364,7 @@ function NurseRow({ nurse, index, nurses }: { nurse: WardNurse; index: number; n
   };
 
   const row = index + 1;
-  const err = "border-[#B42318] bg-[#FBE9E7] text-[#9F1F14]";
+  const err = ui.cellErr;
   return (
     <tr className="border-b border-[#EFEFEB] last:border-b-0">
       <td className="px-2 py-1 font-mono text-xs text-[#66665E]">{row}</td>
@@ -249,13 +391,14 @@ function NurseRow({ nurse, index, nurses }: { nurse: WardNurse; index: number; n
             />
             {yearsMsg && <p className={`${ui.error} mt-0.5`}>{yearsMsg}</p>}
           </td>
-          <td className="px-2 py-1">
-            <input
-              type="checkbox"
-              checked={nurse.tags.includes(NIGHT_ONLY_TAG)}
-              onChange={(e) => (e.target.checked ? addTag : removeTag)(nurse.id, NIGHT_ONLY_TAG)}
-              aria-label={`${row}행 나이트 전담`}
-              className="size-4 accent-[#155E75]"
+          <td className="px-1 py-1">
+            <TagInput
+              tags={nurse.tags}
+              onAdd={(t) => addTag(nurse.id, t)}
+              onRemove={(t) => removeTag(nurse.id, t)}
+              label={`${row}행 태그`}
+              draft={tagDraft}
+              setDraft={setTagDraft}
             />
           </td>
         </>
@@ -268,7 +411,7 @@ function NurseRow({ nurse, index, nurses }: { nurse: WardNurse; index: number; n
             </span>
           </td>
           <td className="px-2 py-1 font-mono text-[#66665E]">{nurse.years}</td>
-          <td className="px-2 py-1 text-[#66665E]">{nurse.tags.includes(NIGHT_ONLY_TAG) ? "Y" : ""}</td>
+          <td className="px-2 py-1 text-[#66665E]">{nurse.tags.join(", ")}</td>
         </>
       )}
       <td className="px-1 py-1">
@@ -288,7 +431,8 @@ function NewNurseRow({ nurses }: { nurses: WardNurse[] }) {
   const addNurses = useAppStore((s) => s.addNurses);
   const [name, setName] = useState("");
   const [years, setYears] = useState("");
-  const [night, setNight] = useState(false);
+  const [tags, setTags] = useState<string[]>([]);
+  const [tagDraft, setTagDraft] = useState("");
   const [tried, setTried] = useState(false);
   const nameRef = useRef<HTMLInputElement>(null);
 
@@ -300,10 +444,14 @@ function NewNurseRow({ nurses }: { nurses: WardNurse[] }) {
   const add = () => {
     if (full) return;
     if (nameMsg || yearsMsg) return setTried(true);
-    addNurses([{ name: name.trim(), years: Number(years.trim()), tags: night ? [NIGHT_ONLY_TAG] : [] }]);
+    // 칸에 적다 만 태그도 함께 넣는다
+    const draft = tagDraft.trim();
+    const all = draft && draft.length <= MAX_TAG_CHARS && !tags.includes(draft) ? [...tags, draft] : tags;
+    addNurses([{ name: name.trim(), years: Number(years.trim()), tags: all.slice(0, MAX_TAGS_PER_NURSE) }]);
     setName("");
     setYears("");
-    setNight(false);
+    setTags([]);
+    setTagDraft("");
     setTried(false);
     nameRef.current?.focus();
   };
@@ -322,7 +470,7 @@ function NewNurseRow({ nurses }: { nurses: WardNurse[] }) {
       </tr>
     );
   }
-  const err = "border-[#B42318] bg-[#FBE9E7] text-[#9F1F14]";
+  const err = ui.cellErr;
   const showName = tried && nameMsg;
   const showYears = tried && yearsMsg;
   return (
@@ -354,14 +502,17 @@ function NewNurseRow({ nurses }: { nurses: WardNurse[] }) {
         />
         {showYears && <p className={`${ui.error} mt-0.5`}>{yearsMsg}</p>}
       </td>
-      <td className="px-2 py-1">
-        <input
-          type="checkbox"
-          checked={night}
-          onChange={(e) => setNight(e.target.checked)}
-          aria-label="새 간호사 나이트 전담"
-          className="size-4 accent-[#155E75]"
+      <td className="px-1 py-1">
+        <TagInput
+          tags={tags}
+          onAdd={(t) => setTags((ts) => (ts.includes(t) ? ts : [...ts, t]))}
+          onRemove={(t) => setTags((ts) => ts.filter((x) => x !== t))}
+          label="새 간호사 태그"
+          onEnterEmpty={add}
+          draft={tagDraft}
+          setDraft={setTagDraft}
         />
+        <p className={`${ui.help} mt-0.5`}>태그에는 이름을 쓰지 마세요</p>
       </td>
       <td className="px-1 py-1">
         <div className="flex justify-end">

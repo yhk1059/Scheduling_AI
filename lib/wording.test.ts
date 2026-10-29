@@ -7,6 +7,7 @@ import { DEFAULT_CONFIG, legacyToBlock, nightOnlyRule, type LegacySpec } from ".
 import type { Ward, WorkPeriod } from "./store";
 import type { ConstraintSpec, Nurse, WardConfig } from "./types.gen";
 import {
+  configSummary,
   describeBlock,
   formatDeviation,
   hardnessLabel,
@@ -342,5 +343,30 @@ describe("taskDoneSteps", () => {
     expect(taskDoneSteps({ kind: "drafting", name: "", requests: 2 })).toBe(1);
     expect(taskDoneSteps({ kind: "generated", name: "" })).toBe(2);
     expect(taskDoneSteps({ kind: "confirmed", name: "", confirmedAt: "" })).toBe(3);
+  });
+});
+
+describe("configSummary", () => {
+  const shift = (code: string, name: string, hours: number, extra: object = {}) => ({ code, name, hours, ...extra });
+  const config = (...shifts: ReturnType<typeof shift>[]): WardConfig =>
+    ({ shifts: [...shifts, shift("O", "휴무", 0)] }) as unknown as WardConfig;
+
+  it("기본 근무 형태는 UI_GUIDE 문구와 같다", () => {
+    expect(configSummary(DEFAULT_CONFIG)).toBe("데이·이브닝·나이트 3교대, 각 8시간");
+  });
+
+  it("시간이 다르면 근무조마다 적고, 더블과 꺼진 코드를 구분한다", () => {
+    const c = config(
+      shift("D", "데이", 8),
+      shift("E", "이브닝", 8),
+      shift("N", "나이트", 10),
+      shift("M", "미드", 7.5, { active: false }),
+      shift("DE", "더블", 16, { parts: ["D", "E"] }),
+    );
+    expect(configSummary(c)).toBe("데이·이브닝·나이트 3교대, 데이 8시간·이브닝 8시간·나이트 10시간 · 더블 DE");
+  });
+
+  it("근무조가 하나뿐이면 교대라고 하지 않는다", () => {
+    expect(configSummary(config(shift("D", "데이", 7.5)))).toBe("데이 근무, 7.5시간");
   });
 });

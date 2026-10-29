@@ -1536,6 +1536,16 @@ describe("근무 형태", () => {
     expect(codes(store)).toContain("S-");
   });
 
+  it("dismissUnconverted는 옮기지 못한 옛 규칙 원문 하나를 지우고 입력 버전은 그대로 둔다", () => {
+    const store = fresh();
+    store.getState().startWard();
+    store.setState((s) => ({ ward: { ...s.ward!, unconverted: [{ source_text: "가" }, { source_text: "나" }] } }));
+    const v = store.getState().inputVersion;
+    store.getState().dismissUnconverted(0);
+    expect(store.getState().ward!.unconverted).toEqual([{ source_text: "나" }]);
+    expect(store.getState().inputVersion).toBe(v);
+  });
+
   it("필요 인원 행은 활성 기본 코드를 따른다(복합·휴무 제외)", () => {
     const store = fresh();
     store.getState().startWard();
@@ -1556,6 +1566,18 @@ describe("근무 형태", () => {
     store.getState().setShiftActive("M", false);
     store.getState().removeRule("cov-weekend-M");
     expect(hasCoverage(ward())).toBe(true);
+  });
+  it("꺼진 근무 코드의 필요 인원 규칙은 요청에서 꺼서 보낸다(규칙 원본은 그대로)", () => {
+    const { store, period } = withPeriod();
+    store.getState().addShift({ code: "M", name: "미드", hours: 8 });
+    store.getState().setCoverage("M", "weekday", 1, 1);
+    store.getState().setCoverage("D", "weekday", 2, 2);
+    store.getState().setShiftActive("M", false);
+    const req = toScheduleRequest(store.getState().ward!, period(), store.getState().periods, TODAY);
+    const byId = (id: string) => req.constraints!.find((c) => c.id === id)!;
+    expect(byId("cov-weekday-M").enabled).toBe(false);
+    expect(byId("cov-weekday-D").enabled).not.toBe(false);
+    expect(store.getState().ward!.rules.find((c) => c.id === "cov-weekday-M")!.enabled).not.toBe(false);
   });
 });
 
