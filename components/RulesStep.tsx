@@ -14,9 +14,10 @@ import {
   type Ward,
   type WorkPeriod,
 } from "@/lib/store";
+import type { ConstraintSpec } from "@/lib/types.gen";
 import { wardRuleCount } from "@/lib/wording";
 
-import ConstraintCard from "./ConstraintCard";
+import ConstraintCard, { ShiftChangeCardView } from "./ConstraintCard";
 import { ui } from "./ui";
 
 const MAX_TEXT_CHARS = 1000; // backend/domain/constants.py MAX_TEXT_CHARS
@@ -76,8 +77,44 @@ export default function RulesStep({ scope, pendingNote = true }: { scope: "ward"
   const cards = cardsInOrder(pending, applied, scope === "ward" ? ward.cardOrder : period!.cardOrder);
   const tooLong = text.length > MAX_TEXT_CHARS;
 
+  // 설정 변경 카드와 딸린 카드(병동 규칙에만 있다). 딸린 카드는 설정 카드 바로 아래에 둔다
+  const configCards = scope === "ward" ? ward.pendingConfig : [];
+  const attached = new Map(configCards.flatMap((cfg) => cfg.ruleIds.map((id) => [id, cfg.change.shift.code] as const)));
+  const pendingCount = pending.length + configCards.length;
+  const order = ward.cardOrder ?? [];
+  const rank = (id: string) => (order.includes(id) ? order.indexOf(id) : order.length);
+  const items = [
+    ...configCards.map((cfg) => ({ id: cfg.id, cfg, entry: null })),
+    ...cards.filter(({ card }) => !attached.has(card.id)).map((entry) => ({ id: entry.card.id, cfg: null, entry })),
+  ]
+    .map((x, i) => ({ x, i }))
+    .sort((a, b) => rank(a.x.id) - rank(b.x.id) || a.i - b.i)
+    .map(({ x }) => x);
+
+  const renderCard = (c: ConstraintSpec, isPending: boolean) =>
+    isPending ? (
+      <ConstraintCard
+        key={c.id}
+        card={c}
+        pending
+        replaces={findReplaced(scope === "ward" ? ward.rules : period!.requests, c)}
+      />
+    ) : scope === "period" ? (
+      <ConstraintCard
+        key={c.id}
+        card={c}
+        pending={false}
+        off={period!.disabledIds.includes(c.id)}
+        onToggleOff={(off) => setDisabled(period!.id, c.id, off)}
+      />
+    ) : (
+      <ConstraintCard key={c.id} card={c} pending={false} />
+    );
+
   const applyAll = () => {
     const store = useAppStore.getState();
+    // 설정 카드를 먼저 적용해 근무 형태가 바뀐 뒤 규칙이 들어가게 한다
+    for (const cfg of configCards) store.applyRule(cfg.id);
     // 표시 순서의 아래(오래된 카드)부터 적용해 교체 규칙이 새 카드를 남기게 한다
     for (const { card } of cards.filter((x) => x.pending).reverse()) {
       if (scope === "ward") store.applyRule(card.id);
@@ -195,11 +232,11 @@ export default function RulesStep({ scope, pendingNote = true }: { scope: "ward"
         </div>
       </section>
 
-      {cards.length === 0 ? (
+      {items.length === 0 ? (
         <p className="text-sm text-[#66665E]">{copy.empty}</p>
       ) : (
         <div className="flex flex-col gap-3">
-          {pending.length >= 2 && (
+          {pendingCount >= 2 && (
             <div className="flex justify-end">
               <button type="button" onClick={applyAll} className={ui.secondary}>
                 모두 적용
@@ -207,24 +244,25 @@ export default function RulesStep({ scope, pendingNote = true }: { scope: "ward"
             </div>
           )}
           <div className="grid grid-cols-2 gap-4">
-            {cards.map(({ card: c, pending: isPending }) =>
-              isPending ? (
-                <ConstraintCard
-                  key={c.id}
-                  card={c}
-                  pending
-                  replaces={findReplaced(scope === "ward" ? ward.rules : period!.requests, c)}
-                />
-              ) : scope === "period" ? (
-                <ConstraintCard
-                  key={c.id}
-                  card={c}
-                  pending={false}
-                  off={period!.disabledIds.includes(c.id)}
-                  onToggleOff={(off) => setDisabled(period!.id, c.id, off)}
-                />
+            {items.map(({ id, cfg, entry }) =>
+              cfg ? (
+                <div key={id} className="flex flex-col gap-3">
+                  <ShiftChangeCardView card={cfg} />
+                  {ward.pendingRules
+                    .filter((c) => cfg.ruleIds.includes(c.id))
+                    .map((c) => (
+                      <div key={c.id} className="pl-4">
+                        <ConstraintCard
+                          card={c}
+                          pending
+                          replaces={findReplaced(ward.rules, c)}
+                          withConfig={cfg.change.shift.code}
+                        />
+                      </div>
+                    ))}
+                </div>
               ) : (
-                <ConstraintCard key={c.id} card={c} pending={false} />
+                renderCard(entry!.card, entry!.pending)
               ),
             )}
           </div>
@@ -233,8 +271,8 @@ export default function RulesStep({ scope, pendingNote = true }: { scope: "ward"
 
       {scope === "period" && period && <PeriodRules ward={ward} period={period} />}
 
-      {scope === "ward" && pendingNote && pending.length > 0 && (
-        <p className={ui.help}>적용하지 않은 카드 {pending.length}개는 근무표에 반영되지 않아요.</p>
+      {scope === "ward" && pendingNote && pendingCount > 0 && (
+        <p className={ui.help}>적용하지 않은 카드 {pendingCount}개는 근무표에 반영되지 않아요.</p>
       )}
 
       {scope === "period" && (

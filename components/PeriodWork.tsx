@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 
 import { carryOverFrom, previousConfirmedPeriod } from "@/lib/continuity";
-import { formatRange, isWeekendDay, monthDay } from "@/lib/period";
+import { dateOfDay, formatRange, isWeekendDay, MAX_MONTH_START_DAY, monthDay, periodEnd, validStart } from "@/lib/period";
 import { parseCarryOver, type CellError } from "@/lib/roster-import";
 import {
   carryOverChanged,
@@ -117,13 +117,7 @@ function PrepareSummary({ period }: { period: WorkPeriod }) {
       {open && (
         <>
           <section className={`${ui.card} flex flex-col gap-3`}>
-            <div className="flex flex-col gap-1">
-              <h3 className={ui.cardTitle}>날짜</h3>
-              <p className="text-sm text-[#3D3D38]">
-                <span className="font-mono font-medium text-[#1B1B18]">{formatRange(period)}</span> ·{" "}
-                <span className="font-mono">{period.length}</span>일
-              </p>
-            </div>
+            <DatesSection period={period} />
             <div className="flex flex-col gap-1">
               <h3 className="text-[13px] font-semibold text-[#1B1B18]">공휴일</h3>
               <p className={ui.help}>날짜를 누르면 공휴일로 체크돼요. 주말과 같은 인원 기준을 써요.</p>
@@ -158,6 +152,96 @@ function PrepareSummary({ period }: { period: WorkPeriod }) {
           <CarryOverSection period={period} />
         </>
       )}
+    </div>
+  );
+}
+
+/**
+ * 날짜: 첫 근무표는 시작일 date 입력 + 끝 날짜(읽기 전용). 다음 근무표는 읽기 전용 + [시작일 미루기](직전 끝 다음 날 이후만).
+ * 미루면 지난 근무표와 이어지지 않아 지난 근무를 직접 입력한다(아래 지난 근무 칸이 붙여넣기로 바뀐다).
+ */
+function DatesSection({ period }: { period: WorkPeriod }) {
+  const ward = useAppStore((s) => s.ward);
+  const periods = useAppStore((s) => s.periods);
+  const postponeStart = useAppStore((s) => s.postponeStart);
+  const [editing, setEditing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  if (!ward) return null;
+  const before = periods.filter((p) => p.id !== period.id && p.start_date < period.start_date).at(-1);
+  const earliest = before ? dateOfDay(before, before.length + 1) : undefined;
+  const earliestLabel = before ? monthDay(before, before.length + 1) : "";
+  const broken = before !== undefined && previousConfirmedPeriod(periods, period) === null;
+  const monthly = ward.unit === "month";
+
+  const onChange = (date: string) => {
+    if (!date) return;
+    if (!validStart(ward.unit, date)) {
+      setError(`한 달 근무표는 1~${MAX_MONTH_START_DAY}일에만 시작할 수 있어요. 다른 날을 골라 주세요.`);
+      return;
+    }
+    if (earliest && date < earliest) {
+      setError(`지난 근무표 다음 날(${earliestLabel}) 이후로 골라 주세요.`);
+      return;
+    }
+    setError(null);
+    postponeStart(period.id, date);
+  };
+
+  const input = (
+    <label className="flex flex-col gap-1">
+      <span className={ui.label}>시작일</span>
+      <input
+        type="date"
+        value={period.start_date}
+        min={earliest}
+        aria-invalid={error !== null || undefined}
+        onChange={(e) => onChange(e.target.value)}
+        className={`${ui.input} w-44 font-mono ${error ? "border-[#B42318]" : ""}`}
+      />
+    </label>
+  );
+
+  return (
+    <div className="flex flex-col gap-2">
+      <h3 className={ui.cardTitle}>날짜</h3>
+      {before === undefined || editing ? (
+        <div className="flex items-end gap-4">
+          {input}
+          <div className="flex flex-col gap-1">
+            <span className={ui.label}>끝 날짜</span>
+            <span className="flex h-10 items-center font-mono text-sm text-[#1B1B18]">
+              {periodEnd(period).replaceAll("-", ".")} · {period.length}일
+            </span>
+          </div>
+          {editing && (
+            <button type="button" onClick={() => setEditing(false)} className={ui.text}>
+              닫기
+            </button>
+          )}
+        </div>
+      ) : (
+        <div className="flex items-center gap-3">
+          <p className="text-sm text-[#3D3D38]">
+            <span className="font-mono font-medium text-[#1B1B18]">{formatRange(period)}</span> ·{" "}
+            <span className="font-mono">{period.length}</span>일
+          </p>
+          {period.status === "draft" && (
+            <button type="button" onClick={() => setEditing(true)} className={ui.textSm}>
+              시작일 미루기
+            </button>
+          )}
+        </div>
+      )}
+      {error ? (
+        <p role="alert" className={ui.error}>
+          {error}
+        </p>
+      ) : (
+        before === undefined && (
+          <p className={ui.help}>{monthly ? `1~${MAX_MONTH_START_DAY}일 중 아무 날에서 시작할 수 있어요.` : "아무 날에서 시작할 수 있어요."}</p>
+        )
+      )}
+      {broken && <p className="text-sm text-[#7A4506]">지난 근무표와 이어지지 않아서 지난 근무를 직접 입력해요</p>}
     </div>
   );
 }
@@ -261,7 +345,14 @@ function CarryOverPaste({ period }: { period: WorkPeriod }) {
         </p>
       </div>
       <label className="flex flex-col gap-1">
-        <span className={ui.label}>이름, 그다음 오래된 날부터 근무 코드(D/E/N/O)</span>
+        <span className={ui.label}>
+          이름, 그다음 오래된 날부터 근무 코드(
+          {ward!.config.shifts
+            .filter((x) => x.active !== false)
+            .map((x) => x.code)
+            .join("/")}
+          )
+        </span>
         <textarea
           value={text}
           onChange={(e) => setText(e.target.value)}

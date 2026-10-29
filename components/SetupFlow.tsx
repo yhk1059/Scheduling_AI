@@ -35,7 +35,7 @@ export default function SetupFlow() {
   const reached = Math.max(step, setupStep(ward) - 1) as SetupStep;
   const canNext = step === 1 ? ward.nurses.some((n) => n.active) : setupStep(ward) === 3;
   const applied = wardRuleCount(ward.rules);
-  const pending = ward.pendingRules.length;
+  const pending = ward.pendingRules.length + ward.pendingConfig.length;
   const title = (text: string) => (
     <h2 tabIndex={-1} data-step-title className={`${ui.cardTitle} outline-none`}>
       {text}
@@ -94,6 +94,9 @@ export default function SetupFlow() {
             <>
               {applied === 0 && <p className={ui.help}>규칙 없이 만들면 필요 인원만 지켜요</p>}
               {pending > 0 && <p className={ui.help}>적용하지 않은 규칙 {pending}개는 빠져요</p>}
+              {!isWardReady(ward) && (
+                <p className={ui.help}>새 근무의 필요 인원을 ② 필요 인원에서 입력하면 만들 수 있어요</p>
+              )}
               <button type="button" disabled={!isWardReady(ward)} onClick={() => createPeriod(today())} className={ui.primary}>
                 첫 근무표 만들기
               </button>

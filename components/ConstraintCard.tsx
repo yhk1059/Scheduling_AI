@@ -2,9 +2,10 @@
 
 import { useState } from "react";
 
-import { type CardPatch, currentPeriod, type Hardness, isLeaveRule, useAppStore } from "@/lib/store";
+import type { Priority } from "@/lib/migrate";
+import { applyShiftChange, type CardPatch, currentPeriod, type Hardness, isLeaveRule, type ShiftChangeCard, useAppStore } from "@/lib/store";
 import type { ConstraintSpec, WardConfig } from "@/lib/types.gen";
-import { dayRanges, describeBlock, hardnessLabel, presetName } from "@/lib/wording";
+import { dayRanges, describeBlock, describeShiftChange, hardnessLabel, presetName } from "@/lib/wording";
 
 import { previewRange } from "./RulesStep";
 import { ui } from "./ui";
@@ -199,6 +200,61 @@ function HardnessToggle({ value, disabled, onChange }: { value: Hardness; disabl
   );
 }
 
+const PRIORITIES: { value: Priority; label: string }[] = [
+  { value: "high", label: "높음" },
+  { value: "normal", label: "보통" },
+  { value: "low", label: "낮음" },
+];
+
+/** '가능하면' 규칙의 중요도(높음·보통·낮음). */
+function PrioritySelect({ value, disabled, onChange }: { value: Priority; disabled: boolean; onChange: (p: Priority) => void }) {
+  return (
+    <label className="flex items-center gap-1.5">
+      <span className={ui.label}>중요도</span>
+      <select
+        value={value}
+        disabled={disabled}
+        onChange={(e) => onChange(e.target.value as Priority)}
+        className={`${ui.input} h-7 px-2 text-xs`}
+      >
+        {PRIORITIES.map((p) => (
+          <option key={p.value} value={p.value}>
+            {p.label}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+}
+
+/** 설정 변경 카드(근무 형태). [적용]하면 근무 형태가 바뀌고, 삭제하면 딸린 규칙 카드도 지운다. */
+export function ShiftChangeCardView({ card }: { card: ShiftChangeCard }) {
+  const config = useAppStore((s) => s.ward?.config);
+  if (!config) return null;
+  const store = useAppStore.getState();
+  return (
+    <article className="flex flex-col gap-2.5 rounded-lg border border-[#C9C9C1] bg-white px-[18px] py-4">
+      <div className="flex items-center justify-between gap-3">
+        <h3 className="text-[13px] font-semibold text-[#1B1B18]">근무 형태</h3>
+        <span className={`${ui.badge} bg-[#EFEFEB] text-[#3D3D38]`}>근무 형태</span>
+      </div>
+      {card.source_text && <p className="text-sm text-[#1B1B18]">“{card.source_text}”</p>}
+      <p className="rounded-sm bg-[#F6F6F3] px-2.5 py-2 text-xs text-[#3D3D38]">{describeShiftChange(card.change, config)}</p>
+      <div className="flex items-center justify-between gap-3">
+        <span className={`${ui.badge} bg-[#FDF0DC] text-[#7A4506]`}>적용 대기</span>
+        <div className="flex items-center gap-1">
+          <button type="button" onClick={() => store.removeRule(card.id)} className={ui.danger}>
+            삭제
+          </button>
+          <button type="button" onClick={() => store.applyRule(card.id)} className={ui.primarySm}>
+            적용
+          </button>
+        </div>
+      </div>
+    </article>
+  );
+}
+
 export default function ConstraintCard({
   card,
   pending,
@@ -208,6 +264,7 @@ export default function ConstraintCard({
   off = false,
   onToggleOff,
   readOnly = false,
+  withConfig,
 }: {
   card: ConstraintSpec;
   pending: boolean;
@@ -223,6 +280,8 @@ export default function ConstraintCard({
   onToggleOff?: (off: boolean) => void;
   /** 기간 화면의 병동 규칙: 수정·삭제·hard/soft 변경 없이 끄고 켜기만 한다 */
   readOnly?: boolean;
+  /** 딸린 카드: [적용]하면 함께 적용되는 설정 변경 카드의 근무 코드 */
+  withConfig?: string;
 }) {
   const ward = useAppStore((s) => s.ward);
   const period = useAppStore(currentPeriod);
@@ -247,6 +306,9 @@ export default function ConstraintCard({
   const fields = fieldsOf(card);
   const editable = fields.length > 0;
   const lastDay = range.length;
+  // 대기 중인 설정 변경(새 코드)도 이름으로 읽히게 합쳐서 문장을 만든다
+  const config = isRule ? ward.pendingConfig.reduce((c, x) => applyShiftChange(c, x.change), ward.config) : ward.config;
+  const hardness: Hardness = alwaysHard(card) ? "hard" : (card.hardness ?? (card.type === "balance" ? "soft" : "hard"));
 
   const save = () => {
     if (!draft) return;
@@ -266,11 +328,23 @@ export default function ConstraintCard({
     >
       <div className="flex items-center justify-between gap-3">
         <h3 className="text-[13px] font-semibold text-[#1B1B18]">{presetName(card)}</h3>
-        <HardnessToggle
-          value={alwaysHard(card) ? "hard" : (card.hardness ?? (card.type === "balance" ? "soft" : "hard"))}
-          disabled={readOnly || alwaysHard(card)}
-          onChange={(hardness) => updateCard(card.id, { hardness })}
-        />
+        {/* 휴가 카드는 항상 반드시라 토글을 두지 않는다 */}
+        {!isLeaveRule(card) && (
+          <div className="flex items-center gap-2">
+            {hardness === "soft" && card.type !== "fixed_assignment" && (
+              <PrioritySelect
+                value={card.priority ?? (card.type === "balance" ? "low" : "normal")}
+                disabled={readOnly}
+                onChange={(priority) => updateCard(card.id, { priority })}
+              />
+            )}
+            <HardnessToggle
+              value={hardness}
+              disabled={readOnly || alwaysHard(card)}
+              onChange={(hardness) => updateCard(card.id, { hardness })}
+            />
+          </div>
+        )}
       </div>
       <p className={`text-sm ${off ? "text-[#66665E]" : "text-[#1B1B18]"}`}>“{card.source_text}”</p>
 
@@ -291,7 +365,7 @@ export default function ConstraintCard({
         </div>
       ) : (
         <p className={`rounded-sm bg-[#F6F6F3] px-2.5 py-2 text-xs ${off ? "text-[#66665E]" : "text-[#3D3D38]"}`}>
-          {describeBlock(card, ward.config, nurses, range)}
+          {describeBlock(card, config, nurses, range)}
         </p>
       )}
 
@@ -339,6 +413,11 @@ export default function ConstraintCard({
               <button type="button" onClick={() => removeCard(card.id)} className={ui.danger}>
                 삭제
               </button>
+              {withConfig && (
+                <span className="ml-2 text-xs font-medium text-[#66665E]">
+                  근무 코드 <span className="font-mono">{withConfig}</span> 추가가 함께 적용돼요
+                </span>
+              )}
               <button
                 type="button"
                 disabled={busy}

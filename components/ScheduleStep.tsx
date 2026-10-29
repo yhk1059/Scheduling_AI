@@ -5,7 +5,7 @@ import { useState, type ReactNode } from "react";
 import { ApiError, errorMessage, explain, solve } from "@/lib/api";
 import { toScheduleCsv } from "@/lib/csv";
 import { historyLoadFor, isOperating } from "@/lib/continuity";
-import { DEFAULT_CONFIG, NIGHT_ONLY_TAG } from "@/lib/migrate";
+import { DEFAULT_CONFIG, NIGHT_ONLY_TAG, normalizeBlock } from "@/lib/migrate";
 import { dayHeader, dayOfDate, isWeekendDay, monthDay, periodDays, periodEnd } from "@/lib/period";
 import {
   carryOverChanged,
@@ -24,6 +24,7 @@ import type {
   RelaxationProposal,
   ScheduleRequest,
   ScheduleResult,
+  ShiftDef,
   WardConfig,
 } from "@/lib/types.gen";
 import { statsFromAssignments } from "@/lib/stats";
@@ -33,11 +34,10 @@ import { markConfirmedEntry } from "./confirmedEntry";
 import { Spinner, today } from "./RulesStep";
 import { ui } from "./ui";
 
-const CODES: Code[] = ["D", "E", "N", "O"];
 const WEEKDAYS = ["일", "월", "화", "수", "목", "금", "토"];
 
 export const CELL =
-  "relative w-[30px] h-7 rounded-xs inline-flex items-center justify-center font-mono text-[13px] transition-colors duration-[120ms]";
+  "relative w-[30px] h-7 rounded-xs inline-flex items-center justify-center font-mono transition-colors duration-[120ms]";
 const CODE_CLASS: Record<Code, string> = {
   D: "bg-[#FFF1C2] text-[#5C4300] font-semibold border border-transparent",
   E: "bg-[#F9CFAE] text-[#6E2A04] font-semibold border border-transparent",
@@ -48,13 +48,26 @@ const CODE_CLASS: Record<Code, string> = {
 /** 기본 4개 외 코드(M, DE 등)는 중립 색 */
 const OTHER_CODE_CLASS = "bg-[#E2E2DC] text-[#1B1B18] font-semibold border border-transparent";
 
+/** 근무 코드 색과 글자 크기(3자 코드는 작게). */
 export function codeClass(code: Code, weekend: boolean): string {
-  return code === "O" ? `${CODE_CLASS.O} ${weekend ? "bg-[#F1EEE6]" : "bg-white"}` : (CODE_CLASS[code] ?? OTHER_CODE_CLASS);
+  const color = code === "O" ? `${CODE_CLASS.O} ${weekend ? "bg-[#F1EEE6]" : "bg-white"}` : (CODE_CLASS[code] ?? OTHER_CODE_CLASS);
+  return `${color} ${code.length >= 3 ? "text-[11px]" : "text-[13px]"}`;
+}
+
+/** 열로 보여 줄 근무 코드: 활성 코드 + 결과에 남은 꺼진 코드(config 순서). */
+function shownCodes(config: WardConfig, assignments?: ScheduleResult["assignments"]): ShiftDef[] {
+  const used = new Set(Object.values(assignments ?? {}).flat());
+  return config.shifts.filter((s) => s.active !== false || used.has(s.code));
+}
+
+/** 변환 전에 확정한 근무표처럼 통계가 옛 형식(counts 없음)인 결과. */
+function isLegacyResult(result: ScheduleResult): boolean {
+  return !Object.values(result.stats).every((s) => s.counts);
 }
 
 /** 변환 전에 확정한 근무표처럼 통계가 옛 형식(counts 없음)이면 배정으로 다시 센다(★12). */
 function withStats(result: ScheduleResult, config: WardConfig, period: Period, holidays: number[]): ScheduleResult {
-  if (Object.values(result.stats).every((s) => s.counts)) return result;
+  if (!isLegacyResult(result)) return result;
   return { ...result, stats: statsFromAssignments(result.assignments, config, period, holidays) };
 }
 
@@ -223,6 +236,8 @@ export function ScheduleBody({
   const now = today();
   const { nurses, holidays = [], constraints = [], history: raw = null } = toScheduleRequest(ward, period, periods, now);
   const { resultVersion } = period;
+  // 변환 전 결과는 희망 반영률·못 지킨 규칙을 셀 수 없어 숨긴다(★12)
+  const legacy = period.result !== null && isLegacyResult(period.result);
   const result = period.result && withStats(period.result, ward.config, period, holidays);
   const { outcome } = sv;
   const confirmed = period.versions.at(-1)?.assignments ?? null;
@@ -294,13 +309,15 @@ export function ScheduleBody({
 
       {result && (
         <>
-          <SummaryCard result={result} infeasible={outcome !== null} confirmed={isConfirmed} draft={isDraft} />
+          <SummaryCard result={result} infeasible={outcome !== null} confirmed={isConfirmed} draft={isDraft} legacy={legacy} />
+          {legacy && <p className="-mt-2 text-sm text-[#66665E]">변환 전에 확정한 근무표예요. 희망 반영과 못 지킨 규칙은 보여 주지 않아요.</p>}
           {evidence && <p className="-mt-2 text-sm text-[#3D3D38]">{evidence}</p>}
           <section className={`${ui.card} flex flex-col gap-3`}>
             <div className="flex h-8 items-center justify-between gap-3">
               <h2 className={ui.cardTitle}>근무표</h2>
               {selected && (
                 <CellEditor
+                  codes={ward.config.shifts.filter((s) => s.active !== false)}
                   label={`${nurses.find((n) => n.id === selected.nurseId)?.name ?? selected.nurseId} ${monthDay(period, selected.day)}`}
                   fixed={fixed.get(`${selected.nurseId}-${selected.day}`)}
                   onPick={(code) => onPick(selected, code)}
@@ -309,6 +326,7 @@ export function ScheduleBody({
               )}
             </div>
             <ScheduleGrid
+              config={ward.config}
               rows={rows}
               result={result}
               period={period}
@@ -322,9 +340,10 @@ export function ScheduleBody({
               history={history}
               pastDays={pastDays}
               todayDay={todayDay}
+              hideViolations={legacy}
             />
           </section>
-          <StatsTable rows={rows} result={result} history={history} />
+          <StatsTable config={ward.config} rows={rows} result={result} history={history} legacy={legacy} />
         </>
       )}
     </>
@@ -476,6 +495,17 @@ export function OutcomePanel({
             <ProposalCard
               key={i}
               proposal={p}
+              changes={p.changes.flatMap((ch) => {
+                const c = constraints.find((x) => x.id === ch.constraint_id);
+                if (!c) return [];
+                if (ch.action === "disable") return [`${presetName(c)} 끄기 · “${c.source_text}”`];
+                const next = normalizeBlock({
+                  ...c,
+                  ...(ch.params && { params: { ...c.params, ...ch.params } }),
+                  ...(ch.hardness && { hardness: ch.hardness }),
+                } as ConstraintSpec);
+                return [`${presetName(c)} → ${describeBlock(next, config, nurses, period)}`];
+              })}
               busy={busy}
               onAccept={() => onAccept(p)}
               onDismiss={() => setDismissed((d) => [...d, p])}
@@ -547,11 +577,14 @@ export function OutcomePanel({
 
 function ProposalCard({
   proposal,
+  changes,
   busy,
   onAccept,
   onDismiss,
 }: {
   proposal: RelaxationProposal;
+  /** 바뀌는 규칙을 블록 문장으로 */
+  changes: string[];
   busy: boolean;
   onAccept: () => void;
   onDismiss: () => void;
@@ -564,6 +597,13 @@ function ProposalCard({
         <span className={`${ui.badge} bg-[#E6F2EA] text-[#1E6B3F]`}>검증됨</span>
       </div>
       <p className="text-sm leading-relaxed text-[#3D3D38]">{proposal.description}</p>
+      {changes.length > 0 && (
+        <ul className="flex flex-col gap-1 rounded-sm bg-[#F6F6F3] px-2.5 py-2 text-xs text-[#3D3D38]">
+          {changes.map((t, i) => (
+            <li key={i}>{t}</li>
+          ))}
+        </ul>
+      )}
       <p className="text-xs text-[#66665E]">
         이렇게 바꾸면 근무표를 만들 수 있어요 · 희망 반영{" "}
         <span className="font-mono">
@@ -593,11 +633,14 @@ export function SummaryCard({
   infeasible,
   confirmed,
   draft,
+  legacy = false,
 }: {
   result: ScheduleResult;
   infeasible: boolean;
   confirmed: boolean;
   draft: boolean;
+  /** 변환 전 결과: 희망 반영·못 지킨 규칙 칸을 숨긴다 */
+  legacy?: boolean;
 }) {
   const { summary } = result;
   const item = "flex flex-col gap-1 border-r border-[#E2E2DC] px-5 py-3.5";
@@ -618,17 +661,21 @@ export function SummaryCard({
           {draft && <span className={`${ui.badge} border border-[#C9C9C1] bg-white text-[#3D3D38]`}>작성 중</span>}
         </span>
       </div>
-      <div className={item}>
-        <span className={label}>희망 반영</span>
-        <span className={`${value} text-[#1B1B18]`}>
-          {summary.preferences_met}/{summary.preferences_total}
-        </span>
-        <span className={label}>희망·기피 요청이 걸린 날 중 지킨 날</span>
-      </div>
-      <div className={item}>
-        <span className={label}>못 지킨 규칙</span>
-        <span className={`${value} text-[#A15C07]`}>{summary.soft_violation_count}</span>
-      </div>
+      {!legacy && (
+        <>
+          <div className={item}>
+            <span className={label}>희망 반영</span>
+            <span className={`${value} text-[#1B1B18]`}>
+              {summary.preferences_met}/{summary.preferences_total}
+            </span>
+            <span className={label}>희망·기피 요청이 걸린 날 중 지킨 날</span>
+          </div>
+          <div className={item}>
+            <span className={label}>못 지킨 규칙</span>
+            <span className={`${value} text-[#A15C07]`}>{summary.soft_violation_count}</span>
+          </div>
+        </>
+      )}
       {result.diff && (
         <div className={item}>
           <span className={label}>확정본에서 바뀐 칸</span>
@@ -640,11 +687,14 @@ export function SummaryCard({
 }
 
 function CellEditor({
+  codes,
   label,
   fixed,
   onPick,
   onCancel,
 }: {
+  /** 고를 수 있는 근무 코드(활성 코드) */
+  codes: ShiftDef[];
   label: string;
   fixed: Code | undefined;
   onPick: (code: Code | null) => void;
@@ -655,12 +705,13 @@ function CellEditor({
       <span className="mr-1 text-xs font-medium text-[#3D3D38]">
         <span className="font-mono">{label}</span> 고정
       </span>
-      {CODES.map((code) => (
+      {codes.map(({ code, name }) => (
         <button
           key={code}
           type="button"
           onClick={() => onPick(code)}
           aria-label={`${code}로 고정`}
+          title={name}
           aria-pressed={fixed === code}
           className={`${CELL} ${codeClass(code, false)} hover:opacity-80 aria-pressed:outline-2 aria-pressed:outline-[#155E75] aria-pressed:outline-offset-1`}
         >
@@ -689,6 +740,7 @@ function LockIcon() {
 }
 
 export function ScheduleGrid({
+  config = DEFAULT_CONFIG,
   rows,
   result,
   period,
@@ -702,7 +754,10 @@ export function ScheduleGrid({
   history,
   pastDays = 0,
   todayDay = null,
+  hideViolations = false,
 }: {
+  /** 병동 근무 형태. 합계 열과 하단 합계 행이 이 코드를 따른다 */
+  config?: WardConfig;
   rows: Nurse[];
   result: ScheduleResult;
   period: Period;
@@ -720,20 +775,27 @@ export function ScheduleGrid({
   pastDays?: number;
   /** 오늘의 기간 인덱스(열 머리 밑줄) */
   todayDay?: number | null;
+  /** 변환 전 결과: 못 지킨 규칙 표시를 숨긴다 */
+  hideViolations?: boolean;
 }) {
   const pdays = periodDays(period);
+  const codes = shownCodes(config, result.assignments);
+  // 하단 합계는 근무조(복합 코드는 세는 근무조마다 더한다)
+  const teams = codes.filter((s) => s.code !== "O" && !s.parts?.length);
+  const covers = (code: Code, team: Code) =>
+    code === team || (config.shifts.find((s) => s.code === code)?.parts ?? []).includes(team);
   // 최근 4주 기록이 하나도 없으면(첫 근무표) 누적 부담 열을 그리지 않는다
   const showHistory = [...(history?.values() ?? [])].some((h) => h.nights > 0 || h.weekends > 0);
   const dayList = pdays.map((p) => p.day);
-  // grid-cols-[150px_44px_repeat(N,30px)_repeat(4,34px)_repeat(2,44px)], N = 기간 길이
+  // grid-cols-[150px_44px_repeat(N,30px)_repeat(K,34px)_repeat(2,44px)], N = 기간 길이, K = 근무 코드 수
   const grid = {
-    gridTemplateColumns: `150px 44px repeat(${period.length}, 30px) repeat(4, 34px)${showHistory ? " repeat(2, 44px)" : ""}`,
+    gridTemplateColumns: `150px 44px repeat(${period.length}, 30px) repeat(${codes.length}, 34px)${showHistory ? " repeat(2, 44px)" : ""}`,
   };
   const rowClass = "grid gap-x-0.5";
   const weekendBg = (d: number) => (isWeekend(d) ? "bg-[#F1EEE6]" : "");
   const changed = new Set((result.diff ?? []).map((c) => `${c.nurse_id}-${c.day}`));
   const violations = new Map<string, string[]>();
-  for (const v of result.soft_violations) {
+  for (const v of hideViolations ? [] : result.soft_violations) {
     if (!v.nurse_id || !v.day) continue;
     const key = `${v.nurse_id}-${v.day}`;
     violations.set(key, [...(violations.get(key) ?? []), v.detail]);
@@ -762,9 +824,9 @@ export function ScheduleGrid({
               </span>
             );
           })}
-          {CODES.map((c) => (
-            <span key={c} className="flex items-end justify-center font-mono text-xs font-semibold text-[#66665E]">
-              {c}
+          {codes.map(({ code, name }) => (
+            <span key={code} title={name} className="flex items-end justify-center font-mono text-xs font-semibold text-[#66665E]">
+              {code}
             </span>
           ))}
           {/* 누적 부담(최근 4주) */}
@@ -826,9 +888,9 @@ export function ScheduleGrid({
                   </button>
                 );
               })}
-              {CODES.map((c) => (
-                <span key={c} className={total}>
-                  {s?.counts?.[c] ?? row.filter((x) => x === c).length}
+              {codes.map(({ code }) => (
+                <span key={code} className={total}>
+                  {s?.counts?.[code] ?? row.filter((x) => x === code).length}
                 </span>
               ))}
               {showHistory && (
@@ -841,13 +903,13 @@ export function ScheduleGrid({
           );
         })}
 
-        {(["D", "E", "N"] as const).map((code) => (
-          <div key={code} className={`${rowClass} ${code === "D" ? "mt-1.5 border-t border-[#EFEFEB] pt-1.5" : ""}`} style={grid}>
+        {teams.map(({ code }, i) => (
+          <div key={code} className={`${rowClass} ${i === 0 ? "mt-1.5 border-t border-[#EFEFEB] pt-1.5" : ""}`} style={grid}>
             <span className="flex h-7 items-center text-xs font-medium text-[#66665E]">{code} 합계</span>
             <span />
             {dayList.map((d) => (
               <span key={d} className={`${total} rounded-xs ${weekendBg(d)}`}>
-                {rows.filter((n) => result.assignments[n.id][d - 1] === code).length}
+                {rows.filter((n) => covers(result.assignments[n.id][d - 1], code)).length}
               </span>
             ))}
           </div>
@@ -857,7 +919,21 @@ export function ScheduleGrid({
   );
 }
 
-export function StatsTable({ rows, result, history }: { rows: Nurse[]; result: ScheduleResult; history: Map<string, Load> }) {
+export function StatsTable({
+  config,
+  rows,
+  result,
+  history,
+  legacy = false,
+}: {
+  config: WardConfig;
+  rows: Nurse[];
+  result: ScheduleResult;
+  history: Map<string, Load>;
+  /** 변환 전 결과: 희망 반영률 열을 숨긴다 */
+  legacy?: boolean;
+}) {
+  const codes = shownCodes(config, result.assignments);
   const thBase = "px-3 py-2 text-xs font-medium whitespace-nowrap text-[#66665E]";
   const th = `${thBase} text-right`;
   const td = "px-3 py-1.5 text-right font-mono text-[13px] font-medium text-[#1B1B18]";
@@ -870,14 +946,15 @@ export function StatsTable({ rows, result, history }: { rows: Nurse[]; result: S
           <thead>
             <tr className="border-b border-[#E2E2DC]">
               <th className={`${thBase} text-left`}>이름</th>
-              {CODES.map((c) => (
-                <th key={c} className={`${th} font-mono`}>
-                  {c}
+              {codes.map(({ code, name }) => (
+                <th key={code} title={name} className={`${th} font-mono`}>
+                  {code}
                 </th>
               ))}
+              <th className={th}>근무 시간</th>
               <th className={th}>주말·공휴일 근무</th>
               <th className={th}>최대 연속 근무</th>
-              <th className={th}>희망 반영률</th>
+              {!legacy && <th className={th}>희망 반영률</th>}
               <th className={th}>평균보다 많은 근무일</th>
               {showHistory && (
                 <>
@@ -894,14 +971,17 @@ export function StatsTable({ rows, result, history }: { rows: Nurse[]; result: S
               return (
                 <tr key={n.id} className="border-b border-[#EFEFEB] last:border-b-0">
                   <td className="px-3 py-1.5 text-sm text-[#1B1B18]">{n.name}</td>
-                  {CODES.map((c) => (
-                    <td key={c} className={td}>
-                      {s.counts?.[c] ?? 0}
+                  {codes.map(({ code }) => (
+                    <td key={code} className={td}>
+                      {s.counts?.[code] ?? 0}
                     </td>
                   ))}
+                  <td className={td}>{s.hours ?? 0}시간</td>
                   <td className={td}>{s.weekend_holiday_work}</td>
                   <td className={td}>{s.max_consecutive_work}일</td>
-                  <td className={td}>{s.preference_rate === null ? "–" : `${Math.round(s.preference_rate * 100)}%`}</td>
+                  {!legacy && (
+                    <td className={td}>{s.preference_rate === null ? "–" : `${Math.round(s.preference_rate * 100)}%`}</td>
+                  )}
                   <td className={td}>{formatDeviation(s.deviation)}</td>
                   {showHistory && (
                     <>
