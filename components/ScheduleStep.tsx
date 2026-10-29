@@ -4,7 +4,8 @@ import { useState, type ReactNode } from "react";
 
 import { ApiError, errorMessage, explain, solve } from "@/lib/api";
 import { toScheduleCsv } from "@/lib/csv";
-import { isOperating } from "@/lib/continuity";
+import { historyLoadFor, isOperating } from "@/lib/continuity";
+import { DEFAULT_CONFIG, NIGHT_ONLY_TAG } from "@/lib/migrate";
 import { dayHeader, dayOfDate, isWeekendDay, monthDay, periodDays, periodEnd } from "@/lib/period";
 import {
   carryOverChanged,
@@ -23,8 +24,10 @@ import type {
   RelaxationProposal,
   ScheduleRequest,
   ScheduleResult,
+  WardConfig,
 } from "@/lib/types.gen";
-import { describeParams, formatDeviation, TEMPLATE_NAMES } from "@/lib/wording";
+import { statsFromAssignments } from "@/lib/stats";
+import { describeBlock, formatDeviation, presetName } from "@/lib/wording";
 
 import { markConfirmedEntry } from "./confirmedEntry";
 import { Spinner, today } from "./RulesStep";
@@ -42,8 +45,17 @@ const CODE_CLASS: Record<Code, string> = {
   O: "text-[#6B6B63] font-normal border border-[#E2E2DC]",
 };
 
+/** 기본 4개 외 코드(M, DE 등)는 중립 색 */
+const OTHER_CODE_CLASS = "bg-[#E2E2DC] text-[#1B1B18] font-semibold border border-transparent";
+
 export function codeClass(code: Code, weekend: boolean): string {
-  return code === "O" ? `${CODE_CLASS.O} ${weekend ? "bg-[#F1EEE6]" : "bg-white"}` : CODE_CLASS[code];
+  return code === "O" ? `${CODE_CLASS.O} ${weekend ? "bg-[#F1EEE6]" : "bg-white"}` : (CODE_CLASS[code] ?? OTHER_CODE_CLASS);
+}
+
+/** 변환 전에 확정한 근무표처럼 통계가 옛 형식(counts 없음)이면 배정으로 다시 센다(★12). */
+function withStats(result: ScheduleResult, config: WardConfig, period: Period, holidays: number[]): ScheduleResult {
+  if (Object.values(result.stats).every((s) => s.counts)) return result;
+  return { ...result, stats: statsFromAssignments(result.assignments, config, period, holidays) };
 }
 
 type Req = Omit<ScheduleRequest, "input_version">;
@@ -61,10 +73,10 @@ type Load = { nights: number; weekends: number };
  * 나이트 전담은 나이트 공정성에서 빠지므로 제외한다. 해당자가 없거나 history가 비면 null.
  */
 function historyEvidence(rows: Nurse[], result: ScheduleResult, history: Map<string, Load>): string | null {
-  const pool = rows.filter((n) => !n.night_only);
+  const pool = rows.filter((n) => !n.tags?.includes(NIGHT_ONLY_TAG));
   if (history.size === 0 || pool.length === 0) return null;
   const past = (n: Nurse) => history.get(n.id)?.nights ?? 0;
-  const now = (n: Nurse) => result.stats[n.id]?.N ?? result.assignments[n.id].filter((c) => c === "N").length;
+  const now = (n: Nurse) => result.stats[n.id]?.counts?.N ?? result.assignments[n.id].filter((c) => c === "N").length;
   const avg = (f: (n: Nurse) => number) => pool.reduce((sum, n) => sum + f(n), 0) / pool.length;
   const pastAvg = avg(past);
   const nowAvg = avg(now);
@@ -153,7 +165,8 @@ export function useSolve(periodId: string) {
 export type Solve = ReturnType<typeof useSolve>;
 
 export function downloadCsv(period: WorkPeriod, nurses: Nurse[], result: ScheduleResult) {
-  const csv = toScheduleCsv({ nurses, period, holidays: period.holidays, assignments: result.assignments, stats: result.stats });
+  const config = useAppStore.getState().ward?.config ?? DEFAULT_CONFIG;
+  const csv = toScheduleCsv({ nurses, period, holidays: period.holidays, assignments: result.assignments, config });
   const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
   const a = document.createElement("a");
   a.href = url;
@@ -208,11 +221,12 @@ export function ScheduleBody({
   if (!ward) return null;
   const periodId = period.id;
   const now = today();
-  const { nurses, holidays = [], constraints = [], history_load = [] } = toScheduleRequest(ward, period, periods, now);
-  const { result, resultVersion } = period;
+  const { nurses, holidays = [], constraints = [], history: raw = null } = toScheduleRequest(ward, period, periods, now);
+  const { resultVersion } = period;
+  const result = period.result && withStats(period.result, ward.config, period, holidays);
   const { outcome } = sv;
   const confirmed = period.versions.at(-1)?.assignments ?? null;
-  const history = new Map(history_load.map((h) => [h.nurse_id, { nights: h.nights, weekends: h.weekends }]));
+  const history = new Map(historyLoadFor(raw, ward.config).map((h) => [h.nurse_id, { nights: h.nights, weekends: h.weekends }]));
   // 운영 중인 기간에서 오늘 이전 날짜는 잠긴다(toScheduleRequest의 pastDayLocks와 같은 범위)
   const todayDay = dayOfDate(period, now);
   const pastDays = isOperating(period, now) && todayDay !== null ? todayDay - 1 : 0;
@@ -421,6 +435,7 @@ export function OutcomePanel({
   onToggle: (id: string, enabled: boolean) => void;
 }) {
   const [dismissed, setDismissed] = useState<RelaxationProposal[]>([]);
+  const config = useAppStore((s) => s.ward?.config) ?? DEFAULT_CONFIG;
   const explanation = outcome.kind === "infeasible" ? outcome.explanation : null;
   // 다시 풀어 검증된 제안만 보여준다(ADR-004)
   const proposals = (explanation?.proposals ?? []).filter((p) => p.verified_summary && !dismissed.includes(p));
@@ -478,12 +493,10 @@ export function OutcomePanel({
               return (
                 <li key={c.constraint_id} className="flex items-center justify-between gap-3 border-b border-[#EFEFEB] py-1.5 last:border-b-0">
                   <span className="flex items-baseline gap-2 text-sm text-[#1B1B18]">
-                    <span className="text-xs font-medium text-[#66665E]">
-                      {TEMPLATE_NAMES[c.type as ConstraintSpec["type"]] ?? c.type}
-                    </span>
+                    <span className="text-xs font-medium text-[#66665E]">{found ? presetName(found) : "규칙"}</span>
                     “{c.source_text}”
                     {found && (
-                      <span className="font-mono text-xs text-[#66665E]">{describeParams(found, nurses, period)}</span>
+                      <span className="font-mono text-xs text-[#66665E]">{describeBlock(found, config, nurses, period)}</span>
                     )}
                   </span>
                   {found && (
@@ -510,8 +523,8 @@ export function OutcomePanel({
               return (
                 <li key={c.id} className="flex items-center justify-between gap-3 border-b border-[#EFEFEB] py-1.5 last:border-b-0">
                   <span className={`flex items-baseline gap-2 text-sm ${on ? "text-[#1B1B18]" : "text-[#66665E]"}`}>
-                    <span className="text-xs font-medium text-[#66665E]">{TEMPLATE_NAMES[c.type]}</span>“{c.source_text}”
-                    <span className="font-mono text-xs text-[#66665E]">{describeParams(c, nurses, period)}</span>
+                    <span className="text-xs font-medium text-[#66665E]">{presetName(c)}</span>“{c.source_text}”
+                    <span className="font-mono text-xs text-[#66665E]">{describeBlock(c, config, nurses, period)}</span>
                   </span>
                   <button
                     type="button"
@@ -769,7 +782,7 @@ export function ScheduleGrid({
             <div key={n.id} className={rowClass} style={grid}>
               <span className="flex h-7 items-center truncate text-sm text-[#1B1B18]">
                 {n.name}
-                {n.night_only && <span className="ml-1.5 text-xs font-medium text-[#66665E]">나이트 전담</span>}
+                {n.tags?.includes(NIGHT_ONLY_TAG) && <span className="ml-1.5 text-xs font-medium text-[#66665E]">나이트 전담</span>}
               </span>
               <span className="flex h-7 items-center font-mono text-[13px] text-[#3D3D38]">{n.years}</span>
               {row.map((code, i) => {
@@ -815,7 +828,7 @@ export function ScheduleGrid({
               })}
               {CODES.map((c) => (
                 <span key={c} className={total}>
-                  {s?.[c] ?? row.filter((x) => x === c).length}
+                  {s?.counts?.[c] ?? row.filter((x) => x === c).length}
                 </span>
               ))}
               {showHistory && (
@@ -883,7 +896,7 @@ export function StatsTable({ rows, result, history }: { rows: Nurse[]; result: S
                   <td className="px-3 py-1.5 text-sm text-[#1B1B18]">{n.name}</td>
                   {CODES.map((c) => (
                     <td key={c} className={td}>
-                      {s[c]}
+                      {s.counts?.[c] ?? 0}
                     </td>
                   ))}
                   <td className={td}>{s.weekend_holiday_work}</td>

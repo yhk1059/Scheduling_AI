@@ -236,7 +236,7 @@ function CarryOverPaste({ period }: { period: WorkPeriod }) {
   const [result, setResult] = useState<ReturnType<typeof parseCarryOver> | null>(null);
 
   const onApply = () => {
-    const parsed = parseCarryOver(text, nurses);
+    const parsed = parseCarryOver(text, nurses, ward!.config);
     setResult(parsed);
     if (parsed.errors.length === 0) setCarryOver(period.id, parsed.rows);
   };

@@ -1,10 +1,18 @@
-// 기간 연속성(ADR-015): 이월, 누적 부담, 지난 날짜 잠금. 모두 순수 함수이고 날짜는 lib/period.ts로만 다룬다.
+// 기간 연속성(ADR-015): 이월, 최근 4주 원본(history), 지난 날짜 잠금. 모두 순수 함수이고 날짜는 lib/period.ts로만 다룬다.
 import { CARRY_OVER_DAYS } from "./roster-import";
 import { dateOfDay, dayOfDate, isWeekendDay, monthDay, periodDays, periodEnd, type PeriodRange } from "./period";
 import type { Assignments, WardNurse, WorkPeriod } from "./store";
-import type { CarryOverRow, ConstraintSpec, DiffCell, HistoryLoad, Nurse } from "./types.gen";
+import type { CarryOverRow, ConstraintSpec, DiffCell, History, Nurse, WardConfig } from "./types.gen";
 
 export const HISTORY_DAYS = 28; // backend/domain/constants.py HISTORY_DAYS
+const OFF = "O";
+
+/** 간호사별 최근 4주 나이트·주말·공휴일 근무 수(화면 표시용). */
+export interface HistoryLoad {
+  nurse_id: string;
+  nights: number;
+  weekends: number;
+}
 
 /** 기간의 최신 확정본(versions 마지막). 없으면 null. */
 export function latestConfirmed(period: WorkPeriod): Assignments | null {
@@ -30,27 +38,56 @@ export function carryOverFrom(prev: WorkPeriod, nurseIds: string[]): CarryOverRo
 }
 
 /**
- * target 시작일 직전 HISTORY_DAYS일 안에 있는 확정 기간들의 최신 확정본으로
- * 간호사별 { nurse_id, nights, weekends }를 센다. 주말은 그 기간의 토·일과 그 기간 holidays.
- * nurseIds에 있는 간호사만, 둘 다 0인 간호사는 뺀다.
+ * target 시작일 직전 HISTORY_DAYS일 안에 있는 확정 기간들의 최신 확정본 원본(백엔드 history).
+ * 시작은 확정본이 있는 첫날, 끝은 마지막 날. 사이가 비거나 그 기간에 행이 없는 날은 휴무(O)로 채운다.
+ * nurseIds에 있고 창 안에 배정이 하나라도 있는 간호사만 행을 둔다. 공휴일은 그 기간들의 공휴일 날짜. 없으면 null.
  */
-export function historyLoadFor(periods: WorkPeriod[], target: PeriodRange, nurseIds: string[]): HistoryLoad[] {
+export function historyFor(periods: WorkPeriod[], target: PeriodRange, nurseIds: string[]): History | null {
   const window: PeriodRange = { start_date: dateOfDay(target, 1 - HISTORY_DAYS), length: HISTORY_DAYS };
-  const load = new Map(nurseIds.map((id) => [id, { nurse_id: id, nights: 0, weekends: 0 }]));
+  const cells = new Map(nurseIds.map((id) => [id, new Map<number, string>()]));
+  const covered: number[] = [];
+  const holidays: string[] = [];
   for (const p of periods) {
     const a = p.status === "confirmed" ? latestConfirmed(p) : null;
     if (!a) continue;
     for (const { day, date } of periodDays(p)) {
-      if (dayOfDate(window, date) === null) continue;
-      const weekend = isWeekendDay(p, day, p.holidays);
-      for (const [id, l] of load) {
+      const i = dayOfDate(window, date);
+      if (i === null) continue;
+      covered.push(i);
+      if (p.holidays.includes(day)) holidays.push(date);
+      for (const [id, row] of cells) {
         const code = a[id]?.[day - 1];
-        if (code === "N") l.nights += 1;
-        if (weekend && code !== undefined && code !== "O") l.weekends += 1;
+        if (code !== undefined) row.set(i, code);
       }
     }
   }
-  return [...load.values()].filter((l) => l.nights > 0 || l.weekends > 0);
+  if (covered.length === 0) return null;
+  const first = Math.min(...covered);
+  const last = Math.max(...covered);
+  const rows = Object.fromEntries(
+    [...cells]
+      .filter(([, row]) => row.size > 0)
+      .map(([id, row]) => [id, Array.from({ length: last - first + 1 }, (_, k) => row.get(first + k) ?? OFF)]),
+  );
+  if (Object.keys(rows).length === 0) return null;
+  return { start_date: dateOfDay(window, first), rows, holidays: holidays.sort() };
+}
+
+/** 화면의 "최근 4주 나이트·주말" 숫자: history 원본에서 나이트(세는 근무조 N)와 주말·공휴일 근무를 센다. 둘 다 0이면 뺀다. */
+export function historyLoadFor(history: History | null, config: WardConfig): HistoryLoad[] {
+  if (!history) return [];
+  const covers = (code: string) => [code, ...(config.shifts.find((s) => s.code === code)?.parts ?? [])];
+  return Object.entries(history.rows)
+    .map(([nurse_id, row]) => {
+      const range: PeriodRange = { start_date: history.start_date, length: row.length };
+      const holidays = (history.holidays ?? []).map((d) => dayOfDate(range, d)).filter((d): d is number => d !== null);
+      return {
+        nurse_id,
+        nights: row.filter((code) => covers(code).includes("N")).length,
+        weekends: row.filter((code, i) => code !== OFF && isWeekendDay(range, i + 1, holidays)).length,
+      };
+    })
+    .filter((l) => l.nights > 0 || l.weekends > 0);
 }
 
 /** 기간이 운영 중인지: 확정됨 && start_date <= today <= end. */

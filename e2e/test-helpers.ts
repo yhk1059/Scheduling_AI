@@ -3,7 +3,8 @@ import { expect, type Locator, type Page, test } from "@playwright/test";
 
 import { isWeekendDay, type PeriodRange, periodDays } from "../lib/period";
 import type { Ward, WorkPeriod } from "../lib/store";
-import type { ConstraintSpec, ScheduleRequest, TranslateResponse } from "../lib/types.gen";
+import { DEFAULT_CONFIG } from "../lib/migrate";
+import type { ConstraintSpec, Days, People, ScheduleRequest, Shifts, TranslateResponse } from "../lib/types.gen";
 
 export type Code = "D" | "E" | "N" | "O";
 export type Grid = Record<string, Code[]>;
@@ -100,14 +101,26 @@ export function expectedHistory(grid: Grid, period: PeriodRange, holidays: numbe
   return out;
 }
 
+/** 휴가 모양 블록(한 사람 × 날짜에 근무 없음)이면 { nurse_id, days }. */
+export function leaveOf(c: ConstraintSpec): { nurse_id: string; days: number[] } | null {
+  if (c.type !== "count") return null;
+  const p = c.params;
+  const ids = p.people?.ids;
+  if (p.per !== "person" || p.max !== 0 || !p.shifts.not_in?.includes("O") || ids?.length !== 1 || !p.days?.days) return null;
+  return { nurse_id: ids[0], days: p.days.days };
+}
+
 /**
- * /solve 요청의 hard 제약(꺼진 것 제외)과 나이트 전담을 근무표에 대어 위반을 모은다. 솔버와 따로 구현한 검사다.
- * 순서·연속 규칙은 지난 근무 마지막 며칠(carry_over)을 앞에 붙여 근무표 경계도 본다.
+ * /solve 요청의 hard 제약(꺼진 것 제외)을 근무표에 대어 위반을 모은다. 솔버와 따로 구현한 검사다.
+ * 블록은 세기(날마다·사람마다, 개수), 순서(금지 패턴·최대 연속·끝난 뒤 휴무), 칸 고정만 본다. 그 밖의 모양은 검사하지 않는다.
+ * 순서 규칙은 지난 근무 마지막 며칠(carry_over)을 앞에 붙여 근무표 경계도 본다.
  */
 export function hardViolations(req: ScheduleRequest, grid: Grid): string[] {
   const out: string[] = [];
   const { nurses, period, holidays = [], constraints = [], carry_over = [] } = req;
+  const config = req.config ?? DEFAULT_CONFIG;
   const days = period.length;
+  const pdays = periodDays(period);
   const isWeekend = (d: number) => isWeekendDay(period, d, holidays);
   const rows = new Map<string, Code[]>();
   const extended = new Map<string, { row: Code[]; offset: number }>();
@@ -120,66 +133,85 @@ export function hardViolations(req: ScheduleRequest, grid: Grid): string[] {
     rows.set(n.id, row);
     const carry = (carry_over.find((r) => r.nurse_id === n.id)?.shifts ?? []) as Code[];
     extended.set(n.id, { row: [...carry, ...row], offset: carry.length });
-    if (n.night_only && row.some((c) => c === "D" || c === "E")) out.push(`${n.name}: 나이트 전담인데 D/E 배정`);
   }
   const name = (id: string) => nurses.find((n) => n.id === id)?.name ?? id;
-  const runs = (row: Code[], inRun: (c: Code) => boolean) => {
-    let best = 0;
-    let cur = 0;
-    for (const c of row) {
-      cur = inRun(c) ? cur + 1 : 0;
-      best = Math.max(best, cur);
-    }
-    return best;
+  const covers = (code: string) => [code, ...(config.shifts.find((s) => s.code === code)?.parts ?? [])];
+  const matches = (code: string, sel: Shifts) =>
+    sel.in ? covers(code).some((c) => sel.in!.includes(c)) : !covers(code).some((c) => sel.not_in!.includes(c));
+  const people = (p: People | undefined) =>
+    nurses
+      .filter(
+        (n) =>
+          (!p?.ids || p.ids.includes(n.id)) &&
+          (!p?.tags || p.tags.some((t) => n.tags?.includes(t))) &&
+          !(p?.exclude_tags ?? []).some((t) => n.tags?.includes(t)) &&
+          (p?.min_years == null || n.years >= p.min_years) &&
+          (p?.max_years == null || n.years <= p.max_years),
+      )
+      .map((n) => n.id);
+  const dayOk = (d: number, sel: Days | undefined) => {
+    const kind = sel?.kind ?? "all";
+    const kindOk =
+      kind === "all" || (kind === "weekend" ? isWeekend(d) : kind === "weekday" ? !isWeekend(d) : holidays.includes(d));
+    const mon0 = (pdays[d - 1].weekday + 6) % 7; // 0=월
+    return kindOk && (!sel?.weekdays || sel.weekdays.includes(mon0)) && (!sel?.days || sel.days.includes(d));
   };
+  const outOfRange = (v: number, min?: number | null, max?: number | null) => (min != null && v < min) || (max != null && v > max);
 
   for (const c of constraints) {
-    if (c.enabled === false || (c.hardness ?? "hard") !== "hard") continue;
+    if (c.enabled === false || (c.hardness ?? (c.type === "balance" ? "soft" : "hard")) !== "hard") continue;
     const tag = `${c.type} "${c.source_text}"`;
     switch (c.type) {
-      case "daily_coverage":
-        for (let d = 1; d <= days; d++) {
-          if (isWeekend(d) !== (c.params.day_kind === "weekend")) continue;
-          const count = [...rows.values()].filter((r) => r[d - 1] === c.params.shift).length;
-          if (count < c.params.min || count > c.params.max) out.push(`${tag}: ${d}일 ${c.params.shift} ${count}명`);
-        }
-        break;
-      case "forbidden_sequence":
-        for (const [id, { row: r, offset }] of extended)
-          for (let i = Math.max(0, offset - 1); i + 1 < r.length; i++)
-            if (r[i] === c.params.first && r[i + 1] === c.params.second)
-              out.push(`${tag}: ${name(id)} ${i - offset + 1}~${i - offset + 2}일`);
-        break;
-      case "max_consecutive_nights":
-        for (const [id, { row }] of extended) if (runs(row, (x) => x === "N") > c.params.days) out.push(`${tag}: ${name(id)}`);
-        break;
-      case "max_consecutive_work":
-        for (const [id, { row }] of extended) if (runs(row, (x) => x !== "O") > c.params.days) out.push(`${tag}: ${name(id)}`);
-        break;
-      case "min_days_off":
-        for (const [id, r] of rows) if (r.filter((x) => x === "O").length < c.params.days) out.push(`${tag}: ${name(id)}`);
-        break;
-      case "off_after_night_block":
-        for (const [id, { row: r, offset }] of extended)
-          for (let i = 0; i + 1 < r.length; i++) {
-            if (r[i] !== "N" || r[i + 1] === "N") continue;
-            for (let k = 1; k <= c.params.days && i + k < r.length; k++)
-              if (i + k >= offset && r[i + k] !== "O")
-                out.push(`${tag}: ${name(id)} ${i - offset + 1}일 N 뒤 ${i + k - offset + 1}일 ${r[i + k]}`);
+      case "count": {
+        const p = c.params;
+        if ((p.measure ?? "count") !== "count") break;
+        const ids = people(p.people);
+        const dayList = pdays.map((x) => x.day).filter((d) => dayOk(d, p.days));
+        const hit = (id: string, d: number) => matches(rows.get(id)?.[d - 1] ?? "O", p.shifts);
+        if (p.per === "day") {
+          for (const d of dayList) {
+            const count = ids.filter((id) => hit(id, d)).length;
+            if (outOfRange(count, p.min, p.max)) out.push(`${tag}: ${d}일 ${count}명`);
           }
-        break;
-      case "skill_mix": {
-        const seniors = nurses.filter((n) => n.years >= c.params.min_years).map((n) => n.id);
-        for (let d = 1; d <= days; d++) {
-          const count = seniors.filter((id) => rows.get(id)?.[d - 1] === c.params.shift).length;
-          if (count < c.params.min_count) out.push(`${tag}: ${d}일 ${c.params.shift} ${count}명`);
+        } else if (p.per === "person") {
+          for (const id of ids) {
+            const count = dayList.filter((d) => hit(id, d)).length;
+            if (outOfRange(count, p.min, p.max)) out.push(`${tag}: ${name(id)} ${count}일`);
+          }
         }
         break;
       }
-      case "leave":
-        for (const d of c.params.days)
-          if (rows.get(c.params.nurse_id)?.[d - 1] !== "O") out.push(`${tag}: ${name(c.params.nurse_id)} ${d}일`);
+      case "sequence": {
+        const p = c.params;
+        for (const id of people(p.people)) {
+          const ext = extended.get(id);
+          if (!ext) continue;
+          const { row: r, offset } = ext;
+          for (const pattern of p.forbid ?? []) {
+            for (let i = Math.max(0, offset - pattern.length + 1); i + pattern.length <= r.length; i++)
+              if (pattern.every((sel, k) => matches(r[i + k], sel))) out.push(`${tag}: ${name(id)} ${i - offset + 1}일부터`);
+          }
+          if (p.run && p.max_len != null) {
+            let cur = 0;
+            for (const code of r) {
+              cur = matches(code, p.run) ? cur + 1 : 0;
+              if (cur > p.max_len) {
+                out.push(`${tag}: ${name(id)}`);
+                break;
+              }
+            }
+          }
+          if (p.after && p.then_off != null) {
+            for (let i = 0; i + 1 < r.length; i++) {
+              if (!matches(r[i], p.after) || matches(r[i + 1], p.after)) continue;
+              for (let k = 1; k <= p.then_off && i + k < r.length; k++)
+                if (i + k >= offset && r[i + k] !== "O")
+                  out.push(`${tag}: ${name(id)} ${i - offset + 1}일 뒤 ${i + k - offset + 1}일 ${r[i + k]}`);
+            }
+          }
+        }
         break;
+      }
       case "fixed_assignment":
         if (rows.get(c.params.nurse_id)?.[c.params.day - 1] !== c.params.shift)
           out.push(`${tag}: ${name(c.params.nurse_id)} ${c.params.day}일`);

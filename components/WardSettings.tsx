@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 
+import { NIGHT_ONLY_TAG } from "@/lib/migrate";
 import type { PeriodUnit } from "@/lib/period";
 import { MAX_NURSES } from "@/lib/roster-import";
 import { isNurseUsed, orphanConstraintIds, useAppStore, type WardNurse } from "@/lib/store";
@@ -192,6 +193,8 @@ const cellInput =
 /** 유효한 값은 바로 저장하고, 아니면 입력 중인 값과 오류를 행에 남긴다(id는 바뀌지 않는다). */
 function NurseRow({ nurse, index, nurses }: { nurse: WardNurse; index: number; nurses: WardNurse[] }) {
   const updateNurse = useAppStore((s) => s.updateNurse);
+  const addTag = useAppStore((s) => s.addTag);
+  const removeTag = useAppStore((s) => s.removeTag);
   const setNurseActive = useAppStore((s) => s.setNurseActive);
   const removeNurse = useAppStore((s) => s.removeNurse);
   const deletable = useAppStore((s) => (s.ward ? !isNurseUsed(nurse.id, s.ward, s.periods) : false));
@@ -249,8 +252,8 @@ function NurseRow({ nurse, index, nurses }: { nurse: WardNurse; index: number; n
           <td className="px-2 py-1">
             <input
               type="checkbox"
-              checked={nurse.night_only}
-              onChange={(e) => updateNurse(nurse.id, { night_only: e.target.checked })}
+              checked={nurse.tags.includes(NIGHT_ONLY_TAG)}
+              onChange={(e) => (e.target.checked ? addTag : removeTag)(nurse.id, NIGHT_ONLY_TAG)}
               aria-label={`${row}행 나이트 전담`}
               className="size-4 accent-[#155E75]"
             />
@@ -265,7 +268,7 @@ function NurseRow({ nurse, index, nurses }: { nurse: WardNurse; index: number; n
             </span>
           </td>
           <td className="px-2 py-1 font-mono text-[#66665E]">{nurse.years}</td>
-          <td className="px-2 py-1 text-[#66665E]">{nurse.night_only ? "Y" : ""}</td>
+          <td className="px-2 py-1 text-[#66665E]">{nurse.tags.includes(NIGHT_ONLY_TAG) ? "Y" : ""}</td>
         </>
       )}
       <td className="px-1 py-1">
@@ -297,7 +300,7 @@ function NewNurseRow({ nurses }: { nurses: WardNurse[] }) {
   const add = () => {
     if (full) return;
     if (nameMsg || yearsMsg) return setTried(true);
-    addNurses([{ name: name.trim(), years: Number(years.trim()), night_only: night }]);
+    addNurses([{ name: name.trim(), years: Number(years.trim()), tags: night ? [NIGHT_ONLY_TAG] : [] }]);
     setName("");
     setYears("");
     setNight(false);

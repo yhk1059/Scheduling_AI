@@ -1,16 +1,16 @@
 // 근무표 CSV 직렬화. 엑셀에서 바로 열리도록 UTF-8 BOM + CRLF, RFC 4180 이스케이프.
-import { periodDays } from "./period";
-import type { Nurse, NurseStats, Period, ScheduleResult } from "./types.gen";
+import { isWeekendDay, periodDays } from "./period";
+import type { Nurse, Period, ScheduleResult, WardConfig } from "./types.gen";
 
 const WEEKDAYS = ["일", "월", "화", "수", "목", "금", "토"];
-const TOTALS = ["D", "E", "N", "O"] as const;
+const OFF = "O";
 
 export interface ScheduleCsvInput {
   nurses: Nurse[];
   period: Period;
   holidays: number[];
   assignments: ScheduleResult["assignments"];
-  stats: Record<string, NurseStats>;
+  config: WardConfig;
 }
 
 /** 수식 인젝션 방지('= + - @' 앞에 ') 후 쉼표·따옴표·줄바꿈이 있으면 따옴표로 감싼다. */
@@ -20,10 +20,17 @@ function cell(value: string | number): string {
   return /[",\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
 }
 
-export function toScheduleCsv({ nurses, period, holidays, assignments, stats }: ScheduleCsvInput): string {
+/**
+ * 행은 간호사(이름, 연차, 날짜별 코드, 활성 코드별 수, 주말·공휴일 근무), 하단은 날짜별 근무조 합계.
+ * 근무조는 활성 기본 코드(복합·휴무 제외)이고, 복합 코드는 세는 근무조마다 더한다.
+ */
+export function toScheduleCsv({ nurses, period, holidays, assignments, config }: ScheduleCsvInput): string {
   const pdays = periodDays(period);
   const dayList = pdays.map((p) => p.day);
-  const blankTotals = ["", "", "", "", ""];
+  const totals = config.shifts.filter((s) => s.active !== false).map((s) => s.code);
+  const groups = config.shifts.filter((s) => s.active !== false && !s.parts?.length && s.code !== OFF).map((s) => s.code);
+  const covers = (code: string) => [code, ...(config.shifts.find((s) => s.code === code)?.parts ?? [])];
+  const blankTotals = Array.from({ length: totals.length + 1 }, () => "");
   const listed = nurses.filter((n) => assignments[n.id]);
 
   const weekdays = pdays.map(({ day, weekday }) => {
@@ -31,16 +38,17 @@ export function toScheduleCsv({ nurses, period, holidays, assignments, stats }: 
     return holidays.includes(day) ? `${w}(공휴일)` : w;
   });
   const rows: (string | number)[][] = [
-    ["이름", "연차", ...weekdays, ...TOTALS, "주말근무"],
+    ["이름", "연차", ...weekdays, ...totals, "주말근무"],
     ["", "", ...pdays.map((p) => p.dom), ...blankTotals],
     ...listed.map((n) => {
-      const s = stats[n.id];
-      return [n.name, n.years, ...assignments[n.id], ...(s ? [s.D, s.E, s.N, s.O, s.weekend_holiday_work] : blankTotals)];
+      const row = assignments[n.id];
+      const weekend = row.filter((code, i) => code !== OFF && isWeekendDay(period, i + 1, holidays)).length;
+      return [n.name, n.years, ...row, ...totals.map((code) => row.filter((c) => c === code).length), weekend];
     }),
-    ...(["D", "E", "N"] as const).map((code) => [
-      `${code} 합계`,
+    ...groups.map((group) => [
+      `${group} 합계`,
       "",
-      ...dayList.map((d) => listed.filter((n) => assignments[n.id][d - 1] === code).length),
+      ...dayList.map((d) => listed.filter((n) => covers(assignments[n.id][d - 1]).includes(group)).length),
       ...blankTotals,
     ]),
   ];

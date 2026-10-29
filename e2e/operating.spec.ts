@@ -5,7 +5,9 @@ import { type BrowserContext, expect, type Page, test } from "@playwright/test";
 import wardOct from "./fixtures/ward-oct.json";
 
 import type { PeriodRange } from "../lib/period";
-import type { HistoryLoad, ScheduleRequest } from "../lib/types.gen";
+import { historyLoadFor, type HistoryLoad } from "../lib/continuity";
+import { DEFAULT_CONFIG } from "../lib/migrate";
+import type { ScheduleRequest } from "../lib/types.gen";
 import {
   CARRY_OVER_DAYS,
   confirmedGrid,
@@ -27,6 +29,7 @@ import {
   solveVia,
   T0,
   appliedCards,
+  leaveOf,
 } from "./test-helpers";
 
 const OCT: PeriodRange = { start_date: "2026-10-01", length: 31 };
@@ -154,7 +157,11 @@ test("S3. 운영 중인 병동: 다음 근무표 만들기와 게스트 확정",
   const expected = expectedHistory(octGrid, OCT, [], HISTORY_FROM);
   expect(await readHistoryColumns(page), "최근 4주 열").toEqual(expected);
   const byId = (list: HistoryLoad[]) => [...list].sort((a, b) => a.nurse_id.localeCompare(b.nurse_id));
-  expect(byId(lastSolve!.history_load ?? []), "요청의 history_load").toEqual(
+  // 요청에는 최근 28일 원본(history)이 들어가고, 백엔드와 화면이 그 원본에서 센다
+  expect(Object.fromEntries(Object.entries(lastSolve!.history?.rows ?? {})), "요청의 history 원본").toEqual(
+    Object.fromEntries(Object.entries(octGrid).map(([name, row]) => [idOf(name), row.slice(HISTORY_FROM - 1)])),
+  );
+  expect(byId(historyLoadFor(lastSolve!.history ?? null, DEFAULT_CONFIG)), "history에서 센 최근 4주").toEqual(
     byId(
       Object.entries(expected)
         .filter(([, v]) => v.nights > 0 || v.weekends > 0)
@@ -230,9 +237,9 @@ test("S4. 운영 중 변경 → 최소 변경 → 다시 확정 → 다음 근�
   const { ward } = await readState(page);
   const choi = ward.nurses.find((n) => n.name === "최지훈")!.id;
   const cards = await interpretOk(page, "변경 입력", "요청 만들기", "최지훈 10월 28일부터 30일까지 병가");
-  const sick = cards.filter((c) => c.type === "leave" && c.params.nurse_id === choi);
+  const sick = cards.flatMap((c) => (leaveOf(c)?.nurse_id === choi ? [leaveOf(c)!] : []));
   expect(sick, "최지훈 병가 카드").toHaveLength(1);
-  if (sick[0].type === "leave") expect(sick[0].params.days).toEqual([28, 29, 30]);
+  expect(sick[0].days).toEqual([28, 29, 30]);
   await expect(pendingCards(page).filter({ hasText: "최지훈 · 10/28~10/30 · 휴무" })).toHaveCount(1);
   for (let guard = 0; (await pendingCards(page).count()) > 0; guard++) {
     expect(guard, "대기 카드 적용 반복").toBeLessThan(10);
