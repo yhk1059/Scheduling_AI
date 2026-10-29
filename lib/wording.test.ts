@@ -9,6 +9,7 @@ import type { ConstraintSpec, Nurse, WardConfig } from "./types.gen";
 import {
   configSummary,
   describeBlock,
+  describeShiftChange,
   formatDeviation,
   hardnessLabel,
   nextTask,
@@ -53,9 +54,36 @@ describe("scheduleName", () => {
   it("주 단위는 'M/D~M/D 근무표'", () => {
     expect(scheduleName({ start_date: "2026-11-02", length: 14 }, "2w")).toBe("11/2~11/15 근무표");
   });
+  it("달력 월이 1일에 시작하지 않으면 날짜로 이름을 붙인다", () => {
+    expect(scheduleName({ start_date: "2026-11-15", length: 30 }, "month")).toBe("11/15~12/14 근무표");
+    expect(scheduleName({ start_date: "2026-12-28", length: 31 }, "month")).toBe("12/28~1/27 근무표");
+  });
   it("월 경계를 넘는 주 단위", () => {
     expect(scheduleName({ start_date: "2026-11-23", length: 14 }, "2w")).toBe("11/23~12/6 근무표");
     expect(scheduleName({ start_date: "2026-12-28", length: 7 }, "1w")).toBe("12/28~1/3 근무표");
+  });
+});
+
+describe("describeShiftChange", () => {
+  it("추가: 코드 · 이름 · 시간", () => {
+    expect(describeShiftChange({ action: "add", shift: { code: "M", name: "미드", hours: 8 } }, DEFAULT_CONFIG)).toBe(
+      "근무 코드 추가 · M 미드 · 8시간",
+    );
+  });
+  it("시작 시각이 있으면 함께 쓴다", () => {
+    expect(
+      describeShiftChange({ action: "add", shift: { code: "M", name: "미드", hours: 8, start: "11:00" } }, DEFAULT_CONFIG),
+    ).toBe("근무 코드 추가 · M 미드 · 11:00부터 8시간");
+  });
+  it("더블은 세는 근무조 이름을 붙인다", () => {
+    expect(
+      describeShiftChange({ action: "add", shift: { code: "DE", name: "더블", hours: 16, parts: ["D", "E"] } }, DEFAULT_CONFIG),
+    ).toBe("근무 코드 추가 · DE 더블 · 16시간 · 데이와 이브닝으로 세요");
+  });
+  it("수정", () => {
+    expect(describeShiftChange({ action: "update", shift: { code: "E", name: "이브닝", hours: 9 } }, DEFAULT_CONFIG)).toBe(
+      "근무 코드 수정 · E 이브닝 · 9시간",
+    );
   });
 });
 

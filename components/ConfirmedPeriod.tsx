@@ -72,7 +72,7 @@ export default function ConfirmedPeriod() {
     setTranslating(true);
     sv.setToast(null);
     try {
-      const res = await translate({ text: input, scope: "period", context: { nurses, period: range, holidays, today: today() } });
+      const res = await translate({ text: input, scope: "period", context: { config: ward.config, nurses, period: range, holidays, today: today() } });
       if (res.status === "ok") {
         addPendingRequests(periodId, res.constraints);
         setChangeIds((ids) => [...ids, ...res.constraints.map((c) => c.id)]);

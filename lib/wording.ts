@@ -2,11 +2,11 @@
 import { monthDay, type PeriodRange, type PeriodUnit } from "./period";
 import { NIGHT_ONLY_TAG } from "./migrate";
 import { homeSummary, isLeaveRule, upcomingRange, type Ward, type WorkPeriod } from "./store";
-import type { ConstraintSpec, Days, Nurse, People, Shifts, WardConfig } from "./types.gen";
+import type { ConstraintSpec, Days, Nurse, People, ShiftChange, Shifts, WardConfig } from "./types.gen";
 
-/** "11월 근무표"(달력 월) / "11/2~11/15 근무표"(주 단위). */
+/** "11월 근무표"(1일에 시작하는 달력 월) / "11/2~11/15 근무표"(주 단위, 1일이 아닌 날에 시작하는 달력 월). */
 export function scheduleName(period: PeriodRange, unit: PeriodUnit): string {
-  if (unit === "month") return `${monthDay(period, 1).split("/")[0]}월 근무표`;
+  if (unit === "month" && period.start_date.endsWith("-01")) return `${monthDay(period, 1).split("/")[0]}월 근무표`;
   return `${monthDay(period, 1)}~${monthDay(period, period.length)} 근무표`;
 }
 
@@ -37,6 +37,20 @@ export function configSummary(config: WardConfig): string {
         : base.map((s) => `${s.name} ${s.hours}시간`).join("·");
   const kind = base.length === 1 ? `${names} 근무` : `${names} ${base.length}교대`;
   return `${kind}, ${hours}${doubles.length ? ` · 더블 ${doubles.map((s) => s.code).join(", ")}` : ""}`;
+}
+
+/** 설정 변경 카드 한 줄: "근무 코드 추가 · M 미드 · 11:00부터 8시간", 더블은 세는 근무조를 붙인다. */
+export function describeShiftChange(change: ShiftChange, config: WardConfig): string {
+  const { code, name, hours, start, parts } = change.shift;
+  const partNames = (parts ?? []).map((p) => config.shifts.find((s) => s.code === p)?.name ?? p);
+  return [
+    `근무 코드 ${change.action === "add" ? "추가" : "수정"}`,
+    `${code} ${name}`,
+    start ? `${start}부터 ${hours}시간` : `${hours}시간`,
+    ...(partNames.length
+      ? [`${partNames.map((n, i) => (i < partNames.length - 1 ? n + josa(n, "과", "와") : n)).join(" ")}${josa(partNames.at(-1)!, "으로", "로")} 세요`]
+      : []),
+  ].join(" · ");
 }
 
 /** "반드시" | "가능하면". */
