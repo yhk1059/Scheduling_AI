@@ -69,9 +69,10 @@ export interface PeriodVersion {
   assignments: Assignments;
   /** 직전 버전 대비 바뀐 칸 */
   changed: DiffCell[];
-  /** 확정 당시의 요청과 결과([변경 취소]). 옛 버전에는 없다 */
+  /** 확정 당시의 요청과 결과, 그 결과에 쓴 이월([변경 취소]). 옛 버전에는 없다 */
   requests?: ConstraintSpec[];
   result?: ScheduleResult;
+  carryOverUsed?: CarryOverRow[] | null;
 }
 
 export interface WorkPeriod extends PeriodRange {
@@ -904,6 +905,7 @@ export function createAppStore(getStorage: () => Storage, now: () => Date = () =
                   changed,
                   requests: p.requests,
                   result: p.result,
+                  carryOverUsed: p.carryOverUsed,
                 };
                 return {
                   ...p,
@@ -921,7 +923,8 @@ export function createAppStore(getStorage: () => Storage, now: () => Date = () =
             const last = period?.versions.at(-1);
             if (!period || !canRevertToConfirmed(period) || !last?.requests || !last.result) return;
             const { requests, result } = last;
-            editPeriod(periodId, (p) => ({ ...p, requests, result, resultVersion: get().inputVersion + 1 }));
+            const carryOverUsed = last.carryOverUsed === undefined ? period.carryOverUsed : last.carryOverUsed;
+            editPeriod(periodId, (p) => ({ ...p, requests, result, carryOverUsed, resultVersion: get().inputVersion + 1 }));
           },
 
           go: (view) => set({ view }),
