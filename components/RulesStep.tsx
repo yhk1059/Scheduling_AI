@@ -52,7 +52,8 @@ export function previewRange(unit: PeriodUnit): PeriodRange {
 
 type Notice = { kind: "clarify" | "unsupported"; text: string } | null;
 
-export default function RulesStep({ scope }: { scope: "ward" | "period" }) {
+/** pendingNote=false: 처음 설정 ③처럼 화면이 대기 카드 안내를 버튼 옆에 따로 둘 때. */
+export default function RulesStep({ scope, pendingNote = true }: { scope: "ward" | "period"; pendingNote?: boolean }) {
   const copy = COPY[scope];
   const ward = useAppStore((s) => s.ward);
   const period = useAppStore(currentPeriod);
@@ -228,15 +229,12 @@ export default function RulesStep({ scope }: { scope: "ward" | "period" }) {
 
       {scope === "period" && period && <PeriodRules ward={ward} period={period} />}
 
-      {scope === "ward" && pending.length > 0 && (
+      {scope === "ward" && pendingNote && pending.length > 0 && (
         <p className={ui.help}>적용하지 않은 카드 {pending.length}개는 근무표에 반영되지 않아요.</p>
       )}
 
       {scope === "period" && (
-      <div className="flex items-center justify-between gap-4">
-        <button type="button" onClick={() => go({ screen: "period", periodId: period!.id, step: 1 })} className={ui.secondary}>
-          이전
-        </button>
+      <div className="flex items-center justify-end gap-4">
         <div className="flex items-center gap-3">
           {blocked && orphanCount > 0 && (
             <p role="alert" className={ui.error}>

@@ -2,8 +2,9 @@
 
 import { formatRange } from "@/lib/period";
 import { homeSummary, isWardReady, upcomingRange, useAppStore, viewForPeriod, type WorkPeriod } from "@/lib/store";
-import { nextTask, scheduleName, unitShort, wardRuleCount, type NextTask } from "@/lib/wording";
+import { nextTask, scheduleName, TASK_STEPS, taskDoneSteps, unitShort, wardRuleCount } from "@/lib/wording";
 
+import { markConfirmedEntry } from "./confirmedEntry";
 import { today } from "./RulesStep";
 import { ui } from "./ui";
 
@@ -25,22 +26,6 @@ function shortTime(iso: string): string {
   const d = new Date(iso);
   const p = (n: number) => String(n).padStart(2, "0");
   return `${d.getMonth() + 1}/${d.getDate()} ${p(d.getHours())}:${p(d.getMinutes())}`;
-}
-
-const TASK_STEPS = ["준비", "요청", "근무표", "확정"];
-
-/** 지금 할 일 카드에서 끝난 단계 수. */
-function doneSteps(task: NextTask): number {
-  switch (task.kind) {
-    case "none":
-      return 0;
-    case "drafting":
-      return task.requests > 0 ? 2 : 1;
-    case "generated":
-      return 3;
-    case "confirmed":
-      return 4;
-  }
 }
 
 /** 진행 단계 한 줄(표시만, 누를 수 없다). */
@@ -65,7 +50,7 @@ function TaskProgress({ done }: { done: number }) {
                   current ? "bg-[#155E75] text-white" : "border border-[#C9C9C1] text-[#66665E]"
                 }`}
               >
-                {i < 3 ? i + 1 : ""}
+                {i < TASK_STEPS.length - 1 ? i + 1 : ""}
               </span>
             )}
             <span className={current ? "font-semibold text-[#1B1B18]" : "text-[#3D3D38]"}>
@@ -157,8 +142,15 @@ export default function WardHome() {
                   )}
                 </p>
               </div>
-              <button type="button" onClick={() => go({ screen: "confirmed", periodId: operating.id })} className={ui.secondary}>
-                열기
+              <button
+                type="button"
+                onClick={() => {
+                  markConfirmedEntry(operating.id, "change");
+                  go({ screen: "confirmed", periodId: operating.id });
+                }}
+                className={ui.secondary}
+              >
+                변경 입력
               </button>
             </section>
           )}
@@ -171,7 +163,7 @@ export default function WardHome() {
                   {formatRange(next.state === "none" ? upcomingRange(ward.unit, periods, now) : next.period)}
                 </span>
               </div>
-              <TaskProgress done={doneSteps(task)} />
+              <TaskProgress done={taskDoneSteps(task)} />
               <p className="text-sm leading-relaxed text-[#3D3D38]">
                 {task.kind === "confirmed" ? (
                   <>

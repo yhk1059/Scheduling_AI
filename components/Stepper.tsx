@@ -1,24 +1,22 @@
-/** 근무표 작성 단계: ① 요청 → ② 근무표. */
-export type PeriodStep = 1 | 2;
-
-const STEPS: { step: PeriodStep; label: string }[] = [
-  { step: 1, label: "요청" },
-  { step: 2, label: "근무표" },
-];
-
-export default function Stepper({
+/** 처음 설정·근무표 작성 화면의 스테퍼. labels[i]가 단계 i + 1이다. */
+export default function Stepper<S extends number>({
+  label: listLabel,
+  labels,
   current,
   reached,
   onSelect,
 }: {
-  current: PeriodStep;
+  label: string;
+  labels: string[];
+  current: S;
   /** 이미 거친 마지막 단계. 그 이하의 다른 단계는 눌러 이동할 수 있다 */
-  reached: PeriodStep;
-  onSelect: (step: PeriodStep) => void;
+  reached: S;
+  onSelect: (step: S) => void;
 }) {
   return (
-    <ol aria-label="기간 작업 단계" className="flex items-center gap-2">
-      {STEPS.map(({ step, label }, i) => {
+    <ol aria-label={listLabel} className="flex items-center gap-2">
+      {labels.map((label, i) => {
+        const step = (i + 1) as S;
         const active = step === current;
         const done = !active && step <= reached;
         return (

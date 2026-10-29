@@ -2,22 +2,29 @@
 
 import { useEffect, useRef, useState } from "react";
 
-import { carryOverFrom, isOperating, previousConfirmedPeriod } from "@/lib/continuity";
+import { carryOverFrom, previousConfirmedPeriod } from "@/lib/continuity";
 import { formatRange, isWeekendDay, monthDay } from "@/lib/period";
 import { parseCarryOver, type CellError } from "@/lib/roster-import";
-import { carryOverChanged, currentPeriod, rosterChangesFor, useAppStore, type WorkPeriod } from "@/lib/store";
+import {
+  carryOverChanged,
+  currentPeriod,
+  prepareNeedsReview,
+  rosterChangesFor,
+  useAppStore,
+  type WorkPeriod,
+} from "@/lib/store";
 import { scheduleName } from "@/lib/wording";
 
 import HolidayCalendar from "./HolidayCalendar";
-import RulesStep, { today } from "./RulesStep";
+import RulesStep from "./RulesStep";
 import ScheduleStep, { CELL, codeClass } from "./ScheduleStep";
-import Stepper, { type PeriodStep } from "./Stepper";
+import Stepper from "./Stepper";
 import { ui } from "./ui";
 
-/** 기간 작업: 제목(근무표 이름 + 날짜 범위 + 상태 배지) + 스테퍼 ① 준비 → ② 요청 → ③ 근무표. */
+/** 근무표 작성: 제목(근무표 이름 + 날짜 범위 + 작성 중 배지) + 스테퍼 ① 요청 → ② 근무표. 확정은 ②의 끝 버튼이다. */
 export default function PeriodWork() {
   const period = useAppStore(currentPeriod);
-  const step = useAppStore((s) => (s.view.screen === "period" ? s.view.step : 2));
+  const step = useAppStore((s) => (s.view.screen === "period" ? s.view.step : 1));
   const go = useAppStore((s) => s.go);
   const unit = useAppStore((s) => s.ward?.unit ?? "month");
 
@@ -31,7 +38,7 @@ export default function PeriodWork() {
   }, [step]);
 
   if (!period) return null;
-  const toStep = (s: PeriodStep) => go({ screen: "period", periodId: period.id, step: s });
+  const toStep = (s: 1 | 2) => go({ screen: "period", periodId: period.id, step: s });
 
   return (
     <div ref={rootRef} className="flex flex-col gap-5">
@@ -44,20 +51,14 @@ export default function PeriodWork() {
         <div className="flex items-center gap-3">
           <h1 className="text-[22px] font-semibold text-[#1B1B18]">{scheduleName(period, unit)}</h1>
           <span className="font-mono text-sm text-[#66665E]">{formatRange(period)}</span>
-          {period.status !== "confirmed" ? (
-            <span className={`${ui.badge} border border-[#C9C9C1] bg-white text-[#3D3D38]`}>작성 중</span>
-          ) : isOperating(period, today()) ? (
-            <span className={`${ui.badge} bg-[#E3F0F3] text-[#155E75]`}>운영 중</span>
-          ) : (
-            <span className={`${ui.badge} bg-[#E6F2EA] text-[#1E6B3F]`}>확정</span>
-          )}
+          <span className={`${ui.badge} border border-[#C9C9C1] bg-white text-[#3D3D38]`}>작성 중</span>
         </div>
-        <Stepper current={step} reached={period.result ? 2 : step} onSelect={toStep} />
+        <Stepper label="근무표 작성 단계" labels={["요청", "근무표"]} current={step} reached={period.result ? 2 : step} onSelect={toStep} />
       </div>
 
       {step === 1 ? (
         <>
-          <PrepareStep period={period} />
+          <PrepareSummary key={`prep-${period.id}`} period={period} />
           <RulesStep key={period.id} scope="period" />
         </>
       ) : (
@@ -67,21 +68,42 @@ export default function PeriodWork() {
   );
 }
 
-function PrepareStep({ period }: { period: WorkPeriod }) {
+/** ① 요청 위의 준비 요약 한 줄 + [바꾸기]. 명단이나 이어지는 근무가 바뀌었을 때만 처음부터 펼친다. */
+function PrepareSummary({ period }: { period: WorkPeriod }) {
   const ward = useAppStore((s) => s.ward);
   const periods = useAppStore((s) => s.periods);
   const go = useAppStore((s) => s.go);
+  const [open, setOpen] = useState(() => (ward ? prepareNeedsReview(ward, periods, period.id) : false));
   if (!ward) return null;
   const active = ward.nurses.filter((n) => n.active).length;
+  const prev = previousConfirmedPeriod(periods, period);
   const hasPrevious = periods.some((p) => p.status === "confirmed" && p.start_date < period.start_date);
   const { added, deactivated } = rosterChangesFor(ward, periods, period.id);
   const names = (list: { name: string }[]) => list.map((n) => n.name).join(", ");
+  const carry = prev
+    ? "지난 근무표에서 이어져요"
+    : period.carryOver.length > 0
+      ? `지난 근무 ${period.carryOver.length}명 입력`
+      : "지난 근무 없음";
 
   return (
-    <div className="flex flex-col gap-5">
-      <h2 tabIndex={-1} data-step-title className={`${ui.cardTitle} outline-none`}>
-        준비
-      </h2>
+    <div className="flex flex-col gap-3">
+      <section className={`${ui.card} flex items-center justify-between gap-3 py-2.5`}>
+        <p className="text-sm text-[#3D3D38]">
+          <span className="font-mono font-medium text-[#1B1B18]">{formatRange(period)}</span> ·{" "}
+          {period.holidays.length > 0 ? (
+            <>
+              공휴일 <span className="font-mono">{period.holidays.length}</span>일
+            </>
+          ) : (
+            "공휴일 없음"
+          )}{" "}
+          · 간호사 <span className="font-mono">{active}</span>명 · {carry}
+        </p>
+        <button type="button" aria-expanded={open} onClick={() => setOpen((o) => !o)} className={ui.textSm}>
+          {open ? "접기" : "바꾸기"}
+        </button>
+      </section>
 
       {carryOverChanged(period, periods) && (
         <div role="status" className={ui.banner}>
@@ -92,46 +114,50 @@ function PrepareStep({ period }: { period: WorkPeriod }) {
         </div>
       )}
 
-      <section className={`${ui.card} flex flex-col gap-3`}>
-        <div className="flex flex-col gap-1">
-          <h3 className={ui.cardTitle}>날짜</h3>
-          <p className="text-sm text-[#3D3D38]">
-            <span className="font-mono font-medium text-[#1B1B18]">{formatRange(period)}</span> ·{" "}
-            <span className="font-mono">{period.length}</span>일
-          </p>
-        </div>
-        <div className="flex flex-col gap-1">
-          <h3 className="text-[13px] font-semibold text-[#1B1B18]">공휴일</h3>
-          <p className={ui.help}>날짜를 누르면 공휴일로 체크돼요. 주말과 같은 인원 기준을 써요.</p>
-        </div>
-        <HolidayCalendar period={period} />
-      </section>
+      {open && (
+        <>
+          <section className={`${ui.card} flex flex-col gap-3`}>
+            <div className="flex flex-col gap-1">
+              <h3 className={ui.cardTitle}>날짜</h3>
+              <p className="text-sm text-[#3D3D38]">
+                <span className="font-mono font-medium text-[#1B1B18]">{formatRange(period)}</span> ·{" "}
+                <span className="font-mono">{period.length}</span>일
+              </p>
+            </div>
+            <div className="flex flex-col gap-1">
+              <h3 className="text-[13px] font-semibold text-[#1B1B18]">공휴일</h3>
+              <p className={ui.help}>날짜를 누르면 공휴일로 체크돼요. 주말과 같은 인원 기준을 써요.</p>
+            </div>
+            <HolidayCalendar period={period} />
+          </section>
 
-      <section className={`${ui.card} flex items-center justify-between gap-3`}>
-        <div className="flex flex-col gap-1">
-          <h3 className={ui.cardTitle}>명단 확인</h3>
-          <p className="text-sm text-[#3D3D38]">
-            간호사 <span className="font-mono">{active}</span>명
-            {hasPrevious &&
-              (added.length === 0 && deactivated.length === 0 ? (
-                " · 지난 근무표와 명단이 같아요"
-              ) : (
-                <>
-                  {" "}
-                  · 지난 근무표 이후 <span className="font-mono">{added.length}</span>명 추가 ·{" "}
-                  <span className="font-mono">{deactivated.length}</span>명 제외
-                </>
-              ))}
-          </p>
-          {added.length > 0 && <p className={ui.help}>추가: {names(added)}</p>}
-          {deactivated.length > 0 && <p className={ui.help}>제외: {names(deactivated)}</p>}
-        </div>
-        <button type="button" onClick={() => go({ screen: "settings", tab: "roster" })} className={ui.text}>
-          병동 설정
-        </button>
-      </section>
+          <section className={`${ui.card} flex items-center justify-between gap-3`}>
+            <div className="flex flex-col gap-1">
+              <h3 className={ui.cardTitle}>명단 확인</h3>
+              <p className="text-sm text-[#3D3D38]">
+                간호사 <span className="font-mono">{active}</span>명
+                {hasPrevious &&
+                  (added.length === 0 && deactivated.length === 0 ? (
+                    " · 지난 근무표와 명단이 같아요"
+                  ) : (
+                    <>
+                      {" "}
+                      · 지난 근무표 이후 <span className="font-mono">{added.length}</span>명 추가 ·{" "}
+                      <span className="font-mono">{deactivated.length}</span>명 제외
+                    </>
+                  ))}
+              </p>
+              {added.length > 0 && <p className={ui.help}>추가: {names(added)}</p>}
+              {deactivated.length > 0 && <p className={ui.help}>제외: {names(deactivated)}</p>}
+            </div>
+            <button type="button" onClick={() => go({ screen: "settings", tab: "roster" })} className={ui.text}>
+              병동 설정
+            </button>
+          </section>
 
-      <CarryOverSection period={period} />
+          <CarryOverSection period={period} />
+        </>
+      )}
     </div>
   );
 }
