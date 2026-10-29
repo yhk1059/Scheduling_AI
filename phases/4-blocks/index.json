@@ -21,7 +21,10 @@
     {
       "step": 2,
       "name": "solver-blocks",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-10-29T23:46:12+0900",
+      "summary": "backend/solver/select.py(people·days·matches·codes_matching·history_count·count_groups·count_bounds 등 순수 함수) 추가; model.py는 x[n,d,c]를 config 활성 코드로 만들고 ModelContext에 match·minutes·value·literal(코드 1개면 변수, 나머지 1개면 부정, 그 밖은 캐시한 보조 변수) 도우미, SHIFTS 상수 제거; hard/soft에 count(묶음 day·person·person_week·person_window, hours는 분 단위)·sequence(forbid·run max/min_len·after를 절로, CLAUSE_TEMPLATES 공유)·balance(spread + history 원본, hard는 max_gap) 등록, TOGGLEABLE에 블록 3종; stats에 공개 violations(request, assignments, c)(블록은 select.py로 평가, hard에도 사용, fixed_assignment 포함), NurseStats.counts·hours(기본값 있음), 한 사람·period·soft 세기 블록을 희망·기피로 집계; constants에 MINUTES_PER_HOUR·BASE_SHIFT_HOURS(시간 soft 위반량은 480분 단위 올림); gen_golden이 convert-cases.json(34케이스: 12종×토글·옵션·가중치·꺼짐 + 나이트 전담 규칙)도 쓰고 --check로 비교. 골든 동등성: feasible 7케이스 모두 블록(convert_request + history_raw, history_load 비움)으로 OPTIMAL·목적값 동일, 기록된 배정이 hard 블록 위반 0, summary·soft 위반 (id, 간호사, 날짜) 목록도 템플릿과 동일, infeasible 2케이스 유지; cases.json 변경 없음. 새 기능 테스트 24개(M, DE 더블, 주 52시간+이월, 7일 창, run.min_len, after 2일, 책임 태그, hard balance, 토요일 셀렉터, history 원본 고르게, 시간 위반 정규화, unsat core에 블록 id). pytest 429·vitest 172 통과, build·lint 통과. 결정: run.min_len은 왼쪽 경계도 알아야 검사(이월이 없으면 기간 첫날에 시작한 구간 제외); person_week 대표 날짜는 그 주의 기간 안 첫날, person_window는 창 끝날이고 창은 꽉 찬 것만; Days.days를 지정한 셀렉터는 이력 날짜를 고르지 않음; 이월 칸의 날짜 종류는 요일만 봄(공휴일 모름); 사람마다 대상 날짜 전부를 맞추거나(min=날짜 수) 피하는(max=0) per=person 세기는 어긴 날마다 위반 1개(템플릿 희망·휴가 목록과 같게); soft balance 시간 기준 허용치는 FAIRNESS_TOLERANCE×8시간; 끈 코드가 previous에 있으면 DIFF_WEIGHT 상수, fixed가 끈 코드면 그 리터럴은 거짓; Nurse.night_only 솔버 처리와 history_load 템플릿 경로는 그대로 둠(step 6)",
+      "completed_at": "2026-10-29T23:56:39+0900"
     },
     {
       "step": 3,
