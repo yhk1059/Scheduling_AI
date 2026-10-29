@@ -1,6 +1,8 @@
-// docs/BROWSER_TEST_SCENARIOS.md S3, S4. 샘플 병동(오늘 2026-10-28 기준: 10월 운영 중 + 11월 작성 중)을 이어 쓰는 흐름이라
+// docs/BROWSER_TEST_SCENARIOS.md S3, S4. 운영 중인 병동(D3, 오늘 2026-10-28 기준: 10월 운영 중 + 11월 작성 중)을 이어 쓰는 흐름이라
 // 페이지 하나를 공유하며 순서대로 돈다. 게스트 모드만 다룬다(ADR-014). LLM은 mock하지 않는다(ADR-013).
 import { type BrowserContext, expect, type Page, test } from "@playwright/test";
+
+import wardOct from "./fixtures/ward-oct.json";
 
 import type { PeriodRange } from "../lib/period";
 import type { HistoryLoad, ScheduleRequest } from "../lib/types.gen";
@@ -75,17 +77,19 @@ async function solve(action: () => Promise<void>) {
   return status;
 }
 
-test("S3. 샘플 체험: 다음 근무표 만들기와 게스트 확정", async () => {
+test("S3. 운영 중인 병동: 다음 근무표 만들기와 게스트 확정", async () => {
   const apiCalls: string[] = [];
   const onRequest = (r: { url: () => string }) => {
     if (new URL(r.url()).pathname.startsWith("/api/")) apiCalls.push(r.url());
   };
   page.on("request", onRequest);
+  // 저장된 게스트 입력(D3)을 넣고 다시 연다
   await page.goto("/app");
-  await page.getByRole("button", { name: "샘플로 체험하기" }).click();
+  await page.evaluate((doc) => localStorage.setItem("nurse-scheduler", JSON.stringify(doc)), wardOct);
+  await page.reload();
 
   // 병동 홈
-  await expect(page.getByRole("heading", { name: "샘플 병동", level: 1 })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "외과 병동", level: 1 })).toBeVisible();
   await expect(page.getByRole("main")).toContainText("간호사 15명 · 병동 규칙 6개 · 한 달 단위");
   const operating = sectionWith("10월 근무표");
   await expect(operating.getByText("운영 중", { exact: true })).toBeVisible();
@@ -99,8 +103,8 @@ test("S3. 샘플 체험: 다음 근무표 만들기와 게스트 확정", async 
   await expect(primaryButtons(page)).toHaveText("이어서 하기");
   await expect(page.getByText("확정한 근무표가 여기에 쌓여요.")).toBeVisible();
   page.off("request", onRequest);
-  expect(apiCalls, "샘플을 열 때 API를 부르지 않는다").toEqual([]);
-  await expectNoDevTerms(page, "샘플 병동 홈");
+  expect(apiCalls, "병동 홈을 열 때 API를 부르지 않는다").toEqual([]);
+  await expectNoDevTerms(page, "병동 홈");
   octGrid = await confirmedGrid(page, OCT.start_date);
 
   // ① 준비: 지난 근무 마지막 며칠(10월 확정본에서)
@@ -114,7 +118,7 @@ test("S3. 샘플 체험: 다음 근무표 만들기와 게스트 확정", async 
   for (const [name, row] of Object.entries(octGrid)) expect(carry[name], `${name} 지난 근무`).toEqual(row.slice(-CARRY_OVER_DAYS));
   await expectNoDevTerms(page, "① 준비");
 
-  // ② 요청: 샘플 요청 3개가 적용된 상태
+  // ② 요청: 요청 3개가 적용된 상태
   await page.getByRole("button", { name: "다음" }).click();
   await expect(page.getByRole("heading", { name: "요청", exact: true })).toBeVisible();
   await expect(pendingCards(page)).toHaveCount(0);
@@ -185,10 +189,10 @@ test("S3. 샘플 체험: 다음 근무표 만들기와 게스트 확정", async 
   await expect(primaryButtons(page)).toHaveCount(1);
   await expect(primaryButtons(page)).toHaveText("12월 근무표 만들기");
   await expect(sectionWith("10월 근무표")).toBeVisible();
-  await expectNoDevTerms(page, "샘플 병동 홈(11월 확정 후)");
+  await expectNoDevTerms(page, "병동 홈(11월 확정 후)");
 });
 
-test("S4. 샘플 운영 중 변경 → 최소 변경 → 다시 확정 → 다음 근무표 배너", async () => {
+test("S4. 운영 중 변경 → 최소 변경 → 다시 확정 → 다음 근무표 배너", async () => {
   await sectionWith("10월 근무표").getByRole("button", { name: "열기" }).click();
   await expect(page.getByRole("heading", { level: 1 })).toHaveText("10월 근무표");
   await expect(page.getByRole("heading", { level: 1 }).locator("..")).toContainText("운영 중");

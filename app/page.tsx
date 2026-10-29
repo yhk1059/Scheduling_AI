@@ -71,7 +71,7 @@ export default function Home() {
           </p>
           <div className="flex items-center gap-2">
             <Link
-              href="/app?start=sample"
+              href="/demo"
               className="inline-flex h-11 items-center gap-2 rounded-md border border-[#155E75] bg-[#155E75] px-[18px] text-[15px] font-medium text-white transition-colors duration-[120ms] hover:bg-[#0E4A5C]"
             >
               샘플로 체험하기
@@ -87,7 +87,7 @@ export default function Home() {
             </a>
           </div>
           <p className="text-xs font-medium text-[#66665E]">
-            로그인 없이 바로 써 볼 수 있어요. 샘플 병동에는 간호사 15명과 이번 달 근무표가 들어 있어요.
+            로그인 없이 바로 써 볼 수 있어요. 샘플에서는 간호사 15명 병동의 규칙과 한 달 근무표를 볼 수 있어요.
           </p>
         </div>
         <LandingPreview />

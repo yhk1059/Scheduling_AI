@@ -15,7 +15,6 @@ import {
   sameCarryOver,
 } from "./continuity";
 import { firstPeriodStart, monthDay, nextPeriod, periodFrom, type PeriodRange, type PeriodUnit } from "./period";
-import { buildSample } from "./sample";
 import { deleteWard, loadWard, saveWard, supabaseConfigured, type AuthUser } from "./supabase";
 import type {
   CarryOverRow,
@@ -62,8 +61,6 @@ export interface Ward {
   pendingRules: ConstraintSpec[];
   /** 카드 표시 순서(새 카드가 앞). 적용해도 바뀌지 않는다. 옛 저장본에는 없다 */
   cardOrder?: string[];
-  /** 샘플에서 시작했는지(로그인 시 질문에 쓴다) */
-  isSample: boolean;
 }
 
 export interface PeriodVersion {
@@ -119,7 +116,7 @@ export interface WardRemote {
 }
 
 export type SyncStatus = "guest" | "loading" | "saving" | "saved" | "error";
-export type LoginPrompt = null | { kind: "sample-choice" } | { kind: "server-replaced-guest" };
+export type LoginPrompt = null | { kind: "server-replaced-guest" };
 
 export interface AppState extends Data {
   storageAvailable: boolean;
@@ -131,8 +128,6 @@ export interface AppState extends Data {
   loginPrompt: LoginPrompt;
   /** 로그인 직후(세션 복원 포함) 한 번. 서버 문서가 있으면 서버 우선, 없으면 게스트 상태를 올린다. */
   signedIn: (user: AuthUser) => Promise<void>;
-  /** sample-choice 답. keep이면 샘플을 내 병동으로, 아니면 빈 병동으로 올린다. */
-  chooseSample: (keep: boolean) => Promise<void>;
   dismissLoginPrompt: () => void;
   retrySave: () => Promise<void>;
   /** 이 브라우저의 상태와 localStorage 키를 지운다. 서버 문서는 그대로 둔다. */
@@ -141,8 +136,6 @@ export interface AppState extends Data {
   deleteWardData: () => Promise<void>;
   // 병동
   startWard: () => void;
-  /** 샘플 병동(운영 중인 이번 달 확정본 + 다음 달 초안)을 만들고 홈으로 간다. */
-  loadSample: (today: string) => void;
   setWardName: (name: string) => void;
   setUnit: (unit: PeriodUnit) => void;
   setCoverage: (shift: Shift, dayKind: DayKind, min: number, max: number) => void;
@@ -193,7 +186,7 @@ function initialData(): Data {
 }
 
 function emptyWard(): Ward {
-  return { name: "", unit: "month", nurses: [], nextNurseNo: 1, rules: [], pendingRules: [], isSample: false };
+  return { name: "", unit: "month", nurses: [], nextNurseNo: 1, rules: [], pendingRules: [] };
 }
 
 function newPeriod(range: PeriodRange): WorkPeriod {
@@ -617,20 +610,7 @@ export function createAppStore(getStorage: () => Storage, now: () => Date = () =
               ready = true;
               return;
             }
-            const { ward } = get();
-            if (ward?.isSample) {
-              set({ loginPrompt: { kind: "sample-choice" } });
-              return;
-            }
-            if (guest) set({ ward: ward && { ...ward, isSample: false } });
-            else replace(emptyWardData());
-            await upload();
-          },
-          chooseSample: async (keep) => {
-            const { ward, auth } = get();
-            if (!remote || !auth || ready) return;
-            if (keep) set({ ward: ward && { ...ward, isSample: false }, loginPrompt: null });
-            else replace(emptyWardData(), { loginPrompt: null });
+            if (!guest) replace(emptyWardData());
             await upload();
           },
           dismissLoginPrompt: () => set({ loginPrompt: null }),
@@ -659,11 +639,6 @@ export function createAppStore(getStorage: () => Storage, now: () => Date = () =
           },
 
           startWard: () => bump({ ward: emptyWard(), periods: [], view: { screen: "settings", tab: "roster" } }),
-          loadSample: (today) => {
-            let n = 0;
-            const { ward, periods } = buildSample(today, () => `p-sample-${++n}`);
-            bump({ ward, periods, view: { screen: "home" } });
-          },
           setWardName: (name) => editWard((w) => ({ ...w, name })),
           setUnit: (unit) => editWard((w) => ({ ...w, unit })),
           setCoverage: (shift, dayKind, min, max) =>

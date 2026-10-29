@@ -8,8 +8,7 @@ import { unitShort } from "@/lib/wording";
 
 import { AccountBar, LoginPromptDialog } from "./Account";
 import PeriodWork from "./PeriodWork";
-import { today } from "./RulesStep";
-import StartScreen, { type StartIntent } from "./StartScreen";
+import StartScreen from "./StartScreen";
 import { ui } from "./ui";
 import WardHome, { isWardReady } from "./WardHome";
 import WardSettings from "./WardSettings";
@@ -24,31 +23,23 @@ export default function AppShell() {
   const auth = useAppStore((s) => s.auth);
   const syncStatus = useAppStore((s) => s.sync.status);
   const retrySave = useAppStore((s) => s.retrySave);
-  // 병동이 있으면(게스트 입력 포함) 바로 들어간다. 게스트는 [시작 화면]으로 샘플·새로 시작을 다시 고를 수 있다(PRD J0)
+  // 병동이 있으면(게스트 입력 포함) 바로 들어간다. 게스트는 [시작 화면]으로 새로 시작을 다시 고를 수 있다(PRD J0)
   const [showStart, setShowStart] = useState(false);
   // 첫 세션 확인 전에는 시작 화면을 띄우지 않는다
   const [authChecked, setAuthChecked] = useState(!supabaseConfigured);
   const loading = !authChecked || (auth !== null && syncStatus === "loading");
-  // 랜딩의 [샘플로 체험하기] / [내 병동으로 시작하기]: /app?start=sample|new
-  const [intent, setIntent] = useState<StartIntent | null>(() => {
-    const v = new URLSearchParams(window.location.search).get("start");
-    return v === "sample" || v === "new" ? v : null;
-  });
-  // 게스트가 다른 쪽(샘플 / 내 병동) 입력을 갖고 있으면 지우기 전에 확인한다. 로그인 사용자는 내 병동으로 들어간다
-  const confirmIntent =
-    intent !== null && auth === null && ward !== null && (intent === "sample") !== ward.isSample ? intent : null;
-  const started = !showStart && confirmIntent === null && ward !== null && !loading;
-  const intentHandled = useRef(false);
+  // 랜딩의 [내 병동으로 시작하기]: /app?start=new. 병동이 이미 있으면(로그인·게스트 입력) 그대로 들어간다
+  const [startNew] = useState(() => new URLSearchParams(window.location.search).get("start") === "new");
+  const started = !showStart && ward !== null && !loading;
+  const startHandled = useRef(false);
 
   useEffect(() => {
-    if (!intent || loading || intentHandled.current) return;
-    intentHandled.current = true;
+    if (!startNew || loading || startHandled.current) return;
+    startHandled.current = true;
     window.history.replaceState(null, "", "/app");
     const s = useAppStore.getState();
-    if (s.auth !== null || s.hasInput()) return;
-    if (intent === "sample") s.loadSample(today());
-    else s.startWard();
-  }, [intent, loading]);
+    if (s.auth === null && !s.hasInput()) s.startWard();
+  }, [startNew, loading]);
 
   // 들어올 때 병동이 준비 전이면 근무표 목록 대신 병동 설정부터 연다
   useEffect(() => {
@@ -145,13 +136,7 @@ export default function AppShell() {
             불러오는 중…
           </p>
         ) : !started ? (
-          <StartScreen
-            intent={confirmIntent}
-            onDone={() => {
-              setShowStart(false);
-              setIntent(null);
-            }}
-          />
+          <StartScreen onDone={() => setShowStart(false)} />
         ) : view.screen === "home" ? (
           <WardHome />
         ) : view.screen === "settings" ? (

@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 
 import sample from "@/lib/samples/ward-15.json";
@@ -10,17 +11,13 @@ import { scheduleName, wardRuleCount } from "@/lib/wording";
 
 import { PrivacyLink } from "./Account";
 import Dialog from "./Dialog";
-import { today } from "./RulesStep";
 import { ui } from "./ui";
 
 const SCREEN_LABELS: Record<Exclude<View["screen"], "period">, string> = { home: "근무표 목록", settings: "병동 설정" };
 const SAMPLE_NURSES = sample.nurses.length;
 const SAMPLE_RULES = wardRuleCount(sample.constraints as ConstraintSpec[]);
 
-export type StartIntent = "sample" | "new";
-
-/** intent가 있으면(랜딩에서 고르고 왔는데 다른 입력이 있으면) 지우기 확인부터 연다. */
-export default function StartScreen({ intent, onDone }: { intent: StartIntent | null; onDone: () => void }) {
+export default function StartScreen({ onDone }: { onDone: () => void }) {
   const hasInput = useAppStore((s) => s.hasInput());
   // 이어서 갈 화면 이름. 근무표 화면이면 "11월 근무표"
   const screenLabel = useAppStore((s) => {
@@ -29,22 +26,16 @@ export default function StartScreen({ intent, onDone }: { intent: StartIntent | 
     return p && s.ward ? scheduleName(p, s.ward.unit) : "근무표";
   });
   const nurseCount = useAppStore((s) => s.ward?.nurses.filter((n) => n.active).length ?? 0);
-  const loadSample = useAppStore((s) => s.loadSample);
   const startWard = useAppStore((s) => s.startWard);
   const showLogin = useAppStore((s) => supabaseConfigured && s.auth === null);
-  const [pending, setPending] = useState<StartIntent | null>(intent);
+  const [pending, setPending] = useState(false);
 
-  const sample = () => {
-    loadSample(today());
-    onDone();
-  };
   const fresh = () => {
     startWard();
     onDone();
   };
-  const run = (kind: StartIntent) => (kind === "sample" ? sample() : fresh());
   // 입력이 있으면 지우기 전에 확인한다
-  const start = (kind: StartIntent) => (hasInput ? setPending(kind) : run(kind));
+  const start = () => (hasInput ? setPending(true) : fresh());
 
   const options = [
     ...(hasInput
@@ -59,15 +50,15 @@ export default function StartScreen({ intent, onDone }: { intent: StartIntent | 
       : []),
     {
       title: "샘플로 체험하기",
-      body: `간호사 ${SAMPLE_NURSES}명과 병동 규칙 ${SAMPLE_RULES}개, 이번 달 확정 근무표가 들어 있어요. 다음 달 근무표를 바로 만들어 볼 수 있어요.`,
+      body: `간호사 ${SAMPLE_NURSES}명과 병동 규칙 ${SAMPLE_RULES}개로 만든 한 달 근무표를 볼 수 있어요. 지금 입력은 그대로 남아요.`,
       action: "샘플로 체험하기",
-      onClick: () => start("sample"),
+      href: "/demo",
     },
     {
       title: "내 병동으로 시작하기",
       body: "빈 병동에서 명단과 필요 인원부터 입력해요. 엑셀 명단을 붙여넣거나 CSV 파일로 올릴 수 있어요.",
       action: "내 병동으로 시작하기",
-      onClick: () => start("new"),
+      onClick: start,
     },
   ];
 
@@ -83,9 +74,15 @@ export default function StartScreen({ intent, onDone }: { intent: StartIntent | 
             <h2 className={ui.cardTitle}>{o.title}</h2>
             <p className="flex-1 text-sm leading-relaxed text-[#3D3D38]">{o.body}</p>
             <div>
-              <button type="button" onClick={o.onClick} className={i === 0 ? ui.primary : ui.secondary}>
-                {o.action}
-              </button>
+              {o.href ? (
+                <Link href={o.href} className={i === 0 ? ui.primary : ui.secondary}>
+                  {o.action}
+                </Link>
+              ) : (
+                <button type="button" onClick={o.onClick} className={i === 0 ? ui.primary : ui.secondary}>
+                  {o.action}
+                </button>
+              )}
             </div>
           </section>
         ))}
@@ -99,14 +96,13 @@ export default function StartScreen({ intent, onDone }: { intent: StartIntent | 
       {pending && (
         <Dialog
           title="지금 입력을 지우고 새로 시작할까요?"
-          onClose={() => setPending(null)}
-          secondary={{ label: "취소", onClick: () => setPending(null) }}
+          onClose={() => setPending(false)}
+          secondary={{ label: "취소", onClick: () => setPending(false) }}
           primary={{
             label: "지우고 시작",
             onClick: () => {
-              const kind = pending;
-              setPending(null);
-              run(kind);
+              setPending(false);
+              fresh();
             },
           }}
         >

@@ -4,6 +4,7 @@
 ```
 app/                  # Next.js 페이지 (UI 세부는 UI_GUIDE 확정 후)
 ├── page.tsx          # 랜딩 (/) — 정적, API 호출 없음
+├── demo/page.tsx     # 샘플 데모 (/demo) — 정적, 보기 전용, 저장 없음 (ADR-016)
 └── app/page.tsx      # 앱 (/app) — 시작, 병동 홈, 병동 설정, 기간 작업 (PRD 화면)
 components/           # UI 컴포넌트
 lib/
@@ -13,7 +14,7 @@ lib/
 ├── roster-import.ts  # 명단/이월 붙여넣기 파싱 (순수 함수)
 ├── csv.ts            # CSV 직렬화 (순수 함수)
 ├── types.gen.ts      # Pydantic JSON Schema에서 생성 (직접 수정 금지)
-└── samples/ward-15.json
+└── samples/         # ward-15.json(샘플 병동), demo-schedule.json(데모 근무표, npm run gen:demo)
 api/index.py          # Vercel Python 함수 진입점 (import만 함)
 backend/              # FastAPI 앱 (무상태)
 ├── routes.py         # HTTP 계층, solver와 llm 오케스트레이션
@@ -22,6 +23,7 @@ backend/              # FastAPI 앱 (무상태)
 ├── solver/           # CP-SAT: model, hard, soft, stats, conflicts — llm을 import하지 않음
 ├── llm/              # client, translator, explainer, prompts, pseudonym — solver를 import하지 않음
 ├── gen_types.py      # JSON Schema → lib/types.gen.ts
+├── gen_demo.py       # 샘플 병동 → lib/samples/demo-schedule.json
 └── tests/
 eval/                 # dataset.jsonl, run.py, results.md
 e2e/                  # Playwright 데모 저니 (수동 실행, 실제 API, 게스트 모드, ADR-013)
