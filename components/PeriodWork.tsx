@@ -17,7 +17,7 @@ import { ui } from "./ui";
 /** 기간 작업: 제목(근무표 이름 + 날짜 범위 + 상태 배지) + 스테퍼 ① 준비 → ② 요청 → ③ 근무표. */
 export default function PeriodWork() {
   const period = useAppStore(currentPeriod);
-  const step = useAppStore((s) => (s.view.screen === "period" ? s.view.step : 1));
+  const step = useAppStore((s) => (s.view.screen === "period" ? s.view.step : 2));
   const go = useAppStore((s) => s.go);
   const unit = useAppStore((s) => s.ward?.unit ?? "month");
 
@@ -52,13 +52,14 @@ export default function PeriodWork() {
             <span className={`${ui.badge} bg-[#E6F2EA] text-[#1E6B3F]`}>확정</span>
           )}
         </div>
-        <Stepper current={step} reached={period.result ? 3 : step} onSelect={toStep} />
+        <Stepper current={step} reached={period.result ? 2 : step} onSelect={toStep} />
       </div>
 
       {step === 1 ? (
-        <PrepareStep period={period} onNext={() => toStep(2)} />
-      ) : step === 2 ? (
-        <RulesStep key={period.id} scope="period" />
+        <>
+          <PrepareStep period={period} />
+          <RulesStep key={period.id} scope="period" />
+        </>
       ) : (
         <ScheduleStep key={period.id} />
       )}
@@ -66,7 +67,7 @@ export default function PeriodWork() {
   );
 }
 
-function PrepareStep({ period, onNext }: { period: WorkPeriod; onNext: () => void }) {
+function PrepareStep({ period }: { period: WorkPeriod }) {
   const ward = useAppStore((s) => s.ward);
   const periods = useAppStore((s) => s.periods);
   const go = useAppStore((s) => s.go);
@@ -85,7 +86,7 @@ function PrepareStep({ period, onNext }: { period: WorkPeriod; onNext: () => voi
       {carryOverChanged(period, periods) && (
         <div role="status" className={ui.banner}>
           지난 근무표가 바뀌어 이어지는 근무가 달라졌어요. 다시 만들면 반영돼요
-          <button type="button" onClick={() => go({ screen: "period", periodId: period.id, step: 3 })} className={ui.textSm}>
+          <button type="button" onClick={() => go({ screen: "period", periodId: period.id, step: 2 })} className={ui.textSm}>
             근무표로
           </button>
         </div>
@@ -131,12 +132,6 @@ function PrepareStep({ period, onNext }: { period: WorkPeriod; onNext: () => voi
       </section>
 
       <CarryOverSection period={period} />
-
-      <div className="flex justify-end">
-        <button type="button" onClick={onNext} className={ui.primary}>
-          다음
-        </button>
-      </div>
     </div>
   );
 }

@@ -11,14 +11,13 @@ import {
   ROSTER_HEADER,
   ROSTER_TEMPLATE_CSV,
 } from "@/lib/roster-import";
-import { isNurseUsed, orphanConstraintIds, useAppStore, type WardNurse } from "@/lib/store";
+import { hasCoverage, isNurseUsed, isWardReady, orphanConstraintIds, useAppStore, type WardNurse } from "@/lib/store";
 import { unitName } from "@/lib/wording";
 
 import CoverageForm, { type CoverageDrafts, hasCoverageError } from "./CoverageForm";
 import RosterEditor, { type RosterDraft } from "./RosterEditor";
 import RulesStep, { today } from "./RulesStep";
 import { ui } from "./ui";
-import { hasCoverage, isWardReady } from "./WardHome";
 
 const TABS = [
   { tab: "roster", label: "명단·필요 인원" },

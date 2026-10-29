@@ -8,6 +8,8 @@ import {
   hardnessLabel,
   nextTask,
   scheduleName,
+  TASK_STEPS,
+  taskDoneSteps,
   TEMPLATE_NAMES,
   unitName,
   unitShort,
@@ -221,5 +223,19 @@ describe("nextTask", () => {
 
   it("주 단위 병동은 날짜로 이름을 붙인다", () => {
     expect(nextTask({ ...ward, unit: "2w" }, [], TODAY)).toEqual({ kind: "none", name: "11/2~11/15 근무표" });
+  });
+});
+
+describe("taskDoneSteps", () => {
+  it("홈 진행 단계는 요청 → 근무표 → 확정 세 칸이다", () => {
+    expect(TASK_STEPS).toEqual(["요청", "근무표", "확정"]);
+  });
+
+  it("상태별로 끝난 단계 수를 센다", () => {
+    expect(taskDoneSteps({ kind: "none", name: "" })).toBe(0);
+    expect(taskDoneSteps({ kind: "drafting", name: "", requests: 0 })).toBe(0);
+    expect(taskDoneSteps({ kind: "drafting", name: "", requests: 2 })).toBe(1);
+    expect(taskDoneSteps({ kind: "generated", name: "" })).toBe(2);
+    expect(taskDoneSteps({ kind: "confirmed", name: "", confirmedAt: "" })).toBe(3);
   });
 });

@@ -120,7 +120,7 @@ export default function RulesStep({ scope }: { scope: "ward" | "period" }) {
     if (orphanCount > 0) {
       setBlocked(true);
     } else {
-      go({ screen: "period", periodId: period.id, step: 3 });
+      go({ screen: "period", periodId: period.id, step: 2 });
     }
   };
 

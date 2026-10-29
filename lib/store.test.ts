@@ -1,19 +1,25 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
+  canRevertToConfirmed,
   carryOverChanged,
   cardsInOrder,
   createAppStore,
   currentPeriod,
   findReplaced,
+  hasCoverage,
   hasUnconfirmedChanges,
   homeSummary,
   isNurseUsed,
+  isWardReady,
   orphanConstraintIds,
+  prepareNeedsReview,
   rosterChangesFor,
   SAVE_DEBOUNCE_MS,
   STORAGE_KEY,
+  setupStep,
   toScheduleRequest,
+  viewForPeriod,
   type WardRemote,
 } from "./store";
 import type { ConstraintSpec, ScheduleResult } from "./types.gen";
@@ -96,12 +102,12 @@ describe("초기 상태", () => {
 });
 
 describe("병동", () => {
-  it("startWard는 빈 병동을 만들고 병동 설정으로 간다", () => {
+  it("startWard는 빈 병동을 만들고 처음 설정 ①로 간다", () => {
     const store = fresh();
     store.getState().startWard();
     const s = store.getState();
     expect(s.ward).toMatchObject({ name: "", unit: "month", nurses: [], nextNurseNo: 1, rules: [] });
-    expect(s.view).toEqual({ screen: "settings", tab: "roster" });
+    expect(s.view).toEqual({ screen: "setup", step: 1 });
     expect(s.hasInput()).toBe(true);
     expect(s.inputVersion).toBe(1);
   });
@@ -444,9 +450,9 @@ describe("기간 입력", () => {
     const { store, id } = withPeriod();
     const v = store.getState().inputVersion;
     store.getState().go({ screen: "settings", tab: "rules" });
-    store.getState().go({ screen: "period", periodId: id, step: 3 });
+    store.getState().go({ screen: "period", periodId: id, step: 2 });
     expect(store.getState().inputVersion).toBe(v);
-    expect(store.getState().view).toEqual({ screen: "period", periodId: id, step: 3 });
+    expect(store.getState().view).toEqual({ screen: "period", periodId: id, step: 2 });
   });
 });
 
@@ -581,9 +587,82 @@ describe("confirm", () => {
     store.getState().confirm(id);
     const p = period();
     expect(p.status).toBe("confirmed");
-    expect(p.versions).toEqual([{ confirmed_at: CONFIRMED_AT.toISOString(), assignments: { n01: ["D"], n02: ["O"] }, changed: [] }]);
+    expect(p.versions).toEqual([
+      {
+        confirmed_at: CONFIRMED_AT.toISOString(),
+        assignments: { n01: ["D"], n02: ["O"] },
+        changed: [],
+        requests: [],
+        result: result({ n01: ["D"], n02: ["O"] }),
+      },
+    ]);
     expect(p.snapshot!.nurses.map((n) => n.id)).toEqual(["n01", "n02"]);
     expect(p.snapshot!.rules.map((c) => c.params)).toEqual([{ days: 3 }]);
+  });
+
+  it("확정하면 확정 근무표 화면으로 옮기고, 결과가 없으면 화면을 그대로 둔다", () => {
+    const { store, id } = withPeriod();
+    store.getState().confirm(id);
+    expect(store.getState().view).toEqual({ screen: "period", periodId: id, step: 1 });
+    store.getState().setResult(id, result({ n01: ["D"], n02: ["O"] }), []);
+    store.getState().go({ screen: "period", periodId: id, step: 2 });
+    store.getState().confirm(id);
+    expect(store.getState().view).toEqual({ screen: "confirmed", periodId: id });
+  });
+});
+
+describe("변경 취소", () => {
+  const leave = card({ id: "sick", type: "leave", scope: "period", params: { nurse_id: "n01", days: [5] } });
+
+  it("마지막 확정본의 배정·결과와 요청으로 되돌리고 inputVersion을 올린다", () => {
+    const { store, id, period } = withConfirmed(fill(30, "D"), fill(30, "O"));
+    expect(canRevertToConfirmed(period())).toBe(false); // 바뀐 것이 없다
+
+    store.getState().addPendingRequests(id, [leave]);
+    store.getState().applyRequest(id, "sick");
+    const changed = fill(30, "D");
+    changed[4] = "O";
+    store.getState().setResult(id, result({ n01: changed, n02: fill(30, "O") }), []);
+    expect(canRevertToConfirmed(period())).toBe(true);
+
+    const v = store.getState().inputVersion;
+    store.getState().revertToConfirmed(id);
+    const p = period();
+    expect(p.requests).toEqual([]);
+    expect(p.result!.assignments).toEqual({ n01: fill(30, "D"), n02: fill(30, "O") });
+    expect(store.getState().inputVersion).toBe(v + 1);
+    expect(p.resultVersion).toBe(v + 1); // 되돌린 결과는 stale이 아니다
+    expect(hasUnconfirmedChanges(p)).toBe(false);
+    expect(canRevertToConfirmed(p)).toBe(false);
+    expect(p.versions).toHaveLength(1);
+  });
+
+  it("요청만 바뀌어도(다시 만들기 전) 되돌릴 수 있다", () => {
+    const { store, id, period } = withConfirmed();
+    store.getState().addPendingRequests(id, [leave]);
+    store.getState().applyRequest(id, "sick");
+    expect(canRevertToConfirmed(period())).toBe(true);
+  });
+
+  it("요청을 남기지 않은 옛 버전은 되돌릴 수 없고 revertToConfirmed는 아무것도 하지 않는다", () => {
+    const { store, id, period } = withConfirmed(fill(30, "D"), fill(30, "O"));
+    const old = { ...period().versions[0] };
+    delete (old as Partial<typeof old>).requests;
+    delete (old as Partial<typeof old>).result;
+    store.setState({ periods: store.getState().periods.map((p) => (p.id === id ? { ...p, versions: [old] } : p)) });
+    const changed = fill(30, "D");
+    changed[4] = "O";
+    store.getState().setResult(id, result({ n01: changed, n02: fill(30, "O") }), []);
+    expect(canRevertToConfirmed(period())).toBe(false);
+    const before = period();
+    store.getState().revertToConfirmed(id);
+    expect(period()).toBe(before);
+  });
+
+  it("초안 기간은 되돌릴 수 없다", () => {
+    const { store, id, period } = withPeriod();
+    store.getState().setResult(id, result({ n01: ["D"] }), []);
+    expect(canRevertToConfirmed(period())).toBe(false);
   });
 });
 
@@ -994,13 +1073,13 @@ describe("로그인 분기", () => {
     expect(store.getState().sync).toEqual({ status: "saved", savedAt: "2026-10-28T07:00:00.000Z" });
   });
 
-  it("둘 다 없으면 빈 병동을 올리고 병동 설정으로 간다", async () => {
+  it("둘 다 없으면 빈 병동을 올리고 처음 설정 ①로 간다", async () => {
     const f = fakeRemote();
     const store = synced(f.remote);
     await store.getState().signedIn(USER);
     const s = store.getState();
     expect(s.ward).toMatchObject({ name: "", nurses: [] });
-    expect(s.view).toEqual({ screen: "settings", tab: "roster" });
+    expect(s.view).toEqual({ screen: "setup", step: 1 });
     expect(f.calls.save).toHaveLength(1);
   });
 
@@ -1203,7 +1282,7 @@ describe("로그아웃과 데이터 삭제", () => {
     expect(f.calls.remove).toBe(0);
   });
 
-  it("deleteWardData는 서버 문서를 지우고 빈 병동 + 병동 설정, 로그인은 유지한다", async () => {
+  it("deleteWardData는 서버 문서를 지우고 빈 병동 + 처음 설정 ①, 로그인은 유지한다", async () => {
     const f = fakeRemote();
     const { store } = withPeriodSynced(f.remote);
     await store.getState().signedIn(USER);
@@ -1212,7 +1291,7 @@ describe("로그아웃과 데이터 삭제", () => {
     expect(f.calls.remove).toBe(1);
     expect(s.ward).toMatchObject({ name: "", nurses: [] });
     expect(s.periods).toEqual([]);
-    expect(s.view).toEqual({ screen: "settings", tab: "roster" });
+    expect(s.view).toEqual({ screen: "setup", step: 1 });
     expect(s.auth).toEqual({ userId: "u1", email: "nurse@example.com" });
     await vi.advanceTimersByTimeAsync(SAVE_DEBOUNCE_MS * 2);
     expect(f.calls.save).toHaveLength(1);
@@ -1225,5 +1304,133 @@ describe("로그아웃과 데이터 삭제", () => {
     await store.getState().signedIn(USER);
     await expect(store.getState().deleteWardData()).rejects.toThrow("network");
     expect(store.getState().periods).toHaveLength(1);
+  });
+});
+
+describe("병동 준비와 처음 설정 단계", () => {
+  const COVERAGE = ["D", "E", "N"] as const;
+  function fullCoverage(store: ReturnType<typeof createAppStore>) {
+    for (const shift of COVERAGE) {
+      store.getState().setCoverage(shift, "weekday", 1, 2);
+      store.getState().setCoverage(shift, "weekend", 1, 2);
+    }
+  }
+
+  it("명단이 없으면 ①, 필요 인원이 다 없으면 ②, 그 밖은 ③", () => {
+    const store = fresh();
+    store.getState().startWard();
+    const ward = () => store.getState().ward!;
+    expect([setupStep(ward()), hasCoverage(ward()), isWardReady(ward())]).toEqual([1, false, false]);
+    store.getState().addNurses(rows);
+    store.getState().setCoverage("D", "weekday", 1, 2);
+    expect([setupStep(ward()), hasCoverage(ward()), isWardReady(ward())]).toEqual([2, false, false]);
+    fullCoverage(store);
+    expect([setupStep(ward()), hasCoverage(ward()), isWardReady(ward())]).toEqual([3, true, true]);
+    // 모두 근무표에서 빼면 명단이 없는 것으로 본다
+    store.getState().setNurseActive("n01", false);
+    store.getState().setNurseActive("n02", false);
+    expect([setupStep(ward()), isWardReady(ward())]).toEqual([1, false]);
+  });
+});
+
+describe("viewForPeriod", () => {
+  it("확정 → 확정 근무표, 결과 있음 → 작성 ②, 그 밖 → 작성 ①", () => {
+    const { store, id, period } = withPeriod();
+    expect(viewForPeriod(period())).toEqual({ screen: "period", periodId: id, step: 1 });
+    store.getState().setResult(id, result({ n01: ["D"], n02: ["O"] }), []);
+    expect(viewForPeriod(period())).toEqual({ screen: "period", periodId: id, step: 2 });
+    store.getState().confirm(id);
+    expect(viewForPeriod(period())).toEqual({ screen: "confirmed", periodId: id });
+  });
+
+  it("createPeriod는 결과가 있는 초안을 작성 ②로 연다", () => {
+    const { store, id } = withPeriod();
+    store.getState().setResult(id, result({ n01: ["D"], n02: ["O"] }), []);
+    store.getState().go({ screen: "home" });
+    store.getState().createPeriod(TODAY);
+    expect(store.getState().view).toEqual({ screen: "period", periodId: id, step: 2 });
+  });
+
+  it("currentPeriod는 확정 근무표 화면의 기간도 고른다", () => {
+    const { store, id } = withConfirmed();
+    store.getState().createPeriod(TODAY);
+    store.getState().go({ screen: "confirmed", periodId: id });
+    expect(currentPeriod(store.getState())?.id).toBe(id);
+  });
+});
+
+describe("prepareNeedsReview", () => {
+  it("첫 근무표와 변동이 없는 근무표는 접고, 명단이 바뀌거나 이어지는 근무가 바뀌면 펼친다", () => {
+    const { store, id } = withConfirmed(fill(30, "D"), fill(30, "O"));
+    const nextId = store.getState().createPeriod(TODAY)!;
+    const review = () => prepareNeedsReview(store.getState().ward!, store.getState().periods, nextId);
+    expect(prepareNeedsReview(store.getState().ward!, store.getState().periods, id)).toBe(false);
+    expect(review()).toBe(false);
+
+    store.getState().addNurses([{ name: "김철수", years: 7, night_only: false }]);
+    expect(review()).toBe(true);
+    store.getState().setNurseActive("n03", false);
+    expect(review()).toBe(false); // 추가했다가 뺀 사람은 변동이 아니다
+
+    const next = () => store.getState().periods.find((p) => p.id === nextId)!;
+    const req = toScheduleRequest(store.getState().ward!, next(), store.getState().periods, TODAY);
+    store.getState().setResult(nextId, result({ n01: fill(31, "D"), n02: fill(31, "O") }), req.carry_over ?? []);
+    const late = fill(30, "D");
+    late[29] = "N";
+    store.getState().setResult(id, result({ n01: late, n02: fill(30, "O") }), []);
+    store.getState().confirm(id);
+    expect(review()).toBe(true);
+  });
+});
+
+describe("옛 화면 상태 불러오기", () => {
+  /** 저장된 문서의 view만 바꿔 localStorage에서 다시 불러온다. */
+  function reload(store: ReturnType<typeof createAppStore>, view: unknown) {
+    const storage = new MemoryStorage();
+    const { ward, periods, inputVersion } = store.getState();
+    storage.setItem(STORAGE_KEY, JSON.stringify({ version: 4, state: { ward, periods, view, inputVersion } }));
+    return fresh(storage).getState();
+  }
+
+  it("작성 ③은 ②로, 확정된 기간은 확정 근무표로 바꾼다", () => {
+    const { store, id } = withConfirmed();
+    const nextId = store.getState().createPeriod(TODAY)!;
+    expect(reload(store, { screen: "period", periodId: nextId, step: 3 }).view).toEqual({ screen: "period", periodId: nextId, step: 2 });
+    expect(reload(store, { screen: "period", periodId: nextId, step: 2 }).view).toEqual({ screen: "period", periodId: nextId, step: 2 });
+    expect(reload(store, { screen: "period", periodId: id, step: 3 }).view).toEqual({ screen: "confirmed", periodId: id });
+    expect(reload(store, { screen: "period", periodId: id, step: 1 }).view).toEqual({ screen: "confirmed", periodId: id });
+    expect(reload(store, { screen: "settings", tab: "rules" }).view).toEqual({ screen: "settings", tab: "rules" });
+    expect(reload(store, { screen: "home" }).view).toEqual({ screen: "home" });
+    expect(reload(store, { screen: "home" }).resetNotice).toBe(false);
+  });
+
+  it("근무표가 없는 병동은 설정·홈 화면을 처음 설정의 못 끝낸 첫 단계로 바꾼다", () => {
+    const store = fresh();
+    store.getState().startWard();
+    expect(reload(store, { screen: "settings", tab: "roster" }).view).toEqual({ screen: "setup", step: 1 });
+    store.getState().addNurses(rows);
+    expect(reload(store, { screen: "settings", tab: "rules" }).view).toEqual({ screen: "setup", step: 2 });
+    expect(reload(store, { screen: "home" }).view).toEqual({ screen: "setup", step: 2 });
+    expect(reload(store, { screen: "setup", step: 1 }).view).toEqual({ screen: "setup", step: 2 });
+  });
+
+  it("근무표가 있는 병동의 처음 설정, 없는 기간을 가리키는 화면은 홈으로 바꾼다", () => {
+    const { store } = withPeriod();
+    expect(reload(store, { screen: "setup", step: 3 }).view).toEqual({ screen: "home" });
+    expect(reload(store, { screen: "period", periodId: "p-없음", step: 2 }).view).toEqual({ screen: "home" });
+    expect(reload(store, { screen: "confirmed", periodId: "p-없음" }).view).toEqual({ screen: "home" });
+  });
+
+  it("서버 문서의 옛 화면 상태도 바꾼다", async () => {
+    const { store, id } = withConfirmed();
+    const { ward, periods, inputVersion } = store.getState();
+    const f = fakeRemote({
+      data: { version: 4, state: { ward, periods, view: { screen: "period", periodId: id, step: 3 }, inputVersion } },
+      updatedAt: SERVER_AT,
+    });
+    const s = synced(f.remote);
+    await s.getState().signedIn(USER);
+    expect(s.getState().view).toEqual({ screen: "confirmed", periodId: id });
+    expect(s.getState().resetNotice).toBe(false);
   });
 });

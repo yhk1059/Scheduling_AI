@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 
-import { useAppStore } from "@/lib/store";
+import { isWardReady, useAppStore } from "@/lib/store";
 import { onAuthChange, supabaseConfigured } from "@/lib/supabase";
 import { unitShort } from "@/lib/wording";
 
@@ -10,7 +10,7 @@ import { AccountBar, LoginPromptDialog } from "./Account";
 import PeriodWork from "./PeriodWork";
 import StartScreen from "./StartScreen";
 import { ui } from "./ui";
-import WardHome, { isWardReady } from "./WardHome";
+import WardHome from "./WardHome";
 import WardSettings from "./WardSettings";
 
 export default function AppShell() {
@@ -139,7 +139,7 @@ export default function AppShell() {
           <StartScreen onDone={() => setShowStart(false)} />
         ) : view.screen === "home" ? (
           <WardHome />
-        ) : view.screen === "settings" ? (
+        ) : view.screen === "settings" || view.screen === "setup" ? (
           <WardSettings />
         ) : (
           <PeriodWork />

@@ -1,22 +1,11 @@
 "use client";
 
 import { formatRange } from "@/lib/period";
-import { homeSummary, upcomingRange, useAppStore, type Ward, type WorkPeriod } from "@/lib/store";
+import { homeSummary, isWardReady, upcomingRange, useAppStore, viewForPeriod, type WorkPeriod } from "@/lib/store";
 import { nextTask, scheduleName, unitShort, wardRuleCount, type NextTask } from "@/lib/wording";
 
 import { today } from "./RulesStep";
 import { ui } from "./ui";
-
-const COVERAGE_COUNT = 6; // D/E/N × 평일/주말·공휴일
-
-export function hasCoverage(ward: Ward): boolean {
-  return ward.rules.filter((r) => r.type === "daily_coverage" && r.scope === "ward").length >= COVERAGE_COUNT;
-}
-
-/** 활성 명단과 필요 인원이 모두 있어야 기간을 만들 수 있다. */
-export function isWardReady(ward: Ward): boolean {
-  return ward.nurses.some((n) => n.active) && hasCoverage(ward);
-}
 
 function formatTime(iso: string): string {
   const d = new Date(iso);
@@ -103,7 +92,7 @@ export default function WardHome() {
   const { operating, next, recent } = homeSummary(periods, now);
   const task = nextTask(ward, periods, now);
   const create = () => createPeriod(now);
-  const open = (p: WorkPeriod) => go({ screen: "period", periodId: p.id, step: p.result ? 3 : 1 });
+  const open = (p: WorkPeriod) => go(viewForPeriod(p));
   const name = (p: WorkPeriod) => scheduleName(p, ward.unit);
   // 다음 근무표가 확정됐고 그 뒤에 만든 근무표가 없으면 그다음 근무표를 만들 수 있다
   const canCreateAfter = next.state === "confirmed" && periods.at(-1)?.id === next.period.id;
@@ -168,7 +157,7 @@ export default function WardHome() {
                   )}
                 </p>
               </div>
-              <button type="button" onClick={() => go({ screen: "period", periodId: operating.id, step: 3 })} className={ui.secondary}>
+              <button type="button" onClick={() => go({ screen: "confirmed", periodId: operating.id })} className={ui.secondary}>
                 열기
               </button>
             </section>
