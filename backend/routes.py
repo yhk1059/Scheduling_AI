@@ -17,6 +17,8 @@ from backend.domain.constants import (
     MAX_FIXED_ASSIGNMENTS,
     MAX_NURSES,
     MAX_PROPOSALS,
+    MAX_SHIFT_CODES,
+    MAX_TAGS_PER_NURSE,
     MAX_TEXT_CHARS,
     PROPOSAL_VERIFY_TIME_LIMIT_S,
 )
@@ -160,6 +162,13 @@ def _check_limits(data: Any) -> None:
         nurses, constraints = part.get("nurses"), part.get("constraints")
         if isinstance(nurses, list) and len(nurses) > MAX_NURSES:
             raise ApiError(413, "PAYLOAD_TOO_LARGE", f"간호사는 최대 {MAX_NURSES}명입니다")
+        if isinstance(nurses, list) and any(
+            isinstance(n, dict) and isinstance(n.get("tags"), list) and len(n["tags"]) > MAX_TAGS_PER_NURSE for n in nurses
+        ):
+            raise ApiError(413, "PAYLOAD_TOO_LARGE", f"태그는 사람당 최대 {MAX_TAGS_PER_NURSE}개입니다")
+        config = part.get("config")
+        if isinstance(config, dict) and isinstance(config.get("shifts"), list) and len(config["shifts"]) > MAX_SHIFT_CODES:
+            raise ApiError(413, "PAYLOAD_TOO_LARGE", f"근무 코드는 최대 {MAX_SHIFT_CODES}개입니다")
         if isinstance(constraints, list):
             fixed = sum(1 for c in constraints if isinstance(c, dict) and c.get("type") == "fixed_assignment")
             if len(constraints) - fixed > MAX_CONSTRAINTS:

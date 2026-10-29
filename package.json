@@ -13,7 +13,8 @@
     "test:e2e": "playwright test",
     "gen:types": "uv run python -m backend.gen_types",
     "gen:demo": "uv run python -m backend.gen_demo",
-    "gen:golden": "uv run python -m backend.gen_golden"
+    "gen:golden": "uv run python -m backend.gen_golden",
+    "bench": "uv run python -m backend.bench"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.118.0",
