@@ -23,6 +23,7 @@ if str(ROOT) not in sys.path:
 
 from pydantic import BaseModel, TypeAdapter, ValidationError  # noqa: E402
 
+from backend.domain.convert import legacy_to_block  # noqa: E402
 from backend.domain.models import (  # noqa: E402
     ConstraintSpec,
     Nurse,
@@ -63,10 +64,33 @@ def _spec(c: dict | BaseModel) -> Any:
     return _spec_adapter.validate_python({**_FILLER, **c})
 
 
+def _sorted(v: Any) -> Any:
+    """리스트를 (셀렉터 안쪽까지) 정렬한다. 금지 패턴 한 개(셀렉터 리스트)는 순서가 뜻이라 그대로 둔다."""
+    if isinstance(v, dict):
+        return {k: _sorted(x) for k, x in v.items()}
+    if not isinstance(v, list):
+        return v
+    items = [_sorted(x) for x in v]
+    if any(isinstance(x, dict) for x in items):
+        return items
+    try:
+        return sorted(items)
+    except TypeError:  # 금지 패턴 목록(리스트의 리스트)
+        return sorted(items, key=lambda x: json.dumps(x, sort_keys=True, ensure_ascii=False))
+
+
+def _block(spec: Any) -> Any:
+    """템플릿 기대값을 블록으로 바꿔 블록 출력과 비교한다. 기간이 필요한 희망 근무는 그대로 둔다."""
+    try:
+        return legacy_to_block(spec)
+    except ValueError:
+        return spec
+
+
 def _key(c: dict | BaseModel) -> str:
     """비교 키: type, hardness, params(리스트는 정렬). id·source_text·weight·scope는 무시한다."""
-    spec = _spec(c)
-    params = {k: sorted(v) if isinstance(v, list) else v for k, v in spec.params.model_dump().items()}
+    spec = _block(_spec(c))
+    params = _sorted(spec.params.model_dump(mode="json"))
     return json.dumps({"type": spec.type, "hardness": spec.hardness, "params": params}, sort_keys=True, ensure_ascii=False)
 
 

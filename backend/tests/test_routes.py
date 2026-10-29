@@ -156,17 +156,38 @@ def test_solve_infeasible_with_conflicts():
 # --- translate ---
 
 
+LEAVE_DRAFT = {
+    "type": "count",
+    "params": {"people": {"ids": ["n01"]}, "days": {"days": [15, 16, 17]}, "shifts": {"not_in": ["O"]}, "per": "person", "max": 0},
+    "source_text": "n01 15~17일 휴가",
+}
+
+
 def test_translate_ok(llm):
-    llm.responses = [
-        ok({"constraints": [{"type": "leave", "params": {"nurse_id": "n01", "days": [15, 16, 17]}, "source_text": "n01 15~17일 휴가"}]})
-    ]
+    llm.responses = [ok({"constraints": [LEAVE_DRAFT]})]
     r = client.post("/api/py/translate", json=translate_body())
     assert r.status_code == 200
     body = r.json()
     assert body["status"] == "ok"
     assert body["input_version"] == 9
-    assert body["constraints"][0]["type"] == "leave"
-    assert body["constraints"][0]["source_text"] == "이영희 15~17일 휴가"
+    assert body["config_changes"] == []
+    (rule,) = body["constraints"]
+    assert rule["type"] == "count" and rule["hardness"] == "hard" and rule["scope"] == "period"
+    assert rule["params"]["shifts"] == {"in": None, "not_in": ["O"]}
+    assert rule["source_text"] == "이영희 15~17일 휴가"
+
+
+def test_translate_ok_with_config_changes(llm):
+    mid = {"code": "M", "name": "미드", "hours": 8, "start": "11:00"}
+    rule = {"type": "count", "params": {"shifts": {"in": ["M"]}, "per": "day", "min": 1}, "source_text": "미드 매일 1명"}
+    llm.responses = [ok({"constraints": [rule], "config_changes": [{"action": "add", "shift": mid}]})]
+    r = client.post("/api/py/translate", json=translate_body("미드 근무 M 11시~19시 추가, 매일 1명"))
+    assert r.status_code == 200
+    body = r.json()
+    assert body["config_changes"] == [
+        {"action": "add", "shift": {"code": "M", "name": "미드", "hours": 8.0, "parts": [], "start": "11:00", "active": True}}
+    ]
+    assert body["constraints"][0]["params"]["shifts"]["in"] == ["M"]
 
 
 def test_translate_clarify(llm):
@@ -214,6 +235,57 @@ def test_explain_returns_only_verified_proposals(llm):
     assert body["text"] == "이영희이 5일에 두 근무로 고정되어 있습니다."
     assert [p["title"] for p in body["proposals"]] == ["f1 해제"]
     assert body["proposals"][0]["verified_summary"] is not None
+
+
+def block_explain_body() -> dict:
+    """하루 데이 인원(count)이 명단보다 많은 휴가와 부딪친다 → 해 없음."""
+    req = sample()
+    nurse_ids = [n["id"] for n in req["nurses"]]
+    req["constraints"] = [
+        {
+            "id": "cov",
+            "scope": "ward",
+            "type": "count",
+            "params": {"shifts": {"in": ["D"]}, "per": "day", "min": len(nurse_ids) - 1},
+            "source_text": "데이 많이",
+        },
+        {
+            "id": "lv",
+            "scope": "period",
+            "type": "count",
+            "params": {"people": {"ids": nurse_ids[:2]}, "days": {"days": [3]}, "shifts": {"not_in": ["O"]}, "per": "person", "max": 0},
+            "source_text": "3일 휴가 둘",
+        },
+    ]
+    return {
+        "request": req,
+        "conflicts": [
+            {"constraint_id": "cov", "type": "count", "source_text": "데이 많이"},
+            {"constraint_id": "lv", "type": "count", "source_text": "3일 휴가 둘"},
+        ],
+    }
+
+
+def test_explain_block_update_verified_by_resolve(llm):
+    body = block_explain_body()
+    assert client.post("/api/py/solve", json=body["request"]).json()["status"] == "infeasible"
+    lower = {
+        "title": "데이 1명으로",
+        "description": "데이 인원을 줄인다",
+        "changes": [{"action": "update", "constraint_id": "cov", "params": {"min": 1}}],
+    }
+    still_bad = {
+        "title": "다른 날로",
+        "description": "휴가를 다른 날로",
+        "changes": [{"action": "update", "constraint_id": "lv", "params": {"days": {"days": [4]}}}],
+    }
+    llm.responses = [ok({"text": "데이 인원이 너무 많습니다.", "proposals": [still_bad, lower]})]
+    r = client.post("/api/py/explain", json=body)
+    assert r.status_code == 200
+    proposals = r.json()["proposals"]
+    assert [p["title"] for p in proposals] == ["데이 1명으로"]
+    params = proposals[0]["changes"][0]["params"]
+    assert params["min"] == 1 and params["shifts"]["in"] == ["D"] and params["per"] == "day"
 
 
 @pytest.mark.parametrize("error", [LLMUnavailableError("down"), None])
@@ -449,8 +521,9 @@ def test_500_internal_hides_stack(monkeypatch, capsys):
 
 
 def test_log_line_for_llm_request_without_raw_text(llm, capsys):
-    bad = ok({"constraints": [{"type": "leave", "params": {"nurse_id": "n01", "days": [40]}, "source_text": "x"}]})
-    good = ok({"constraints": [{"type": "leave", "params": {"nurse_id": "n01", "days": [15]}, "source_text": "n01 15일 휴가"}]})
+    bad_params = {**LEAVE_DRAFT["params"], "days": {"days": [40]}}
+    bad = ok({"constraints": [{**LEAVE_DRAFT, "params": bad_params, "source_text": "x"}]})
+    good = ok({"constraints": [{**LEAVE_DRAFT, "source_text": "n01 15일 휴가"}]})
     llm.responses = [bad, good]
     capsys.readouterr()
     client.post("/api/py/translate", json=translate_body("이영희 15일 휴가 비밀메모"))

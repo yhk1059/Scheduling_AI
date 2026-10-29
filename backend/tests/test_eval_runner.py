@@ -144,6 +144,23 @@ def draft(type_: str, params: dict, hardness: str | None = None) -> dict:
     return d
 
 
+def leave_draft(nurse_id: str, days) -> dict:
+    """translator가 내는 블록 모양의 휴가. 채점은 템플릿 기대값을 블록으로 바꿔 비교한다."""
+    params = {"people": {"ids": [nurse_id]}, "days": {"days": days}, "shifts": {"not_in": ["O"]}, "per": "person", "max": 0}
+    return draft("count", params)
+
+
+NF_DRAFT = draft("balance", {"people": {"exclude_tags": ["나이트전담"]}, "shifts": {"in": ["N"]}}, "hard")
+
+
+def test_score_compares_template_expected_with_block_actual():
+    block = {**leave_draft("n01", [16, 15]), "hardness": "hard"}
+    del block["source_text"]
+    assert run.score_constraints([leave("n01", [15, 16])], [block]) == (1, 1, 1)
+    assert run.score_constraints([NF], [{**NF_DRAFT, "hardness": "soft"}]) == (1, 1, 1)
+    assert run.score_constraints([NF], [NF_DRAFT]) == (0, 1, 1)
+
+
 def test_run_cases_aggregates():
     cases = [
         case(
@@ -154,8 +171,8 @@ def test_run_cases_aggregates():
         case("b", {"status": "clarify"}),
     ]
     client = FakeClient(
-        ok({"constraints": [draft("leave", {"nurse_id": "n01", "days": "많이"})]}),  # 스키마 위반 → 재시도
-        ok({"constraints": [draft("leave", {"nurse_id": "n01", "days": [16, 15]}), draft("night_fairness", {}, "hard")]}),
+        ok({"constraints": [leave_draft("n01", "많이")]}),  # 스키마 위반 → 재시도
+        ok({"constraints": [leave_draft("n01", [16, 15]), NF_DRAFT]}),
         ok({"unsupported_reason": "템플릿 없음"}),
     )
     results = run.run_cases(cases, client)
@@ -181,8 +198,8 @@ def test_run_cases_exact_and_error():
         case("a", {"status": "ok", "constraints": [leave("n01", [15])]}),
         case("b", {"status": "ok", "constraints": [leave("n02", [3])]}),
     ]
-    bad = ok({"constraints": [draft("leave", {"nurse_id": "n01", "days": "x"})]})
-    client = FakeClient(ok({"constraints": [draft("leave", {"nurse_id": "n01", "days": [15]})]}), bad, bad, bad)
+    bad = ok({"constraints": [leave_draft("n01", "x")]})
+    client = FakeClient(ok({"constraints": [leave_draft("n01", [15])]}), bad, bad, bad)
     results = run.run_cases(cases, client)
     m = run.aggregate(results)
 
@@ -196,7 +213,7 @@ def test_run_cases_exact_and_error():
 
 def test_write_results(tmp_path):
     cases = [case("a", {"status": "clarify"})]
-    results = run.run_cases(cases, FakeClient(ok({"constraints": [draft("leave", {"nurse_id": "n01", "days": [1]})]})))
+    results = run.run_cases(cases, FakeClient(ok({"constraints": [leave_draft("n01", [1])]})))
     out = tmp_path / "results.md"
     run.write_results(out, run.aggregate(results), results, model="fake-model")
     text = out.read_text(encoding="utf-8")
@@ -215,3 +232,11 @@ def test_missing_key_exit_2(monkeypatch, capsys):
     monkeypatch.setattr(run, "load_local_env", lambda *a, **k: None)
     assert run.main(["--limit", "1"]) == 2
     assert "ANTHROPIC_API_KEY가 없습니다" in capsys.readouterr().err
+
+
+def test_score_keeps_forbid_pattern_order():
+    def forbid(*patterns):
+        return {"type": "sequence", "hardness": "hard", "params": {"forbid": [[{"in": [a]}, {"in": [b]}] for a, b in patterns]}}
+
+    assert run.score_constraints([forbid(("N", "D"), ("N", "E"))], [forbid(("N", "E"), ("N", "D"))]) == (1, 1, 1)
+    assert run.score_constraints([forbid(("N", "D"))], [forbid(("D", "N"))]) == (0, 1, 1)
