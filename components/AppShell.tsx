@@ -2,12 +2,14 @@
 
 import { useEffect, useRef, useState } from "react";
 
-import { isWardReady, useAppStore } from "@/lib/store";
+import { setupStep, useAppStore } from "@/lib/store";
 import { onAuthChange, supabaseConfigured } from "@/lib/supabase";
 import { unitShort } from "@/lib/wording";
 
 import { AccountBar, LoginPromptDialog } from "./Account";
+import ConfirmedPeriod from "./ConfirmedPeriod";
 import PeriodWork from "./PeriodWork";
+import SetupFlow from "./SetupFlow";
 import StartScreen from "./StartScreen";
 import { ui } from "./ui";
 import WardHome from "./WardHome";
@@ -41,11 +43,11 @@ export default function AppShell() {
     if (s.auth === null && !s.hasInput()) s.startWard();
   }, [startNew, loading]);
 
-  // 들어올 때 병동이 준비 전이면 근무표 목록 대신 병동 설정부터 연다
+  // 근무표를 한 번도 만들지 않은 병동은 처음 설정의 못 끝낸 첫 단계부터 연다
   useEffect(() => {
     if (!started) return;
     const s = useAppStore.getState();
-    if (s.view.screen === "home" && s.ward && !isWardReady(s.ward)) s.go({ screen: "settings", tab: "roster" });
+    if (s.ward && s.periods.length === 0 && s.view.screen !== "setup") s.go({ screen: "setup", step: setupStep(s.ward) });
   }, [started]);
 
   useEffect(() => {
@@ -87,7 +89,7 @@ export default function AppShell() {
       {started && (
         <nav className="border-b border-[#E2E2DC] bg-white">
           <div className="mx-auto flex max-w-[1360px] gap-1 px-6">
-            {tabs.map((t) => (
+            {view.screen !== "setup" && tabs.map((t) => (
               <button
                 key={t.label}
                 type="button"
@@ -139,8 +141,12 @@ export default function AppShell() {
           <StartScreen onDone={() => setShowStart(false)} />
         ) : view.screen === "home" ? (
           <WardHome />
-        ) : view.screen === "settings" || view.screen === "setup" ? (
+        ) : view.screen === "setup" ? (
+          <SetupFlow />
+        ) : view.screen === "settings" ? (
           <WardSettings />
+        ) : view.screen === "confirmed" ? (
+          <ConfirmedPeriod key={view.periodId} />
         ) : (
           <PeriodWork />
         )}
