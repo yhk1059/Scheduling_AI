@@ -40,16 +40,9 @@ class _OutputError(Exception):
         self.clarify = clarify  # 참조 무결성 실패면 사용자에게 되물을 질문
 
 
-def _tags(nurse: Nurse) -> list[str]:
-    """태그. 옛 night_only는 나이트 전담 태그로 본다(convert_request와 같다)."""
-    if nurse.night_only and NIGHT_ONLY_TAG not in nurse.tags:
-        return [*nurse.tags, NIGHT_ONLY_TAG]
-    return list(nurse.tags)
-
-
 def _known_tags(ctx: TranslateContext) -> list[str]:
     """병동 태그 목록: 명단의 태그 ∪ 나이트 전담(추천 태그라 늘 있다)."""
-    return sorted({t for n in ctx.nurses for t in _tags(n)} | {NIGHT_ONLY_TAG})
+    return sorted({t for n in ctx.nurses for t in n.tags} | {NIGHT_ONLY_TAG})
 
 
 def _context_message(req: TranslateRequest, text: str) -> str:
@@ -72,7 +65,7 @@ def _context_message(req: TranslateRequest, text: str) -> str:
         "weekend_and_holiday_days": [d["day"] for d in days if d["weekend"]],
         "holidays": sorted(ctx.holidays),
         "config": {"shifts": [s.model_dump(include={"code", "name", "hours", "parts", "active"}) for s in ctx.config.shifts]},
-        "nurses": [{"id": n.id, "years": n.years, "tags": _tags(n)} for n in ctx.nurses],
+        "nurses": [{"id": n.id, "years": n.years, "tags": n.tags} for n in ctx.nurses],
         "known_tags": _known_tags(ctx),
     }
     return f"<context>\n{json.dumps(context, ensure_ascii=False)}\n</context>\n<input>\n{text}\n</input>"
@@ -108,7 +101,7 @@ def _people(nurses: list[Nurse], sel: People) -> list[str]:
     """셀렉터가 고른 간호사 id. 규칙은 solver/select.py와 같다(llm은 solver를 import하지 않는다)."""
     out = []
     for n in nurses:
-        tags = set(_tags(n))
+        tags = set(n.tags)
         if sel.ids is not None and n.id not in sel.ids:
             continue
         if sel.tags is not None and not set(sel.tags) & tags:

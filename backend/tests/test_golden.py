@@ -1,6 +1,6 @@
 """골든 케이스(backend/tests/golden/cases.json): 블록화 전 솔버의 목적값·배정 기록(ADR-018 이전 기준).
 
-블록 경로는 같은 케이스를 convert_request로 바꿔 풀어 목적값이 같은지 본다.
+요청은 옛 형식(legacy.py)이다. 옛 솔버는 없어졌으므로 convert_request로 블록으로 바꿔 풀어 목적값이 같은지 본다.
 """
 
 import json
@@ -8,25 +8,27 @@ from pathlib import Path
 
 import pytest
 
-from pydantic import TypeAdapter
+from pydantic import TypeAdapter, ValidationError
 
 from backend.domain.convert import convert_request, legacy_to_block
+from backend.domain.legacy import LegacyScheduleRequest, LegacySpec
 from backend.domain.models import ConstraintSpec, Period, ScheduleRequest
-from backend.gen_golden import CASES_PATH, CONVERT_CASES_PATH, build_convert_cases, history_load, render, solve_case
-from backend.solver.stats import compute_result, violations
+from backend.gen_golden import CASES_PATH, CONVERT_CASES_PATH, build_convert_cases, render, solve_case
+from backend.solver.stats import violations
 
 CASES = json.loads(Path(CASES_PATH).read_text(encoding="utf-8"))
 FEASIBLE = [c for c in CASES if c["status"] == "ok"]
 INFEASIBLE = [c for c in CASES if c["status"] == "infeasible"]
 spec_adapter = TypeAdapter(ConstraintSpec)
+legacy_adapter = TypeAdapter(LegacySpec)
 
 
 def _ids(cases):
     return [c["id"] for c in cases]
 
 
-def _request(case) -> ScheduleRequest:
-    return ScheduleRequest.model_validate(case["request"])
+def _legacy(case) -> LegacyScheduleRequest:
+    return LegacyScheduleRequest.model_validate(case["request"])
 
 
 def test_cases_cover_templates_and_toggles():
@@ -49,56 +51,18 @@ def test_cases_cover_templates_and_toggles():
 
 
 @pytest.mark.parametrize("case", CASES, ids=_ids(CASES))
-def test_request_validates(case):
-    _request(case)
-
-
-@pytest.mark.parametrize("case", [c for c in CASES if c["history_raw"]], ids=_ids([c for c in CASES if c["history_raw"]]))
-def test_history_load_matches_raw(case):
-    assert case["request"]["history_load"] == history_load(case["history_raw"])
-
-
-@pytest.mark.parametrize("case", FEASIBLE, ids=_ids(FEASIBLE))
-def test_feasible_objective_reproduces(case):
-    assert case["optimal"] is True
-    out = solve_case(_request(case))
-    assert out["status"] == "ok" and out["optimal"]
-    assert out["objective"] == case["objective"]
-
-
-@pytest.mark.parametrize("case", FEASIBLE, ids=_ids(FEASIBLE))
-def test_recorded_assignments_satisfy_hard(case):
-    data = dict(case["request"])
-    fixed = [
-        {
-            "id": f"golden-{nid}-{d}",
-            "type": "fixed_assignment",
-            "scope": "period",
-            "source_text": "",
-            "params": {"nurse_id": nid, "day": d, "shift": s},
-        }
-        for nid, row in case["assignments"].items()
-        for d, s in enumerate(row, start=1)
-    ]
-    data["constraints"] = data["constraints"] + fixed
-    out = solve_case(ScheduleRequest.model_validate(data))
-    assert out["status"] == "ok"
-    assert out["objective"] >= case["objective"]
-
-
-@pytest.mark.parametrize("case", INFEASIBLE, ids=_ids(INFEASIBLE))
-def test_infeasible_stays_infeasible(case):
-    assert case["conflict_ids"]
-    assert solve_case(_request(case), conflicts=False)["status"] == "infeasible"
+def test_request_validates_as_legacy_only(case):
+    _legacy(case)
+    with pytest.raises(ValidationError):  # 옛 형식(night_only, history_load, 템플릿)은 새 요청이 받지 않는다
+        ScheduleRequest.model_validate(case["request"])
 
 
 # --- 블록 동등성(ADR-018): 템플릿을 convert_request로 바꿔 풀어도 같은 결과 ---
 
 
 def _block_request(case) -> ScheduleRequest:
-    """골든 요청을 블록으로 바꾸고, 누적 부담은 history_load 대신 원본(history_raw)으로 보낸다."""
-    data = convert_request(_request(case)).model_dump(mode="json")
-    data["history_load"] = []
+    """골든 요청을 블록으로 바꾸고(history_load는 버림), 누적 부담은 원본(history_raw)으로 보낸다."""
+    data = convert_request(_legacy(case)).model_dump(mode="json")
     data["history"] = case["history_raw"]
     return ScheduleRequest.model_validate(data)
 
@@ -121,16 +85,6 @@ def test_recorded_assignments_satisfy_hard_blocks(case):
         assert violations(req, case["assignments"], c) == [], c.id
 
 
-@pytest.mark.parametrize("case", FEASIBLE, ids=_ids(FEASIBLE))
-def test_block_summary_matches_templates(case):
-    legacy = compute_result(_request(case), case["assignments"], optimal=True)
-    blocks = compute_result(_block_request(case), case["assignments"], optimal=True)
-    assert blocks.summary == legacy.summary
-    assert [(v.constraint_id, v.nurse_id, v.day) for v in blocks.soft_violations] == [
-        (v.constraint_id, v.nurse_id, v.day) for v in legacy.soft_violations
-    ]
-
-
 @pytest.mark.parametrize("case", INFEASIBLE, ids=_ids(INFEASIBLE))
 def test_blocks_infeasible_stays_infeasible(case):
     assert solve_case(_block_request(case), conflicts=False)["status"] == "infeasible"
@@ -150,6 +104,6 @@ def test_convert_cases_cover_templates_toggles_and_night_only():
     assert any(c["template"] is None and c["block"]["id"] == "night-only" for c in cases)
     for c in cases:
         if c["template"]:
-            got = legacy_to_block(spec_adapter.validate_python(c["template"]), Period.model_validate(c["period"]),
+            got = legacy_to_block(legacy_adapter.validate_python(c["template"]), Period.model_validate(c["period"]),
                                   c["holidays"])
             assert spec_adapter.dump_python(got, mode="json", exclude_none=True) == c["block"], c["name"]

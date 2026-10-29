@@ -1,36 +1,32 @@
-"""솔버 hard 템플릿 1~9. 병렬 탐색이라 정확한 배정값이 아니라 제약 충족 여부를 검증한다."""
+"""솔버 hard 규칙(템플릿 이름의 블록 모양과 칸 고정). 병렬 탐색이라 정확한 배정값이 아니라 제약 충족 여부를 검증한다."""
 
-import json
-from pathlib import Path
+import pytest
+from pydantic import ValidationError
 
 from backend.domain.models import ScheduleRequest, SolveInfeasible, SolveOk
+from backend.solver import select
 from backend.solver.model import build_model, solve
-
-SAMPLE_PATH = Path(__file__).resolve().parents[2] / "lib" / "samples" / "ward-15.json"
+from backend.tests.blocks import (
+    coverage,
+    fixed,
+    forbid,
+    leave,
+    max_nights,
+    max_work,
+    min_off,
+    night_only,
+    off_after_night,
+    sample_data,
+    skill_mix,
+)
 
 # 2026-11: 30일, 1일이 일요일. 주말 = 1, 7, 8, 14, 15, 21, 22, 28, 29
 START, DAYS = "2026-11-01", 30
 WEEKENDS = {1, 7, 8, 14, 15, 21, 22, 28, 29}
 
 
-def sample_data() -> dict:
-    """샘플 병동을 요청 dict로. next_requests(다음 근무표 요청)는 ScheduleRequest 필드가 아니라 뺀다."""
-    data = json.loads(SAMPLE_PATH.read_text(encoding="utf-8"))
-    del data["next_requests"]
-    return data
-
-
-def nurse(nid: str, years: int = 5, night_only: bool = False) -> dict:
-    return {"id": nid, "name": f"간호사{nid}", "years": years, "night_only": night_only}
-
-
-def con(cid: str, type_: str, params: dict, **extra) -> dict:
-    return {"id": cid, "type": type_, "scope": "ward", "source_text": "원문", "params": params, **extra}
-
-
-def coverage(shift: str, day_kind: str, lo: int, hi: int, **extra) -> dict:
-    return con(f"cov-{day_kind}-{shift}", "daily_coverage",
-               {"shift": shift, "day_kind": day_kind, "min": lo, "max": hi}, **extra)
+def nurse(nid: str, years: int = 5, tags: list[str] | None = None) -> dict:
+    return {"id": nid, "name": f"간호사{nid}", "years": years, "tags": tags or []}
 
 
 def request(nurses: list[dict] | None = None, constraints: list[dict] | None = None, **extra) -> ScheduleRequest:
@@ -80,10 +76,22 @@ def test_every_nurse_has_one_shift_per_day():
 
 
 def test_night_only_nurse_gets_only_n_or_o():
-    nurses = [nurse("n1", night_only=True), nurse("n2"), nurse("n3")]
-    req = request(nurses, [coverage("N", "weekday", 1, 1), coverage("N", "weekend", 1, 1)])
+    nurses = [nurse("n1", tags=["나이트전담"]), nurse("n2"), nurse("n3")]
+    req = request(nurses, [coverage("N", "weekday", 1, 1), coverage("N", "weekend", 1, 1), night_only()])
     a = solve_ok(req)
     assert set(a["n1"]) <= {"N", "O"}
+
+
+def test_night_only_tag_without_rule_is_not_special():
+    """나이트 전담은 태그 + 기본 규칙이다. 솔버는 태그만으로는 아무것도 막지 않는다."""
+    nurses = [nurse("n1", tags=["나이트전담"]), nurse("n2"), nurse("n3")]
+    req = request(nurses, [fixed("fx", "n1", 1, "D")])
+    assert solve_ok(req)["n1"][0] == "D"
+
+
+def test_old_night_only_field_is_rejected():
+    with pytest.raises(ValidationError):
+        request([{**nurse("n1"), "night_only": True}])
 
 
 def test_is_weekend_includes_sat_sun_and_holidays():
@@ -93,16 +101,16 @@ def test_is_weekend_includes_sat_sun_and_holidays():
 
 def test_hard_literal_per_enabled_hard_constraint_only():
     req = request(constraints=[
-        con("a", "min_days_off", {"days": 8}),
-        con("b", "min_days_off", {"days": 8}, enabled=False),
-        con("c", "min_days_off", {"days": 8}, hardness="soft"),
-        con("d", "leave", {"nurse_id": "n1", "days": [3]}),
+        min_off("a", 8),
+        min_off("b", 8, enabled=False),
+        min_off("c", 8, hardness="soft"),
+        leave("d", "n1", [3]),
     ])
     ctx = build_model(req)
     assert set(ctx.hard_literals) == {"a", "d"}
 
 
-# --- 템플릿 1~9 ---
+# --- 템플릿 이름의 블록 모양 ---
 
 
 def test_daily_coverage_by_day_kind_with_holiday():
@@ -123,7 +131,7 @@ def test_daily_coverage_by_day_kind_with_holiday():
 
 def test_forbidden_sequence_within_month():
     req = request(constraints=[coverage("N", "weekday", 2, 2), coverage("D", "weekday", 2, 2),
-                               con("fs", "forbidden_sequence", {"first": "N", "second": "D"})])
+                               forbid("fs", "N", "D")])
     a = solve_ok(req)
     for row in a.values():
         assert all(not (p == "N" and q == "D") for p, q in zip(row, row[1:]))
@@ -131,7 +139,7 @@ def test_forbidden_sequence_within_month():
 
 def test_forbidden_sequence_checks_carry_over_last_day():
     req = request(
-        constraints=[con("fs", "forbidden_sequence", {"first": "N", "second": "D"})],
+        constraints=[forbid("fs", "N", "D")],
         carry_over=[{"nurse_id": "n1", "shifts": ["D", "N"]}],
     )
     assert solve_ok(req)["n1"][0] != "D"
@@ -139,8 +147,8 @@ def test_forbidden_sequence_checks_carry_over_last_day():
 
 def test_forbidden_sequence_carry_last_n_with_fixed_day1_d_is_infeasible():
     req = request(
-        constraints=[con("fs", "forbidden_sequence", {"first": "N", "second": "D"}),
-                     con("fx", "fixed_assignment", {"nurse_id": "n1", "day": 1, "shift": "D"})],
+        constraints=[forbid("fs", "N", "D"),
+                     fixed("fx", "n1", 1, "D")],
         carry_over=[{"nurse_id": "n1", "shifts": ["N"]}],
     )
     assert isinstance(solve(req), SolveInfeasible)
@@ -148,9 +156,9 @@ def test_forbidden_sequence_carry_last_n_with_fixed_day1_d_is_infeasible():
 
 def test_violation_only_inside_carry_over_is_ignored():
     req = request(
-        constraints=[con("fs", "forbidden_sequence", {"first": "N", "second": "D"}),
-                     con("mw", "max_consecutive_work", {"days": 2}),
-                     con("mn", "max_consecutive_nights", {"days": 1})],
+        constraints=[forbid("fs", "N", "D"),
+                     max_work("mw", 2),
+                     max_nights("mn", 1)],
         carry_over=[{"nurse_id": "n1", "shifts": ["N", "N", "D", "O"]}],
     )
     assert isinstance(solve(req), SolveOk)
@@ -160,7 +168,7 @@ def test_max_consecutive_work_including_carry_over():
     req = request(
         constraints=[coverage("D", "weekday", 2, 2), coverage("E", "weekday", 2, 2),
                      coverage("D", "weekend", 2, 2), coverage("E", "weekend", 2, 2),
-                     con("mw", "max_consecutive_work", {"days": 4})],
+                     max_work("mw", 4)],
         carry_over=[{"nurse_id": "n1", "shifts": ["D", "D", "E"]}],
     )
     a = solve_ok(req)
@@ -171,8 +179,8 @@ def test_max_consecutive_work_including_carry_over():
 
 def test_max_consecutive_work_carry_full_forces_day1_off():
     req = request(
-        constraints=[con("mw", "max_consecutive_work", {"days": 3}),
-                     con("fx", "fixed_assignment", {"nurse_id": "n1", "day": 1, "shift": "E"})],
+        constraints=[max_work("mw", 3),
+                     fixed("fx", "n1", 1, "E")],
         carry_over=[{"nurse_id": "n1", "shifts": ["D", "D", "D"]}],
     )
     assert isinstance(solve(req), SolveInfeasible)
@@ -181,7 +189,7 @@ def test_max_consecutive_work_carry_full_forces_day1_off():
 def test_max_consecutive_nights_including_carry_over():
     req = request(
         constraints=[coverage("N", "weekday", 2, 2), coverage("N", "weekend", 2, 2),
-                     con("mn", "max_consecutive_nights", {"days": 2})],
+                     max_nights("mn", 2)],
         carry_over=[{"nurse_id": "n1", "shifts": ["N"]}],
     )
     a = solve_ok(req)
@@ -192,7 +200,7 @@ def test_max_consecutive_nights_including_carry_over():
 
 def test_min_days_off():
     req = request(constraints=[coverage("D", "weekday", 2, 6), coverage("D", "weekend", 2, 6),
-                               con("off", "min_days_off", {"days": 10})])
+                               min_off("off", 10)])
     a = solve_ok(req)
     assert all(row.count("O") >= 10 for row in a.values())
 
@@ -201,7 +209,7 @@ def test_off_after_night_block_including_carry_over():
     req = request(
         constraints=[coverage("N", "weekday", 1, 1), coverage("N", "weekend", 1, 1),
                      coverage("D", "weekday", 2, 2), coverage("D", "weekend", 2, 2),
-                     con("noff", "off_after_night_block", {"days": 2})],
+                     off_after_night("noff", 2)],
         carry_over=[{"nurse_id": "n1", "shifts": ["D", "N"]}],
     )
     a = solve_ok(req)
@@ -215,8 +223,8 @@ def test_off_after_night_block_including_carry_over():
 
 def test_off_after_night_block_carry_n_then_day1_work_is_infeasible():
     req = request(
-        constraints=[con("noff", "off_after_night_block", {"days": 1}),
-                     con("fx", "fixed_assignment", {"nurse_id": "n1", "day": 1, "shift": "E"})],
+        constraints=[off_after_night("noff", 1),
+                     fixed("fx", "n1", 1, "E")],
         carry_over=[{"nurse_id": "n1", "shifts": ["N"]}],
     )
     assert isinstance(solve(req), SolveInfeasible)
@@ -225,7 +233,7 @@ def test_off_after_night_block_carry_n_then_day1_work_is_infeasible():
 def test_skill_mix():
     nurses = [nurse("n1", 1), nurse("n2", 1), nurse("n3", 2), nurse("n4", 4), nurse("n5", 6), nurse("n6", 8)]
     req = request(nurses, [coverage("N", "weekday", 2, 2), coverage("N", "weekend", 2, 2),
-                           con("sm", "skill_mix", {"shift": "N", "min_years": 3, "min_count": 1})])
+                           skill_mix("sm", "N", 3, 1)])
     a = solve_ok(req)
     senior = {n.id for n in req.nurses if n.years >= 3}
     for d in range(DAYS):
@@ -234,14 +242,14 @@ def test_skill_mix():
 
 def test_leave_days_are_off():
     req = request(constraints=[coverage("D", "weekday", 5, 6), coverage("D", "weekend", 5, 6),
-                               con("lv", "leave", {"nurse_id": "n2", "days": [4, 5, 6]})])
+                               leave("lv", "n2", [4, 5, 6])])
     a = solve_ok(req)
     assert [a["n2"][d - 1] for d in (4, 5, 6)] == ["O", "O", "O"]
 
 
 def test_fixed_assignment():
     req = request(constraints=[coverage("N", "weekday", 0, 0),
-                               con("fx", "fixed_assignment", {"nurse_id": "n3", "day": 10, "shift": "E"})])
+                               fixed("fx", "n3", 10, "E")])
     assert solve_ok(req)["n3"][9] == "E"
 
 
@@ -249,8 +257,8 @@ def test_fixed_assignment():
 
 
 def test_leave_and_fixed_on_same_cell_is_infeasible():
-    req = request(constraints=[con("lv", "leave", {"nurse_id": "n1", "days": [5]}),
-                               con("fx", "fixed_assignment", {"nurse_id": "n1", "day": 5, "shift": "D"})])
+    req = request(constraints=[leave("lv", "n1", [5]),
+                               fixed("fx", "n1", 5, "D")])
     res = solve(req)
     assert isinstance(res, SolveInfeasible)
     assert {c.constraint_id for c in res.conflicts} == {"lv", "fx"}
@@ -258,8 +266,8 @@ def test_leave_and_fixed_on_same_cell_is_infeasible():
 
 
 def test_disabled_constraint_is_ignored():
-    req = request(constraints=[con("lv", "leave", {"nurse_id": "n1", "days": [5]}),
-                               con("fx", "fixed_assignment", {"nurse_id": "n1", "day": 5, "shift": "D"},
+    req = request(constraints=[leave("lv", "n1", [5]),
+                               fixed("fx", "n1", 5, "D",
                                    enabled=False)])
     assert solve_ok(req)["n1"][4] == "O"
 
@@ -273,13 +281,11 @@ def test_soft_toggled_template_is_skipped_in_hard_phase():
 def test_sample_ward_has_solution():
     req = ScheduleRequest.model_validate(sample_data())
     a = solve_ok(req)
-    night_only = {n.id for n in req.nurses if n.night_only}
-    assert all(set(a[nid]) <= {"N", "O"} for nid in night_only)
-    ctx = build_model(req)
+    night_only_ids = {n.id for n in req.nurses if "나이트전담" in n.tags}
+    assert night_only_ids and all(set(a[nid]) <= {"N", "O"} for nid in night_only_ids)
     for c in req.constraints:
-        if c.type != "daily_coverage":
+        if not c.id.startswith("cov-"):
             continue
         p = c.params
-        for d in range(1, req.period.days + 1):
-            if (p.day_kind == "weekend") == ctx.is_weekend(d):
-                assert p.min <= sum(row[d - 1] == p.shift for row in a.values()) <= p.max
+        for d in select.days(req, p.days):
+            assert p.min <= sum(row[d - 1] in p.shifts.codes for row in a.values()) <= p.max

@@ -121,7 +121,9 @@ def test_inactive_code_cannot_be_part():
 def test_nurse_tags_default_and_limits():
     assert Nurse.model_validate(nurses(1)[0]).tags == []
     n = Nurse.model_validate({**nurses(1)[0], "tags": ["책임", "나이트전담"]})
-    assert n.tags == ["책임", "나이트전담"] and n.night_only is False
+    assert n.tags == ["책임", "나이트전담"]
+    with pytest.raises(ValidationError):  # night_only는 없어졌다(나이트전담 태그 + 기본 규칙)
+        Nurse.model_validate({**nurses(1)[0], "night_only": True})
     for bad in (["x" * 11], [""], [f"t{i}" for i in range(constants.MAX_TAGS_PER_NURSE + 1)]):
         with pytest.raises(ValidationError):
             Nurse.model_validate({**nurses(1)[0], "tags": bad})
@@ -160,11 +162,17 @@ def test_fixed_assignment_code_checked_against_config():
     assert ScheduleRequest.model_validate(request([fixed], config=config(shift("M", "미드"))))
 
 
-def test_template_codes_checked_against_config():
+def test_sequence_codes_checked_against_config():
     no_n = {"shifts": [shift("D"), shift("E"), shift("O", "휴무", 0)]}
-    seq = block("tpl", "forbidden_sequence", {"first": "N", "second": "D"})
-    with pytest.raises(ValidationError, match="tpl"):
+    seq = block("seq", "sequence", {"forbid": [[{"in": ["N"]}, {"in": ["D"]}]]})
+    with pytest.raises(ValidationError, match="seq"):
         ScheduleRequest.model_validate(request([seq], config=no_n))
+
+
+@pytest.mark.parametrize("type_", ["daily_coverage", "forbidden_sequence", "leave", "shift_preference", "night_fairness"])
+def test_template_types_are_rejected(type_):
+    with pytest.raises(ValidationError):
+        ScheduleRequest.model_validate(request([block("tpl", type_, {})]))
 
 
 # --- 셀렉터 ---

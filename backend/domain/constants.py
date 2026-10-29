@@ -7,7 +7,7 @@ MAX_TEXT_CHARS = 1000
 CARRY_OVER_DAYS = 7
 MAX_PERIOD_DAYS = 31
 MAX_FIXED_ASSIGNMENTS = MAX_NURSES * MAX_PERIOD_DAYS  # 고정 근무는 칸마다 하나
-HISTORY_DAYS = 28  # 누적 부담 창(일). 최근 4주 나이트·주말 근무 수의 상한
+HISTORY_DAYS = 28  # 누적 부담 창(일). history 원본 행의 최대 길이
 MAX_SHIFT_CODES = 8  # 병동 근무 코드 수(O 포함)
 MAX_TAGS_PER_NURSE = 5
 MAX_TAG_CHARS = 10
@@ -41,13 +41,7 @@ CONFLICT_TIME_LIMIT_S = 5
 PROPOSAL_VERIFY_TIME_LIMIT_S = 3
 
 # 가중치
-DEFAULT_WEIGHT = 10  # hard 기본 템플릿을 soft로 바꿨을 때 위반 1건당 페널티
-DEFAULT_SOFT_WEIGHTS: dict[str, int] = {
-    "shift_preference": 10,
-    "night_fairness": 5,
-    "weekend_fairness": 5,
-}
-# 블록의 중요도 → soft 위반 1단위당 페널티(ADR-018). 보통·낮음은 위 기본값과 같다.
+# 블록의 중요도 → soft 위반 1단위당 페널티(ADR-018). 보통 = 템플릿 기본 가중치, 낮음 = 템플릿 공정성 기본 가중치.
 PRIORITY_WEIGHTS: dict[str, int] = {"high": 30, "normal": 10, "low": 5}
 # 근무 시간(measure=hours)은 분 단위 정수로 계산한다(근무 시간은 0.5시간 단위라 정수가 된다).
 MINUTES_PER_HOUR = 60

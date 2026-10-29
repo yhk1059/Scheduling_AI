@@ -32,7 +32,7 @@ NURSES = [
     Nurse(id="n01", name="이영희", years=12),
     Nurse(id="n02", name="박민수", years=9),
     Nurse(id="n03", name="김민수", years=2),
-    Nurse(id="n14", name="문가람", years=11, night_only=True),
+    Nurse(id="n14", name="문가람", years=11, tags=["나이트전담"]),
 ]
 
 
@@ -139,7 +139,7 @@ def test_context_has_config_tags_and_known_tags():
     assert context["config"]["shifts"][0] == {"code": "D", "name": "데이", "hours": 8, "parts": [], "active": True}
     by_id = {n["id"]: n for n in context["nurses"]}
     assert by_id["n04"] == {"id": "n04", "years": 5, "tags": ["책임"]}
-    assert by_id["n14"]["tags"] == ["나이트전담"]  # night_only는 태그로 보낸다
+    assert by_id["n14"]["tags"] == ["나이트전담"]
     assert context["known_tags"] == ["나이트전담", "책임"]
 
 
@@ -377,7 +377,7 @@ def test_empty_days_clarify():
 
 def test_night_only_tag_with_nobody_is_empty_target():
     req = request("나이트 전담은 나이트만")
-    nurses = [n.model_copy(update={"night_only": False}) for n in NURSES]
+    nurses = [n.model_copy(update={"tags": []}) for n in NURSES]
     req = req.model_copy(update={"context": req.context.model_copy(update={"nurses": nurses})})
     rule = count({"people": {"tags": ["나이트전담"]}, "shifts": {"not_in": ["N", "O"]}, "per": "person", "max": 0})
     client = FakeClient(*[ok({"constraints": [rule]})] * (1 + constants.LLM_MAX_RETRIES))
@@ -387,7 +387,7 @@ def test_night_only_tag_with_nobody_is_empty_target():
 
 
 def test_exclude_night_only_tag_is_known_even_if_unused():
-    nurses = [n.model_copy(update={"night_only": False}) for n in NURSES]
+    nurses = [n.model_copy(update={"tags": []}) for n in NURSES]
     req = request("나이트 고르게", "ward")
     req = req.model_copy(update={"context": req.context.model_copy(update={"nurses": nurses})})
     res = translate(req, FakeClient(ok({"constraints": [NIGHT_FAIR]})))

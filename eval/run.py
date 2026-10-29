@@ -29,7 +29,6 @@ if str(ROOT) not in sys.path:
 from pydantic import BaseModel, TypeAdapter, ValidationError  # noqa: E402
 
 from backend.domain.constants import CARRY_OVER_DAYS, NIGHT_ONLY_TAG, OFF_CODE  # noqa: E402
-from backend.domain.convert import legacy_to_block  # noqa: E402
 from backend.domain.models import (  # noqa: E402
     DEFAULT_CONFIG,
     ConstraintSpec,
@@ -137,10 +136,9 @@ def _period(case: dict | None, ward: dict) -> tuple[Period, list[int]]:
     return Period(**case.get("period", ward["period"])), case.get("holidays", ward["holidays"])
 
 
-def _spec(c: dict | BaseModel, period: Period | None = None, holidays: list[int] = ()) -> Any:
-    """기대·실제 제약을 스펙으로. 템플릿이면 변환표로 블록을 만든다."""
-    spec = c if isinstance(c, BaseModel) else _spec_adapter.validate_python({**_FILLER, **c})
-    return legacy_to_block(spec, period, holidays)
+def _spec(c: dict | BaseModel) -> Any:
+    """기대·실제 제약을 스펙으로."""
+    return c if isinstance(c, BaseModel) else _spec_adapter.validate_python({**_FILLER, **c})
 
 
 def _dump(spec: Any) -> dict:
@@ -219,10 +217,9 @@ def _judge_key(spec: Any, schedules: list) -> tuple:
 
 def score_constraints(expected: list, actual: list, case: dict | None = None, config: WardConfig | None = None) -> tuple[int, int, int]:
     """의미 기준 일대일 매칭. (일치 수, 기대 수, 실제 수)."""
-    period, holidays = _period(case, _ward())
     config = config or judge_config([])
-    exp = [_spec(c, period, holidays) for c in expected]
-    act = [_spec(c, period, holidays) for c in actual]
+    exp = [_spec(c) for c in expected]
+    act = [_spec(c) for c in actual]
     schedules = judge_schedules(case, config, exp)
     e = Counter(_judge_key(s, schedules) for s in exp)
     a = Counter(_judge_key(s, schedules) for s in act)

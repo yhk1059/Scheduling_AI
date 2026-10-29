@@ -30,14 +30,7 @@ def fallback_explanation(request: ScheduleRequest, conflicts: list[Conflict]) ->
     return f"다음 규칙들이 동시에 지켜질 수 없습니다: {quoted}."
 
 
-def _tags(nurse: Any) -> list[str]:
-    """태그. 옛 night_only는 나이트 전담 태그로 본다(convert_request와 같다)."""
-    if nurse.night_only and NIGHT_ONLY_TAG not in nurse.tags:
-        return [*nurse.tags, NIGHT_ONLY_TAG]
-    return list(nurse.tags)
-
-
-def _is_night_only_rule(spec: Any) -> bool:
+def _is_night_dedicated_rule(spec: Any) -> bool:
     people = getattr(spec.params, "people", None)
     return people is not None and NIGHT_ONLY_TAG in (people.tags or [])
 
@@ -51,7 +44,7 @@ def _context_message(request: ScheduleRequest, specs: dict[str, Any], conflicts:
     context = {
         "config": {"shifts": [s.model_dump(include={"code", "name", "hours", "parts", "active"}) for s in request.config.shifts]},
         "nurse_count": len(nurses),
-        "nurses": [{"id": n.id, "years": n.years, "tags": _tags(n)} for n in nurses],
+        "nurses": [{"id": n.id, "years": n.years, "tags": n.tags} for n in nurses],
         "period": {"start": period.start_date.isoformat(), "end": period.date_of(days).isoformat(), "length": days},
         "days": [{"day": d, "date": period.date_of(d).isoformat()} for d in range(1, days + 1)],
         "weekend_and_holiday_days": weekends,
@@ -90,7 +83,7 @@ def _parse(result: ToolCallResult) -> ExplainerOutput:
 def _check_change(change: ConstraintChange, request: ScheduleRequest, spec: Any) -> ConstraintChange | None:
     """유효하면 params를 전체 값으로 채운 change, 아니면 None. params는 최상위 키 단위로 바꾼다(셀렉터는 통째로)."""
     if change.action == "disable":
-        if _is_night_only_rule(spec):  # 나이트 전담 규칙은 끄지 않는다
+        if _is_night_dedicated_rule(spec):  # 나이트 전담 규칙은 끄지 않는다
             return None
         return ConstraintChange(action="disable", constraint_id=change.constraint_id)
     if change.params is None and change.hardness is None:
@@ -112,7 +105,7 @@ def _check_change(change: ConstraintChange, request: ScheduleRequest, spec: Any)
     if not set(_constraint_codes(updated)) <= request.config.codes:
         return None
     people = getattr(updated.params, "people", None)
-    known_tags = {t for n in request.nurses for t in _tags(n)} | {NIGHT_ONLY_TAG}
+    known_tags = {t for n in request.nurses for t in n.tags} | {NIGHT_ONLY_TAG}
     if people is not None and not {*(people.tags or []), *people.exclude_tags} <= known_tags:
         return None
     return ConstraintChange(

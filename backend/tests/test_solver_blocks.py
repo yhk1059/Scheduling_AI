@@ -340,6 +340,5 @@ def test_soft_block_violations_listed_and_preferences_counted():
 def test_stats_counts_and_hours_default_config():
     req = request([nurse("a")], [], length=4)
     s = compute_result(req, {"a": ["D", "N", "O", "D"]}, optimal=True).stats["a"]
-    assert (s.D, s.E, s.N, s.O) == (2, 0, 1, 1)
     assert s.counts == {"D": 2, "E": 0, "N": 1, "O": 1}
     assert s.hours == 24
