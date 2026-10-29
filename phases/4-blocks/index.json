@@ -45,7 +45,10 @@
     {
       "step": 5,
       "name": "eval-blocks",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-10-30T00:11:48+0900",
+      "summary": "eval을 의미 기준으로: eval/run.py 판정기(고정 시드 20261030 무작위 근무표 50개 + 이월 7일, 기대 블록마다 대상 칸을 맞는/안 맞는 코드로 뒤집은 근무표 4개에서 stats.violations 위반 집합 {(사람 묶음, 날)}이 모두 같고 hardness·soft면 priority가 같으면 일치, 사람 없는 위반은 블록이 고른 사람 전체로 정규화, Counter로 일대일 매칭) + config_changes는 코드·hours·parts 비교, 판정 근무 형태 = 기본 + 기대 변경 + 실제 출력이 새로 더한 코드; eval 병동 태그(책임 n01·n06, 신규 n11~n13, night_only→나이트전담)는 run.py _ward()에서만 더함(샘플 파일 그대로); eval/convert_dataset.py로 기존 49건(w·h·m·c·u 44 + p 5)을 기계 변환(set legacy, 희망 min은 케이스 기간·공휴일로), 새 케이스 30건(set new: M·DE 설정 카드, 주 52/40시간, 책임·신규·연차 배치, 토요일, 7일 창, 나이트 블록 길이·after 2일, not_in 금지, priority high·low, 공휴일, 요일 기피, 태그 고르게, E 시간 update, 빈 대상·없는 태그·인원 모순 clarify, 트리플·짝 unsupported, 인젝션); validate_dataset는 set·블록 type·config_changes·태그 검사; --gate(GATE_EXACT legacy 0.95/new 0.85, GATE_SCHEMA_VALID 1.0, 미달이면 exit 1), results.md에 set별 표·실행 이력. 실제 API 결과(claude-sonnet-5-5): 1회차 legacy 91.8%(h03·m05·m11·u03 실패)/new 100% → 2회차 legacy 100%(49/49)·new 100%(30/30)·스키마 유효율 100%, 평균 재시도 0.01. 프롬프트 보강: 칸 고정(고정·박아줘)은 count min 1 hard 예시, '되도록이면·가능하면'은 soft일 뿐 priority 아님(high는 중요도 말 또는 '되도록이면 꼭'), 기간 전체 근무 시간 예시. 기대값 수정 1건: u03 '한 달 근무시간 160시간' unsupported → count{not_in [O], per person, hours, max 160}(ADR-018 이후 시간 세기는 지원 범위, 미지원은 하루 세 근무·짝·시각 겹침뿐). test_eval_runner 68개(같은 규칙 다른 모양: 휴가 per=person↔per=day↔휴무 min, in↔not_in, 셀렉터 순서, fixed↔count, after↔forbid not_in; 숫자·대상 하나 다른 12쌍 불일치). pytest 557·vitest 172, build·lint 통과. eval은 npm run test에 넣지 않음(판정기 단위 테스트와 dry-run만, 판정에 LLM 안 씀)",
+      "completed_at": "2026-10-30T00:28:13+0900"
     },
     {
       "step": 6,
