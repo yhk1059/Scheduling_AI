@@ -3,7 +3,14 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import type { PeriodUnit } from "@/lib/period";
-import { buildRoster, decodeText, mapHeaders, parseDelimited } from "@/lib/roster-import";
+import {
+  buildRoster,
+  decodeText,
+  mapHeaders,
+  parseDelimited,
+  ROSTER_HEADER,
+  ROSTER_TEMPLATE_CSV,
+} from "@/lib/roster-import";
 import { isNurseUsed, orphanConstraintIds, useAppStore, type WardNurse } from "@/lib/store";
 import { unitName } from "@/lib/wording";
 
@@ -31,6 +38,22 @@ function draftFromText(text: string): RosterDraft {
     mapping: { name: 0, ...(width > 1 && { years: 1 }), ...(width > 2 && { night_only: 2 }) },
     firstRowIsData: true,
   };
+}
+
+/** 엑셀 없이 직접 입력할 때: 헤더와 빈 행 하나로 편집 표를 연다. */
+const emptyDraft = (): RosterDraft => ({
+  rows: [[...ROSTER_HEADER], ROSTER_HEADER.map(() => "")],
+  mapping: { name: 0, years: 1, night_only: 2 },
+  firstRowIsData: false,
+});
+
+function downloadTemplate() {
+  const url = URL.createObjectURL(new Blob([ROSTER_TEMPLATE_CSV], { type: "text/csv;charset=utf-8" }));
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "명단_양식.csv";
+  a.click();
+  URL.revokeObjectURL(url);
 }
 
 export default function WardSettings() {
@@ -182,6 +205,14 @@ function RosterTab() {
               CSV 파일 올리기
               <input type="file" accept=".csv,.tsv,.txt,text/csv" onChange={(e) => void onUpload(e)} className="sr-only" />
             </label>
+            <button type="button" onClick={downloadTemplate} className={ui.text}>
+              양식 내려받기
+            </button>
+            {ward.nurses.length === 0 && (
+              <button type="button" onClick={() => setDraft(emptyDraft())} className={`${ui.text} ml-auto`}>
+                빈 표로 시작
+              </button>
+            )}
           </div>
           {draft && roster && (
             <>
@@ -221,7 +252,7 @@ function NurseTable({ nurses }: { nurses: WardNurse[] }) {
   const active = nurses.filter((n) => n.active);
   const inactive = nurses.filter((n) => !n.active);
 
-  if (nurses.length === 0) return <p className="text-sm text-[#66665E]">아직 명단이 없어요. 아래에 엑셀 명단을 붙여넣어 주세요.</p>;
+  if (nurses.length === 0) return <p className="text-sm text-[#66665E]">아직 명단이 없어요. 아래에 엑셀 명단을 붙여넣거나 [빈 표로 시작]을 눌러 직접 입력해 주세요.</p>;
 
   return (
     <div className="flex flex-col gap-2">
