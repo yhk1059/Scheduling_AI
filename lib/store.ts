@@ -4,6 +4,7 @@
 import { create } from "zustand";
 import { persist, type PersistStorage, type StorageValue } from "zustand/middleware";
 
+import { availabilityRules, type AvailabilitySlots } from "./availability";
 import {
   carryOverFrom,
   diffAssignments,
@@ -144,6 +145,8 @@ export interface WorkPeriod extends PeriodRange {
   snapshot: { employees: ShopEmployee[]; rules: ConstraintSpec[] } | null;
   /** 요청 카드 id → 예시 판정(translate 응답) */
   examples?: Record<string, RuleExample[]>;
+  /** 직원 id → 가능 시간. 값이 아예 없으면 가능 시간 규칙을 더하지 않는다(입력 화면이 생기면 지운다) */
+  availability?: Record<string, AvailabilitySlots>;
 }
 
 export type SetupStep = 1 | 2 | 3;
@@ -552,13 +555,18 @@ export function toScheduleRequest(
   const previous = period.result
     ? Object.fromEntries(Object.entries(period.result.assignments).filter(([id]) => ids.has(id)))
     : null;
+  // 꺼진 칸 고정은 지키지 않으므로 가능 시간도 그대로 적용한다
+  const fixedCells = [...constraints, ...locks].flatMap((c) =>
+    c.type === "fixed_assignment" && c.enabled !== false ? [c.params] : [],
+  );
+  const availability = period.availability ? availabilityRules(active, shop.config, period, period.availability, fixedCells) : [];
   const prev = previousConfirmedPeriod(periods, period);
   return {
     config: shop.config,
     employees: active.map(({ id, name, tags }) => ({ id, name, tags })) as ScheduleRequest["employees"],
     period: { start_date: period.start_date, length: period.length },
     holidays: period.holidays,
-    constraints: [...constraints, ...locks],
+    constraints: [...constraints, ...availability, ...locks],
     carry_over: prev ? carryOverFrom(prev, activeIds) : period.carryOver.filter((r) => ids.has(r.employee_id)),
     history: historyFor(periods, period, activeIds),
     ...(previous && { previous }),

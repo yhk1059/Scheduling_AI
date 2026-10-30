@@ -12,9 +12,11 @@ from datetime import date, timedelta
 from typing import Any
 
 from backend.domain.constants import (
+    AVAILABILITY_RULE_PREFIX,
     CARRY_OVER_DAYS,
     CONFLICT_TIME_LIMIT_S,
     HISTORY_DAYS,
+    MAX_AVAILABILITY_RULES,
     MAX_EMPLOYEES,
     MAX_OFFSET_SPAN,
     MAX_PATTERN_LEN,
@@ -31,6 +33,8 @@ from backend.solver.model import solve
 START = date(2026, 12, 1)  # 화요일. 첫 주(월 11/30)에 이월 칸이 들어간다
 HOLIDAYS = [25, 31]
 LEAVE_DAY = 10  # 충돌 변형: 이날 휴가가 몰려 필요 인원을 채울 수 없다
+AVAIL_FORBIDDEN_DAYS = 8  # 가능 시간 변형: 사람 × 코드마다 금지하는 날 수
+AVAIL_FREE_DAYS = 3  # 가능 시간 변형: 첫 며칠은 금지하지 않는다. 이월 근무 이어가기(최소 연속, 뒤 휴무)가 막히지 않게
 
 # 근무 코드 8개(O 포함): 기본 D/E/N + 미드 M + 짧은 S + 더블 DE·ME
 CONFIG = {
@@ -275,6 +279,23 @@ def worst_shop() -> dict:
     }
 
 
+def availability_rules(data: dict) -> list[dict]:
+    """직원 × 코드마다 가능 시간 규칙(상한을 꽉 채운 280개). 사람마다 코드마다 다른 날을 금지하되 해는 남긴다."""
+    codes = [s["code"] for s in CONFIG["shifts"] if s["code"] != "O"]
+    rows = []
+    for i, n in enumerate(data["employees"]):
+        for k, code in enumerate(codes):
+            days = sorted({(i * 3 + k * 5 + j * 11) % (MAX_PERIOD_DAYS - AVAIL_FREE_DAYS) + AVAIL_FREE_DAYS + 1 for j in range(AVAIL_FORBIDDEN_DAYS)})
+            rows.append(expr_rule(f"{AVAILABILITY_RULE_PREFIX}{n['id']}-{code}", {"per": "person", "people": {"ids": [n["id"]]}, "days": {"days": days}},
+                                  cmp(cnt(IN(code)), "eq", 0)))
+    assert len(rows) == MAX_AVAILABILITY_RULES
+    return rows
+
+
+def with_availability(data: dict) -> dict:
+    return {**data, "constraints": data["constraints"] + availability_rules(data)}
+
+
 def with_leave_conflict(data: dict) -> dict:
     """휴가 규칙 하나: 직원 30명이 같은 날 쉬면 필요 인원을 채울 수 없다."""
     ids = [n["id"] for n in data["employees"]][:30]
@@ -322,9 +343,10 @@ def measure(label: str, req: ScheduleRequest, bad: ScheduleRequest) -> bool:
 
 def main() -> int:
     data = worst_shop()
-    req = ScheduleRequest.model_validate(data)
-    bad = ScheduleRequest.model_validate(with_leave_conflict(data))
-    return 0 if measure("식", req, bad) else 1
+    ok = measure("식", ScheduleRequest.model_validate(data), ScheduleRequest.model_validate(with_leave_conflict(data)))
+    avail = with_availability(data)
+    ok = measure("식 + 가능 시간", ScheduleRequest.model_validate(avail), ScheduleRequest.model_validate(with_leave_conflict(avail))) and ok
+    return 0 if ok else 1
 
 
 if __name__ == "__main__":
