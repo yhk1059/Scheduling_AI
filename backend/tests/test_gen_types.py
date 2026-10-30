@@ -25,6 +25,7 @@ def test_schema_has_named_top_level_definitions():
 def test_unions_reference_their_members():
     defs = build_schema()["$defs"]
     refs = {item["$ref"].rsplit("/", 1)[-1] for item in defs["ConstraintSpec"]["oneOf"]}
-    assert refs == {"CountRule", "SequenceRule", "BalanceRule", "Rule", "FixedAssignment"}
+    assert refs == {"Rule", "FixedAssignment"}
+    assert not {"CountRule", "SequenceRule", "BalanceRule", "CountParams"} & set(defs)
     refs = {item["$ref"].rsplit("/", 1)[-1] for item in defs["SolveResponse"]["oneOf"]}
     assert refs == {"SolveOk", "SolveInfeasible", "SolveTimeout"}

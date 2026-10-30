@@ -1,4 +1,4 @@
-"""템플릿 → 블록 변환(설계 §2.5). 저장 이전과 eval 기대값 재작성이 같은 표를 쓴다."""
+"""템플릿 → 블록 변환(설계 §2.5)과 옛 요청 → 식 규칙 요청. 저장 이전과 eval 기대값 재작성이 같은 표를 쓴다."""
 
 import json
 from datetime import date
@@ -8,7 +8,13 @@ import pytest
 from pydantic import TypeAdapter
 
 from backend.domain import constants
-from backend.domain.convert import convert_request, legacy_to_block, night_dedicated_rule
+from backend.domain.convert import (
+    block_to_rules,
+    convert_request,
+    legacy_to_block,
+    night_dedicated_block,
+    night_dedicated_rule,
+)
 from backend.domain.legacy import LegacyScheduleRequest, LegacySpec
 from backend.domain.models import ConstraintSpec, Period, ScheduleRequest
 
@@ -160,8 +166,8 @@ def test_soft_weight_to_priority(weight, priority):
     assert b.weight == constants.PRIORITY_WEIGHTS[priority]
 
 
-def test_night_dedicated_rule():
-    r = night_dedicated_rule("night-only")
+def test_night_dedicated_block():
+    r = night_dedicated_block("night-only")
     assert (r.id, r.type, r.hardness, r.scope) == ("night-only", "count", "hard", "ward")
     assert r.source_text == "나이트 전담은 나이트와 휴무만"
     assert params(r) == {
@@ -172,6 +178,18 @@ def test_night_dedicated_rule():
     }
 
 
+@pytest.mark.parametrize("cid", ["night-only", "nd"])
+def test_night_dedicated_rule_is_default_rule(cid):
+    r = night_dedicated_rule(cid)
+    assert (r.id, r.type, r.hardness, r.scope, r.default) == (cid, "rule", "hard", "ward", True)
+    assert r.source_text == "나이트 전담은 나이트와 휴무만"
+    assert r.values["max"].value == 0
+    assert r.body.for_each.per == "person" and r.body.for_each.people.tags == ["나이트전담"]
+    assert r.body.then.left.shifts.not_in == ["N", "O"] and r.body.then.op == "le"
+    (block_rule,) = block_to_rules(night_dedicated_block(cid))
+    assert r.body == block_rule.body
+
+
 def test_convert_request_tags_night_only():
     raw = CASES[0]["request"]
     req = LegacyScheduleRequest.model_validate(raw)
@@ -179,17 +197,21 @@ def test_convert_request_tags_night_only():
     out = convert_request(req)
     tagged = {n.id for n in out.nurses if "나이트전담" in n.tags}
     assert tagged and tagged == {n.id for n in req.nurses if n.night_only}
-    assert sum(c.type == "count" and c.params.people.tags == ["나이트전담"] for c in out.constraints) == 1
+    assert sum(c.type == "rule" and c.body.kind == "require" and c.body.for_each.people.tags == ["나이트전담"]
+               for c in out.constraints) == 1
+    assert out.constraints[-1] == night_dedicated_rule("night-only")
     assert out.history is None  # history_load(요약)는 원본으로 되돌릴 수 없어 버린다
     assert "night_only" not in out.nurses[0].model_dump() and "history_load" not in out.model_dump()
     assert req.nurses[0].tags == []  # 원본은 바꾸지 않는다
 
 
 @pytest.mark.parametrize("case", CASES, ids=[c["id"] for c in CASES])
-def test_golden_requests_convert_to_valid_blocks(case):
+def test_golden_requests_convert_to_valid_rules(case):
     req = LegacyScheduleRequest.model_validate(case["request"])
     out = convert_request(req)
-    assert {c.type for c in out.constraints} <= {"count", "sequence", "balance", "fixed_assignment"}
-    assert len(out.constraints) == len(req.constraints) + 1
+    assert {c.type for c in out.constraints} <= {"rule", "fixed_assignment"}
+    blocks = [legacy_to_block(c, req.period, req.holidays) for c in req.constraints] + [night_dedicated_block("night-only")]
+    expected = [r.model_copy(update={"default": True}) if r.id == "night-only" else r for b in blocks for r in block_to_rules(b)]
+    assert out.constraints == expected  # 템플릿 → 블록 → 식(블록을 거친 것과 같다)
     revalidated = ScheduleRequest.model_validate(out.model_dump(mode="json"))
     assert revalidated == out

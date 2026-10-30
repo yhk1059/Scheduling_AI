@@ -21,10 +21,12 @@ from pydantic import TypeAdapter
 
 from backend.domain.constants import HISTORY_DAYS
 from backend.domain.convert import block_to_rules, rules_request
+from backend.domain.legacy import BlockScheduleRequest
 from backend.domain.models import Balance, ConstraintSpec, Rule, ScheduleRequest
 from backend.gen_golden import solve_case
 from backend.solver import evaluate, select, stats
 from backend.solver.model import solve
+from backend.tests import block_oracle
 
 GOLDEN = Path(__file__).parent / "golden"
 BLOCK_CASES = json.loads((GOLDEN / "blocks-cases.json").read_text(encoding="utf-8"))
@@ -39,11 +41,11 @@ def _ids(cases):
 # --- 골든 동등성 ---
 
 
-def _block_req(case) -> ScheduleRequest:
-    return ScheduleRequest.model_validate(case["request"])
+def _block_req(case) -> BlockScheduleRequest:
+    return BlockScheduleRequest.model_validate(case["request"])
 
 
-def _shape_changed(req: ScheduleRequest) -> list[str]:
+def _shape_changed(req: BlockScheduleRequest) -> list[str]:
     """식으로 바꾸면 soft 위반량 모양이 달라지는 블록 id."""
     out = []
     for c in req.constraints:
@@ -332,16 +334,24 @@ def test_feature_rule_infeasible_core_contains_rule(cid):
 
 
 def test_preference_summary_same_for_block_and_rules():
+    """블록 기준(block_oracle: 지우기 전 stats의 블록 경로)과 식 규칙의 희망 반영·soft 위반이 같다."""
     case = next(c for c in BLOCK_CASES if c["id"] == "block-soft-prefs")
     block_req = _block_req(case)
+    req = rules_request(block_req)
     a = case["expected"]["assignments"]
-    block_res = stats.compute_result(block_req, a, optimal=True)
-    rule_res = stats.compute_result(rules_request(block_req), a, optimal=True)
-    assert block_res.summary.preferences_total > 0
-    assert rule_res.summary == block_res.summary
+    rule_res = stats.compute_result(req, a, optimal=True)
+    cells = [x for c in block_req.constraints if c.enabled for x in block_oracle.preference_cells(req, c)]
+    met = {n.id: 0 for n in req.nurses}
+    total = {n.id: 0 for n in req.nurses}
+    for nid, d, sel, prefer in cells:
+        total[nid] += 1
+        met[nid] += select.matches(req.config, a[nid][d - 1], sel) == prefer
+    assert sum(total.values()) > 0
+    assert (rule_res.summary.preferences_total, rule_res.summary.preferences_met) == (sum(total.values()), sum(met.values()))
     assert {k: v.preference_rate for k, v in rule_res.stats.items()} == {
-        k: v.preference_rate for k, v in block_res.stats.items()
+        k: met[k] / total[k] if total[k] else None for k in total
     }
+    soft = [c for c in block_req.constraints if c.enabled and c.hardness == "soft"]
     assert [(v.constraint_id, v.nurse_id, v.day) for v in rule_res.soft_violations] == [
-        (v.constraint_id, v.nurse_id, v.day) for v in block_res.soft_violations
+        (c.id, nid, day) for c in soft for _, nid, day in block_oracle.violations(req, a, c)
     ]

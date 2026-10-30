@@ -1,4 +1,4 @@
-"""soft 블록, 목적함수, compute_result(요약·통계)."""
+"""soft 규칙, 목적함수, compute_result(요약·통계)."""
 
 import time
 
@@ -7,8 +7,8 @@ from ortools.sat.python import cp_model
 from backend.domain.models import ScheduleRequest, SolveOk
 from backend.solver.model import build_model, solve
 from backend.solver.stats import compute_result
-from backend.tests import blocks
-from backend.tests.blocks import (
+from backend.tests import rules
+from backend.tests.rules import (
     coverage,
     history,
     max_nights,
@@ -29,7 +29,7 @@ def pref(cid: str, nid: str, shift: str, prefer: bool, days: list[int] | None = 
     target = set(days if days is not None else range(1, 31))
     if weekends_only:
         target &= WEEKENDS
-    return blocks.pref(cid, nid, shift, len(target) if prefer else None, days, weekends_only, **extra)
+    return rules.preference(cid, nid, shift, len(target) if prefer else None, days, weekends_only, **extra)
 
 
 def basic_coverage() -> list[dict]:
@@ -198,7 +198,7 @@ def test_compute_result_weekends_only_preference():
     assert {x.day for x in r.soft_violations} == {1, 21, 22}
 
 
-def test_compute_result_soft_violations_for_toggled_blocks():
+def test_compute_result_soft_violations_for_toggled_rules():
     cons = [
         max_work("mcw", 5, hardness="soft"),
         max_work("mcw-hard", 5),  # hard는 나열하지 않는다
@@ -326,9 +326,9 @@ def test_sample_ward_31_days_solves_within_10s():
         *[skill_mix(f"sm-{s}", s, 3, 1) for s in "DEN"],
         night_fair(),
         weekend_fair(),
-        blocks.pref("p1", "n01", "O", 2, [24, 25]),
-        blocks.pref("p2", "n05", "O", 8, weekends_only=True),  # 12월 주말 8일
-        blocks.pref("p3", "n11", "N"),
+        rules.preference("p1", "n01", "O", 2, [24, 25]),
+        rules.preference("p2", "n05", "O", 8, weekends_only=True),  # 12월 주말 8일
+        rules.preference("p3", "n11", "N"),
     ]
     req = ScheduleRequest.model_validate(data)
 

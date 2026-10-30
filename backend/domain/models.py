@@ -13,8 +13,6 @@ from backend.domain.constants import (
     EXAMPLES_MAX_NURSES,
     EXAMPLES_PER_RULE,
     HISTORY_DAYS,
-    MAX_PATTERN_LEN,
-    MAX_PATTERNS,
     MAX_COND_CMPS,
     MAX_OFFSET,
     MAX_OFFSET_SPAN,
@@ -27,7 +25,6 @@ from backend.domain.constants import (
     MAX_WINDOW_DAYS,
     MIN_COND_CMPS,
     MIN_OFFSET,
-    MIN_PATTERN_LEN,
     MIN_WINDOW_DAYS,
     OFF_CODE,
     PRIORITY_WEIGHTS,
@@ -199,69 +196,7 @@ class Shifts(BaseModel):
         return self.in_ if self.in_ is not None else self.not_in  # type: ignore[return-value]
 
 
-# --- 블록 params ---
-
-
-class CountParams(_Strict):
-    people: People = People()
-    days: Days = Days()
-    shifts: Shifts
-    per: Literal["day", "person", "person_week", "person_window"]
-    window: int | None = Field(default=None, ge=MIN_WINDOW_DAYS, le=MAX_WINDOW_DAYS)
-    measure: Literal["count", "hours"] = "count"
-    min: float | None = Field(default=None, ge=0)
-    max: float | None = Field(default=None, ge=0)
-
-    @model_validator(mode="after")
-    def _check(self):
-        if self.min is None and self.max is None:
-            raise ValueError("min과 max 중 하나 이상이 있어야 합니다")
-        if self.min is not None and self.max is not None and self.min > self.max:
-            raise ValueError(f"min({self.min})이 max({self.max})보다 큽니다")
-        if (self.per == "person_window") != (self.window is not None):
-            raise ValueError("window는 per=person_window일 때만, 그리고 반드시 있어야 합니다")
-        return self
-
-
-ForbidPattern = Annotated[list[Shifts], Field(min_length=MIN_PATTERN_LEN, max_length=MAX_PATTERN_LEN)]
-
-
-class SequenceParams(_Strict):
-    people: People = People()
-    forbid: list[ForbidPattern] | None = Field(default=None, min_length=1, max_length=MAX_PATTERNS)
-    run: Shifts | None = None
-    min_len: int | None = Field(default=None, ge=1)
-    max_len: int | None = Field(default=None, ge=1)
-    after: Shifts | None = None
-    then_off: int | None = Field(default=None, ge=1)
-
-    @model_validator(mode="after")
-    def _check(self):
-        modes = [m for m in ("forbid", "run", "after") if getattr(self, m) is not None]
-        if len(modes) != 1:
-            raise ValueError("forbid, run, after 중 하나만 있어야 합니다")
-        if self.run is not None:
-            if self.min_len is None and self.max_len is None:
-                raise ValueError("run에는 min_len과 max_len 중 하나 이상이 있어야 합니다")
-            if self.min_len is not None and self.max_len is not None and self.min_len > self.max_len:
-                raise ValueError(f"min_len({self.min_len})이 max_len({self.max_len})보다 큽니다")
-        elif self.min_len is not None or self.max_len is not None:
-            raise ValueError("min_len과 max_len은 run에만 씁니다")
-        if (self.after is not None) != (self.then_off is not None):
-            raise ValueError("after와 then_off는 함께 있어야 합니다")
-        return self
-
-
-class BalanceParams(_Strict):
-    people: People = People()
-    days: Days = Days()
-    shifts: Shifts
-    measure: Literal["count", "hours"] = "count"
-    with_history: bool = True  # 최근 28일 근무를 더해서 센다
-    max_gap: int = Field(default=1, ge=0)  # hard일 때만: (최대 − 최소) ≤ max_gap
-
-
-# --- 블록 제약 ---
+# --- 중요도 공통 ---
 
 
 class _BlockBase(_ConstraintBase):
@@ -271,23 +206,6 @@ class _BlockBase(_ConstraintBase):
     def _weight_from_priority(self):
         self.weight = PRIORITY_WEIGHTS[self.priority]  # 입력 weight는 무시한다
         return self
-
-
-class CountRule(_BlockBase):
-    type: Literal["count"]
-    params: CountParams
-
-
-class SequenceRule(_BlockBase):
-    type: Literal["sequence"]
-    params: SequenceParams
-
-
-class BalanceRule(_BlockBase):
-    type: Literal["balance"]
-    hardness: Hardness = "soft"
-    priority: Priority = "low"
-    params: BalanceParams
 
 
 # --- 규칙 식(ADR-019). 재귀하지 않는다: 조건은 비교 하나, 또는 비교 2~4개의 그리고/또는 ---
@@ -443,9 +361,7 @@ class Rule(_BlockBase):
         return self
 
 
-ConstraintSpec = Annotated[
-    Union[CountRule, SequenceRule, BalanceRule, Rule, FixedAssignment], Field(discriminator="type")
-]
+ConstraintSpec = Annotated[Union[Rule, FixedAssignment], Field(discriminator="type")]
 
 
 # --- 요청 ---
@@ -477,34 +393,24 @@ def _check_roster(nurses: list[Nurse]) -> None:
 
 def _constraint_refs(c: typing.Any) -> tuple[list[str], list[int]]:
     """제약이 참조하는 (nurse_ids, days)."""
-    if isinstance(c, Rule):
-        b = c.body
-        if isinstance(b, Balance):
-            people, days = [b.people], [b.days]
-        else:
-            counts = rule_counts(b)
-            people = [b.for_each.people, *(n.who for n in counts if n.who)]
-            days = [b.for_each.days, *(n.days for n in counts)]
-        return [i for p in people for i in p.ids or []], [d for s in days for d in s.days or []]
-    p = c.params
-    if isinstance(p, FixedAssignmentParams):
-        return [p.nurse_id], [p.day]
-    days = getattr(p, "days", None)
-    return p.people.ids or [], (days.days if days else None) or []
+    if isinstance(c, FixedAssignment):
+        return [c.params.nurse_id], [c.params.day]
+    b = c.body
+    if isinstance(b, Balance):
+        people, days = [b.people], [b.days]
+    else:
+        counts = rule_counts(b)
+        people = [b.for_each.people, *(n.who for n in counts if n.who)]
+        days = [b.for_each.days, *(n.days for n in counts)]
+    return [i for p in people for i in p.ids or []], [d for s in days for d in s.days or []]
 
 
 def _constraint_codes(c: typing.Any) -> list[str]:
     """제약이 직접 적은 근무 코드."""
-    if isinstance(c, Rule):
-        selectors = [c.body.shifts] if isinstance(c.body, Balance) else [n.shifts for n in rule_counts(c.body)]
-        return [code for s in selectors for code in s.codes]
-    p = c.params
-    if isinstance(p, FixedAssignmentParams):
-        return [p.shift]
-    if isinstance(p, SequenceParams):
-        selectors = [s for pattern in p.forbid or [] for s in pattern] + [s for s in (p.run, p.after) if s]
-        return [code for s in selectors for code in s.codes]
-    return p.shifts.codes
+    if isinstance(c, FixedAssignment):
+        return [c.params.shift]
+    selectors = [c.body.shifts] if isinstance(c.body, Balance) else [n.shifts for n in rule_counts(c.body)]
+    return [code for s in selectors for code in s.codes]
 
 
 class ScheduleRequest(_Strict):
@@ -713,12 +619,11 @@ TranslateResponse = Annotated[
 
 
 class ConstraintChange(_Strict):
-    """완화 변경. 식 규칙은 disable·set_value·set_hardness만 받는다(★7). update(params 교체)는 블록용이다."""
+    """완화 변경(★7): 끄기, 값 하나 바꾸기, 반드시/가능하면 바꾸기. 식 구조는 바꾸지 않는다."""
 
-    action: Literal["disable", "update", "set_value", "set_hardness"]
+    action: Literal["disable", "set_value", "set_hardness"]
     constraint_id: str
-    params: dict[str, typing.Any] | None = None
-    hardness: Hardness | None = None
+    hardness: Hardness | None = None  # set_hardness: 새 hardness
     name: ValueName | None = None  # set_value: 바꿀 값 이름
     value: float | None = None  # set_value: 새 값
 

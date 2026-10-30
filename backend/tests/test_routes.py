@@ -14,8 +14,6 @@ from backend.domain.constants import (
     MAX_NURSES,
     MAX_OFFSET,
     MAX_OFFSET_SPAN,
-    MAX_PATTERN_LEN,
-    MAX_PATTERNS,
     MAX_PROPOSALS,
     MAX_RULE_CMPS,
     MAX_RULE_VALUES,
@@ -29,7 +27,7 @@ from backend.domain.constants import (
 from backend.llm.client import LLMConfigError, LLMUnavailableError, ToolCallResult
 from backend.routes import app, get_llm_client
 from backend.solver.model import solve as real_solve
-from backend.tests.blocks import history, sample_data
+from backend.tests.rules import history, sample_data
 
 client = TestClient(app)
 
@@ -330,15 +328,16 @@ def explain_body() -> dict:
         "conflicts": [
             {"constraint_id": "f1", "type": "fixed_assignment", "source_text": "f1 원문"},
             {"constraint_id": "f2", "type": "fixed_assignment", "source_text": "f2 원문"},
+            {"constraint_id": "rule-min-off", "type": "rule", "source_text": "최소 휴무"},
         ],
     }
 
 
 GOOD = {"title": "f1 해제", "description": "D 고정을 푼다", "changes": [{"action": "disable", "constraint_id": "f1"}]}
 BAD = {
-    "title": "f2를 E로",
+    "title": "휴무 9일로",
     "description": "여전히 같은 날 두 근무",
-    "changes": [{"action": "update", "constraint_id": "f2", "params": {"shift": "E"}}],
+    "changes": [{"action": "set_value", "constraint_id": "rule-min-off", "name": "min", "value": 9}],
 }
 
 
@@ -352,57 +351,6 @@ def test_explain_returns_only_verified_proposals(llm):
     assert body["text"] == "이영희이 5일에 두 근무로 고정되어 있습니다."
     assert [p["title"] for p in body["proposals"]] == ["f1 해제"]
     assert body["proposals"][0]["verified_summary"] is not None
-
-
-def block_explain_body() -> dict:
-    """하루 데이 인원(count)이 명단보다 많은 휴가와 부딪친다 → 해 없음."""
-    req = sample()
-    nurse_ids = [n["id"] for n in req["nurses"]]
-    req["constraints"] = [
-        {
-            "id": "cov",
-            "scope": "ward",
-            "type": "count",
-            "params": {"shifts": {"in": ["D"]}, "per": "day", "min": len(nurse_ids) - 1},
-            "source_text": "데이 많이",
-        },
-        {
-            "id": "lv",
-            "scope": "period",
-            "type": "count",
-            "params": {"people": {"ids": nurse_ids[:2]}, "days": {"days": [3]}, "shifts": {"not_in": ["O"]}, "per": "person", "max": 0},
-            "source_text": "3일 휴가 둘",
-        },
-    ]
-    return {
-        "request": req,
-        "conflicts": [
-            {"constraint_id": "cov", "type": "count", "source_text": "데이 많이"},
-            {"constraint_id": "lv", "type": "count", "source_text": "3일 휴가 둘"},
-        ],
-    }
-
-
-def test_explain_block_update_verified_by_resolve(llm):
-    body = block_explain_body()
-    assert client.post("/api/py/solve", json=body["request"]).json()["status"] == "infeasible"
-    lower = {
-        "title": "데이 1명으로",
-        "description": "데이 인원을 줄인다",
-        "changes": [{"action": "update", "constraint_id": "cov", "params": {"min": 1}}],
-    }
-    still_bad = {
-        "title": "다른 날로",
-        "description": "휴가를 다른 날로",
-        "changes": [{"action": "update", "constraint_id": "lv", "params": {"days": {"days": [4]}}}],
-    }
-    llm.responses = [ok({"text": "데이 인원이 너무 많습니다.", "proposals": [still_bad, lower]})]
-    r = client.post("/api/py/explain", json=body)
-    assert r.status_code == 200
-    proposals = r.json()["proposals"]
-    assert [p["title"] for p in proposals] == ["데이 1명으로"]
-    params = proposals[0]["changes"][0]["params"]
-    assert params["min"] == 1 and params["shifts"]["in"] == ["D"] and params["per"] == "day"
 
 
 def rule_explain_body() -> dict:
@@ -452,8 +400,7 @@ def test_explain_rule_set_value_verified_by_resolve(llm):
     lower = change("데이 1명으로", {"action": "set_value", "constraint_id": "cov", "name": "min", "value": 1})
     still_bad = change("데이 그대로", {"action": "set_value", "constraint_id": "cov", "name": "min", "value": n - 1})
     soft = change("가능하면으로", {"action": "set_hardness", "constraint_id": "cov", "hardness": "soft"})
-    structure = change("구조 바꾸기", {"action": "update", "constraint_id": "cov", "params": {"min": 1}})
-    llm.responses = [ok({"text": "데이 인원이 너무 많습니다.", "proposals": [still_bad, structure, lower, soft]})]
+    llm.responses = [ok({"text": "데이 인원이 너무 많습니다.", "proposals": [still_bad, lower, soft]})]
     r = client.post("/api/py/explain", json=body)
     assert r.status_code == 200
     proposals = r.json()["proposals"]
@@ -635,25 +582,23 @@ N_SEL, D_SEL = {"in": ["N"]}, {"in": ["D"]}
 
 
 @pytest.mark.parametrize(
-    "spec, accepted",
+    "spec",
     [
-        (block("sequence", {"forbid": [[N_SEL] + [D_SEL] * (MAX_PATTERN_LEN - 1)]}), True),
-        (block("sequence", {"forbid": [[N_SEL] + [D_SEL] * MAX_PATTERN_LEN]}), False),
-        (block("sequence", {"forbid": [[N_SEL, D_SEL]] * MAX_PATTERNS}), True),
-        (block("sequence", {"forbid": [[N_SEL, D_SEL]] * (MAX_PATTERNS + 1)}), False),
-        (block("count", {"shifts": {"in": ["O"]}, "per": "person_window", "window": MAX_WINDOW_DAYS, "min": 1}), True),
-        (block("count", {"shifts": {"in": ["O"]}, "per": "person_window", "window": MAX_WINDOW_DAYS + 1, "min": 1}), False),
+        block("count", {"shifts": D_SEL, "per": "day", "min": 1}),
+        block("sequence", {"forbid": [[N_SEL, D_SEL]]}),
+        {**block("balance", {"shifts": N_SEL}), "hardness": "soft"},
     ],
-    ids=["pattern-len-at-limit", "pattern-len-over", "patterns-at-limit", "patterns-over", "window-at-limit", "window-over"],
+    ids=["count", "sequence", "balance"],
 )
-def test_block_format_limits_are_422(spec, accepted):
+@pytest.mark.parametrize("endpoint", ["solve", "explain"])
+def test_block_types_are_422(spec, endpoint):
+    """블록 3종은 옛 형식이다(ADR-019 ★2). 요청은 rule | fixed_assignment만 받는다."""
     data = sample()
     data["constraints"] = data["constraints"] + [spec]
-    r = client.post("/api/py/solve", json=data)
-    if accepted:
-        assert r.status_code == 200, r.text
-    else:
-        assert_error(r, 422, "VALIDATION_ERROR")
+    body = data if endpoint == "solve" else {"request": data, "conflicts": []}
+    r = client.post(f"/api/py/{endpoint}", json=body)
+    assert_error(r, 422, "VALIDATION_ERROR")
+    assert "constraints" in r.json()["error"]["message"]
 
 
 # --- 규칙 식 상한(ADR-019): 모델 검증이라 422 ---

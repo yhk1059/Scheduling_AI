@@ -7,12 +7,11 @@
 - 칸 하나를 세는 개수 비교는 칸 리터럴(ctx.literal 캐시)이다. 그 밖은 필요한 곳(when, 또는)에서만 bool로 reify한다.
 - hard: lit ∧ when → then. soft: when이 참일 때 then을 벗어난 양(비교 하나, 시간은 기본 근무 단위로 올림)
   또는 1(그리고/또는) × weight.
-- 고르게는 블록과 같은 식(hard.balance_exprs·spread_vars, soft.add_balance)이다.
+- 고르게는 내장 함수다(hard.balance_exprs·spread_vars, soft.add_balance).
 """
 
 import math
 from dataclasses import dataclass
-from types import SimpleNamespace
 from typing import TYPE_CHECKING
 
 from ortools.sat.python import cp_model
@@ -154,7 +153,7 @@ def _require(ctx: "ModelContext", rule: Rule, inst: evaluate.Instance, cond: Con
 def add_rule_hard(ctx: "ModelContext", rule: Rule, lit) -> None:
     body = rule.body
     if isinstance(body, Balance):
-        counts, ub = hard.balance_exprs(ctx, SimpleNamespace(params=body))
+        counts, ub = hard.balance_exprs(ctx, body)
         if len(counts) < 2:
             return
         hi, lo = hard.spread_vars(ctx, counts, ub)
@@ -190,7 +189,7 @@ def _amount(ctx: "ModelContext", b: _Bound, unit: int, enforce: list):
 def add_rule_soft(ctx: "ModelContext", rule: Rule) -> None:
     body = rule.body
     if isinstance(body, Balance):
-        soft.add_balance(ctx, SimpleNamespace(params=body, weight=rule.weight))
+        soft.add_balance(ctx, body, rule.weight)
         return
     for inst in evaluate.instances(ctx.request, rule):
         when = _when_lits(ctx, rule, inst, body.when)

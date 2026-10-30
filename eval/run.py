@@ -49,7 +49,6 @@ from backend.domain.models import (  # noqa: E402
     cond_cmps,
     rule_counts,
 )
-from backend.domain.convert import block_to_rules  # noqa: E402
 from backend.env import load_local_env  # noqa: E402
 from backend.llm.client import (  # noqa: E402
     AnthropicClient,
@@ -204,17 +203,6 @@ def judge_schedules(case: dict | None, config: WardConfig, expected: list) -> li
     return out
 
 
-def _as_rules(specs: list) -> list:
-    """블록은 식 규칙으로 바꿔 같은 단위(규칙)로 비교한다. 바꿀 수 없는 블록은 그대로 둔다(어떤 것과도 같지 않다)."""
-    out = []
-    for s in specs:
-        try:
-            out += block_to_rules(s)
-        except ValueError:
-            out.append(s)
-    return out
-
-
 def _scope_people(request: ScheduleRequest, rule: Any) -> frozenset:
     """사람이 묶이지 않은 위반의 사람 묶음: 고르게는 고른 사람, 날·기간 범위는 세는 사람(who)."""
     body = rule.body
@@ -279,7 +267,7 @@ def _judge_key(spec: Any, schedules: list) -> tuple:
 def score_constraints(expected: list, actual: list, case: dict | None = None, config: WardConfig | None = None) -> tuple[int, int, int]:
     """의미 기준 일대일 매칭(식 규칙 단위). (일치 수, 기대 수, 실제 수)."""
     config = config or judge_config([])
-    exp_rules, act_rules = _as_rules([_spec(c) for c in expected]), _as_rules([_spec(c) for c in actual])
+    exp_rules, act_rules = [_spec(c) for c in expected], [_spec(c) for c in actual]
     schedules = judge_schedules(case, config, exp_rules)
     e = Counter(_judge_key(s, schedules) for s in exp_rules)
     a = Counter(_judge_key(s, schedules) for s in act_rules)

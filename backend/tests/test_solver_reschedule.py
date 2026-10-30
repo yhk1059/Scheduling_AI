@@ -4,7 +4,7 @@ import pytest
 
 from backend.domain.models import ScheduleRequest, SolveOk
 from backend.solver.model import solve
-from backend.tests.blocks import fixed, leave, sample_data
+from backend.tests.rules import fixed, leave, sample_data
 from backend.tests.test_solver_hard import nurse
 
 

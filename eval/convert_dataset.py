@@ -18,12 +18,13 @@ if str(ROOT) not in sys.path:
 from pydantic import TypeAdapter  # noqa: E402
 
 from backend.domain.convert import block_to_rules, legacy_to_block  # noqa: E402
-from backend.domain.models import ConstraintSpec, Period  # noqa: E402
+from backend.domain.legacy import BlockSpec  # noqa: E402
+from backend.domain.models import Period  # noqa: E402
 
 DATASET = ROOT / "eval" / "dataset.jsonl"
 SAMPLE = ROOT / "lib" / "samples" / "ward-15.json"
 
-_adapter = TypeAdapter(ConstraintSpec)
+_adapter = TypeAdapter(BlockSpec)  # 블록·식·칸 고정을 모두 읽는다
 _FILLER = {"id": "eval", "scope": "ward", "source_text": "eval"}
 _EXCLUDE = {"id", "scope", "source_text", "enabled", "weight"}
 _BLOCK_TYPES = ("count", "sequence", "balance")

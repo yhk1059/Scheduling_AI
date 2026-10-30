@@ -13,8 +13,6 @@ from backend.domain.models import (
     RelaxationProposal,
     Rule,
     ScheduleRequest,
-    _constraint_codes,
-    _constraint_refs,
 )
 from backend.llm.client import LLMClient, LLMInvalidOutputError, ToolCallResult
 from backend.llm.prompts import EXPLAIN_SYSTEM, EXPLAIN_TOOL, ExplainerOutput, ProposalDraft
@@ -31,17 +29,14 @@ def fallback_explanation(request: ScheduleRequest, conflicts: list[Conflict]) ->
     return f"다음 규칙들이 동시에 지켜질 수 없습니다: {quoted}."
 
 
-def _is_night_dedicated_rule(spec: Any) -> bool:
-    if isinstance(spec, Rule):
-        body = spec.body
-        people = body.people if body.kind == "balance" else body.for_each.people
-    else:
-        people = getattr(spec.params, "people", None)
-    return people is not None and NIGHT_ONLY_TAG in (people.tags or [])
+def _is_night_dedicated_rule(spec: Rule) -> bool:
+    body = spec.body
+    people = body.people if body.kind == "balance" else body.for_each.people
+    return NIGHT_ONLY_TAG in (people.tags or [])
 
 
 def _conflict_item(c: Conflict, spec: Any, nurses: list) -> dict:
-    """충돌 제약 하나. 식 규칙은 식 JSON(기본값 생략) + label 있는 values, 블록은 params."""
+    """충돌 제약 하나. 식 규칙은 식 JSON(기본값 생략) + label 있는 values, 칸 고정은 params."""
     item: dict[str, Any] = {"id": c.constraint_id, "type": c.type, "hardness": spec.hardness if spec else None}
     if isinstance(spec, Rule):
         item["values"] = {k: v.model_dump(mode="json") for k, v in spec.values.items()}
@@ -87,8 +82,8 @@ def _parse(result: ToolCallResult) -> ExplainerOutput:
 
 
 def _check_rule_change(change: ConstraintChange, spec: Rule) -> ConstraintChange | None:
-    """식 규칙은 값·켜기/끄기·반드시/가능하면만 바꾼다(★7). 구조(update)와 나이트 전담 규칙 완화는 거부한다."""
-    if _is_night_dedicated_rule(spec) or change.action == "update":
+    """식 규칙은 값·켜기/끄기·반드시/가능하면만 바꾼다(★7). 나이트 전담 규칙 완화는 거부한다."""
+    if _is_night_dedicated_rule(spec):
         return None
     if change.action == "disable":
         return ConstraintChange(action="disable", constraint_id=change.constraint_id)
@@ -108,43 +103,12 @@ def _check_rule_change(change: ConstraintChange, spec: Rule) -> ConstraintChange
 
 
 def _check_change(change: ConstraintChange, request: ScheduleRequest, spec: Any) -> ConstraintChange | None:
-    """유효하면 params를 전체 값으로 채운 change, 아니면 None. params는 최상위 키 단위로 바꾼다(셀렉터는 통째로)."""
+    """유효하면 정리한 change, 아니면 None. 칸 고정은 끄기(해제)만 받는다."""
     if isinstance(spec, Rule):
         return _check_rule_change(change, spec)
-    if change.action in ("set_value", "set_hardness"):  # 블록은 step 8까지 disable·update만
+    if change.action != "disable":
         return None
-    if change.action == "disable":
-        if _is_night_dedicated_rule(spec):  # 나이트 전담 규칙은 끄지 않는다
-            return None
-        return ConstraintChange(action="disable", constraint_id=change.constraint_id)
-    if change.params is None and change.hardness is None:
-        return None
-    data = spec.model_dump(mode="json")
-    if change.params is not None:
-        data["params"] = {**data["params"], **change.params}
-    if change.hardness is not None:
-        data["hardness"] = change.hardness
-    try:
-        updated = _spec_adapter.validate_python(data)
-    except ValidationError:
-        return None
-    nurse_ids, cdays = _constraint_refs(updated)
-    if any(i not in {n.id for n in request.nurses} for i in nurse_ids):
-        return None
-    if any(not 1 <= d <= request.period.days for d in cdays):
-        return None
-    if not set(_constraint_codes(updated)) <= request.config.codes:
-        return None
-    people = getattr(updated.params, "people", None)
-    known_tags = {t for n in request.nurses for t in n.tags} | {NIGHT_ONLY_TAG}
-    if people is not None and not {*(people.tags or []), *people.exclude_tags} <= known_tags:
-        return None
-    return ConstraintChange(
-        action="update",
-        constraint_id=change.constraint_id,
-        params=updated.params.model_dump(mode="json") if change.params is not None else None,
-        hardness=change.hardness,
-    )
+    return ConstraintChange(action="disable", constraint_id=change.constraint_id)
 
 
 def _to_proposal(

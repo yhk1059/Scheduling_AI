@@ -11,6 +11,7 @@ from backend.domain.models import Conflict, Nurse, Period, ScheduleRequest
 from backend.llm.client import LLMInvalidOutputError, ToolCallResult
 from backend.llm.explainer import explain, fallback_explanation
 from backend.llm.prompts import EXPLAIN_SYSTEM, EXPLAIN_TOOL
+from backend.tests import rules
 
 NURSES = [
     Nurse(id="n01", name="이영희", years=12),
@@ -18,41 +19,11 @@ NURSES = [
     Nurse(id="n03", name="김지훈", years=2, tags=["나이트전담"]),
 ]
 
-COVERAGE = {
-    "id": "cov",
-    "scope": "ward",
-    "type": "count",
-    "params": {"days": {"kind": "weekend"}, "shifts": {"in": ["D"]}, "per": "day", "min": 3, "max": 3},
-    "source_text": "주말 D 최소 3명",
-}
-LEAVE = {
-    "id": "lv1",
-    "scope": "period",
-    "type": "count",
-    "params": {"people": {"ids": ["n01"]}, "days": {"days": [14, 15]}, "shifts": {"not_in": ["O"]}, "per": "person", "max": 0},
-    "source_text": "이영희 14~15일 휴가",
-}
-FIXED = {
-    "id": "fx1",
-    "scope": "period",
-    "type": "fixed_assignment",
-    "params": {"nurse_id": "n02", "day": 14, "shift": "N"},
-    "source_text": "박민수 14일 N 고정",
-}
-UNRELATED = {
-    "id": "seq",
-    "scope": "ward",
-    "type": "sequence",
-    "params": {"forbid": [[{"in": ["N"]}, {"in": ["D"]}]]},
-    "source_text": "나이트 다음 날 데이 금지",
-}
-NIGHT_ONLY = {
-    "id": "night-only",
-    "scope": "ward",
-    "type": "count",
-    "params": {"people": {"tags": ["나이트전담"]}, "shifts": {"not_in": ["N", "O"]}, "per": "person", "max": 0},
-    "source_text": "나이트 전담은 나이트와 휴무만",
-}
+COVERAGE = rules.count("cov", {"in": ["D"]}, "day", 3, 3, days={"kind": "weekend"}, source_text="주말 D 최소 3명")
+LEAVE = rules.leave("lv1", "n01", [14, 15], source_text="이영희 14~15일 휴가")
+FIXED = rules.fixed("fx1", "n02", 14, "N", source_text="박민수 14일 N 고정")
+UNRELATED = rules.forbid("seq", "N", "D", source_text="나이트 다음 날 데이 금지")
+NIGHT_ONLY = rules.night_only()
 
 REQUEST = ScheduleRequest(
     nurses=NURSES,
@@ -62,10 +33,10 @@ REQUEST = ScheduleRequest(
     input_version=3,
 )
 CONFLICTS = [
-    Conflict(constraint_id="cov", type="count", source_text="주말 D 최소 3명"),
-    Conflict(constraint_id="lv1", type="count", source_text="이영희 14~15일 휴가"),
+    Conflict(constraint_id="cov", type="rule", source_text="주말 D 최소 3명"),
+    Conflict(constraint_id="lv1", type="rule", source_text="이영희 14~15일 휴가"),
     Conflict(constraint_id="fx1", type="fixed_assignment", source_text="박민수 14일 N 고정"),
-    Conflict(constraint_id="night-only", type="count", source_text="나이트 전담은 나이트와 휴무만"),
+    Conflict(constraint_id="night-only", type="rule", source_text="나이트 전담은 나이트와 휴무만"),
 ]
 
 TEXT = "n01의 14~15일 휴가 때문에 주말 데이 인원 3명을 채울 수 없습니다. n02도 14일 나이트로 고정되어 있습니다."
@@ -93,19 +64,18 @@ def disable(cid: str) -> dict:
     return {"action": "disable", "constraint_id": cid}
 
 
-def update(cid: str, params: dict | None = None, hardness: str | None = None) -> dict:
-    d: dict = {"action": "update", "constraint_id": cid}
-    if params is not None:
-        d["params"] = params
-    if hardness is not None:
-        d["hardness"] = hardness
-    return d
+def set_value(cid: str, name: str, value: float) -> dict:
+    return {"action": "set_value", "constraint_id": cid, "name": name, "value": value}
+
+
+def set_hardness(cid: str, hardness: str = "soft") -> dict:
+    return {"action": "set_hardness", "constraint_id": cid, "hardness": hardness}
 
 
 THREE = [
-    proposal("주말 D 최소 2명으로", update("cov", {"min": 2, "max": 3})),
+    proposal("주말 D 최소 2명으로", set_value("cov", "min", 2)),
     proposal("n02 고정 해제", disable("fx1")),
-    proposal("주말 D 인원을 soft로", update("cov", hardness="soft")),
+    proposal("주말 D 인원을 soft로", set_hardness("cov")),
 ]
 
 
@@ -125,33 +95,17 @@ def test_explain_text_and_three_proposals():
     assert len(client.calls) == 1
 
 
-def test_update_params_are_merged_into_full_block_params():
-    client = FakeClient(ok({"text": TEXT, "proposals": [proposal("완화", update("cov", {"min": 2}))]}))
+def test_update_action_is_schema_error_and_retried():
+    """블록용 update(params 교체)는 없어졌다(ADR-019 ★7). 스키마 오류로 다시 묻는다."""
+    old = {"action": "update", "constraint_id": "cov", "params": {"min": 2}}
+    client = FakeClient(
+        ok({"text": TEXT, "proposals": [proposal("옛 형식", old)]}),
+        ok({"text": TEXT, "proposals": [proposal("정상", set_value("cov", "min", 2))]}),
+    )
     _, proposals = explain(REQUEST, CONFLICTS, client)
-
-    params = proposals[0].changes[0].params
-    assert params["min"] == 2 and params["max"] == 3 and params["per"] == "day"
-    assert params["shifts"] == {"in": ["D"], "not_in": None}
-    assert params["days"]["kind"] == "weekend"
-
-
-def test_update_replaces_selector_whole():
-    # 최상위 키 단위 교체: days 셀렉터는 통째로 바뀌고 kind는 기본값(all)으로 돌아간다
-    change = update("lv1", {"days": {"days": [15]}})
-    client = FakeClient(ok({"text": TEXT, "proposals": [proposal("하루 줄이기", change)]}))
-    _, proposals = explain(REQUEST, CONFLICTS, client)
-
-    params = proposals[0].changes[0].params
-    assert params["days"] == {"kind": "all", "weekdays": None, "days": [15]}
-    assert params["people"]["ids"] == ["n01"] and params["max"] == 0
-
-
-def test_update_changes_selector_people():
-    change = update("cov", {"people": {"min_years": 3}, "min": 1, "max": None})
-    client = FakeClient(ok({"text": TEXT, "proposals": [proposal("연차로", change)]}))
-    _, proposals = explain(REQUEST, CONFLICTS, client)
-    params = proposals[0].changes[0].params
-    assert params["people"]["min_years"] == 3 and params["max"] is None
+    assert len(client.calls) == 2
+    assert "action" in client.calls[1]["messages"][-1]["content"]
+    assert [p.title for p in proposals] == ["정상"]
 
 
 def test_request_is_pseudonymized_and_uses_tool():
@@ -169,7 +123,7 @@ def test_request_is_pseudonymized_and_uses_tool():
     assert '"seq"' not in body
     assert '"hardness": "hard"' in body
     assert '"nurse_count": 3' in body
-    assert '"not_in": ["O"]' in body  # 블록 params(셀렉터 별칭 그대로)
+    assert '"not_in": ["O"]' in body  # 식 셀렉터(별칭 그대로)
     context = json.loads(body.split("<context>\n")[1].split("\n</context>")[0])
     assert context["period"] == {"start": "2026-11-01", "end": "2026-11-30", "length": 30}
     assert len(context["days"]) == 30
@@ -202,11 +156,10 @@ def test_tool_schema_from_pydantic():
 def test_prompt_instructions():
     assert "휴가" in EXPLAIN_SYSTEM and "마지막 수단" in EXPLAIN_SYSTEM
     assert "fixed_assignment" in EXPLAIN_SYSTEM and "disable" in EXPLAIN_SYSTEM
-    assert "update" in EXPLAIN_SYSTEM and "최상위 키" in EXPLAIN_SYSTEM
     assert "나이트전담" in EXPLAIN_SYSTEM and "config.shifts" in EXPLAIN_SYSTEM
-    for word in ("count", "sequence", "balance", "not_in"):
+    for word in ("balance", "not_in"):
         assert word in EXPLAIN_SYSTEM
-    for old in ("daily_coverage", "night_fairness"):
+    for old in ("daily_coverage", "night_fairness", "sequence", '"update"', "블록"):
         assert old not in EXPLAIN_SYSTEM
     assert "11/30" in EXPLAIN_SYSTEM and "days" in EXPLAIN_SYSTEM
     assert "대상 월" not in EXPLAIN_SYSTEM and "이번 달" not in EXPLAIN_SYSTEM
@@ -228,24 +181,19 @@ def test_drop_proposal_with_unknown_constraint_id():
     assert [p.title for p in proposals] == ["정상"]
 
 
-def test_drop_update_with_invalid_params():
+def test_drop_invalid_changes():
     props = [
-        proposal("min > max", update("cov", {"min": 5, "max": 3})),
-        proposal("모르는 키", update("cov", {"minimum": 2})),
-        proposal("잘못된 근무", update("fx1", {"shift": "X"})),
-        proposal("없는 근무 코드", update("cov", {"shifts": {"in": ["M"]}})),
-        proposal("셀렉터 형식", update("cov", {"shifts": {"in": ["D"], "not_in": ["O"]}})),
-        proposal("범위 밖 날짜", update("lv1", {"days": {"days": [40]}})),
-        proposal("명단에 없는 간호사", update("lv1", {"people": {"ids": ["n99"]}})),
-        proposal("없는 태그", update("cov", {"people": {"tags": ["책임"]}})),
-        proposal("빈 update", update("cov")),
-        proposal("정상", update("lv1", {"days": {"days": [15]}})),
+        proposal("없는 값 이름", set_value("cov", "max", 2)),
+        proposal("음수 값", set_value("lv1", "max", -1)),
+        proposal("고정 칸 값", set_value("fx1", "min", 1)),
+        proposal("고정 칸 가능하면", set_hardness("fx1")),
+        proposal("정상", set_value("cov", "min", 2)),
     ]
     client = FakeClient(ok({"text": TEXT, "proposals": props}))
     _, proposals = explain(REQUEST, CONFLICTS, client)
 
     assert [p.title for p in proposals] == ["정상"]
-    assert proposals[0].changes[0].params["days"]["days"] == [15]
+    assert proposals[0].changes[0].value == 2
 
 
 def test_drop_proposal_disabling_night_only_rule():
@@ -313,15 +261,14 @@ def test_retries_exhausted_raises():
 
 
 def test_names_restored_in_text_title_description():
-    props = [proposal("n01 휴가 하루 줄이기", update("lv1", {"days": {"days": [15]}}), description="n01의 14일을 근무로 돌립니다.")]
+    props = [proposal("n01 휴가를 가능하면으로", set_hardness("lv1"), description="n01의 14일을 근무로 돌릴 수 있게 합니다.")]
     client = FakeClient(ok({"text": "n01과 n02가 겹칩니다. n03은 무관합니다.", "proposals": props}))
     text, proposals = explain(REQUEST, CONFLICTS, client)
 
     assert text == "이영희과 박민수가 겹칩니다. 김지훈은 무관합니다."
-    assert proposals[0].title == "이영희 휴가 하루 줄이기"
-    assert proposals[0].description == "이영희의 14일을 근무로 돌립니다."
-    # params의 간호사 id는 id로 남는다
-    assert proposals[0].changes[0].params["people"]["ids"] == ["n01"]
+    assert proposals[0].title == "이영희 휴가를 가능하면으로"
+    assert proposals[0].description == "이영희의 14일을 근무로 돌릴 수 있게 합니다."
+    assert proposals[0].changes[0].constraint_id == "lv1"
 
 
 # --- 식 규칙: 값·끄기·가능하면만 ---
@@ -375,17 +322,9 @@ RULE_CONFLICTS = [
     Conflict(constraint_id="cov-r", type="rule", source_text="주말 데이 3명"),
     Conflict(constraint_id="mx", type="rule", source_text="나이트 3연속까지"),
     Conflict(constraint_id="night-only", type="rule", source_text="나이트 전담은 나이트와 휴무만"),
-    Conflict(constraint_id="lv1", type="count", source_text="이영희 14~15일 휴가"),
+    Conflict(constraint_id="lv1", type="rule", source_text="이영희 14~15일 휴가"),
     Conflict(constraint_id="fx1", type="fixed_assignment", source_text="박민수 14일 N 고정"),
 ]
-
-
-def set_value(cid: str, name: str, value: float) -> dict:
-    return {"action": "set_value", "constraint_id": cid, "name": name, "value": value}
-
-
-def set_hardness(cid: str, hardness: str = "soft") -> dict:
-    return {"action": "set_hardness", "constraint_id": cid, "hardness": hardness}
 
 
 def explain_rules(*props: dict) -> list:
@@ -406,15 +345,15 @@ def test_rule_context_has_expression_values_and_source_text():
     assert cov["body"]["then"]["right"] == {"value": "min"}
     assert cov["source_text"] == "주말 데이 3명"
     assert "params" not in cov
-    lv = next(x for x in items if x["id"] == "lv1")
-    assert lv["params"]["max"] == 0  # 블록은 그대로 params
+    fx = next(x for x in items if x["id"] == "fx1")
+    assert fx["params"] == {"nurse_id": "n02", "day": 14, "shift": "N"}  # 칸 고정은 그대로 params
 
 
 def test_set_value_kept_with_name_and_value():
     (p,) = explain_rules(proposal("최대 연속 나이트 3 → 4", set_value("mx", "max_len", 4)))
     (change,) = p.changes
     assert (change.action, change.constraint_id, change.name, change.value) == ("set_value", "mx", "max_len", 4)
-    assert change.params is None and change.hardness is None
+    assert change.hardness is None
 
 
 def test_set_hardness_and_disable_on_rule_kept():
@@ -425,23 +364,21 @@ def test_set_hardness_and_disable_on_rule_kept():
 
 def test_rule_structure_changes_rejected():
     props = explain_rules(
-        proposal("구조 바꾸기", update("mx", {"for_each": {"per": "person_window", "window": 5}})),
-        proposal("hardness도 update로는 안 됨", update("mx", hardness="soft")),
         proposal("없는 값 이름", set_value("mx", "min", 2)),
         proposal("음수 값", set_value("cov-r", "min", -1)),
-        proposal("정상과 함께여도", set_value("mx", "max_len", 4), update("cov-r", {"min": 2})),
+        proposal("정상과 함께여도", set_value("mx", "max_len", 4), set_value("cov-r", "max", 2)),
         proposal("정상", set_value("cov-r", "min", 2)),
     )
     assert [p.title for p in props] == ["정상"]
 
 
-def test_set_value_and_set_hardness_rejected_for_blocks():
+def test_set_value_and_set_hardness_rejected_for_fixed():
     props = explain_rules(
-        proposal("블록 값", set_value("lv1", "max", 1)),
+        proposal("고정 칸 값", set_value("fx1", "min", 1)),
         proposal("고정 칸 가능하면", set_hardness("fx1")),
-        proposal("블록 update는 그대로", update("lv1", {"days": {"days": [15]}})),
+        proposal("고정 칸 해제는 그대로", disable("fx1")),
     )
-    assert [p.title for p in props] == ["블록 update는 그대로"]
+    assert [p.title for p in props] == ["고정 칸 해제는 그대로"]
 
 
 def test_night_only_rule_never_relaxed():

@@ -4,15 +4,38 @@ import importlib.util
 from pathlib import Path
 
 import pytest
-from pydantic import ValidationError
+from pydantic import TypeAdapter, ValidationError
 
 from backend.domain.convert import block_to_rules
+from backend.domain.legacy import BlockSpec
 from backend.llm.client import ToolCallResult
 
 ROOT = Path(__file__).resolve().parents[2]
 _spec = importlib.util.spec_from_file_location("eval_run", ROOT / "eval" / "run.py")
 run = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(run)
+
+
+_block_adapter = TypeAdapter(BlockSpec)
+_BLOCK_TYPES = ("count", "sequence", "balance")
+
+
+def _rules_of(c: dict) -> list:
+    """블록 dict(옛 기대값 모양)는 식 규칙 스펙으로(convert_dataset.py와 같은 변환), 그 밖은 그대로."""
+    if c.get("type") not in _BLOCK_TYPES:
+        return [c]
+    return block_to_rules(_block_adapter.validate_python({**run._FILLER, **c}))
+
+
+def as_rules(*blocks: dict) -> list[dict]:
+    """블록을 데이터셋 기대값 형식(식 규칙 dict)으로. 식·칸 고정은 그대로."""
+    return [r if isinstance(r, dict) else run._dump(r) for b in blocks for r in _rules_of(b)]
+
+
+def score(expected: list, actual: list, **kwargs) -> tuple[int, int, int]:
+    """블록 모양 테스트 입력을 식 규칙으로 바꿔 채점한다(채점기는 식 규칙과 칸 고정만 받는다)."""
+    specs = lambda cs: [r for c in cs for r in _rules_of(c)]  # noqa: E731
+    return run.score_constraints(specs(expected), specs(actual), **kwargs)
 
 
 def count(params: dict, hardness: str | None = None, **extra) -> dict:
@@ -40,39 +63,46 @@ def seq(params: dict, hardness: str = "hard") -> dict:
 
 def test_score_order_independent():
     a, b = leave("n01", [15]), NF
-    assert run.score_constraints([a, b], [b, a]) == (2, 2, 2)
+    assert score([a, b], [b, a]) == (2, 2, 2)
 
 
 def test_score_sorts_days():
-    assert run.score_constraints([leave("n01", [15, 16, 17])], [leave("n01", [17, 15, 16])]) == (1, 1, 1)
+    assert score([leave("n01", [15, 16, 17])], [leave("n01", [17, 15, 16])]) == (1, 1, 1)
 
 
 def test_score_ignores_id_source_text_weight_scope():
     actual = leave("n01", [15], id="abc", source_text="이영희 15일 휴가", weight=1, scope="period", enabled=True)
-    assert run.score_constraints([leave("n01", [15])], [actual]) == (1, 1, 1)
+    assert score([leave("n01", [15])], [actual]) == (1, 1, 1)
 
 
 def test_score_compares_hardness_and_params():
     hard = {**NF, "hardness": "hard"}
-    assert run.score_constraints([NF], [hard]) == (0, 1, 1)
-    assert run.score_constraints([leave("n01", [15])], [leave("n02", [15])]) == (0, 1, 1)
+    assert score([NF], [hard]) == (0, 1, 1)
+    assert score([leave("n01", [15])], [leave("n02", [15])]) == (0, 1, 1)
 
 
 def test_score_multiset():
-    assert run.score_constraints([leave("n01", [1]), leave("n01", [1])], [leave("n01", [1])]) == (1, 2, 1)
+    assert score([leave("n01", [1]), leave("n01", [1])], [leave("n01", [1])]) == (1, 2, 1)
 
 
 def test_score_fills_defaults():
     expected = count({"shifts": {"in": ["O"]}, "per": "person", "min": 8})
     actual = count({"people": {}, "days": {"kind": "all"}, "shifts": {"in": ["O"]}, "per": "person", "measure": "count", "min": 8}, "hard")
-    assert run.score_constraints([expected], [actual]) == (1, 1, 1)
+    assert score([expected], [actual]) == (1, 1, 1)
 
 
 def test_score_rejects_template_expected():
-    """기대값은 블록만 쓴다(템플릿은 step 5에서 모두 바꿨다)."""
+    """기대값은 식 규칙만 쓴다(템플릿은 step 5, 블록은 step 7에서 모두 바꿨다)."""
     template = {"type": "leave", "hardness": "hard", "params": {"nurse_id": "n01", "days": [15, 16]}}
     with pytest.raises(ValidationError):
-        run.score_constraints([template], [leave("n01", [16, 15])])
+        run.score_constraints([template], as_rules(leave("n01", [16, 15])))
+
+
+@pytest.mark.parametrize("block", [leave("n01", [15]), NF, seq({"run": {"in": ["N"]}, "max_len": 3})], ids=_BLOCK_TYPES)
+def test_score_rejects_block_specs(block):
+    """채점기는 블록을 식으로 바꾸지 않는다(ADR-019 ★2: 블록은 변환에만 남는다)."""
+    with pytest.raises(ValidationError):
+        run.score_constraints([block], as_rules(block))
 
 
 # 같은 규칙의 다른 모양은 일치
@@ -80,36 +110,36 @@ def test_score_rejects_template_expected():
 
 def test_same_rule_leave_per_person_vs_per_day():
     per_day = count({"people": {"ids": ["n01"]}, "days": {"days": [15, 16, 17]}, "shifts": {"not_in": ["O"]}, "per": "day", "max": 0}, "hard")
-    assert run.score_constraints([leave("n01", [15, 16, 17])], [per_day]) == (1, 1, 1)
+    assert score([leave("n01", [15, 16, 17])], [per_day]) == (1, 1, 1)
 
 
 def test_same_rule_leave_as_off_exactly():
     off = count({"people": {"ids": ["n01"]}, "days": {"days": [15, 16, 17]}, "shifts": {"in": ["O"]}, "per": "person", "min": 3}, "hard")
-    assert run.score_constraints([leave("n01", [15, 16, 17])], [off]) == (1, 1, 1)
+    assert score([leave("n01", [15, 16, 17])], [off]) == (1, 1, 1)
 
 
 def test_same_rule_in_vs_not_in():
     a = seq({"forbid": [[{"in": ["N"]}, {"in": ["D", "E"]}]]})
     b = seq({"forbid": [[{"in": ["N"]}, {"not_in": ["N", "O"]}]]})
-    assert run.score_constraints([a], [b]) == (1, 1, 1)
+    assert score([a], [b]) == (1, 1, 1)
 
 
 def test_same_rule_selector_list_order():
     a = count({"people": {"ids": ["n01", "n02"]}, "days": {"weekdays": [0, 4]}, "shifts": {"in": ["D", "E"]}, "per": "person", "max": 0}, "soft")
     b = count({"people": {"ids": ["n02", "n01"]}, "days": {"weekdays": [4, 0]}, "shifts": {"in": ["E", "D"]}, "per": "person", "max": 0}, "soft")
-    assert run.score_constraints([a], [b]) == (1, 1, 1)
+    assert score([a], [b]) == (1, 1, 1)
 
 
 def test_same_rule_fixed_vs_count():
     fixed = {"type": "fixed_assignment", "hardness": "hard", "params": {"nurse_id": "n03", "day": 25, "shift": "N"}}
     block = count({"people": {"ids": ["n03"]}, "days": {"days": [25]}, "shifts": {"in": ["N"]}, "per": "person", "min": 1}, "hard")
-    assert run.score_constraints([fixed], [block]) == (1, 1, 1)
+    assert score([fixed], [block]) == (1, 1, 1)
 
 
 def test_same_rule_off_after_night_vs_forbid():
     after = seq({"after": {"in": ["N"]}, "then_off": 1})
     forbid = seq({"forbid": [[{"in": ["N"]}, {"not_in": ["N", "O"]}]]})
-    assert run.score_constraints([after], [forbid]) == (1, 1, 1)
+    assert score([after], [forbid]) == (1, 1, 1)
 
 
 # 식 규칙: 같은 규칙의 다른 식 모양은 일치(위반은 evaluate.evaluate_rule로 센다)
@@ -141,15 +171,15 @@ PAIR_LE = rule({"per": "day"}, cmp(cnt(N_, who={"ids": ["n01", "n02"]}), "le", 1
 
 def test_same_rule_pair_forbid_le_vs_when():
     when_form = rule({"per": "day"}, cmp(cnt(N_, who={"ids": ["n02"]}), "eq", 0), when=cmp(cnt(N_, who={"ids": ["n01"]}), "ge", 1))
-    assert run.score_constraints([PAIR_LE], [when_form]) == (1, 1, 1)
+    assert score([PAIR_LE], [when_form]) == (1, 1, 1)
 
 
 def test_same_rule_window_vs_offset():
     window = rule({"per": "person_window", "window": 4}, cmp(cnt(N_), "le", {"value": "max_len"}), values={"max_len": val(3, "최대 연속 나이트")})
     back = rule({"per": "person_day"}, cmp(cnt(N_, offset=[-3, 0]), "le", 3))
     fwd = rule({"per": "person_day"}, cmp(cnt(N_, offset=[0, 3]), "le", 3))
-    assert run.score_constraints([window], [back]) == (1, 1, 1)
-    assert run.score_constraints([window], [fwd]) == (1, 1, 1)
+    assert score([window], [back]) == (1, 1, 1)
+    assert score([window], [fwd]) == (1, 1, 1)
 
 
 def test_same_rule_leave_person_vs_person_day():
@@ -160,29 +190,29 @@ def test_same_rule_leave_person_vs_person_day():
     )
     person_day = rule({"per": "person_day", "people": {"ids": ["n01"]}, "days": {"days": [15, 16, 17]}}, cmp(cnt(O_), "eq", 1))
     day = rule({"per": "day", "days": {"days": [15, 16, 17]}}, cmp(cnt(WORK_, who={"ids": ["n01"]}), "le", 0))
-    assert run.score_constraints([person], [person_day]) == (1, 1, 1)
-    assert run.score_constraints([person], [day]) == (1, 1, 1)
+    assert score([person], [person_day]) == (1, 1, 1)
+    assert score([person], [day]) == (1, 1, 1)
 
 
 def test_same_rule_expr_in_vs_not_in():
     a = rule({"per": "person_day"}, {"any": [cmp(cnt(N_, offset=[0, 0]), "eq", 0), cmp(cnt({"in": ["D", "E"]}, offset=[1, 1]), "eq", 0)]})
     b = rule({"per": "person_day"}, {"any": [cmp(cnt(N_, offset=[0, 0]), "eq", 0), cmp(cnt({"not_in": ["N", "O"]}, offset=[1, 1]), "eq", 0)]})
-    assert run.score_constraints([a], [b]) == (1, 1, 1)
+    assert score([a], [b]) == (1, 1, 1)
 
 
 def test_same_rule_value_names_ignored():
     a = rule({"per": "day", "days": {"kind": "weekday"}}, cmp(cnt({"in": ["D"]}), "ge", {"value": "min"}), values={"min": val(3, "최소 인원")})
     b = rule({"per": "day", "days": {"kind": "weekday"}}, cmp(cnt({"in": ["D"]}), "ge", {"value": "need"}), values={"need": val(3, "데이 인원")})
     c = rule({"per": "day", "days": {"kind": "weekday"}}, cmp(cnt({"in": ["D"]}), "ge", 3))
-    assert run.score_constraints([a], [b]) == (1, 1, 1)
-    assert run.score_constraints([a], [c]) == (1, 1, 1)
+    assert score([a], [b]) == (1, 1, 1)
+    assert score([a], [c]) == (1, 1, 1)
 
 
 def test_same_rule_block_vs_expr():
-    # 블록(옛 기대값)은 식으로 바꿔 같은 단위로 비교한다
+    # 블록(옛 기대값)을 식으로 바꾼 것과 손으로 쓴 다른 식 모양이 같다
     after = seq({"after": {"in": ["N"]}, "then_off": 1})
     forbid = rule({"per": "person_day"}, {"any": [cmp(cnt(N_, offset=[0, 0]), "eq", 0), cmp(cnt({"not_in": ["N", "O"]}, offset=[1, 1]), "eq", 0)]})
-    assert run.score_constraints([after], [forbid]) == (1, 1, 1)
+    assert score([after], [forbid]) == (1, 1, 1)
 
 
 @pytest.mark.parametrize(
@@ -196,7 +226,7 @@ def test_same_rule_block_vs_expr():
     ],
 )
 def test_expr_different_rule_mismatch(actual):
-    assert run.score_constraints([PAIR_LE], [actual]) == (0, 1, 1)
+    assert score([PAIR_LE], [actual]) == (0, 1, 1)
 
 
 @pytest.mark.parametrize(
@@ -219,7 +249,7 @@ def test_expr_different_rule_mismatch(actual):
     ],
 )
 def test_expr_shapes_mismatch(expected, actual):
-    assert run.score_constraints([expected], [actual]) == (0, 1, 1)
+    assert score([expected], [actual]) == (0, 1, 1)
 
 
 # 숫자나 대상이 하나 다르면 불일치
@@ -248,26 +278,26 @@ def test_expr_shapes_mismatch(expected, actual):
     ],
 )
 def test_different_rule_mismatch(expected, actual):
-    assert run.score_constraints([expected], [actual]) == (0, 1, 1)
+    assert score([expected], [actual]) == (0, 1, 1)
 
 
 def test_score_compares_priority_only_when_soft():
     soft = count({"shifts": {"in": ["O"]}, "per": "person", "min": 8}, "soft")
-    assert run.score_constraints([{**soft, "priority": "high"}], [soft]) == (0, 1, 1)
+    assert score([{**soft, "priority": "high"}], [soft]) == (0, 1, 1)
     hard = count({"shifts": {"in": ["O"]}, "per": "person", "min": 8}, "hard")
-    assert run.score_constraints([{**hard, "priority": "high"}], [hard]) == (1, 1, 1)
+    assert score([{**hard, "priority": "high"}], [hard]) == (1, 1, 1)
 
 
 def test_score_rare_violation_distinguished_by_flips():
     # 무작위 근무표에서 한 칸이 정확히 맞기는 드물다. 기대 블록의 대상 칸을 뒤집은 근무표로 구분한다
     a = count({"people": {"ids": ["n01"]}, "days": {"days": [15]}, "shifts": {"in": ["D"]}, "per": "person", "min": 1}, "soft")
     b = count({"people": {"ids": ["n01"]}, "days": {"days": [15]}, "shifts": {"in": ["E"]}, "per": "person", "min": 1}, "soft")
-    assert run.score_constraints([a], [b]) == (0, 1, 1)
+    assert score([a], [b]) == (0, 1, 1)
 
 
 def test_schedules_deterministic():
     case_ = {"id": "x", "today": "2026-10-26", "scope": "ward", "text": "t", "expected": {"status": "ok", "constraints": [leave("n01", [3])]}}
-    expected = run._as_rules([run._spec(leave("n01", [3]))])
+    expected = [run._spec(r) for r in as_rules(leave("n01", [3]))]
     s1 = run.judge_schedules(case_, run.judge_config([]), expected)
     s2 = run.judge_schedules(case_, run.judge_config([]), expected)
     assert len(s1) >= run.K_RANDOM
@@ -293,12 +323,12 @@ def test_score_constraints_with_new_code():
     config = run.judge_config([DE])
     a = count({"shifts": {"in": ["DE"]}, "per": "person", "max": 2})
     b = count({"shifts": {"in": ["DE"]}, "per": "person", "max": 3})
-    assert run.score_constraints([a], [a], config=config) == (1, 1, 1)
-    assert run.score_constraints([a], [b], config=config) == (0, 1, 1)
+    assert score([a], [a], config=config) == (1, 1, 1)
+    assert score([a], [b], config=config) == (0, 1, 1)
     # 더블 DE가 있어도 in [D, E] ↔ not_in [N, O]는 같다(DE는 D·E를 센다)
     x = count({"shifts": {"in": ["D", "E"]}, "per": "day", "max": 10})
     y = count({"shifts": {"not_in": ["N", "O"]}, "per": "day", "max": 10})
-    assert run.score_constraints([x], [y], config=config) == (1, 1, 1)
+    assert score([x], [y], config=config) == (1, 1, 1)
 
 
 # --- 데이터셋 검증 ---
@@ -306,11 +336,6 @@ def test_score_constraints_with_new_code():
 
 def case(id_: str, expected: dict, **extra) -> dict:
     return {"id": id_, "set": "legacy", "today": "2026-10-26", "scope": "period", "text": "t", "expected": expected, **extra}
-
-
-def as_rules(*blocks: dict) -> list[dict]:
-    """블록을 데이터셋 기대값 형식(식 규칙)으로(convert_dataset.py와 같은 변환)."""
-    return [run._dump(r) for b in blocks for r in block_to_rules(run._spec(b))]
 
 
 def test_validate_dataset_ok():
@@ -465,22 +490,22 @@ BAD_RULE = {"body": {"kind": "require", "for_each": {"per": "person"}, "then": "
 
 def rules(*blocks: dict) -> list[dict]:
     """블록 초안을 translator가 받는 규칙 초안(RuleDraft)으로(설계 §2.5 변환표)."""
-    return [r.model_dump(mode="json", exclude=_SERVER_FIELDS) for b in blocks for r in block_to_rules(run._spec(b))]
+    return [r.model_dump(mode="json", exclude=_SERVER_FIELDS) for b in blocks for r in _rules_of(b)]
 
 
 def test_score_compares_expected_with_draft_actual():
     block = {**leave_draft("n01", [16, 15]), "hardness": "hard"}
     del block["source_text"]
-    assert run.score_constraints([leave("n01", [15, 16])], [block]) == (1, 1, 1)
-    assert run.score_constraints([NF], [{**NF_DRAFT, "hardness": "soft"}]) == (1, 1, 1)
-    assert run.score_constraints([NF], [NF_DRAFT]) == (0, 1, 1)
+    assert score([leave("n01", [15, 16])], [block]) == (1, 1, 1)
+    assert score([NF], [{**NF_DRAFT, "hardness": "soft"}]) == (1, 1, 1)
+    assert score([NF], [NF_DRAFT]) == (0, 1, 1)
 
 
 def test_run_cases_aggregates():
     cases = [
         case(
             "a",
-            {"status": "ok", "constraints": [leave("n01", [15, 16]), NF]},
+            {"status": "ok", "constraints": as_rules(leave("n01", [15, 16]), NF)},
             scope="ward",
         ),
         case("b", {"status": "clarify"}),
@@ -510,8 +535,8 @@ def test_run_cases_aggregates():
 
 def test_run_cases_exact_and_error():
     cases = [
-        case("a", {"status": "ok", "constraints": [leave("n01", [15])]}),
-        case("b", {"status": "ok", "constraints": [leave("n02", [3])]}),
+        case("a", {"status": "ok", "constraints": as_rules(leave("n01", [15]))}),
+        case("b", {"status": "ok", "constraints": as_rules(leave("n02", [3]))}),
     ]
     bad = ok({"rules": [BAD_RULE]})
     client = FakeClient(ok({"rules": rules(leave_draft("n01", [15]))}), bad, bad, bad)
@@ -537,7 +562,7 @@ def test_write_results(tmp_path):
 
 def test_run_case_config_changes():
     de_rule = count({"shifts": {"in": ["DE"]}, "per": "person", "max": 2})
-    cases = [case("a", {"status": "ok", "config_changes": [DE], "constraints": [de_rule]}, set="new", scope="ward")]
+    cases = [case("a", {"status": "ok", "config_changes": [DE], "constraints": as_rules(de_rule)}, set="new", scope="ward")]
     client = FakeClient(ok({"config_changes": [DE], "rules": rules(draft("count", de_rule["params"]))}))
     (r,) = run.run_cases(cases, client)
     assert (r.tp, r.n_expected, r.n_actual, r.exact, r.set) == (2, 2, 2, True, "new")
@@ -550,7 +575,7 @@ def test_run_case_config_changes():
 
 def test_aggregate_by_set_and_gate():
     cases = [
-        case("a", {"status": "ok", "constraints": [leave("n01", [15])]}),
+        case("a", {"status": "ok", "constraints": as_rules(leave("n01", [15]))}),
         case("b", {"status": "clarify"}),
         case("c", {"status": "unsupported"}, set="new"),
     ]
@@ -640,5 +665,5 @@ def test_score_keeps_forbid_pattern_order():
         return {"type": "sequence", "hardness": "hard", "params": {"forbid": [[{"in": [a]}, {"in": [b]}] for a, b in patterns]}}
 
     # 금지 패턴 여럿은 패턴마다 규칙으로 나뉘어 규칙 단위로 맞춘다
-    assert run.score_constraints([forbid(("N", "D"), ("N", "E"))], [forbid(("N", "E"), ("N", "D"))]) == (2, 2, 2)
-    assert run.score_constraints([forbid(("N", "D"))], [forbid(("D", "N"))]) == (0, 1, 1)
+    assert score([forbid(("N", "D"), ("N", "E"))], [forbid(("N", "E"), ("N", "D"))]) == (2, 2, 2)
+    assert score([forbid(("N", "D"))], [forbid(("D", "N"))]) == (0, 1, 1)

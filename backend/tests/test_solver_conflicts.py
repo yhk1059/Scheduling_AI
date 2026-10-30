@@ -7,7 +7,7 @@ from backend.domain.models import ScheduleRequest, SolveInfeasible
 from backend.solver import model as solver_model
 from backend.solver.conflicts import find_conflicts
 from backend.solver.model import solve
-from backend.tests.blocks import coverage, fixed, forbid, leave, max_nights, night_only, sample_data
+from backend.tests.rules import coverage, fixed, forbid, leave, max_nights, night_only, sample_data
 from backend.tests.test_solver_hard import nurse, request
 
 
@@ -41,7 +41,7 @@ def test_excess_leave_conflicts_with_weekend_coverage():
 def test_conflict_carries_type_and_source_text():
     req, _ = overloaded_sample()
     by_id = {c.constraint_id: c for c in find_conflicts(req)}
-    assert by_id["lv-n01"].type == "count"
+    assert by_id["lv-n01"].type == "rule"
     assert by_id["lv-n01"].source_text == "원문"
 
 
@@ -59,7 +59,7 @@ def test_fixed_cells_conflict_with_rule():
 
 
 def test_night_only_nurse_fixed_day_shift():
-    """나이트 전담은 규칙 블록이라 core에 나온다."""
+    """나이트 전담은 기본 규칙이라 core에 나온다."""
     nurses = [nurse("n1", tags=["나이트전담"]), nurse("n2"), nurse("n3")]
     req = request(nurses, [fixed("f1", "n1", 3, "D"), max_nights("mcn", 3), night_only()])
     assert ids(find_conflicts(req)) == {"f1", "night-only"}
