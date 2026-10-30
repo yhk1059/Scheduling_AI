@@ -53,7 +53,10 @@
     {
       "step": 6,
       "name": "examples-route",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-10-30T14:08:47+0900",
+      "completed_at": "2026-10-30T14:16:05+0900",
+      "summary": "models.RuleExample{nurse_ids 1~3, days 연속 ≤7(기간이 짧으면 기간 전체), cells nurse_id→코드, marks (nurse_id, day), detail}와 TranslateOk.examples(규칙 id → ≤EXAMPLES_PER_RULE 3). evaluate.py(순수, CP-SAT·LLM 미사용)에 sample_schedules(request, seed, count): 활성 코드 무작위 count개(휴무 EXAMPLES_OFF_RATIO 0.3, 이월 없음 — 띠는 기간 안만) + 요청 규칙의 세기마다 세는 칸을 맞는/안 맞는 코드 전부·절반으로 뒤집은 변형 4개(eval 판정기와 같은 생각); pick_examples(request, rule, schedules, limit, deadline=None): evaluate_rule 위반에서 인스턴스마다 하나, 띠의 사람·날이 겹치지 않는 것 먼저 → 모자라면 겹치는 것으로 채움; marks는 어긴 비교의 넘친 쪽 세는 칸/모자란 쪽 세지 않은 칸, when 조건의 세는 칸도 띠에 보이게(사람 순서: 첫 어긋난 사람 → 첫 조건 사람 → 나머지); 띠 날은 인스턴스 날+어긋난 칸 → 조건 칸 → 세는 날 순으로 7일 안에 담기는 데까지, 넘치면 첫 어긋난 칸부터 7일, 3일 미만이면 양옆으로 넓힘; detail은 stats.describe_violation(names=False — who.ids는 '지정한 간호사', 코드 이름은 config). routes._translate: ok이면 config_changes를 적용한 config·nurses·period·holidays·그 규칙 하나로 임시 ScheduleRequest를 만들어 규칙마다 예시(키는 모든 rule id), 전체 EXAMPLES_TIME_BUDGET_S 1초 deadline(규칙 사이 + 근무표 사이) 넘으면 남은 규칙은 빈 목록. 상수 EXAMPLES_PER_RULE·SAMPLES 8·SEED·TIME_BUDGET_S·OFF_RATIO·MAX_NURSES 3·MIN/MAX_DAYS 3/7. 측정(40명×31일·코드 8): 보통 규칙 ≤0.05s, 위반이 없는 person_day 비교 6개 규칙은 전체 훑기 1.5s라 deadline 인자를 더함. 결정: 고르게(balance)는 사람 사이 차이라 띠로 못 보여 예시 없음; 같은 인스턴스는 근무표가 달라도 한 번만(휴가 규칙은 예시 1개); describe_violation 순환 import는 _example 안 지역 import. test_examples 13(나이트→데이 금지·휴가·조건부·짝에서 예시·marks가 실제 위반 칸·결정적·겹치지 않음·늘 지켜짐/대상 없는 날·balance 빈 목록·짧은 기간·deadline) + test_routes 4(키=규칙 id·실명 없음·결정적·config_changes 코드·예산 0이면 빈 목록). pytest 1285·vitest 292, build·lint(기존 경고 1)·gen:golden --check 통과. types.gen.ts는 재생성하지 않음(step 9)."
     },
     {
       "step": 7,
