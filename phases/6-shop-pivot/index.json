@@ -29,7 +29,10 @@
     {
       "step": 3,
       "name": "remove-nurse-concepts",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-10-30T23:09:16+0900",
+      "summary": "나이트 전담(NIGHT_ONLY_TAG, 거부 분기, 프롬프트, 상수·추천 칩·기본 카드)과 연차(Nurse.years, min_years·max_years, CSV·명단·근무표 열, 입력 오류)를 백엔드·프론트에서 삭제, ward-15.json·demo-schedule·solver-cases·types.gen 재생성. 결정: 새 병동 기본 규칙은 빈 목록; night_fair 도우미와 sample의 나이트 고르게는 exclude_tags 없이 전원 대상; 해 없음 골든 2개(infeasible-tag-rule, block-infeasible-tag)와 태그 제외 검사는 삭제 대신 일반 태그 '파트'로 유지해 해 없음 3케이스 기준을 지킴; night-only-rules 케이스는 rules-8p-10d로 이름 변경, soft-b·rules-8p-10d에서 연차 규칙 제거; 골든 기대값 변화(sample-2w 20→35, sample-1w 5→10, rules-8p-10d 0→5)는 전담 제외가 사라져 고르게 대상이 넓어진 때문이고(편차는 n14·n15의 최근 4주 나이트), soft-b는 목적값 110 유지·배정만 달라짐, 나머지 14케이스는 그대로; eval에서 연차·나이트 전담 케이스 9건 삭제(w03,w15,b11,b25,x03,x08,x20,b23,x17), w10·w13은 기대값의 제외 태그만 뺌; bench의 연차 규칙(senior-*, 조건부의 연차 비교)은 삭제하거나 책임 태그로 대체(40명 규칙 74개, 풀이 5.58s/10s, 충돌 분석 5.00s/5s); e2e는 컴파일만 맞춤: 스펙의 '새 간호사 연차' 입력과 fixture의 years는 samples-e2e 단계까지 남아 지금은 실행되지 않음; git grep -E의 \\b가 이 환경에서 동작하지 않아 AC grep은 years 단독을 잡지 못하므로 git grep -w로 따로 확인함",
+      "completed_at": "2026-10-30T23:18:13+0900"
     },
     {
       "step": 4,
