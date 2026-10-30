@@ -5,8 +5,7 @@ from datetime import date, timedelta
 from pathlib import Path
 
 from backend.domain.constants import HISTORY_DAYS, NIGHT_ONLY_TAG
-from backend.domain.convert import NIGHT_ONLY_RULE_ID, night_dedicated_rule, rules_request
-from backend.domain.legacy import BlockScheduleRequest
+from backend.domain.convert import NIGHT_ONLY_RULE_ID, night_dedicated_rule
 
 SAMPLE_PATH = Path(__file__).resolve().parents[2] / "lib" / "samples" / "ward-15.json"
 
@@ -195,7 +194,7 @@ def history(start: str, rows: dict[str, list[str]], holidays: list[str] = ()) ->
 
 
 def sample_data() -> dict:
-    """샘플 병동(블록 형식)을 식 규칙으로 바꾼 요청 dict. next_requests(다음 근무표 요청)는 뺀다."""
+    """샘플 병동(식 규칙) 요청 dict. next_requests(다음 근무표 요청)는 뺀다."""
     data = json.loads(SAMPLE_PATH.read_text(encoding="utf-8"))
     del data["next_requests"]
-    return rules_request(BlockScheduleRequest.model_validate(data)).model_dump(mode="json", by_alias=True)
+    return data

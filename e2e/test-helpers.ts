@@ -4,7 +4,7 @@ import { expect, type Locator, type Page, test } from "@playwright/test";
 import { isWeekendDay, type PeriodRange, periodDays } from "../lib/period";
 import type { Ward, WorkPeriod } from "../lib/store";
 import { DEFAULT_CONFIG, ruleShape } from "../lib/migrate";
-import type { ConstraintSpec, Days, People, ScheduleRequest, Shifts, TranslateResponse } from "../lib/types.gen";
+import type { ConstraintSpec, Days, People, ScheduleRequest, ScheduleResult, Shifts, TranslateResponse } from "../lib/types.gen";
 
 /** 근무 코드. 기본은 D/E/N/O이고 병동이 더한 코드(M, DE 등)도 온다. */
 export type Code = "D" | "E" | "N" | "O" | (string & {});
@@ -236,13 +236,51 @@ export function hardViolations(req: ScheduleRequest, grid: Grid): string[] {
   return out;
 }
 
-/** 근무 칸이 모두 있고 마지막 /solve 요청의 반드시 규칙을 지키는지 본다. */
+/**
+ * 식 규칙 평가(backend solver/evaluate)로 근무표의 반드시 규칙 위반을 모은다. 조건부·짝처럼 hardViolations가 읽지 못하는 모양도 본다.
+ * 모든 칸을 고정 근무로 걸고 반드시 식 규칙을 가능하면으로 바꿔 /api/py/solve에 보내면, 응답의 soft_violations가 그 규칙들의
+ * evaluate_rule 결과다. 반드시 고르게(balance)는 가능하면의 기준이 달라 그대로 두고, 해가 없으면 위반으로 본다.
+ * 칸 고정은 hardViolations가 보므로 빼고, 가능하면 규칙은 판정과 관계없어 뺀다.
+ */
+export async function evaluatedViolations(page: Page, req: ScheduleRequest, grid: Grid): Promise<string[]> {
+  const hard = new Set<string>();
+  const constraints: ConstraintSpec[] = [];
+  for (const c of req.constraints ?? []) {
+    if (c.type !== "rule" || c.enabled === false) continue;
+    const balance = c.body.kind === "balance";
+    if ((c.hardness ?? (balance ? "soft" : "hard")) !== "hard") continue;
+    if (balance) constraints.push(c);
+    else {
+      hard.add(c.id);
+      constraints.push({ ...c, hardness: "soft" });
+    }
+  }
+  for (const n of req.nurses)
+    (grid[n.name] ?? []).forEach((shift, i) =>
+      constraints.push({
+        id: `e2e-${n.id}-${i + 1}`,
+        type: "fixed_assignment",
+        scope: "period",
+        source_text: "e2e",
+        params: { nurse_id: n.id, day: i + 1, shift },
+      }),
+    );
+  const res = await page.request.post("/api/py/solve", { data: { ...req, previous: null, constraints }, timeout: 60_000 });
+  expect(res.ok(), `평가용 solve ${res.status()}`).toBe(true);
+  const body = await res.json();
+  if (body.status !== "ok") return [`반드시 고르게 규칙 위반 또는 ${body.status}: ${JSON.stringify(body.conflicts ?? [])}`];
+  const result = body.result as ScheduleResult;
+  return result.soft_violations.filter((v) => hard.has(v.constraint_id)).map((v) => `${v.constraint_id}: ${v.detail}`);
+}
+
+/** 근무 칸이 모두 있고 마지막 /solve 요청의 반드시 규칙을 지키는지 본다(따로 구현한 검사 + 식 규칙 평가). */
 export async function expectHardRulesHold(page: Page, period: PeriodRange, lastSolve: ScheduleRequest | undefined) {
   const grid = await readGrid(page, period);
   expect(lastSolve, "마지막 /solve 요청").toBeTruthy();
   expect(cellCount(grid), "근무 칸 수").toBe(lastSolve!.nurses.length * period.length);
   expect(lastSolve!.period).toEqual(period);
   expect(hardViolations(lastSolve!, grid), "반드시 규칙 위반").toEqual([]);
+  expect(await evaluatedViolations(page, lastSolve!, grid), "반드시 규칙 위반(식 규칙 평가)").toEqual([]);
 }
 
 /** 입력칸에 말을 넣고 [규칙 만들기]/[요청 만들기]를 누른 뒤 응답을 돌려준다. */
