@@ -1,6 +1,6 @@
 """규칙 식을 근무표 위에서 평가한다(ADR-019, 설계 §2.2~§2.4). 식 의미의 단일 기준이다.
 
-결과 통계(stats), eval 판정기, 예시 판정이 이 함수를 쓰고, CP-SAT 컴파일은 이 함수와 같은 답을 내야 한다.
+결과 통계(stats), eval 판정기, 예시 판정(sample_schedules·pick_examples)이 이 함수를 쓰고, CP-SAT 컴파일은 이 함수와 같은 답을 내야 한다.
 순수 함수다(CP-SAT 미사용). 날짜는 기간 안 인덱스(1..length)이고, 0 이하는 이월 칸(0이 시작 전날)이다.
 
 - 모르는 날(기간 뒤, 이월로도 모르는 기간 앞)의 칸은 세지 않는다(0).
@@ -10,9 +10,18 @@
 """
 
 import math
+import random
 from dataclasses import dataclass
+from time import monotonic
 
-from backend.domain.constants import FAIRNESS_TOLERANCE
+from backend.domain.constants import (
+    EXAMPLES_MAX_DAYS,
+    EXAMPLES_MAX_NURSES,
+    EXAMPLES_MIN_DAYS,
+    EXAMPLES_OFF_RATIO,
+    FAIRNESS_TOLERANCE,
+    OFF_CODE,
+)
 from backend.domain.models import (
     All,
     Any,
@@ -23,8 +32,10 @@ from backend.domain.models import (
     Count,
     Require,
     Rule,
+    RuleExample,
     ScheduleRequest,
     ValueRef,
+    cond_cmps,
     rule_counts,
 )
 from backend.solver import select
@@ -215,3 +226,162 @@ def evaluate_rule(request: ScheduleRequest, assignments: Assignments, rule: Rule
             amount = math.ceil(over / select.measure_unit(body.then.left.measure))
         out.append(RuleViolation(inst, amount))
     return out
+
+
+# --- 예시 판정(설계 §4.2, 결정 ★6): LLM 없이 샘플 근무표에서 위반 사례를 고른다 ---
+
+_FLIPS = (("all", True), ("all", False), ("half", True), ("half", False))  # (뒤집는 방식, 세는 코드로인지)
+
+
+def _flipped(base: Assignments, cells: list[tuple[str, int]], pool: list[str], rng: random.Random, mode: str) -> Assignments:
+    out = {nid: list(row) for nid, row in base.items()}
+    for nid, d in cells:
+        if mode == "half" and rng.random() < 0.5:
+            continue
+        out[nid][d - 1] = rng.choice(pool)
+    return out
+
+
+def sample_schedules(request: ScheduleRequest, seed: int, count: int) -> list[Assignments]:
+    """샘플 근무표: 활성 코드 무작위 count개(휴무 약 EXAMPLES_OFF_RATIO) + 요청의 규칙이 세는 칸을 뒤집은 변형.
+
+    뒤집기는 eval 판정기와 같은 생각이다: 특정 사람·특정 날만 고르는 규칙도 위반이 나오게, 세기마다 그 칸을
+    맞는 코드 전부/맞지 않는 코드 전부/절반씩으로 바꾼다. 이월은 넣지 않는다(띠는 기간 안 날만 보인다).
+    """
+    rng = random.Random(seed)
+    config = request.config
+    active = [s.code for s in config.shifts if s.active]
+    work = [c for c in active if c != OFF_CODE]
+    ids = [n.id for n in request.nurses]
+    length = request.period.days
+
+    def cell() -> str:
+        return OFF_CODE if not work or rng.random() < EXAMPLES_OFF_RATIO else rng.choice(work)
+
+    base = [{nid: [cell() for _ in range(length)] for nid in ids} for _ in range(count)]
+    out = list(base)
+    flips = 0
+    for rule in request.constraints:
+        if not isinstance(rule, Rule) or isinstance(rule.body, Balance):
+            continue
+        insts = instances(request, rule)
+        for c in rule_counts(rule.body):
+            cells = sorted({cell for inst in insts for cell in count_scope(request, rule, inst, c) if cell[1] >= 1})
+            match = [code for code in active if select.matches(config, code, c.shifts)]
+            other = [code for code in active if code not in match]
+            for mode, to_match in _FLIPS:
+                pool = match if to_match else other
+                if cells and pool and base:
+                    out.append(_flipped(base[flips % len(base)], cells, pool, rng, mode))
+                    flips += 1
+    return out
+
+
+def _sides(c: Cmp) -> list[Count]:
+    return [c.left, c.right] if isinstance(c.right, Count) else [c.left]
+
+
+def _marks(
+    request: ScheduleRequest, assignments: Assignments, rule: Rule, inst: Instance, cmps: list[Cmp], violated: bool
+) -> list[tuple[str, int]]:
+    """비교를 그렇게 만든 기간 안 칸. 넘친 쪽은 세는 칸, 모자란 쪽은 세지 않은 칸이다.
+    violated=False(when 조건)면 세는 칸만 본다."""
+    out: list[tuple[str, int]] = []
+    for c in cmps:
+        left, right = cmp_sides(request, assignments, rule, inst, c)
+        excess = left > right if violated else True
+        sides = [(c.left, excess)]
+        if isinstance(c.right, Count):
+            sides.append((c.right, not excess if violated else True))
+        for count, counted in sides:
+            for nid, d, code in count_cells(request, assignments, rule, inst, count):
+                if d >= 1 and select.matches(request.config, code, count.shifts) == counted:
+                    out.append((nid, d))
+    return list(dict.fromkeys(out))
+
+
+def _strip_days(length: int, marks: list[int], tiers: list[list[int]]) -> list[int]:
+    """띠의 날: 연속 3~7일(기간 안). tiers(인스턴스 날·어긋난 칸 → 조건 칸 → 세는 날)를 앞에서부터
+    7일 안에 담기는 데까지 담는다. 어긋난 칸부터 7일에 담기지 않으면 첫 어긋난 칸부터 7일."""
+    lo, hi = min(tiers[0]), max(tiers[0])
+    if hi - lo + 1 > EXAMPLES_MAX_DAYS:
+        lo = min(marks)
+        hi = min(lo + EXAMPLES_MAX_DAYS - 1, length)
+    else:
+        for tier in tiers[1:]:
+            if tier and max(hi, *tier) - min(lo, *tier) + 1 <= EXAMPLES_MAX_DAYS:
+                lo, hi = min(lo, *tier), max(hi, *tier)
+    left = True
+    while hi - lo + 1 < EXAMPLES_MIN_DAYS and (lo > 1 or hi < length):
+        if (left and lo > 1) or hi == length:
+            lo -= 1
+        else:
+            hi += 1
+        left = not left
+    return list(range(lo, hi + 1))
+
+
+def _example(request: ScheduleRequest, assignments: Assignments, rule: Rule, v: RuleViolation) -> RuleExample | None:
+    from backend.solver.stats import describe_violation  # stats가 이 모듈을 import한다(순환 피함)
+
+    body = rule.body
+    assert isinstance(body, Require)
+    inst = v.instance
+    failed = [c for c in cond_cmps(body.then) if not cmp_holds(request, assignments, rule, inst, c)]
+    marks = _marks(request, assignments, rule, inst, failed, violated=True)
+    if not marks:
+        return None
+    context = _marks(request, assignments, rule, inst, cond_cmps(body.when), violated=False)
+    ordered = [marks[0][0], *(n for n, _ in context[:1]), *(n for n, _ in marks), *(n for n, _ in context)]
+    nurse_ids = list(dict.fromkeys(ordered))[:EXAMPLES_MAX_NURSES]
+    marks = [m for m in marks if m[0] in nurse_ids]
+    length = request.period.days
+    anchor = [d for d in inst.days if 1 <= d <= length]
+    scope = [d for c in failed for count in _sides(c) for _, d in count_scope(request, rule, inst, count) if d >= 1]
+    mark_days = [d for _, d in marks]
+    days = _strip_days(
+        length,
+        mark_days,
+        [anchor + mark_days, [d for n, d in context if n in nurse_ids], sorted(set(scope))],
+    )
+    return RuleExample(
+        nurse_ids=nurse_ids,
+        days=days,
+        cells={nid: [assignments[nid][d - 1] for d in days] for nid in nurse_ids},
+        marks=[(n, d) for n, d in marks if d in days],
+        detail=describe_violation(request, assignments, rule, v, names=False),
+    )
+
+
+def _overlaps(a: RuleExample, b: RuleExample) -> bool:
+    return bool(set(a.nurse_ids) & set(b.nurse_ids)) and bool(set(a.days) & set(b.days))
+
+
+def pick_examples(
+    request: ScheduleRequest, rule: Rule, schedules: list[Assignments], limit: int, deadline: float | None = None
+) -> list[RuleExample]:
+    """위반 사례 ≤ limit개. 인스턴스마다 하나, 띠의 사람·날이 서로 겹치지 않는 것을 먼저 고른다.
+    고르게는 사람 사이 차이라 띠로 보일 수 없어 예시가 없다. 같은 입력이면 같은 결과다.
+    deadline(monotonic 시각)을 넘기면 다음 근무표를 보지 않고 그때까지 고른 것을 돌려준다."""
+    if isinstance(rule.body, Balance) or limit <= 0:
+        return []
+    chosen: list[RuleExample] = []
+    spare: list[RuleExample] = []
+    seen: set[Instance] = set()
+    for assignments in schedules:
+        if deadline is not None and monotonic() >= deadline:
+            break
+        for v in evaluate_rule(request, assignments, rule):
+            if v.instance in seen:
+                continue
+            seen.add(v.instance)
+            ex = _example(request, assignments, rule, v)
+            if ex is None:
+                continue
+            if not any(_overlaps(ex, c) for c in chosen):
+                chosen.append(ex)
+                if len(chosen) == limit:
+                    return chosen
+            elif len(spare) < limit:
+                spare.append(ex)
+    return (chosen + spare)[:limit]

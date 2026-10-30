@@ -47,6 +47,16 @@ DEFAULT_MODEL = "claude-sonnet-5-5"
 SOLVE_TIME_LIMIT_S = 10
 CONFLICT_TIME_LIMIT_S = 5
 PROPOSAL_VERIFY_TIME_LIMIT_S = 3
+EXAMPLES_TIME_BUDGET_S = 1  # /translate 예시 판정 전체. 넘으면 남은 규칙은 예시 없음
+
+# 예시 판정(ADR-019, 설계 §4.2): 고정 시드 샘플 근무표에서 위반 사례를 고른다
+EXAMPLES_PER_RULE = 3
+EXAMPLES_SAMPLES = 8  # 무작위 근무표 수(규칙이 세는 칸을 뒤집은 변형은 따로 더한다)
+EXAMPLES_SEED = 20261030
+EXAMPLES_OFF_RATIO = 0.3  # 샘플 근무표의 휴무 비율
+EXAMPLES_MAX_NURSES = 3  # 띠 하나에 보일 간호사 수
+EXAMPLES_MIN_DAYS = 3  # 띠의 날 수(기간이 더 짧으면 기간 전체)
+EXAMPLES_MAX_DAYS = 7
 
 # 가중치
 # 블록의 중요도 → soft 위반 1단위당 페널티(ADR-018). 보통 = 템플릿 기본 가중치, 낮음 = 템플릿 공정성 기본 가중치.

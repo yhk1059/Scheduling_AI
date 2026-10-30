@@ -1,4 +1,4 @@
-"""HTTP 계층. solver와 llm의 조합(제안 재풀이 검증)은 이 파일에서만 한다(ADR-006)."""
+"""HTTP 계층. solver와 llm의 조합(제안 재풀이 검증, 예시 판정)은 이 파일에서만 한다(ADR-006)."""
 
 import json
 import logging
@@ -13,6 +13,10 @@ from pydantic import BaseModel, TypeAdapter, ValidationError
 from starlette.concurrency import run_in_threadpool
 
 from backend.domain.constants import (
+    EXAMPLES_PER_RULE,
+    EXAMPLES_SAMPLES,
+    EXAMPLES_SEED,
+    EXAMPLES_TIME_BUDGET_S,
     MAX_CONSTRAINTS,
     MAX_FIXED_ASSIGNMENTS,
     MAX_NURSES,
@@ -30,6 +34,8 @@ from backend.domain.models import (
     ExplainRequest,
     ExplainResponse,
     RelaxationProposal,
+    Rule,
+    RuleExample,
     ScheduleRequest,
     SolveInfeasible,
     SolveOk,
@@ -38,6 +44,7 @@ from backend.domain.models import (
     TranslateOk,
     TranslateRequest,
     TranslateUnsupported,
+    WardConfig,
 )
 from backend.env import load_local_env
 from backend.llm.client import (
@@ -50,6 +57,7 @@ from backend.llm.client import (
 )
 from backend.llm.explainer import explain, fallback_explanation
 from backend.llm.translator import translate
+from backend.solver.evaluate import pick_examples, sample_schedules
 from backend.solver.model import solve
 
 logger = logging.getLogger(__name__)
@@ -213,7 +221,7 @@ async def translate_endpoint(
     req: TranslateRequest = Depends(_body(TranslateRequest)),
     client: LLMClient = Depends(get_llm_client),
 ) -> TranslateOk | TranslateClarify | TranslateUnsupported:
-    return await run_in_threadpool(translate, req, _metered(request, client))
+    return await run_in_threadpool(_translate, req, _metered(request, client))
 
 
 @app.post("/api/py/explain")
@@ -223,6 +231,44 @@ async def explain_endpoint(
     client: LLMClient = Depends(get_llm_client),
 ) -> ExplainResponse:
     return await run_in_threadpool(_explain, req, _metered(request, client))
+
+
+# --- /translate 오케스트레이션: 예시 판정 ---
+
+
+def _examples(req: TranslateRequest, ok: TranslateOk) -> dict[str, list[RuleExample]]:
+    """규칙마다 샘플 근무표의 위반 사례(설계 §4.2). LLM을 쓰지 않는다. 예산을 넘기면 남은 규칙은 빈 목록이다."""
+    ctx = req.context
+    rules = [c for c in ok.constraints if isinstance(c, Rule)]
+    out: dict[str, list[RuleExample]] = {r.id: [] for r in rules}
+    if not ctx.nurses:
+        return out
+    shifts = {s.code: s for s in ctx.config.shifts}
+    for change in ok.config_changes:  # translate가 이미 검증했다
+        shifts[change.shift.code] = change.shift
+    config = WardConfig(shifts=list(shifts.values()))
+    deadline = monotonic() + EXAMPLES_TIME_BUDGET_S
+    for rule in rules:
+        if monotonic() >= deadline:
+            break
+        request = ScheduleRequest(
+            config=config,
+            nurses=ctx.nurses,
+            period=ctx.period,
+            holidays=ctx.holidays,
+            constraints=[rule],
+            input_version=req.input_version,
+        )
+        schedules = sample_schedules(request, EXAMPLES_SEED, EXAMPLES_SAMPLES)
+        out[rule.id] = pick_examples(request, rule, schedules, EXAMPLES_PER_RULE, deadline)
+    return out
+
+
+def _translate(req: TranslateRequest, client: LLMClient) -> TranslateOk | TranslateClarify | TranslateUnsupported:
+    result = translate(req, client)
+    if isinstance(result, TranslateOk):
+        result = result.model_copy(update={"examples": _examples(req, result)})
+    return result
 
 
 # --- /explain 오케스트레이션 ---

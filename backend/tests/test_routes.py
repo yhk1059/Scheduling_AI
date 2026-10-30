@@ -8,6 +8,7 @@ from fastapi.testclient import TestClient
 
 from backend import routes
 from backend.domain.constants import (
+    EXAMPLES_PER_RULE,
     MAX_CONSTRAINTS,
     MAX_FIXED_ASSIGNMENTS,
     MAX_NURSES,
@@ -248,6 +249,62 @@ def test_translate_ok_with_config_changes(llm):
         {"action": "add", "shift": {"code": "M", "name": "미드", "hours": 8.0, "parts": [], "start": "11:00", "active": True}}
     ]
     assert body["constraints"][0]["body"]["then"]["left"]["shifts"]["in"] == ["M"]
+
+
+PAIR_DRAFT = {
+    "body": {
+        "kind": "require",
+        "for_each": {"per": "day"},
+        "then": {"left": {"who": {"ids": ["n01", "n02"]}, "shifts": {"in": ["N"]}}, "op": "le", "right": 1},
+    },
+    "source_text": "n01와 n02는 같은 날 나이트 금지",
+}
+
+
+def test_translate_examples_keyed_by_rule_id(llm):
+    llm.responses = [ok({"rules": [LEAVE_DRAFT, PAIR_DRAFT]})]
+    body = client.post("/api/py/translate", json=translate_body()).json()
+    ids = [c["id"] for c in body["constraints"]]
+    assert set(body["examples"]) == set(ids)
+    leave, pair = (body["examples"][i] for i in ids)
+    assert 1 <= len(leave) <= EXAMPLES_PER_RULE and 1 <= len(pair) <= EXAMPLES_PER_RULE
+    ex = leave[0]
+    assert set(ex) == {"nurse_ids", "days", "cells", "marks", "detail"}
+    assert ex["nurse_ids"] == ["n01"] and {15, 16, 17} <= set(ex["days"])
+    assert all(nid == "n01" and d in (15, 16, 17) for nid, d in ex["marks"])
+    names = [n["name"] for n in sample()["nurses"]]
+    assert not any(name in e["detail"] for e in leave + pair for name in names)
+
+
+def test_translate_examples_are_deterministic(llm):
+    llm.responses = [ok({"rules": [PAIR_DRAFT]}), ok({"rules": [PAIR_DRAFT]})]
+    first = client.post("/api/py/translate", json=translate_body()).json()
+    second = client.post("/api/py/translate", json=translate_body()).json()
+    assert list(first["examples"].values()) == list(second["examples"].values())
+
+
+def test_translate_examples_use_config_changes(llm):
+    mid = {"code": "M", "name": "미드", "hours": 8}
+    rule = {
+        "body": {
+            "kind": "require",
+            "for_each": {"per": "day"},
+            "then": {"left": {"shifts": {"in": ["M"]}}, "op": "le", "right": 1},
+        },
+        "source_text": "미드는 하루 1명까지",
+    }
+    llm.responses = [ok({"rules": [rule], "config_changes": [{"action": "add", "shift": mid}]})]
+    body = client.post("/api/py/translate", json=translate_body("미드 추가, 하루 1명까지")).json()
+    (examples,) = body["examples"].values()
+    assert examples and all(row[ex["days"].index(d)] == "M" for ex in examples for nid, d in ex["marks"] for row in [ex["cells"][nid]])
+    assert "미드" in examples[0]["detail"]
+
+
+def test_translate_examples_time_budget(llm, monkeypatch):
+    monkeypatch.setattr(routes, "EXAMPLES_TIME_BUDGET_S", 0)
+    llm.responses = [ok({"rules": [LEAVE_DRAFT, PAIR_DRAFT]})]
+    body = client.post("/api/py/translate", json=translate_body()).json()
+    assert len(body["examples"]) == 2 and all(v == [] for v in body["examples"].values())
 
 
 def test_translate_clarify(llm):
