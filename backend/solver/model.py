@@ -12,13 +12,13 @@ from ortools.sat.python import cp_model
 
 from backend.domain.constants import CONFLICT_TIME_LIMIT_S, DIFF_WEIGHT, SOLVE_TIME_LIMIT_S
 from backend.domain.models import ScheduleRequest, Shifts, SolveInfeasible, SolveOk, SolveTimeout
-from backend.solver import compile, hard, select, soft, stats
+from backend.solver import compile, hard, select, stats
 from backend.solver.conflicts import find_conflicts
 
 Cell = cp_model.IntVar | bool | None
 
 HARD_ADDERS = {**hard.ADDERS, "rule": compile.add_rule_hard}
-SOFT_ADDERS = {**soft.ADDERS, "rule": compile.add_rule_soft}
+SOFT_ADDERS = {"rule": compile.add_rule_soft}
 
 
 @dataclass

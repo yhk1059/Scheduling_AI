@@ -1,8 +1,8 @@
 """최악 병동 성능 확인(ADR-008, ADR-019). 실행: npm run bench
 
 입력 상한(constants.py)을 꽉 채운 병동이 시간 예산 안에 해를 내는지, 휴가 충돌을 더한 변형에서
-충돌 분석이 예산 안에 끝나는지 확인한다. 블록 병동과, 같은 블록을 식 규칙으로 바꾸고 식 고유 규칙
-(조건부·짝·세기끼리 비교·offset 폭 상한)을 더한 병동을 나란히 잰다.
+충돌 분석이 예산 안에 끝나는지 확인한다. 병동 규칙은 옛 블록 60개를 식으로 옮긴 규칙(설계 §2.5 모양)에
+식 고유 규칙(조건부·짝·세기끼리 비교·offset 폭 상한)을 더한 것이다.
 하나라도 넘으면 exit 1. 넘으면 시간 예산을 늘리지 말고 상한을 낮춘다. 시간이 걸려서 npm run test에는 넣지 않는다.
 """
 
@@ -25,7 +25,7 @@ from backend.domain.constants import (
     NIGHT_ONLY_TAG,
     SOLVE_TIME_LIMIT_S,
 )
-from backend.domain.convert import night_dedicated_rule, rules_request
+from backend.domain.convert import night_dedicated_rule
 from backend.domain.models import ScheduleRequest, SolveInfeasible, SolveOk
 from backend.solver.conflicts import find_conflicts
 from backend.solver.model import solve
@@ -84,21 +84,94 @@ def past_rows(people: list[dict]) -> dict[str, list[str]]:
     return rows
 
 
-def block(cid: str, type_: str, params: dict, hardness: str = "hard", **extra: Any) -> dict:
-    return {"id": cid, "type": type_, "scope": "ward", "hardness": hardness, "source_text": cid, "params": params, **extra}
+def cnt(shifts: dict, who: dict | None = None, offset: tuple[int, int] | None = None, **extra: Any) -> dict:
+    c: dict = {"shifts": shifts, **extra}
+    if who is not None:
+        c["who"] = who
+    if offset is not None:
+        c["offset"] = list(offset)
+    return c
 
 
-def count(cid: str, shifts: dict, per: str, lo=None, hi=None, hardness: str = "hard", priority: str = "normal", **params: Any) -> dict:
-    p = {"shifts": shifts, "per": per, **params}
-    if lo is not None:
-        p["min"] = lo
-    if hi is not None:
-        p["max"] = hi
-    return block(cid, "count", p, hardness, priority=priority)
+def cmp(left: dict, op: str, right: Any) -> dict:
+    return {"left": left, "op": op, "right": right}
+
+
+def expr_rule(cid: str, for_each: dict, then: dict, when: dict | None = None, values: dict | None = None,
+              hardness: str = "hard", priority: str = "normal") -> dict:
+    body: dict = {"kind": "require", "for_each": for_each, "then": then}
+    if when is not None:
+        body["when"] = when
+    return {"id": cid, "type": "rule", "scope": "ward", "hardness": hardness, "priority": priority, "source_text": cid,
+            "values": values or {}, "body": body}
+
+
+def flip(s: dict) -> dict:
+    return {"not_in": s["in"]} if "in" in s else {"in": s["not_in"]}
+
+
+def count(cid: str, shifts: dict, per: str, lo=None, hi=None, hardness: str = "hard", priority: str = "normal",
+          people: dict | None = None, days: dict | None = None, window: int | None = None, measure: str = "count") -> dict:
+    """세기: 범위(per)마다 고른 칸 수(또는 시간)가 lo~hi. 날마다면 people은 세는 사람(who), 아니면 묶는 사람."""
+    left = cnt(shifts, people if per == "day" else None, **({"measure": "hours"} if measure == "hours" else {}))
+    for_each: dict = {"per": per}
+    if per != "day" and people:
+        for_each["people"] = people
+    if days:
+        for_each["days"] = days
+    if window:
+        for_each["window"] = window
+    values, cmps = {}, []
+    if lo is not None and lo == hi:
+        values["min"] = {"value": lo, "label": "인원"}
+        cmps.append(cmp(left, "eq", {"value": "min"}))
+    else:
+        if lo is not None:
+            values["min"] = {"value": lo, "label": "최소"}
+            cmps.append(cmp(left, "ge", {"value": "min"}))
+        if hi is not None:
+            values["max"] = {"value": hi, "label": "최대"}
+            cmps.append(cmp(left, "le", {"value": "max"}))
+    then = cmps[0] if len(cmps) == 1 else {"all": cmps}
+    rule = expr_rule(cid, for_each, then, values=values, hardness=hardness, priority=priority)
+    return {**rule, "default": cid.startswith("cov-")}  # 필요 인원은 기본 규칙
+
+
+PERSON_DAY = {"per": "person_day"}
+
+
+def forbid(cid: str, patterns: list[list[dict]]) -> list[dict]:
+    """금지 순서: 패턴마다 규칙 하나(둘째부터 id에 -2, -3…)."""
+    return [
+        expr_rule(cid if i == 0 else f"{cid}-{i + 1}", PERSON_DAY,
+                  {"any": [cmp(cnt(s, offset=(j, j)), "eq", 0) for j, s in enumerate(pattern)]})
+        for i, pattern in enumerate(patterns)
+    ]
+
+
+def max_run(cid: str, run: dict, k: int) -> dict:
+    return expr_rule(cid, {"per": "person_window", "window": k + 1}, cmp(cnt(run), "le", {"value": "max_len"}),
+                     values={"max_len": {"value": k, "label": "최대 연속"}})
+
+
+def min_run(cid: str, run: dict, k: int) -> dict:
+    when = {"all": [cmp(cnt(flip(run), offset=(-1, -1)), "ge", 1), cmp(cnt(run, offset=(0, 0)), "ge", 1)]}
+    return expr_rule(cid, PERSON_DAY, cmp(cnt(flip(run), offset=(1, k - 1)), "eq", 0), when=when)
+
+
+def off_after(cid: str, after: dict, k: int) -> dict:
+    when = {"all": [cmp(cnt(after, offset=(0, 0)), "ge", 1), cmp(cnt(flip(after), offset=(1, 1)), "ge", 1)]}
+    return expr_rule(cid, PERSON_DAY, cmp(cnt(WORK, offset=(1, k)), "eq", 0), when=when)
+
+
+def balance(cid: str, shifts: dict, **extra: Any) -> dict:
+    body = {"kind": "balance", **extra, "shifts": shifts, "max_gap": {"value": "max_gap"}}
+    return {"id": cid, "type": "rule", "scope": "ward", "hardness": "soft", "priority": "low", "source_text": cid,
+            "values": {"max_gap": {"value": 1, "label": "최대 차이"}}, "body": body}
 
 
 def rules(people: list[dict]) -> list[dict]:
-    """블록 60개."""
+    """옛 블록 60개를 식으로 옮긴 규칙(금지 패턴 블록 2개는 패턴마다 나뉘어 66개)."""
     general = {"exclude_tags": [NIGHT_ONLY_TAG]}
     rows: list[dict] = [night_dedicated_rule("night-only").model_dump(by_alias=True)]
     # 필요 인원: 근무조 4개 × 평일/주말 (8)
@@ -124,21 +197,21 @@ def rules(people: list[dict]) -> list[dict]:
         count("weekend-max", WORK, "person", hi=7, days={"kind": "weekend"}),
         count("night-max", ALL_N, "person", hi=8, people=general),
     ]
-    # 순서: 금지 패턴 블록 2개(패턴 수·길이 상한), 연속 구간 3개, 구간 뒤 휴무 1개 (6)
-    rows.append(block("forbid-after-night", "sequence", {"forbid": [[ALL_N, IN(c)] for c in ("D", "E", "M", "DE")][:MAX_PATTERNS]}))
+    # 순서: 금지 패턴 8개(옛 블록 2개, 패턴 수·길이 상한), 연속 구간 3개, 구간 뒤 휴무 1개 (12)
+    rows += forbid("forbid-after-night", [[ALL_N, IN(c)] for c in ("D", "E", "M", "DE")][:MAX_PATTERNS])
     long_pattern = [ALL_N, IN("O"), IN("D", "DE"), IN("N")][:MAX_PATTERN_LEN]
-    rows.append(block("forbid-misc", "sequence", {"forbid": [[IN("E"), IN("D")], [IN("ME", "DE"), IN("D", "M")], [IN("E"), IN("M")], long_pattern][:MAX_PATTERNS]}))
+    rows += forbid("forbid-misc", [[IN("E"), IN("D")], [IN("ME", "DE"), IN("D", "M")], [IN("E"), IN("M")], long_pattern][:MAX_PATTERNS])
     rows += [
-        block("run-work", "sequence", {"run": WORK, "max_len": 5}),
-        block("run-night", "sequence", {"run": ALL_N, "max_len": 3}),
-        block("run-night-min", "sequence", {"run": ALL_N, "min_len": 2}),
-        block("after-night", "sequence", {"after": ALL_N, "then_off": 2}),
+        max_run("run-work", WORK, 5),
+        max_run("run-night", ALL_N, 3),
+        min_run("run-night-min", ALL_N, 2),
+        off_after("after-night", ALL_N, 2),
     ]
     # 고르게 (3)
     rows += [
-        block("fair-night", "balance", {"people": general, "shifts": ALL_N}, hardness="soft"),
-        block("fair-weekend", "balance", {"days": {"kind": "weekend"}, "shifts": WORK}, hardness="soft"),
-        block("fair-hours", "balance", {"shifts": WORK, "measure": "hours"}, hardness="soft"),
+        balance("fair-night", ALL_N, people=general),
+        balance("fair-weekend", WORK, days={"kind": "weekend"}),
+        balance("fair-hours", WORK, measure="hours"),
     ]
     # 가능하면 세기 (3)
     rows += [
@@ -158,26 +231,6 @@ def rules(people: list[dict]) -> list[dict]:
 
 
 # --- 식 고유 규칙(ADR-019): 블록으로는 쓸 수 없는 모양 ---
-
-
-def cnt(shifts: dict, who: dict | None = None, offset: tuple[int, int] | None = None, **extra: Any) -> dict:
-    c: dict = {"shifts": shifts, **extra}
-    if who is not None:
-        c["who"] = who
-    if offset is not None:
-        c["offset"] = list(offset)
-    return c
-
-
-def cmp(left: dict, op: str, right: Any) -> dict:
-    return {"left": left, "op": op, "right": right}
-
-
-def expr_rule(cid: str, for_each: dict, then: dict, when: dict | None = None, values: dict | None = None) -> dict:
-    body: dict = {"kind": "require", "for_each": for_each, "then": then}
-    if when is not None:
-        body["when"] = when
-    return {"id": cid, "type": "rule", "scope": "ward", "hardness": "hard", "source_text": cid, "values": values or {}, "body": body}
 
 
 def expr_rules() -> list[dict]:
@@ -223,7 +276,7 @@ def worst_ward() -> dict:
         "nurses": people,
         "period": {"start_date": START.isoformat(), "length": MAX_PERIOD_DAYS},
         "holidays": HOLIDAYS,
-        "constraints": rules(people),
+        "constraints": rules(people) + expr_rules(),
         "carry_over": [{"nurse_id": nid, "shifts": row[-CARRY_OVER_DAYS:]} for nid, row in past.items()],
         "history": {"start_date": (START - timedelta(days=HISTORY_DAYS)).isoformat(), "rows": past, "holidays": []},
         "input_version": 1,
@@ -231,7 +284,7 @@ def worst_ward() -> dict:
 
 
 def with_leave_conflict(data: dict) -> dict:
-    """휴가 블록 하나: 일반 간호사 30명이 같은 날 쉬면 필요 인원을 채울 수 없다."""
+    """휴가 규칙 하나: 일반 간호사 30명이 같은 날 쉬면 필요 인원을 채울 수 없다."""
     ids = [n["id"] for n in data["nurses"] if NIGHT_ONLY_TAG not in n["tags"]][:30]
     leave = count("leave-crowd", IN("O"), "person", lo=1, people={"ids": ids}, days={"days": [LEAVE_DAY]})
     return {**data, "constraints": data["constraints"] + [leave]}
@@ -245,13 +298,6 @@ def timed(fn, *args, **kwargs):
     t = time.monotonic()
     out = fn(*args, **kwargs)
     return out, time.monotonic() - t
-
-
-def with_expr_rules(req: ScheduleRequest) -> ScheduleRequest:
-    """블록을 식 규칙으로 바꾸고(휴가 블록도) 식 고유 규칙을 더한 요청."""
-    data = rules_request(req).model_dump(mode="json")
-    data["constraints"] += expr_rules()
-    return ScheduleRequest.model_validate(data)
 
 
 def measure(label: str, req: ScheduleRequest, bad: ScheduleRequest) -> bool:
@@ -284,10 +330,9 @@ def measure(label: str, req: ScheduleRequest, bad: ScheduleRequest) -> bool:
 
 def main() -> int:
     data = worst_ward()
-    blocks = ScheduleRequest.model_validate(data)
-    blocks_bad = ScheduleRequest.model_validate(with_leave_conflict(data))
-    passed = [measure("블록", blocks, blocks_bad), measure("식", with_expr_rules(blocks), with_expr_rules(blocks_bad))]
-    return 0 if all(passed) else 1
+    req = ScheduleRequest.model_validate(data)
+    bad = ScheduleRequest.model_validate(with_leave_conflict(data))
+    return 0 if measure("식", req, bad) else 1
 
 
 if __name__ == "__main__":

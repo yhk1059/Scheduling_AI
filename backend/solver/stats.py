@@ -2,7 +2,7 @@
 
 from typing import Any
 
-from backend.domain.constants import FAIRNESS_TOLERANCE, MINUTES_PER_HOUR, OFF_CODE
+from backend.domain.constants import MINUTES_PER_HOUR, OFF_CODE
 from backend.domain.models import (
     Assignments,
     Balance,
@@ -56,18 +56,6 @@ def _runs(seq: list[str], pred, offset: int) -> list[tuple[int, int]]:
     return out
 
 
-def _with_carry(request: ScheduleRequest, assignments: Assignments, nid: str) -> tuple[list[str], int]:
-    carry = next((list(r.shifts) for r in request.carry_over if r.nurse_id == nid), [])
-    return carry + list(assignments[nid]), len(carry)
-
-
-def _cell(request: ScheduleRequest, a: Assignments, nurse_id: str, day: int) -> str:
-    if day >= 1:
-        return a[nurse_id][day - 1]
-    row = select.carry(request)[nurse_id]
-    return row[len(row) - 1 + day]
-
-
 def _shift_label(config: WardConfig, sel: Shifts) -> str:
     names = {s.code: s.name for s in config.shifts}
     if sel.in_ is not None:
@@ -82,94 +70,6 @@ _DAY_KIND_LABEL = {"all": "", "weekday": "평일 ", "weekend": "주말·공휴�
 
 def _num(v: float) -> str:
     return f"{v:g}"
-
-
-def _range_text(lo: float | None, hi: float | None, unit: str) -> str:
-    if lo is not None and hi is not None:
-        return f"{_num(lo)}{unit}" if lo == hi else f"{_num(lo)}~{_num(hi)}{unit}"
-    return f"{_num(lo)}{unit} 이상" if lo is not None else f"{_num(hi)}{unit} 이하"  # type: ignore[arg-type]
-
-
-def _count_violations(request: ScheduleRequest, a: Assignments, c: Any) -> list[tuple[str, str | None, int | None]]:
-    """세기 블록. 사람마다 대상 날짜 전부를 맞추거나(min = 날짜 수) 피하는(max = 0) 모양은 어긴 날마다 하나."""
-    p = c.params
-    config = request.config
-    label = _shift_label(config, p.shifts)
-    lo, hi = select.count_bounds(p)
-    if p.per == "person" and p.measure == "count":
-        target = select.days(request, p.days)
-        avoid = hi == 0
-        if avoid or (lo is not None and lo == len(target) > 0):
-            return [
-                (f"{label} {'배정' if avoid else '아님'} (기준 {'배정 안 함' if avoid else label})", nid, d)
-                for nid in select.people(request, p.people)
-                for d in target
-                if select.matches(config, a[nid][d - 1], p.shifts) == avoid
-            ]
-    scale = select.measure_scale(p.measure)
-    unit = "시간" if p.measure == "hours" else ("명" if p.per == "day" else "일")
-    prefix = {"person_week": "주 ", "person_window": f"{p.window}일 중 "}.get(p.per, "")
-    out = []
-    for nid, day, cells in select.count_groups(request, p):
-        total = sum(select.value(config, _cell(request, a, n, d), p.shifts, p.measure) for n, d in cells)
-        if (lo is not None and total < lo) or (hi is not None and total > hi):
-            detail = f"{prefix}{label} {_num(total / scale)}{unit} (기준 {_range_text(p.min, p.max, unit)})"
-            out.append((detail, nid, day))
-    return out
-
-
-def _sequence_block_violations(request: ScheduleRequest, a: Assignments, c: Any) -> list[tuple[str, str | None, int | None]]:
-    p = c.params
-    config = request.config
-    m = lambda code, sel: select.matches(config, code, sel)  # noqa: E731
-    out = []
-    for nid in select.people(request, p.people):
-        seq, off = _with_carry(request, a, nid)
-        day = lambda i: i - off + 1  # noqa: E731
-        if p.forbid is not None:
-            for pattern in p.forbid:
-                k = len(pattern)
-                text = "→".join(_shift_label(config, sel) for sel in pattern)
-                for i in range(max(off - (k - 1), 0), len(seq) - k + 1):
-                    if all(m(seq[i + j], sel) for j, sel in enumerate(pattern)):
-                        out.append((f"금지 순서 {text}", nid, day(i + k - 1)))
-        elif p.run is not None:
-            label = _shift_label(config, p.run)
-            for length, end in _runs(seq, lambda s: m(s, p.run), off):
-                end_idx = end + off - 1
-                if p.max_len is not None and length > p.max_len:
-                    out.append((f"연속 {label} {length}일 (기준 {p.max_len}일 이하)", nid, end))
-                known = end_idx - length + 1 > 0 and end_idx < len(seq) - 1  # 양쪽 경계를 아는 구간만
-                if p.min_len is not None and length < p.min_len and known:
-                    out.append((f"연속 {label} {length}일 (기준 {p.min_len}일 이상)", nid, end))
-        else:
-            label = _shift_label(config, p.after)
-            for i in range(max(off - 1, 0), len(seq) - 1):
-                if m(seq[i], p.after) and not m(seq[i + 1], p.after):
-                    for k in range(1, p.then_off + 1):
-                        if i + k < len(seq) and seq[i + k] != OFF_CODE:
-                            out.append((f"{label} 후 {k}일째 휴무 아님", nid, day(i + k)))
-    return out
-
-
-def _balance_violations(request: ScheduleRequest, a: Assignments, c: Any) -> list[tuple[str, str | None, int | None]]:
-    """사람 사이 차이. soft는 FAIRNESS_TOLERANCE(시간 기준은 기본 근무 단위)를, hard는 max_gap을 넘으면 하나."""
-    p = c.params
-    config = request.config
-    counts = []
-    for nid, days in select.balance_cells(request, p).items():
-        past = select.history_count(request, nid, p.days, p.shifts, p.measure) if p.with_history else 0
-        counts.append(past + sum(select.value(config, a[nid][d - 1], p.shifts, p.measure) for d in days))
-    if len(counts) < 2:
-        return []
-    gap = max(counts) - min(counts)
-    if c.hardness == "hard":
-        limit = p.max_gap * select.measure_scale(p.measure)
-    else:
-        limit = FAIRNESS_TOLERANCE * select.measure_unit(p.measure)
-    if gap <= limit:
-        return []
-    return [(_balance_detail(request, p, gap), None, None)]
 
 
 def _balance_detail(request: ScheduleRequest, p: Any, gap: int) -> str:
@@ -277,16 +177,8 @@ def _rule_violations(request: ScheduleRequest, a: Assignments, rule: Any) -> lis
     return out
 
 
-_BLOCK_VIOLATIONS = {
-    "count": _count_violations,
-    "sequence": _sequence_block_violations,
-    "balance": _balance_violations,
-    "rule": _rule_violations,
-}
-
-
 def violations(request: ScheduleRequest, assignments: Assignments, c: Any) -> list[SoftViolation]:
-    """제약 하나의 위반 목록(hardness와 관계없이 센다). 블록은 솔버와 같은 select.py로, 규칙 식은 evaluate.py로 평가한다."""
+    """제약 하나의 위반 목록(hardness와 관계없이 센다). 규칙 식은 evaluate.py로 평가한다."""
     if c.type == "fixed_assignment":
         p = c.params
         if assignments[p.nurse_id][p.day - 1] == p.shift:
@@ -294,39 +186,31 @@ def violations(request: ScheduleRequest, assignments: Assignments, c: Any) -> li
         return [SoftViolation(constraint_id=c.id, nurse_id=p.nurse_id, day=p.day, detail=f"고정 {p.shift} 아님")]
     return [
         SoftViolation(constraint_id=c.id, nurse_id=nid, day=day, detail=detail)
-        for detail, nid, day in _BLOCK_VIOLATIONS[c.type](request, assignments, c)
+        for detail, nid, day in _rule_violations(request, assignments, c)
     ]
 
 
 def _preference_cells(request: ScheduleRequest, c: Any) -> list[tuple[str, int, Shifts, bool]]:
     """희망·기피로 세는 칸 (nurse_id, 날짜, 근무, 희망 여부).
 
-    한 사람·기간 범위·soft 세기 블록(per=person, 개수). max=0이면 기피, 아니면 희망.
-    규칙 식은 같은 모양(person 범위, when 없음, 한 사람(who.ids 또는 for_each.people.ids)의 개수를 숫자·값과 비교)을
-    센다. 0 이하·0과 같음이면 기피, 아니면 희망.
+    soft·기간 범위 규칙에서 person 범위, when 없음, 한 사람(who.ids 또는 for_each.people.ids)의 개수를 숫자·값과
+    비교하는 모양을 센다. 0 이하·0과 같음이면 기피, 아니면 희망.
     """
-    if c.hardness != "soft" or c.scope != "period":
+    if c.hardness != "soft" or c.scope != "period" or c.type != "rule" or not isinstance(c.body, Require):
         return []
-    if c.type == "count":
-        p = c.params
-        if p.per == "person" and p.measure == "count" and p.people.ids is not None and len(p.people.ids) == 1:
-            prefer = p.max != 0
-            return [(p.people.ids[0], d, p.shifts, prefer) for d in select.days(request, p.days)]
-    if c.type == "rule" and isinstance(c.body, Require):
-        body = c.body
-        cmps = cond_cmps(body.then)
-        if body.for_each.per != "person" or body.when is not None:
-            return []
-        if any(isinstance(x.right, Count) or x.left.measure != "count" or x.left != cmps[0].left for x in cmps):
-            return []
-        left = cmps[0].left
-        who = left.who if left.who is not None else body.for_each.people
-        if who.ids is None or len(who.ids) != 1:
-            return []
-        prefer = not any(x.op in ("le", "eq") and evaluate.resolve(c, x.right) == 0 for x in cmps)
-        days = [d for d in select.days(request, body.for_each.days) if select.day_matches(request, left.days, d)]
-        return [(who.ids[0], d, left.shifts, prefer) for d in days]
-    return []
+    body = c.body
+    cmps = cond_cmps(body.then)
+    if body.for_each.per != "person" or body.when is not None:
+        return []
+    if any(isinstance(x.right, Count) or x.left.measure != "count" or x.left != cmps[0].left for x in cmps):
+        return []
+    left = cmps[0].left
+    who = left.who if left.who is not None else body.for_each.people
+    if who.ids is None or len(who.ids) != 1:
+        return []
+    prefer = not any(x.op in ("le", "eq") and evaluate.resolve(c, x.right) == 0 for x in cmps)
+    days = [d for d in select.days(request, body.for_each.days) if select.day_matches(request, left.days, d)]
+    return [(who.ids[0], d, left.shifts, prefer) for d in days]
 
 
 def compute_result(request: ScheduleRequest, assignments: Assignments, optimal: bool) -> ScheduleResult:

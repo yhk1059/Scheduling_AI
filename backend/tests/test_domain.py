@@ -1,4 +1,4 @@
-"""도메인 모델: 블록 3종·칸 고정 직렬화, hardness·중요도 기본값, params 검증, 참조 무결성, 샘플."""
+"""도메인 모델: 식 규칙·칸 고정 직렬화, hardness·중요도 기본값, 검증, 옛 형식 거부, 참조 무결성, 샘플."""
 
 import json
 from datetime import date
@@ -8,9 +8,11 @@ import pytest
 from pydantic import TypeAdapter, ValidationError
 
 from backend.domain import constants
-from backend.domain.convert import NIGHT_ONLY_RULE_ID
+from backend.domain.convert import NIGHT_ONLY_RULE_ID, rules_request
+from backend.domain.legacy import BlockScheduleRequest, BlockSpec
 from backend.domain.models import (
     DEFAULT_CONFIG,
+    ConstraintChange,
     ConstraintSpec,
     ErrorBody,
     ExplainRequest,
@@ -20,26 +22,34 @@ from backend.domain.models import (
     TranslateRequest,
     TranslateResponse,
 )
-from backend.tests import blocks
+from backend.tests import rules
 
 SAMPLE_PATH = Path(__file__).resolve().parents[2] / "lib" / "samples" / "ward-15.json"
 spec_adapter = TypeAdapter(ConstraintSpec)
 
-# 템플릿 12종이 바뀐 블록 모양(설계 §2.5)
-BLOCKS = [
-    blocks.coverage("D", "weekday", 3, 4),
-    blocks.forbid("c2", "N", "D"),
-    blocks.max_work("c3", 5),
-    blocks.max_nights("c4", 3),
-    blocks.min_off("c5", 8),
-    blocks.off_after_night("c6", 1),
-    blocks.skill_mix("c7", "N", 3, 1),
-    blocks.leave("c8", "n01", [15, 16, 17]),
-    blocks.fixed("c9", "n02", 3, "E"),
-    blocks.pref("c10", "n03", "O", 9, weekends_only=True),
-    blocks.night_fair("c11"),
-    blocks.weekend_fair("c12"),
+# 템플릿 12종이 바뀐 식 규칙 모양(설계 §2.5)
+RULES = [
+    rules.coverage("D", "weekday", 3, 4),
+    rules.forbid("c2", "N", "D"),
+    rules.max_work("c3", 5),
+    rules.max_nights("c4", 3),
+    rules.min_off("c5", 8),
+    rules.off_after_night("c6", 1),
+    rules.skill_mix("c7", "N", 3, 1),
+    rules.leave("c8", "n01", [15, 16, 17]),
+    rules.fixed("c9", "n02", 3, "E"),
+    rules.preference("c10", "n03", "O", 9, weekends_only=True),
+    rules.night_fair("c11"),
+    rules.weekend_fair("c12"),
 ]
+
+
+def _is_balance(raw: dict) -> bool:
+    return raw.get("body", {}).get("kind") == "balance"
+
+
+def _block(cid: str, type_: str, params: dict) -> dict:
+    return {"id": cid, "type": type_, "scope": "ward", "hardness": "hard", "source_text": "원문", "params": params}
 
 
 def nurses(n: int = 3) -> list[dict]:
@@ -60,54 +70,68 @@ def request(constraints: list[dict], **extra) -> dict:
 # --- 제약 ---
 
 
-def test_constraint_types_are_blocks_and_fixed():
-    assert {b["type"] for b in BLOCKS} == {"count", "sequence", "balance", "fixed_assignment"}
+def test_constraint_types_are_rules_and_fixed():
+    assert {r["type"] for r in RULES} == {"rule", "fixed_assignment"}
 
 
-@pytest.mark.parametrize("raw", BLOCKS, ids=[b["id"] for b in BLOCKS])
+@pytest.mark.parametrize("raw", RULES, ids=[r["id"] for r in RULES])
 def test_constraint_roundtrip(raw):
     spec = spec_adapter.validate_python(raw)
     assert spec.type == raw["type"]
     dumped = spec_adapter.dump_python(spec, mode="json")
     assert spec_adapter.validate_json(json.dumps(dumped)) == spec
-    assert isinstance(dumped["params"], dict)
+    assert isinstance(dumped["params" if raw["type"] == "fixed_assignment" else "body"], dict)
     assert dumped["enabled"] is True
 
 
 def test_fixed_assignment_is_always_hard():
-    raw = next(b for b in BLOCKS if b["type"] == "fixed_assignment")
+    raw = next(r for r in RULES if r["type"] == "fixed_assignment")
     assert spec_adapter.validate_python({**raw, "hardness": "soft"}).hardness == "hard"
 
 
 def test_default_hardness_and_weight_per_type():
-    for raw in BLOCKS:
+    for raw in RULES:
         without = {k: v for k, v in raw.items() if k not in ("hardness", "priority", "weight")}
         spec = spec_adapter.validate_python(without)
-        assert spec.hardness == ("soft" if raw["type"] == "balance" else "hard")
-        low = raw["type"] == "balance"
-        assert spec.weight == constants.PRIORITY_WEIGHTS["low" if low else "normal"]
+        assert spec.hardness == ("soft" if _is_balance(raw) else "hard")
+        assert spec.weight == constants.PRIORITY_WEIGHTS["low" if _is_balance(raw) else "normal"]
 
 
 @pytest.mark.parametrize("type_", ["daily_coverage", "leave", "shift_preference", "night_fairness", "unknown"])
 def test_template_types_rejected(type_):
     with pytest.raises(ValidationError):
-        spec_adapter.validate_python(blocks.con("x", type_, {}))
+        spec_adapter.validate_python(_block("x", type_, {}))
+
+
+OLD_BLOCKS = [
+    _block("x", "count", {"shifts": {"in": ["D"]}, "per": "day", "min": 3}),
+    _block("x", "sequence", {"forbid": [[{"in": ["N"]}, {"in": ["D"]}]]}),
+    {**_block("x", "balance", {"shifts": {"in": ["N"]}}), "hardness": "soft"},
+]
+
+
+@pytest.mark.parametrize("raw", OLD_BLOCKS, ids=[b["type"] for b in OLD_BLOCKS])
+def test_block_types_rejected(raw):
+    """블록 3종은 옛 형식이다(ADR-019 ★2). legacy.py 모델로만 읽고, 요청은 식 규칙만 받는다."""
+    TypeAdapter(BlockSpec).validate_python(raw)
+    with pytest.raises(ValidationError, match="does not match any of the expected tags"):
+        spec_adapter.validate_python(raw)
 
 
 @pytest.mark.parametrize(
     "raw",
     [
-        blocks.coverage("D", "weekday", 5, 4),
-        blocks.max_work("x", 0),
-        blocks.min_off("x", -1),
-        blocks.off_after_night("x", 0),
-        blocks.con("x", "count", {"shifts": {"in": ["D"]}, "per": "day"}),
-        {**blocks.max_work("x", 5), "weight": 0},
-        blocks.con("x", "sequence", {"run": {"not_in": ["O"]}, "max_len": 5, "extra": 1}),
-        {**blocks.night_fair("x"), "scope": "year"},
-        {**blocks.night_fair("x"), "priority": "urgent"},
+        {**rules.min_off("x", 8), "values": {"min": {"value": 8, "label": "최소"}, "max": {"value": 9, "label": "최대"}}},
+        rules.max_work("x", 0),
+        rules.min_off("x", -1),
+        rules.off_after_night("x", 0),
+        {**rules.min_off("x", 8), "values": {}},
+        {**rules.max_work("x", 5), "weight": 0},
+        {**rules.max_work("x", 5), "body": {**rules.max_work("x", 5)["body"], "extra": 1}},
+        {**rules.night_fair("x"), "scope": "year"},
+        {**rules.night_fair("x"), "priority": "urgent"},
     ],
-    ids=["min>max", "run-0", "min-negative", "then-off-0", "no-bound", "weight-0", "extra-param", "bad-scope", "bad-priority"],
+    ids=["unused-value", "run-0", "min-negative", "then-off-0", "no-value", "weight-0", "extra-key", "bad-scope", "bad-priority"],
 )
 def test_invalid_params_rejected(raw):
     with pytest.raises(ValidationError):
@@ -156,8 +180,8 @@ def test_period_rejects_old_shape():
 # --- ScheduleRequest 참조 무결성 ---
 
 
-def test_schedule_request_accepts_all_blocks():
-    req = ScheduleRequest.model_validate(request(BLOCKS))
+def test_schedule_request_accepts_all_rules():
+    req = ScheduleRequest.model_validate(request(RULES))
     assert len(req.constraints) == 12
     assert req.carry_over == []
     assert req.previous is None
@@ -165,7 +189,7 @@ def test_schedule_request_accepts_all_blocks():
 
 
 def test_unknown_nurse_id_reports_constraint_id():
-    bad = blocks.leave("bad-leave", "n99", [1])
+    bad = rules.leave("bad-leave", "n99", [1])
     with pytest.raises(ValidationError, match="bad-leave"):
         ScheduleRequest.model_validate(request([bad]))
 
@@ -173,9 +197,9 @@ def test_unknown_nurse_id_reports_constraint_id():
 @pytest.mark.parametrize(
     "raw",
     [
-        blocks.leave("bad-day", "n01", [31]),
-        blocks.fixed("bad-day", "n01", 0, "D"),
-        blocks.pref("bad-day", "n01", "N", None, [40]),
+        rules.leave("bad-day", "n01", [31]),
+        rules.fixed("bad-day", "n01", 0, "D"),
+        rules.preference("bad-day", "n01", "N", None, [40]),
     ],
 )
 def test_day_out_of_range_reports_constraint_id(raw):
@@ -218,7 +242,7 @@ def test_duplicate_nurse_ids_or_names_rejected():
 
 
 def test_duplicate_constraint_ids_rejected():
-    raw = blocks.night_fair("same")
+    raw = rules.night_fair("same")
     with pytest.raises(ValidationError, match="same"):
         ScheduleRequest.model_validate(request([raw, raw]))
 
@@ -234,10 +258,19 @@ def test_negative_years_rejected():
 
 
 def test_sample_ward_is_block_format():
+    """샘플 병동(lib/samples)은 블록 형식으로 남아 있다(클라이언트 이전은 이후 step). 식으로 바꿔야 요청이 된다."""
     raw = json.loads(SAMPLE_PATH.read_text(encoding="utf-8"))
-    next_requests = TypeAdapter(list[ConstraintSpec]).validate_python(raw.pop("next_requests"))
+    next_requests = TypeAdapter(list[BlockSpec]).validate_python(raw.pop("next_requests"))
     assert next_requests and all(c.scope == "period" for c in next_requests)
-    req = ScheduleRequest.model_validate(raw)
+    with pytest.raises(ValidationError):
+        ScheduleRequest.model_validate(raw)
+    blocks = BlockScheduleRequest.model_validate(raw)
+    coverage = [c for c in blocks.constraints if c.id.startswith("cov-")]
+    assert coverage and all(c.type == "count" and c.scope == "ward" and c.hardness == "hard" for c in coverage)
+    kinds = {(c.params.shifts.in_[0], c.params.days.kind) for c in coverage}
+    assert kinds == {(s, k) for s in "DEN" for k in ("weekday", "weekend")}
+    req = rules_request(blocks)
+    assert {c.type for c in req.constraints} == {"rule"}
     assert req.config == DEFAULT_CONFIG
     assert req.constraints[-1].id == NIGHT_ONLY_RULE_ID
     assert req.input_version == 0
@@ -249,10 +282,7 @@ def test_sample_ward_is_block_format():
     assert {"이영희", "박민수", "김철수", "정유진", "최지훈"} <= names
     years = [n.years for n in req.nurses]
     assert min(years) >= 1 and max(years) <= 15 and len(set(years)) >= 8
-    coverage = [c for c in req.constraints if c.id.startswith("cov-")]
-    assert coverage and all(c.type == "count" and c.scope == "ward" and c.hardness == "hard" for c in coverage)
-    kinds = {(c.params.shifts.in_[0], c.params.days.kind) for c in coverage}
-    assert kinds == {(s, k) for s in "DEN" for k in ("weekday", "weekend")}
+    assert all(c.default for c in req.constraints if c.id.startswith("cov-") or c.id == NIGHT_ONLY_RULE_ID)
 
 
 # --- 응답/요청 모델 ---
@@ -265,7 +295,7 @@ def test_solve_response_discriminates_by_status():
         {
             "status": "infeasible",
             "input_version": 1,
-            "conflicts": [{"constraint_id": "c1", "type": "count", "source_text": "휴가"}],
+            "conflicts": [{"constraint_id": "c1", "type": "rule", "source_text": "휴가"}],
         }
     )
     assert infeasible.conflicts[0].constraint_id == "c1"
@@ -304,17 +334,42 @@ def test_translate_models():
     )
     assert req.context.today.isoformat() == "2026-10-26"
     adapter = TypeAdapter(TranslateResponse)
-    ok = adapter.validate_python({"status": "ok", "input_version": 5, "constraints": [BLOCKS[1]]})
-    assert ok.constraints[0].type == "sequence"
+    ok = adapter.validate_python({"status": "ok", "input_version": 5, "constraints": [RULES[1]]})
+    assert ok.constraints[0].type == "rule"
+    with pytest.raises(ValidationError):  # 블록은 응답에도 없다
+        adapter.validate_python({"status": "ok", "input_version": 5, "constraints": [OLD_BLOCKS[1]]})
     assert adapter.validate_python({"status": "clarify", "input_version": 5, "question": "누구?"}).question == "누구?"
     assert adapter.validate_python({"status": "unsupported", "input_version": 5, "reason": "x"}).reason == "x"
 
 
 def test_explain_request_wraps_schedule_request():
     req = ExplainRequest.model_validate(
-        {"request": request(BLOCKS), "conflicts": [{"constraint_id": "c8", "type": "count", "source_text": "휴가"}]}
+        {"request": request(RULES), "conflicts": [{"constraint_id": "c8", "type": "rule", "source_text": "휴가"}]}
     )
     assert req.request.input_version == 0
+
+
+@pytest.mark.parametrize(
+    "raw",
+    [
+        {"action": "update", "constraint_id": "c1", "params": {"min": 2}},
+        {"action": "update", "constraint_id": "c1", "hardness": "soft"},
+        {"action": "disable", "constraint_id": "c1", "params": {"min": 2}},
+    ],
+    ids=["update-params", "update-hardness", "params-field"],
+)
+def test_constraint_change_update_rejected(raw):
+    """블록용 update(params 교체)는 없어졌다(ADR-019 ★7). 남는 것은 disable | set_value | set_hardness."""
+    with pytest.raises(ValidationError):
+        ConstraintChange.model_validate(raw)
+
+
+def test_constraint_change_actions():
+    assert ConstraintChange.model_validate({"action": "disable", "constraint_id": "c1"}).action == "disable"
+    sv = ConstraintChange.model_validate({"action": "set_value", "constraint_id": "c1", "name": "min", "value": 2})
+    assert (sv.name, sv.value) == ("min", 2)
+    sh = ConstraintChange.model_validate({"action": "set_hardness", "constraint_id": "c1", "hardness": "soft"})
+    assert sh.hardness == "soft"
 
 
 def test_error_body():
@@ -332,7 +387,7 @@ def test_history_load_rejected():
 
 
 def test_history_accepted():
-    history = blocks.history("2026-11-01", {"n01": ["N"] * 8})
+    history = rules.history("2026-11-01", {"n01": ["N"] * 8})
     req = ScheduleRequest.model_validate(request([], history=history))
     assert req.history.rows["n01"].count("N") == 8
     assert req.history.start_date == date(2026, 10, 4)
@@ -340,9 +395,9 @@ def test_history_accepted():
 
 def test_history_unknown_nurse_or_code_rejected():
     with pytest.raises(ValidationError, match="n99"):
-        ScheduleRequest.model_validate(request([], history=blocks.history("2026-11-01", {"n99": ["N"]})))
+        ScheduleRequest.model_validate(request([], history=rules.history("2026-11-01", {"n99": ["N"]})))
     with pytest.raises(ValidationError, match="M"):
-        ScheduleRequest.model_validate(request([], history=blocks.history("2026-11-01", {"n01": ["M"]})))
+        ScheduleRequest.model_validate(request([], history=rules.history("2026-11-01", {"n01": ["M"]})))
 
 
 def test_history_longer_than_limit_rejected():

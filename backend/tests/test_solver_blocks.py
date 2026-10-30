@@ -1,4 +1,4 @@
-"""블록 3종(count·sequence·balance) 솔버 경로와 대상 고르기(select.py), 블록 위반 계산(ADR-018, 설계 §3)."""
+"""옛 블록 기능(세기·순서·고르게)을 식 규칙으로 옮긴 솔버 경로와 대상 고르기(select.py), 위반 계산(ADR-018·019, 설계 §3)."""
 
 from backend.domain.models import Days, People, ScheduleRequest, Shifts, SolveInfeasible, SolveOk, WardConfig
 from backend.gen_golden import solve_case
@@ -6,6 +6,7 @@ from backend.solver import select
 from backend.solver.conflicts import find_conflicts
 from backend.solver.model import build_model, solve
 from backend.solver.stats import compute_result, violations
+from backend.tests.rules import N, balance, cmp, cnt, con, count, max_run, min_run, off_after, require
 
 MONDAY = "2026-11-02"  # 11/2 월요일: 7일이면 6, 7일이 토·일
 
@@ -23,19 +24,6 @@ def config(*extra: dict) -> dict:
 
 def nurse(nid: str, years: int = 5, tags: list[str] | None = None) -> dict:
     return {"id": nid, "name": f"간호사{nid}", "years": years, "tags": tags or []}
-
-
-def block(cid: str, type_: str, params: dict, hardness: str = "hard", **extra) -> dict:
-    return {"id": cid, "type": type_, "scope": "ward", "hardness": hardness, "source_text": cid, "params": params, **extra}
-
-
-def count(cid: str, shifts: dict, per: str, lo=None, hi=None, hardness: str = "hard", **params) -> dict:
-    p = {"shifts": shifts, "per": per, **params}
-    if lo is not None:
-        p["min"] = lo
-    if hi is not None:
-        p["max"] = hi
-    return block(cid, "count", p, hardness)
 
 
 def daily(code: str, n: int, **params) -> dict:
@@ -142,7 +130,7 @@ def test_match_uses_carry_constants():
 # --- 새 기능 ---
 
 
-def test_mid_shift_counted_by_coverage_block():
+def test_mid_shift_counted_by_coverage_rule():
     req = request([nurse(f"n{i}") for i in range(5)], [daily("D", 1), daily("M", 1), daily("N", 1)],
                   config=config(shift("M", "미드")))
     a = solve_ok(req)
@@ -199,7 +187,8 @@ def test_window_requires_off_day():
 def test_night_block_min_length():
     rules = [
         daily("N", 1),
-        block("n-run", "sequence", {"run": {"in": ["N"]}, "min_len": 2, "max_len": 3}),
+        max_run("n-run", N, 3),
+        min_run("n-run-2", N, 2),
     ]
     carry = [{"nurse_id": f"n{i}", "shifts": ["O"]} for i in range(3)]
     a = solve_ok(request([nurse(f"n{i}") for i in range(3)], rules, length=10, carry_over=carry))
@@ -211,7 +200,7 @@ def test_night_block_min_length():
 
 
 def test_off_days_after_night_block():
-    rules = [daily("N", 1), block("after-n", "sequence", {"after": {"in": ["N"]}, "then_off": 2})]
+    rules = [daily("N", 1), off_after("after-n", 2)]
     a = solve_ok(request([nurse(f"n{i}") for i in range(4)], rules, length=10))
     for row in a.values():
         for start, length in runs(row, lambda s: s == "N"):
@@ -228,7 +217,7 @@ def test_tag_coverage():
 
 
 def test_hard_balance_max_gap():
-    rules = [daily("N", 1), block("n-even", "balance", {"shifts": {"in": ["N"]}, "max_gap": 0}, "hard")]
+    rules = [daily("N", 1), balance("n-even", N, max_gap=0, hardness="hard")]
     a = solve_ok(request([nurse(f"n{i}") for i in range(3)], rules, length=6))
     assert [row.count("N") for row in a.values()] == [2, 2, 2]
 
@@ -245,10 +234,10 @@ def test_weekday_selector_saturday_only():
 
 def test_balance_with_raw_history():
     history = {"start_date": "2026-10-05", "rows": {"a": ["N"] * 4 + ["O"] * 24}, "holidays": []}
-    rules = [daily("N", 1), block("n-even", "balance", {"shifts": {"in": ["N"]}}, "soft")]
+    rules = [daily("N", 1), balance("n-even", N)]
     a = solve_ok(request([nurse("a"), nurse("b")], rules, length=4, history=history))
     assert a["b"].count("N") == 4
-    rules[1]["params"]["with_history"] = False
+    rules[1]["body"]["with_history"] = False
     a = solve_ok(request([nurse("a"), nurse("b")], rules, length=4, history=history))
     assert a["a"].count("N") == a["b"].count("N") == 2
 
@@ -260,18 +249,18 @@ def test_soft_hours_violation_normalized_by_base_shift():
     assert out["objective"] == 10
 
 
-def test_infeasible_block_ids_in_core():
+def test_infeasible_rule_ids_in_core():
     nurses = [nurse("a", tags=["나이트전담"]), nurse("b", tags=["나이트전담"])]
     rules = [
         count("night-only", {"not_in": ["N", "O"]}, "person", hi=0, people={"tags": ["나이트전담"]}),
         daily("D", 1),
         daily("N", 1),
-        block("max-n", "sequence", {"run": {"in": ["N"]}, "max_len": 5}),
+        max_run("max-n", N, 5),
     ]
     req = request(nurses, rules, length=3)
     assert isinstance(solve(req, analyze_conflicts=False), SolveInfeasible)
     assert {c.constraint_id for c in find_conflicts(req)} == {"night-only", "cov-D"}
-    assert {c.type for c in find_conflicts(req)} == {"count"}
+    assert {c.type for c in find_conflicts(req)} == {"rule"}
 
 
 # --- 위반 계산(stats.violations) ---
@@ -292,26 +281,30 @@ def test_violations_count_per_day_and_person_week():
 
 
 def test_violations_sequence_forbid_three_cells_with_carry():
-    rule = request([nurse("a")], [block("f", "sequence", {"forbid": [[{"in": ["N"]}, {"in": ["O"]}, {"in": ["N"]}]]})])
+    pattern = [{"in": ["N"]}, {"in": ["O"]}, {"in": ["N"]}]
+    then = {"any": [cmp(cnt(sel, (i, i)), "eq", 0) for i, sel in enumerate(pattern)]}
+    rule = request([nurse("a")], [con("f", require("person_day", then))])
     req = request([nurse("a")], [], length=5, carry_over=[{"nurse_id": "a", "shifts": ["N", "O"]}])
     v = violations(req, {"a": ["N", "O", "N", "D", "D"]}, rule.constraints[0])
-    assert [x.day for x in v] == [1, 3]
+    # 위반 2개(이월 −1~1일, 1~3일). 표시 날은 인스턴스 첫날(이월이면 1일)이라 둘 다 1일(블록은 패턴 끝 칸 1, 3일)
+    assert [x.day for x in v] == [1, 1]
 
 
 def test_violations_run_min_and_after():
     req = request([nurse("a")], [], length=7, carry_over=[{"nurse_id": "a", "shifts": ["O"]}])
     row = {"a": ["N", "O", "N", "N", "D", "O", "N"]}
-    run = request([nurse("a")], [block("r", "sequence", {"run": {"in": ["N"]}, "min_len": 2})]).constraints[0]
+    run = request([nurse("a")], [min_run("r", N, 2)]).constraints[0]
     assert [x.day for x in violations(req, row, run)] == [1]  # 7일 N은 기간 끝에 닿아 제외
-    after = request([nurse("a")], [block("af", "sequence", {"after": {"in": ["N"]}, "then_off": 1})]).constraints[0]
-    assert [x.day for x in violations(req, row, after)] == [5]
+    after = request([nurse("a")], [off_after("af", 1)]).constraints[0]
+    # 위반 1개(4일 N 다음 5일 D). 표시 날은 인스턴스 날(나이트가 끝난 4일, 블록은 휴무가 아닌 5일)
+    assert [x.day for x in violations(req, row, after)] == [4]
 
 
 def test_violations_balance_soft_tolerance_and_hard_gap():
     req = request([nurse("a"), nurse("b")], [], length=4)
     a = {"a": ["N", "N", "O", "O"], "b": ["O", "O", "O", "O"]}
-    soft = request([nurse("a")], [block("s", "balance", {"shifts": {"in": ["N"]}}, "soft")]).constraints[0]
-    hard = request([nurse("a")], [block("h", "balance", {"shifts": {"in": ["N"]}, "max_gap": 1}, "hard")]).constraints[0]
+    soft = request([nurse("a")], [balance("s", N)]).constraints[0]
+    hard = request([nurse("a")], [balance("h", N, max_gap=1, hardness="hard")]).constraints[0]
     v = violations(req, a, soft)
     assert len(v) == 1 and v[0].detail == "나이트 개수 편차 2"
     assert len(violations(req, a, hard)) == 1
@@ -322,7 +315,7 @@ def test_violations_balance_soft_tolerance_and_hard_gap():
 # --- 결과 ---
 
 
-def test_soft_block_violations_listed_and_preferences_counted():
+def test_soft_rule_violations_listed_and_preferences_counted():
     rules = [
         daily("D", 1),
         count("want-off", {"in": ["O"]}, "person", lo=2, hardness="soft", people={"ids": ["a"]}, days={"days": [1, 2]}),

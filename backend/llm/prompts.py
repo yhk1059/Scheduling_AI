@@ -429,10 +429,7 @@ EXPLAIN_SYSTEM = f"""\
 - body.kind "balance": 고른 사람 사이 개수·시간 차이를 줄인다. hard면 max_gap까지 허용한다.
 - values: 식이 {{"value": 이름}}으로 참조하는 조정 가능한 값. {{이름: {{value, label}}}}이고 label이 카드에 보이는 이름이다.
 
-### 블록 제약 (옛 형식)
-- count: people·days·shifts로 고른 칸을 per(day: 날마다, person: 사람마다, person_week: 사람·주마다, person_window: 사람·연속 window일마다) 묶음으로 세어 min~max 범위를 건다.
-- sequence: 사람마다 순서 규칙. forbid(금지 패턴), run(연속 구간 길이 min_len·max_len), after+then_off(구간이 끝난 뒤 휴무).
-- balance: 사람 사이 개수·시간 차이를 줄인다.
+### 칸 고정
 - fixed_assignment: 칸 고정(nurse_id, day, shift).
 
 ## text
@@ -447,10 +444,6 @@ EXPLAIN_SYSTEM = f"""\
     예: 최대 연속 나이트 3 → 4는 {{"action": "set_value", "constraint_id": id, "name": "max_len", "value": 4}}
   - action "set_hardness": hardness "soft"로 반드시 → 가능하면으로 바꾼다.
   - action "disable": 이번 기간만 끈다.
-- 블록 제약의 완화
-  - action "disable": 해당 제약을 이번 기간만 끈다.
-  - action "update": params의 최상위 키(min, max, max_len, then_off, days, people 등) 중 바꿀 것만 params에 넣는다.
-    셀렉터(people, days, shifts)를 바꿀 때는 그 셀렉터 전체를 새 값으로 쓴다. type은 바꿀 수 없다. hardness를 "soft"로 바꿀 수도 있다.
 - 고정 칸(fixed_assignment)이 충돌에 있으면 그 고정을 해제하는 disable을 제안한다.
 - 한 사람의 근무를 막는 기간 요청(휴가: 한 사람, 휴무 말고 모두를 0번)을 줄이거나 끄는 제안은
   다른 방법이 없을 때만 마지막 수단으로, 마지막 순서에 둔다. 휴가와 고정 칸의 hardness는 바꾸지 않는다.

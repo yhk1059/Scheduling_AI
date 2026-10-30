@@ -1,4 +1,7 @@
-"""템플릿 12종 → 블록(ADR-018), 블록 → 식 규칙(ADR-019) 변환. 저장 이전과 eval 기대값 재작성에 같은 표를 쓴다. 순수 함수."""
+"""템플릿 12종 → 블록(ADR-018), 블록 → 식 규칙(ADR-019) 변환. 저장 이전과 eval 기대값 재작성에 같은 표를 쓴다. 순수 함수.
+
+옛 형식(템플릿·블록, legacy.py)은 여기서 식 규칙 요청(ScheduleRequest)으로만 나간다.
+"""
 
 from collections.abc import Sequence
 from typing import Any
@@ -6,22 +9,20 @@ from typing import Any
 from pydantic import TypeAdapter
 
 from backend.domain.constants import NIGHT_ONLY_TAG, OFF_CODE, PRIORITY_WEIGHTS
-from backend.domain.legacy import LegacyScheduleRequest
-from backend.domain.models import (
+from backend.domain.legacy import (
     BalanceRule,
-    ConstraintSpec,
+    BlockScheduleRequest,
+    BlockSpec,
     CountRule,
-    Nurse,
-    Period,
-    Rule,
-    ScheduleRequest,
+    LegacyScheduleRequest,
     SequenceRule,
-    Shifts,
 )
+from backend.domain.models import ConstraintSpec, Nurse, Period, Rule, ScheduleRequest, Shifts
 
 NIGHT_ONLY_RULE_ID = "night-only"
 NIGHT_ONLY_SOURCE = "나이트 전담은 나이트와 휴무만"
 
+_block_adapter = TypeAdapter(BlockSpec)
 _spec_adapter = TypeAdapter(ConstraintSpec)
 _BLOCK_CLASSES = {"count": CountRule, "sequence": SequenceRule, "balance": BalanceRule}
 
@@ -109,7 +110,7 @@ def legacy_to_block(spec: Any, period: Period | None = None, holidays: Sequence[
     if spec.type in ("fixed_assignment", *_BLOCK_CLASSES):
         return spec
     block_type, params = _block_params(spec, period, holidays)
-    return _spec_adapter.validate_python(
+    return _block_adapter.validate_python(
         {
             "id": spec.id,
             "type": block_type,
@@ -123,8 +124,8 @@ def legacy_to_block(spec: Any, period: Period | None = None, holidays: Sequence[
     )
 
 
-def night_dedicated_rule(id: str) -> CountRule:
-    """기본 규칙 "나이트 전담은 나이트와 휴무만"(솔버 특수 처리를 대신한다)."""
+def night_dedicated_block(id: str) -> CountRule:
+    """기본 규칙 "나이트 전담은 나이트와 휴무만"의 블록 모양(변환 픽스처용)."""
     return CountRule.model_validate(
         {
             "id": id,
@@ -142,11 +143,13 @@ def night_dedicated_rule(id: str) -> CountRule:
     )
 
 
-def convert_request(req: LegacyScheduleRequest) -> ScheduleRequest:
-    """옛 요청 전체를 블록 형식으로. night_only는 나이트 전담 태그로 바꾸고 기본 규칙을 더한다.
+def night_dedicated_rule(id: str) -> Rule:
+    """기본 규칙 "나이트 전담은 나이트와 휴무만"(솔버 특수 처리를 대신한다). 식 규칙, default=True."""
+    (rule,) = block_to_rules(night_dedicated_block(id))
+    return rule.model_copy(update={"default": True})
 
-    history_load(나이트·주말 두 숫자)는 원본으로 되돌릴 수 없어 버린다. 이력이 필요하면 history를 따로 넣는다.
-    """
+
+def _block_request(req: LegacyScheduleRequest) -> BlockScheduleRequest:
     nurses = [
         Nurse(
             id=n.id,
@@ -157,14 +160,22 @@ def convert_request(req: LegacyScheduleRequest) -> ScheduleRequest:
         for n in req.nurses
     ]
     constraints = [legacy_to_block(c, req.period, req.holidays) for c in req.constraints]
-    constraints.append(night_dedicated_rule(NIGHT_ONLY_RULE_ID))
-    return ScheduleRequest.model_validate(
+    constraints.append(night_dedicated_block(NIGHT_ONLY_RULE_ID))
+    return BlockScheduleRequest.model_validate(
         {
             **req.model_dump(mode="json", exclude={"history_load"}),
             "nurses": [n.model_dump(mode="json") for n in nurses],
-            "constraints": [_spec_adapter.dump_python(c, mode="json") for c in constraints],
+            "constraints": [_block_adapter.dump_python(c, mode="json") for c in constraints],
         }
     )
+
+
+def convert_request(req: LegacyScheduleRequest) -> ScheduleRequest:
+    """옛 요청 전체를 식 규칙 형식으로(템플릿 → 블록 → 식). night_only는 나이트 전담 태그로 바꾸고 기본 규칙을 더한다.
+
+    history_load(나이트·주말 두 숫자)는 원본으로 되돌릴 수 없어 버린다. 이력이 필요하면 history를 따로 넣는다.
+    """
+    return rules_request(_block_request(req))
 
 
 # --- 블록 → 식(설계 §2.5) ---
@@ -315,8 +326,8 @@ def block_to_rules(block: Any) -> list[Any]:
     ]
 
 
-def rules_request(req: ScheduleRequest) -> ScheduleRequest:
-    """요청의 블록을 모두 식 규칙으로 바꾼 요청."""
+def rules_request(req: BlockScheduleRequest) -> ScheduleRequest:
+    """블록 형식 요청의 블록을 모두 식 규칙으로 바꾼 요청."""
     constraints = [r for c in req.constraints for r in block_to_rules(c)]
     return ScheduleRequest.model_validate(
         {

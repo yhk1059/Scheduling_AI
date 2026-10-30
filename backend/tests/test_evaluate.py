@@ -10,16 +10,19 @@ import pytest
 from pydantic import TypeAdapter
 
 from backend.domain.constants import CARRY_OVER_DAYS, HISTORY_DAYS
-from backend.domain.models import ConstraintSpec, Rule, ScheduleRequest
+from backend.domain.legacy import BlockSpec
+from backend.domain.models import Rule, ScheduleRequest
 from backend.solver import select, stats
 from backend.solver.evaluate import Instance, RuleViolation, evaluate_rule, instances
+from backend.tests import block_oracle
 
 GOLDEN = Path(__file__).parent / "golden"
 EXPR_CASES = json.loads((GOLDEN / "expr-convert-cases.json").read_text(encoding="utf-8"))
-BLOCK_REQUESTS = {
-    c["id"]: c["request"] for c in json.loads((GOLDEN / "blocks-cases.json").read_text(encoding="utf-8"))
+BLOCK_REQUESTS = {  # 병동·기간·이월만 쓴다(규칙은 케이스의 블록·식을 따로 평가한다)
+    c["id"]: {**c["request"], "constraints": []}
+    for c in json.loads((GOLDEN / "blocks-cases.json").read_text(encoding="utf-8"))
 }
-spec_adapter = TypeAdapter(ConstraintSpec)
+block_adapter = TypeAdapter(BlockSpec)
 
 START = date(2026, 11, 5)  # 목요일. 1=목 2=금 3=토 4=일 5=월 … 14=수
 NURSES = [
@@ -257,7 +260,7 @@ def _case_requests(case: dict, rng: random.Random) -> list[ScheduleRequest]:
 def _target(request: ScheduleRequest, block) -> tuple[list[tuple[str, int]], object]:
     p = block.params
     if block.type == "count":
-        return [c for _, _, cs in select.count_groups(request, p) for c in cs if c[1] >= 1], p.shifts
+        return [c for _, _, cs in block_oracle.count_groups(request, p) for c in cs if c[1] >= 1], p.shifts
     if block.type == "balance":
         return [(n, d) for n, ds in select.balance_cells(request, p).items() for d in ds], p.shifts
     sel = p.run or p.after or p.forbid[0][0]
@@ -312,7 +315,7 @@ RUN_DETAIL = re.compile(r"연속 .+ (\d+)일 \(기준 \d+일 (이하|이상)\)")
 
 
 def block_keys(request: ScheduleRequest, a: dict, block) -> set:
-    """블록 위반(stats.violations)을 식 인스턴스 날로 맞춘다.
+    """블록 위반(block_oracle.violations)을 식 인스턴스 날로 맞춘다.
 
     - 세기: 사람마다(person)는 날을 떼고(희망·휴가 모양은 날마다 나오므로), 나머지는 그대로
     - 금지 순서: 패턴 마지막 날 → 첫날(d)
@@ -321,18 +324,17 @@ def block_keys(request: ScheduleRequest, a: dict, block) -> set:
     - 끝난 뒤 휴무: 휴무 아닌 칸 → 그 칸을 덮는 구간 끝날(d)
     """
     p = block.params
-    vs = stats.violations(request, a, block)
+    vs = block_oracle.violations(request, a, block)
     if block.type == "count":
-        return {(v.nurse_id, None if p.per == "person" else v.day) for v in vs}
+        return {(nid, None if p.per == "person" else day) for _, nid, day in vs}
     if block.type == "balance":
         return {(None, None) for _ in vs}
     out = set()
-    for v in vs:
-        nid, day = v.nurse_id, v.day
+    for detail, nid, day in vs:
         if p.forbid is not None:
-            out.add((nid, day - v.detail.count("→")))
+            out.add((nid, day - detail.count("→")))
         elif p.run is not None:
-            length, kind = RUN_DETAIL.match(v.detail).groups()
+            length, kind = RUN_DETAIL.match(detail).groups()
             start = day - int(length) + 1
             if kind == "이상":
                 out.add((nid, start))
@@ -352,10 +354,10 @@ def block_amounts(request: ScheduleRequest, a: dict, block) -> dict | None:
     if block.type == "count" and p.min is not None and p.max is not None and p.min != p.max:
         return None  # 그리고(All)가 되어 위반량이 1(설계 §3)
     if block.type == "count":
-        lo, hi = select.count_bounds(p)
+        lo, hi = block_oracle.count_bounds(p)
         unit = select.measure_unit(p.measure)
         out = {}
-        for nid, day, cells in select.count_groups(request, p):
+        for nid, day, cells in block_oracle.count_groups(request, p):
             total = sum(select.value(request.config, _code(request, a, n, d), p.shifts, p.measure) for n, d in cells)
             over = max((lo - total) if lo is not None else 0, (total - hi) if hi is not None else 0, 0)
             if over:
@@ -381,7 +383,7 @@ PAIRS = [c for c in EXPR_CASES if c["block"]["type"] != "fixed_assignment"]
 
 @pytest.mark.parametrize("case", PAIRS, ids=[c["name"] for c in PAIRS])
 def test_rules_match_block_violations(case):
-    block = spec_adapter.validate_python(case["block"])
+    block = block_adapter.validate_python(case["block"])
     rules = [Rule.model_validate(r) for r in case["rules"]]
     for request, a in schedules(case, block):
         expected = block_keys(request, a, block)
@@ -402,7 +404,7 @@ def test_rules_match_block_amounts_except_min_max_min_len_and_then_off(case):
     - 끝난 뒤 휴무: 양은 같지만 칸이 두 구간에 걸칠 수 있어 블록 목록에서 되짚을 수 없다
     - 고르게: test_balance_amount_matches_spread
     """
-    block = spec_adapter.validate_python(case["block"])
+    block = block_adapter.validate_python(case["block"])
     rules = [Rule.model_validate(r) for r in case["rules"]]
     for request, a in schedules(case, block):
         expected = block_amounts(request, a, block)

@@ -1,4 +1,4 @@
-"""도메인 모델(ADR-018): 병동 구조, 태그, 셀렉터, 블록 3종, history, config 기준 참조 무결성."""
+"""도메인 모델(ADR-018): 병동 구조, 태그, 셀렉터, history, config 기준 참조 무결성. 블록 3종은 옛 형식(legacy.py)이다(ADR-019)."""
 
 import json
 
@@ -6,6 +6,8 @@ import pytest
 from pydantic import TypeAdapter, ValidationError
 
 from backend.domain import constants
+from backend.domain.convert import block_to_rules
+from backend.domain.legacy import BlockScheduleRequest, BlockSpec
 from backend.domain.models import (
     DEFAULT_CONFIG,
     ConstraintSpec,
@@ -18,6 +20,7 @@ from backend.domain.models import (
 )
 
 spec_adapter = TypeAdapter(ConstraintSpec)
+block_adapter = TypeAdapter(BlockSpec)
 
 
 def nurses(n: int = 3) -> list[dict]:
@@ -51,6 +54,11 @@ def block(cid: str, type_: str, params: dict, **extra) -> dict:
 COUNT = block("b1", "count", {"shifts": {"in": ["D"]}, "per": "day", "min": 3, "max": 4})
 SEQ = block("b2", "sequence", {"run": {"in": ["N"]}, "max_len": 3})
 BAL = block("b3", "balance", {"shifts": {"in": ["N"]}})
+
+
+def as_rules(raw: dict) -> list[dict]:
+    """블록 dict를 식 규칙 dict로(설계 §2.5)."""
+    return [spec_adapter.dump_python(r, mode="json") for r in block_to_rules(block_adapter.validate_python(raw))]
 
 
 # --- WardConfig ---
@@ -164,9 +172,9 @@ def test_fixed_assignment_code_checked_against_config():
 
 def test_sequence_codes_checked_against_config():
     no_n = {"shifts": [shift("D"), shift("E"), shift("O", "휴무", 0)]}
-    seq = block("seq", "sequence", {"forbid": [[{"in": ["N"]}, {"in": ["D"]}]]})
+    seq = as_rules(block("seq", "sequence", {"forbid": [[{"in": ["N"]}, {"in": ["D"]}]]}))
     with pytest.raises(ValidationError, match="seq"):
-        ScheduleRequest.model_validate(request([seq], config=no_n))
+        ScheduleRequest.model_validate(request(seq, config=no_n))
 
 
 @pytest.mark.parametrize("type_", ["daily_coverage", "forbidden_sequence", "leave", "shift_preference", "night_fairness"])
@@ -191,19 +199,19 @@ def test_shifts_requires_exactly_one(raw):
         Shifts.model_validate(raw)
 
 
-# --- 블록 ---
+# --- 블록(옛 형식, legacy.py): 변환 입력으로만 읽는다 ---
 
 
 @pytest.mark.parametrize("raw", [COUNT, SEQ, BAL], ids=["count", "sequence", "balance"])
 def test_block_roundtrip(raw):
-    spec = spec_adapter.validate_python(raw)
-    dumped = spec_adapter.dump_python(spec, mode="json")
-    assert spec_adapter.validate_json(json.dumps(dumped)) == spec
+    spec = block_adapter.validate_python(raw)
+    dumped = block_adapter.dump_python(spec, mode="json")
+    assert block_adapter.validate_json(json.dumps(dumped)) == spec
     assert dumped["enabled"] is True
 
 
 def test_block_defaults():
-    count, seq, bal = (spec_adapter.validate_python(r) for r in (COUNT, SEQ, BAL))
+    count, seq, bal = (block_adapter.validate_python(r) for r in (COUNT, SEQ, BAL))
     assert (count.hardness, count.priority) == ("hard", "normal")
     assert (seq.hardness, seq.priority) == ("hard", "normal")
     assert (bal.hardness, bal.priority) == ("soft", "low")
@@ -215,7 +223,7 @@ def test_block_defaults():
 
 @pytest.mark.parametrize("priority", ["high", "normal", "low"])
 def test_block_weight_follows_priority(priority):
-    spec = spec_adapter.validate_python({**COUNT, "hardness": "soft", "priority": priority, "weight": 99})
+    spec = block_adapter.validate_python({**COUNT, "hardness": "soft", "priority": priority, "weight": 99})
     assert spec.weight == constants.PRIORITY_WEIGHTS[priority]
 
 
@@ -287,7 +295,7 @@ N, D, O = {"in": ["N"]}, {"in": ["D"]}, {"in": ["O"]}
 )
 def test_invalid_blocks_rejected(raw):
     with pytest.raises(ValidationError):
-        spec_adapter.validate_python(raw)
+        block_adapter.validate_python(raw)
 
 
 def test_valid_block_shapes():
@@ -298,15 +306,22 @@ def test_valid_block_shapes():
         _seq(run={"not_in": ["O"]}, min_len=2),
         _seq(after=N, then_off=2, people={"tags": ["책임"], "exclude_tags": ["신규"]}),
     ):
-        spec_adapter.validate_python(raw)
+        block_adapter.validate_python(raw)
 
 
-# --- 블록 참조 무결성 ---
+# --- 참조 무결성(블록을 식으로 바꾼 규칙) ---
 
 
-def test_request_accepts_blocks():
-    req = ScheduleRequest.model_validate(request([COUNT, SEQ, BAL]))
-    assert [c.type for c in req.constraints] == ["count", "sequence", "balance"]
+@pytest.mark.parametrize("raw", [COUNT, SEQ, BAL], ids=["count", "sequence", "balance"])
+def test_request_rejects_blocks(raw):
+    with pytest.raises(ValidationError, match="does not match any of the expected tags"):
+        ScheduleRequest.model_validate(request([raw]))
+    assert BlockScheduleRequest.model_validate(request([raw])).constraints[0].type == raw["type"]
+
+
+def test_request_accepts_converted_blocks():
+    req = ScheduleRequest.model_validate(request([r for b in (COUNT, SEQ, BAL) for r in as_rules(b)]))
+    assert [(c.id, c.type) for c in req.constraints] == [("b1", "rule"), ("b2", "rule"), ("b3", "rule")]
 
 
 @pytest.mark.parametrize(
@@ -321,14 +336,14 @@ def test_request_accepts_blocks():
     ],
     ids=["unknown-nurse", "unknown-code", "day-out-of-range", "forbid-code", "after-code", "balance-code"],
 )
-def test_block_reference_errors_report_constraint_id(raw):
+def test_rule_reference_errors_report_constraint_id(raw):
     with pytest.raises(ValidationError, match="제약 x"):
-        ScheduleRequest.model_validate(request([raw]))
+        ScheduleRequest.model_validate(request(as_rules(raw)))
 
 
 def test_unknown_tag_passes():
     raw = _count(people={"tags": ["없는태그"]})
-    assert ScheduleRequest.model_validate(request([raw]))
+    assert ScheduleRequest.model_validate(request(as_rules(raw)))
 
 
 # --- history ---

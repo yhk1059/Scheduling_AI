@@ -28,6 +28,7 @@ def _max_run(row: list[str]) -> int:
 
 
 def test_sample_ward_rules():
+    """샘플 병동 파일(lib/samples)은 블록 형식으로 남아 있다(클라이언트 이전은 이후 step)."""
     rules = {c["id"]: c for c in WARD["constraints"] if not c["id"].startswith("cov-")}
     assert all(c["scope"] == "ward" for c in WARD["constraints"])
     assert {cid: (c["type"], c["hardness"]) for cid, c in rules.items()} == {
@@ -46,11 +47,12 @@ def test_sample_ward_rules():
 
 
 def test_demo_request_uses_ward_rules_only():
+    """병동 규칙을 식으로 바꿔 쓴다. 샘플 블록은 모두 규칙 하나씩이라 id가 그대로다."""
     req = demo_request()
     assert req.period.model_dump(mode="json") == DEMO_PERIOD
     assert req.holidays == [] and req.carry_over == [] and req.previous is None
     assert [c.id for c in req.constraints] == [c["id"] for c in WARD["constraints"]]
-    assert {c.type for c in req.constraints} <= {"count", "sequence", "balance"}
+    assert {c.type for c in req.constraints} == {"rule"}
     assert {n.id for n in req.nurses if NIGHT_ONLY_TAG in n.tags} == NIGHT_ONLY
 
 

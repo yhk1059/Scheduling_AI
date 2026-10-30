@@ -1,4 +1,4 @@
-"""솔버 hard 규칙(템플릿 이름의 블록 모양과 칸 고정). 병렬 탐색이라 정확한 배정값이 아니라 제약 충족 여부를 검증한다."""
+"""솔버 hard 규칙(프리셋 이름의 식 규칙과 칸 고정). 병렬 탐색이라 정확한 배정값이 아니라 제약 충족 여부를 검증한다."""
 
 import pytest
 from pydantic import ValidationError
@@ -6,7 +6,7 @@ from pydantic import ValidationError
 from backend.domain.models import ScheduleRequest, SolveInfeasible, SolveOk
 from backend.solver import select
 from backend.solver.model import build_model, solve
-from backend.tests.blocks import (
+from backend.tests.rules import (
     coverage,
     fixed,
     forbid,
@@ -110,7 +110,7 @@ def test_hard_literal_per_enabled_hard_constraint_only():
     assert set(ctx.hard_literals) == {"a", "d"}
 
 
-# --- 템플릿 이름의 블록 모양 ---
+# --- 프리셋 이름의 식 규칙 ---
 
 
 def test_daily_coverage_by_day_kind_with_holiday():
@@ -286,6 +286,7 @@ def test_sample_ward_has_solution():
     for c in req.constraints:
         if not c.id.startswith("cov-"):
             continue
-        p = c.params
-        for d in select.days(req, p.days):
-            assert p.min <= sum(row[d - 1] in p.shifts.codes for row in a.values()) <= p.max
+        n = c.values["min"].value  # 샘플 필요 인원은 정확히 n명(eq)
+        shifts = c.body.then.left.shifts
+        for d in select.days(req, c.body.for_each.days):
+            assert sum(row[d - 1] in shifts.codes for row in a.values()) == n

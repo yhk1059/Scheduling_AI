@@ -6,18 +6,20 @@ from pathlib import Path
 import pytest
 from pydantic import TypeAdapter
 
-from backend.domain.convert import NIGHT_ONLY_RULE_ID, block_to_rules, night_dedicated_rule, rules_request
+from backend.domain.convert import NIGHT_ONLY_RULE_ID, block_to_rules, night_dedicated_block, rules_request
+from backend.domain.legacy import BlockScheduleRequest, BlockSpec
 from backend.domain.models import ConstraintSpec, Rule, ScheduleRequest
 
 GOLDEN = Path(__file__).parent / "golden"
 BLOCK_CASES = json.loads((GOLDEN / "blocks-cases.json").read_text(encoding="utf-8"))
 EXPR_CASES = json.loads((GOLDEN / "expr-convert-cases.json").read_text(encoding="utf-8"))
 spec_adapter = TypeAdapter(ConstraintSpec)
+block_adapter = TypeAdapter(BlockSpec)
 
 
 def blk(type_: str, params: dict, cid: str = "b1", **extra) -> object:
     raw = {"id": cid, "type": type_, "scope": "ward", "source_text": "원문", "params": params, **extra}
-    return spec_adapter.validate_python(raw)
+    return block_adapter.validate_python(raw)
 
 
 def body(r: Rule) -> dict:
@@ -211,7 +213,7 @@ def test_rule_unchanged():
 def test_default_rules():
     cov = one(blk("count", {"shifts": {"in": ["D"]}, "per": "day", "min": 3}, cid="cov-D-weekday"))
     assert cov.default is True
-    night = one(night_dedicated_rule(NIGHT_ONLY_RULE_ID))
+    night = one(night_dedicated_block(NIGHT_ONLY_RULE_ID))
     assert night.default is True
     assert body(night)["for_each"] == {"per": "person", "people": {"tags": ["나이트전담"]}}
     other = one(blk("count", {"shifts": {"in": ["O"]}, "per": "person", "min": 8}, cid="min-off"))
@@ -223,7 +225,7 @@ def test_default_rules():
 
 @pytest.mark.parametrize("case", BLOCK_CASES, ids=[c["id"] for c in BLOCK_CASES])
 def test_rules_request_validates(case):
-    req = ScheduleRequest.model_validate(case["request"])
+    req = BlockScheduleRequest.model_validate(case["request"])
     out = rules_request(req)
     assert {c.type for c in out.constraints} <= {"rule", "fixed_assignment"}
     assert ScheduleRequest.model_validate(out.model_dump(mode="json")) == out
@@ -242,5 +244,5 @@ def test_fixture_matches_converter():
     names = [c["name"] for c in EXPR_CASES]
     assert len(names) == len(set(names))
     for case in EXPR_CASES:
-        rules = block_to_rules(spec_adapter.validate_python(case["block"]))
+        rules = block_to_rules(block_adapter.validate_python(case["block"]))
         assert [spec_adapter.dump_python(r, mode="json", exclude_none=True) for r in rules] == case["rules"], case["name"]

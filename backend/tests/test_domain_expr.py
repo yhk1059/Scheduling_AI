@@ -300,8 +300,11 @@ def test_unknown_tags_pass():
     assert ScheduleRequest.model_validate(request([r]))
 
 
-def test_rules_and_blocks_coexist():
+def test_blocks_no_longer_accepted_beside_rules():
+    """블록은 식으로 통일됐다(ADR-019 ★2). 요청은 rule | fixed_assignment만 받는다."""
     blk = {"id": "b1", "type": "count", "scope": "ward", "source_text": "원문",
            "params": {"shifts": {"in": ["D"]}, "per": "day", "min": 1}}
-    req = ScheduleRequest.model_validate(request([blk, EXAMPLES["pair-apart"]]))
-    assert [c.type for c in req.constraints] == ["count", "rule"]
+    with pytest.raises(ValidationError):
+        ScheduleRequest.model_validate(request([blk, EXAMPLES["pair-apart"]]))
+    req = ScheduleRequest.model_validate(request([EXAMPLES["pair-apart"]]))
+    assert [c.type for c in req.constraints] == ["rule"]
