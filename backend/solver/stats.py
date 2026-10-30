@@ -5,16 +5,21 @@ from typing import Any
 from backend.domain.constants import FAIRNESS_TOLERANCE, MINUTES_PER_HOUR, OFF_CODE
 from backend.domain.models import (
     Assignments,
+    Balance,
+    Cmp,
+    Count,
     DiffCell,
     NurseStats,
+    People,
     ScheduleRequest,
     ScheduleResult,
     Shifts,
     SoftViolation,
     Summary,
     WardConfig,
+    cond_cmps,
 )
-from backend.solver import select
+from backend.solver import evaluate, select
 from backend.solver.select import is_weekend  # noqa: F401  토·일 ∪ 공휴일(솔버와 같은 정의)
 
 
@@ -163,22 +168,117 @@ def _balance_violations(request: ScheduleRequest, a: Assignments, c: Any) -> lis
         limit = FAIRNESS_TOLERANCE * select.measure_unit(p.measure)
     if gap <= limit:
         return []
+    return [(_balance_detail(request, p, gap), None, None)]
+
+
+def _balance_detail(request: ScheduleRequest, p: Any, gap: int) -> str:
     prefix = "최근 4주 포함 " if p.with_history and request.history is not None else ""
-    label = _DAY_KIND_LABEL[p.days.kind] + _shift_label(config, p.shifts)
+    label = _DAY_KIND_LABEL[p.days.kind] + _shift_label(request.config, p.shifts)
     if p.measure == "hours":
-        return [(f"{prefix}{label} 근무 시간 편차 {_num(gap / MINUTES_PER_HOUR)}시간", None, None)]
-    return [(f"{prefix}{label} 개수 편차 {gap}", None, None)]
+        return f"{prefix}{label} 근무 시간 편차 {_num(gap / MINUTES_PER_HOUR)}시간"
+    return f"{prefix}{label} 개수 편차 {gap}"
+
+
+# --- 규칙 식(ADR-019): evaluate.py로 평가하고 위반 목록 형식으로 바꾼다 ---
+
+
+def _who_label(request: ScheduleRequest, who: People | None) -> str:
+    if who is None:
+        return ""
+    if who.ids is not None:
+        names = {n.id: n.name for n in request.nurses}
+        return "·".join(names[i] for i in who.ids) + " "
+    parts = list(who.tags or [])
+    if who.min_years is not None:
+        parts.append(f"{who.min_years}년차 이상")
+    if who.max_years is not None:
+        parts.append(f"{who.max_years}년차 이하")
+    return " ".join(parts) + " " if parts else ""
+
+
+def _count_label(request: ScheduleRequest, c: Count) -> str:
+    return _who_label(request, c.who) + _DAY_KIND_LABEL[c.days.kind] + _shift_label(request.config, c.shifts)
+
+
+def _count_unit(per: str, c: Count) -> str:
+    if c.measure == "hours":
+        return "시간"
+    return {"day": "명", "period": "번"}.get(per, "일")
+
+
+_OP_TEXT = {"ge": " 이상", "le": " 이하", "eq": ""}
+
+
+def _cmp_detail(request: ScheduleRequest, assignments: Assignments, rule: Any, inst: evaluate.Instance, c: Cmp) -> str:
+    per = rule.body.for_each.per
+    left, right = evaluate.cmp_sides(request, assignments, rule, inst, c)
+    unit = _count_unit(per, c.left)
+    prefix = {"person_week": "주 ", "person_window": f"{rule.body.for_each.window}일 중 "}.get(per, "")
+    base = f"{_num(right / select.measure_scale(c.left.measure))}{unit}"
+    if isinstance(c.right, Count):
+        base = f"{_count_label(request, c.right)} {_num(right / select.measure_scale(c.right.measure))}{_count_unit(per, c.right)}"
+    value = f"{_num(left / select.measure_scale(c.left.measure))}{unit}"
+    return f"{prefix}{_count_label(request, c.left)} {value} (기준 {base}{_OP_TEXT[c.op]})"
+
+
+def describe_violation(request: ScheduleRequest, assignments: Assignments, rule: Any, v: evaluate.RuleViolation) -> str:
+    """위반 한 줄: "{묶음} {값} (기준 {범위})". 그리고/또는은 어긴 비교를 " · "로 잇는다."""
+    body = rule.body
+    if isinstance(body, Balance):
+        values = evaluate.balance_values(request, assignments, body)
+        return _balance_detail(request, body, max(values) - min(values))
+    failed = [
+        c for c in cond_cmps(body.then) if not evaluate.cmp_holds(request, assignments, rule, v.instance, c)
+    ]
+    return " · ".join(_cmp_detail(request, assignments, rule, v.instance, c) for c in failed)
+
+
+def _rep_day(rule: Any, inst: evaluate.Instance) -> int | None:
+    """위반을 표시할 기간 안 날: 날·주는 첫날(이월이면 1일), 창은 끝날, 사람·기간은 없음."""
+    if isinstance(rule.body, Balance) or not inst.days:
+        return None
+    if rule.body.for_each.per == "person_window":
+        return inst.days[-1]
+    return max(inst.days[0], 1)
+
+
+def _cell_violations(request: ScheduleRequest, a: Assignments, rule: Any, v: evaluate.RuleViolation) -> list[tuple[str, str | None, int | None]]:
+    """사람마다 대상 날짜 전부를 맞추거나(최소 = 날짜 수) 피하는(최대 0) 모양은 블록처럼 어긴 날마다 하나."""
+    body = rule.body
+    if isinstance(body, Balance) or body.for_each.per != "person" or body.when is not None:
+        return []
+    c = body.then
+    if not isinstance(c, Cmp) or isinstance(c.right, Count) or c.left.measure != "count":
+        return []
+    bound = evaluate.resolve(rule, c.right)
+    cells = evaluate.count_cells(request, a, rule, v.instance, c.left)
+    avoid = c.op in ("le", "eq") and bound == 0
+    if not avoid and not (c.op in ("ge", "eq") and bound == len(cells) > 0):
+        return []
+    label = _shift_label(request.config, c.left.shifts)
+    detail = f"{label} 배정 (기준 배정 안 함)" if avoid else f"{label} 아님 (기준 {label})"
+    return [(detail, nid, d) for nid, d, code in cells if select.matches(request.config, code, c.left.shifts) == avoid]
+
+
+def _rule_violations(request: ScheduleRequest, a: Assignments, rule: Any) -> list[tuple[str, str | None, int | None]]:
+    out = []
+    for v in evaluate.evaluate_rule(request, a, rule):
+        out += _cell_violations(request, a, rule, v) or [
+            (describe_violation(request, a, rule, v), v.instance.nurse_id, _rep_day(rule, v.instance))
+        ]
+    return out
 
 
 _BLOCK_VIOLATIONS = {
     "count": _count_violations,
     "sequence": _sequence_block_violations,
     "balance": _balance_violations,
+    "rule": _rule_violations,
 }
 
 
 def violations(request: ScheduleRequest, assignments: Assignments, c: Any) -> list[SoftViolation]:
-    """제약 하나의 위반 목록(hardness와 관계없이 센다). 블록은 솔버와 같은 select.py로 평가한다."""
+    """제약 하나의 위반 목록(hardness와 관계없이 센다). 블록은 솔버와 같은 select.py로, 규칙 식은 evaluate.py로 평가한다."""
     if c.type == "fixed_assignment":
         p = c.params
         if assignments[p.nurse_id][p.day - 1] == p.shift:
