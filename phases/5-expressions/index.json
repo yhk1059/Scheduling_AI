@@ -85,7 +85,10 @@
     {
       "step": 10,
       "name": "ui-setup-coverage",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-10-30T15:20:15+0900",
+      "summary": "처음 설정 ②를 '병동 소개'로 바꿈(스테퍼·제목 '병동 소개'): 근무 형태 요약 + RulesStep intro 모드(scope ward, textbox '병동 소개 입력', 제출 '규칙 만들기', 예시 '데이 평일 3명 이상, 주말 2명, 더블도 있어'·'나이트는 매일 2~3명', 적용된 카드는 필요 인원만) + 접힌 CoverageSection collapsible(button '숫자로 입력하기' aria-expanded, 이름 고정); [다음] 항상 활성·markIntroSeen, 켜진 필요 인원 규칙이 없으면 '필요 인원 없이 만들면 인원을 맞추지 않아요'; ③ '규칙 없이 만들면 기본 규칙만 지켜요'. CoverageForm: 칸마다 최소·최대(textbox '{평일|주말·공휴일} {근무 이름} 최소 인원'/'… 최대 인원', '3 ~ 4 명', 최대 비우면 '명 이상'), coverageRange로 읽고 setCoverage로 씀, 하루 합계 줄·'쉴 사람이 없어요' 삭제, 오류 '인원은 숫자로 적어 주세요.'·'최소가 최대보다 커요.'(aria-invalid), 설명 '최대를 비우면 그 이상이면 돼요.'. 병동 규칙 탭·③: cov-* 숨김을 없애고 기본 규칙 카드(default)를 맨 위로 정렬, ConstraintCard에 '기본' 배지(bg-[#EFEFEB] text-[#3D3D38]), 적용된 기본 카드는 [삭제] 대신 [끄기]→'꺼짐' 배지+[다시 켜기]. store: enableRule(id) 추가, addPendingRules가 날마다 모든 사람 개수 모양(필요 인원, 토요일만 포함) 병동 규칙에 default=true(vitest 2개 추가). 수동 저니(npm run dev, 임시 Playwright·삭제, 실제 API): ① 3명→예시 입력→필요 인원 카드 2장(기본)+DE 설정 카드→모두 적용→config에 DE, 폼 평일 데이 3~(이상)·주말 데이 2~2 ② 6명·D/E/N 3~3 폼 오류 없음→근무표 만들기 '규칙을 모두 지키는 근무표가 없어요'+설명 ③ 필요 인원 없이 [다음]→안내→③→첫 근무표 만들기→'11월 근무표' ④ 병동 규칙 탭 기본 카드 끄기→다시 켜기; 콘솔·API 오류 없음. pytest 1322·vitest 519, build·lint(기존 경고 1) 통과. 결정: 기본 카드는 대기 중이어도 맨 위(적용 후 제자리 유지); ②의 적용된 카드는 필요 인원만 보이고 그 밖 규칙은 ③에서 보임; 병동 원본에서 끈 기본 카드 배지는 '꺼짐'(제외 배지 색); 폼 aria-label이 '평일 데이 인원'→'평일 데이 최소/최대 인원'으로 바뀌어 e2e(journey·structure)와 BROWSER_TEST_SCENARIOS D2·S5·S6·S14는 step 12에서 고쳐야 함(③에 필요 인원 카드가 보여 S6 카드 수도 바뀜).",
+      "completed_at": "2026-10-30T15:26:46+0900"
     },
     {
       "step": 11,
