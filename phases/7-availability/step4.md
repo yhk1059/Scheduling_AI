@@ -1,4 +1,4 @@
-# Step 4: availability-ui
+# Step 4: samples-e2e
 
 ## 읽어야 할 파일
 
@@ -7,37 +7,33 @@
 - `/CLAUDE.md`
 - `/notes/shop-pivot-design-2026-10-30.md`
 - `/docs/ADR.md`
-- `/lib/supabase.ts`
-- `/lib/availability.ts`
-- `/lib/store.ts`
-- `/docs/UI_GUIDE.md`
-- `/supabase/migrations/20261030000100_availability.sql`
+- `/docs/BROWSER_TEST_SCENARIOS.md`
+- `/e2e/test-helpers.ts`
+- `/playwright.config.ts`
+- `/docs/PRD.md`
 
 ## 배경
 
 프로젝트를 간호사 근무표에서 매장 직원 근무표로 전환하는 중이다. 문서(`docs/`)는 이미 전환 후 기준이고, 코드는 step마다 그 기준으로 옮겨진다. 실제 사용자, 저장 데이터, 배포가 없으므로 하위 호환 코드를 남기지 않는다.
 
-직원 드래그 캘린더와 매니저 링크 표를 만든다. 데스크톱 웹 기준이고 터치는 지원하지 않는다.
+전체 흐름을 실제로 검증한다. 실제 Anthropic API와 테스트 Supabase 프로젝트를 쓴다. 마이그레이션 `20261030000000_shops.sql`, `20261030000100_availability.sql`은 사용자가 이미 적용했다. DB를 바꾸는 명령을 실행하지 마라.
 
 ## 작업
 
-순수 함수(드래그 범위 계산, slots ↔ 칸 변환)는 테스트를 먼저 쓴다.
-
-1. `lib/supabase.ts`: 링크 행 만들기·읽기, `get_availability`, `submit_availability` rpc, 확정 때 `locked_at` 기록, 다시 확정 시 유지. 시작일이 바뀌면 행을 다시 만든다.
-2. `app/a/[token]/page.tsx`: UI_GUIDE "직원 가능 시간 입력"대로. 로그인을 요구하지 않고 store를 쓰지 않는다. 드래그는 빈 칸이면 칠하고 칠한 칸이면 지운다.
-3. ①의 링크 표: 행마다 [링크 복사].
-4. ③ 진입과 [근무표 만들기] 때 가능 시간을 다시 읽어 store에 넣고, 달라졌으면 배너를 보인다.
-5. step 0에서 둔 예외(`availability` 값이 없으면 규칙을 더하지 않음)를 지운다. 이제 제출 전이면 가능 시간이 없으므로 배정되지 않는다.
-6. 공통 개발 용어 검사에 걸리지 않는 문구를 쓴다(화면에 `토큰`, `availability` 금지).
+1. `.env.local`에 `ANTHROPIC_API_KEY`, `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `E2E_TEST_EMAIL`, `E2E_TEST_PASSWORD`가 없으면 즉시 blocked로 멈춘다. 값을 출력하지 마라.
+2. 테스트 전용 로그인 경로(`NEXT_PUBLIC_E2E_LOGIN`이 켜졌을 때만)와 도우미 `loginAsTestUser`를 만든다. 프로덕션 빌드에서 이 값이 없으면 경로가 없어야 한다.
+3. `docs/BROWSER_TEST_SCENARIOS.md`대로 `e2e/`를 다시 쓴다. `e2e/fixtures/shop-oct.json`을 맞추고 `playwright.config.ts`에 `workers: 1`을 둔다.
+4. 랜딩과 샘플 데모를 점검한다.
+5. `npm run test:e2e`가 통과할 때까지 고친다. 문서와 다르게 구현해야 하면 이유를 summary에 적는다.
 
 ## Acceptance Criteria
 
 ```bash
-uv run pytest backend/tests scripts/test_hooks.py
-npx vitest run
-npx tsc --noEmit
-npm run lint
 npm run build
+npm run lint
+npm run test
+npm run bench
+npm run test:e2e
 ```
 
 ## 검증 절차
@@ -51,6 +47,6 @@ npm run build
 
 ## 금지사항
 
-- 직원 화면에 다른 직원의 이름이나 매장 조건을 보여 주지 마라.
-- 미제출 경고나 대리 입력을 만들지 마라. 이유: 사용자가 모두 제출한다고 가정했다.
+- e2e 전용 로그인을 프로덕션에서 켜지 마라.
+- `.env.local` 값을 커밋하거나 출력하지 마라.
 - 이 step의 범위 밖 파일을 고치거나 다음 step의 일을 미리 하지 마라. 이유: step마다 독립 세션이 실행되어 범위가 겹치면 충돌한다.

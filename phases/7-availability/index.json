@@ -19,16 +19,11 @@
     },
     {
       "step": 3,
-      "name": "availability-db",
-      "status": "pending"
-    },
-    {
-      "step": 4,
       "name": "availability-ui",
       "status": "pending"
     },
     {
-      "step": 5,
+      "step": 4,
       "name": "samples-e2e",
       "status": "pending"
     }

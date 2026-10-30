@@ -25,7 +25,7 @@
 1. `lib/availability.ts`: `coversShift(ranges, shift) -> boolean`은 가능 시간이 근무조 시각을 완전히 덮는지 본다. 이어진 구간은 합쳐서 판단한다. 복합 코드는 `parts`가 모두 덮여야 한다.
 2. `availabilityRules(employees, config, period, slotsByEmployee, fixedCells) -> Rule[]`: 직원 × 근무 코드마다 덮지 못하는 날을 금지하는 반드시 규칙이다. id는 `avail-{직원 id}-{코드}`, `source_text`는 "{이름} 가능 시간". 고정 칸은 뺀다. 가능 시간이 없는 직원은 휴무 말고 모두 금지다.
 3. `store.ts`: 기간마다 `availability: { [employeeId]: slots }`를 두고, `toScheduleRequest`가 이 규칙을 더한다. 매장 조건에는 저장하지 않는다. `slots` 형식은 `{ "2026-11-02": [["09:00", "15:00"]] }`이다.
-4. 입력 화면이 생기기 전까지 기존 흐름이 멈추지 않게, 기간에 `availability` 값이 아예 없으면 가능 시간 규칙을 더하지 않는다. 이 예외는 step 4(availability-ui)에서 지운다.
+4. 입력 화면이 생기기 전까지 기존 흐름이 멈추지 않게, 기간에 `availability` 값이 아예 없으면 가능 시간 규칙을 더하지 않는다. 이 예외는 step 3(availability-ui)에서 지운다.
 5. 백엔드 상한(`_check_limits`)이 `avail-` 규칙을 규칙 200개 상한에서 빼게 한다(테스트 먼저). 최악 입력을 `backend/bench.py`에 더한다.
 
 ## Acceptance Criteria
