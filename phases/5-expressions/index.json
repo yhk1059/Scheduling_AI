@@ -93,7 +93,10 @@
     {
       "step": 11,
       "name": "ui-cards",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-10-30T15:27:17+0900",
+      "summary": "카드 의미 확인 UI: ConstraintCard 해석 결과를 describeRule().parts로 그리는 RuleText(새 components/RuleText.tsx, 조정 가능한 값은 font-mono + underline decoration-dotted underline-offset-2; 샘플 데모·랜딩 PreviewCard도 같이 사용), [수정]은 문장 아래에 값마다 label + 숫자 입력 + [저장]/[취소] + 안내 '바꾸려면 말로 다시 적어 주세요'(병동 규칙 setRuleValue·요청 setRequestValue, 값 없는 규칙은 [수정] 없음); 예시 판정 띠: 서버 examples(ward.examples / period.examples, 카드 id)를 '이런 근무면 이 규칙에 어긋나요' + RuleExample마다 실제 <table>(열 머리 첫 칸 M/D·나머지 dayHeader, 행 머리 간호사 이름(명단, 없으면 '간호사'), 칸 w-6 h-6 codeClass(주말 O 색 포함), marks 칸은 ring-1 ring-[#B42318]이고 td aria-label '{이름} {M}월 {D}일 {코드} 어긋남') + detail 한 줄; 대기 카드는 펼침, 적용된 카드(기간의 병동 규칙 목록·확정 근무표 변경 카드 포함)는 [예시 보기] Text(aria-expanded)로 접음, 예시 없으면 숨김; 제안 카드(ScheduleStep): LLM description 대신 변경마다 결정적 한 줄 — set_value '{label} {이전} → {새 값}', disable '이번 근무표에서만 끄기', set_hardness '반드시 → 가능하면' + 그 규칙 원문 “…” 보조 한 줄(변경을 못 읽으면 description으로 대체), [수락]은 applyChanges 그대로. store(TDD): setRuleValue·setRequestValue가 그 카드의 예시를 지움(옛 값으로 판정한 예시라 — 수동 저니에서 3→4 수정 뒤에도 '기준 3일 이하' 띠가 남는 것을 발견), vitest 1개 추가. 수동 저니(npm run dev, 임시 Playwright·삭제, 실제 API, D3 픽스처 + 신규·책임 태그): ① '나이트는 3번까지만 연속' → 최대 연속 나이트 카드 '나이트 연속 3일까지'(3 밑줄)·예시 띠 3개(어긋남 칸 12)·기존 규칙 대체 → 적용 → [예시 보기] 펼침 → [수정] 4 저장 → '나이트 연속 4일까지', 예시 사라짐 ② '신규가 나이트면 책임도 나이트에 1명' → 조건 규칙 '매일, 신규 태그 나이트 1명 이상이면 책임 태그 나이트 1명 이상', 띠 3개(3명×3일) ③ 11월에 11/20 휴가 4+4명 → 근무표 없음 → 제안 3개 '인원 3 → 2'·'최소 인원 3 → 2'·'반드시 → 가능하면'(실행마다 '이번 근무표에서만 끄기'도 나옴) → [수락] → ok; 콘솔·API 오류 없음. pytest 1322·vitest 520, build·lint(기존 경고 1) 통과. 결정: 휴가 날짜 수정은 step 9에서 이미 없어져 다시 만들지 않음(날짜는 식 구조라 ★7에 따라 말로 다시 입력); 수정 폼은 문장을 가리지 않고 아래에 펼침; 띠 칸은 근무 셀 축소판(24px) <span>이고 편집하지 않음; 충돌 목록의 규칙 문장은 text 그대로(밑줄 없음). 발견(범위 밖): 여러 사람을 한 장으로 묶은 휴가 카드는 presetName이 '근무 횟수'이고 isLeaveRule이 아니라 반드시/가능하면 토글이 보임(wording·store의 휴가 모양 판정이 한 사람만 봄).",
+      "completed_at": "2026-10-30T15:34:27+0900"
     },
     {
       "step": 12,
