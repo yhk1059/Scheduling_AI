@@ -69,7 +69,10 @@
     {
       "step": 8,
       "name": "eval-shop",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-10-30T23:45:03+0900",
+      "summary": "eval/dataset.jsonl을 매장 말투 100개로 다시 만듦(basic 41·config 9·time-window 17·hours 7·tag 11·conditional 7·pair 8), eval/run.py를 샘플 매장(lib/samples/shop-12.json) 기준으로 바꾸고 묶음별 정확도와 합격 여부(전체 90%, time-window 90%)를 출력, results.md 맨 위에 지난 결과 표시, test_eval_runner를 A/M/C로 옮기고 validate_dataset 통과와 묶음 수를 고정. 실행 명령(실행하지 않음, 정확도 미측정): uv run python eval/run.py --gate (확인만 하려면 --dry-run). 결정: 묶음 이름 new·expr를 config·tag·conditional·pair로 나누고 옛 게이트(set별 목표, 기존 79건 합산, 스키마 유효율)는 지움(스키마 유효율은 출력만); 날짜 인덱스는 샘플이 11/2 시작이라 달력일−1로 다시 계산(15일→14); eval 전용 태그를 없애고 샘플의 리더 3명·신입 2명을 씀, 명단이 12명이라 e13~e15 케이스는 다른 직원으로 옮기거나 지움; 근무 형태 변경 판정에 start·end를 더함; 묶음이 달라 열이 맞지 않는 옛 실행 이력 행은 다음 실행 때 옮기지 않음(git에 남음); 시간대 정답은 근무조 시각으로 한 번 계산해 대조함, 복합 구간은 프롬프트대로 코드 집합마다 규칙 하나; 평소 되는 시간을 말하는 케이스(c05)는 clarify; a11(리더 4명)은 리더가 3명뿐이라 clarify 기대값을 유지함",
+      "completed_at": "2026-10-30T23:51:29+0900"
     }
   ],
   "created_at": "2026-10-30T22:48:58+0900"
