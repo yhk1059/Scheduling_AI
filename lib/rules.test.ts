@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { balance, count, fixedCell, forbid, maxRun, minRun, OFF, offAfter, WORK } from "./test-rules";
-import { DEFAULT_CONFIG, NIGHT_ONLY_RULE_ID, NIGHT_ONLY_TAG, nightOnlyRule, normalizeRule, ruleShape } from "./rules";
+import { DEFAULT_CONFIG, normalizeRule, ruleShape } from "./rules";
 import type { ConstraintSpec, Rule, Shifts } from "./types.gen";
 
 const N: Shifts = { in: ["N"] };
@@ -68,12 +68,6 @@ describe("normalizeRule", () => {
     });
   });
 
-  it("나이트 전담 기본 규칙은 default 식 규칙", () => {
-    expect(nightOnlyRule()).toEqual(
-      count({ people: { tags: [NIGHT_ONLY_TAG] }, shifts: { not_in: ["N", "O"] }, per: "person", max: 0 }, { id: NIGHT_ONLY_RULE_ID, hardness: "hard", source_text: "나이트 전담은 나이트와 휴무만", default: true }),
-    );
-    expect(nightOnlyRule()).toMatchObject({ id: NIGHT_ONLY_RULE_ID, default: true });
-  });
 });
 
 describe("칸 고정", () => {

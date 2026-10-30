@@ -155,9 +155,7 @@ export function hardViolations(req: ScheduleRequest, grid: Grid): string[] {
         (n) =>
           (!p?.ids || p.ids.includes(n.id)) &&
           (!p?.tags || p.tags.some((t) => n.tags?.includes(t))) &&
-          !(p?.exclude_tags ?? []).some((t) => n.tags?.includes(t)) &&
-          (p?.min_years == null || n.years >= p.min_years) &&
-          (p?.max_years == null || n.years <= p.max_years),
+          !(p?.exclude_tags ?? []).some((t) => n.tags?.includes(t)),
       )
       .map((n) => n.id);
   const dayOk = (d: number, sel: Days | undefined) => {

@@ -77,7 +77,7 @@ def test_fixed_assignment_edit_is_applied_with_few_changes(base):
 
 def test_new_nurse_not_in_previous_is_ignored_by_diff(base):
     raw = sample()
-    raw["nurses"].append(nurse("n99", years=3))
+    raw["nurses"].append(nurse("n99"))
     raw["previous"] = base
     result = solve_result(raw)
     assert "n99" in result.assignments

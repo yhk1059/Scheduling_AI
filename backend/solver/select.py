@@ -41,10 +41,6 @@ def people(request: ScheduleRequest, sel: People) -> list[str]:
             continue
         if set(sel.exclude_tags) & set(n.tags):
             continue
-        if sel.min_years is not None and n.years < sel.min_years:
-            continue
-        if sel.max_years is not None and n.years > sel.max_years:
-            continue
         out.append(n.id)
     return out
 

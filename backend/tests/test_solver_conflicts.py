@@ -7,8 +7,8 @@ from backend.domain.models import ScheduleRequest, SolveInfeasible
 from backend.solver import model as solver_model
 from backend.solver.conflicts import find_conflicts
 from backend.solver.model import solve
-from backend.tests.rules import coverage, fixed, forbid, leave, max_nights, night_only, sample_data
-from backend.tests.test_solver_hard import nurse, request
+from backend.tests.rules import coverage, fixed, forbid, leave, max_nights, sample_data
+from backend.tests.test_solver_hard import request
 
 
 def basic_coverage() -> list[dict]:
@@ -56,13 +56,6 @@ def test_fixed_cells_conflict_with_rule():
         forbid("fs", "N", "D"),
     ])
     assert ids(find_conflicts(req)) == {"f1", "f2", "fs"}
-
-
-def test_night_only_nurse_fixed_day_shift():
-    """나이트 전담은 기본 규칙이라 core에 나온다."""
-    nurses = [nurse("n1", tags=["나이트전담"]), nurse("n2"), nurse("n3")]
-    req = request(nurses, [fixed("f1", "n1", 3, "D"), max_nights("mcn", 3), night_only()])
-    assert ids(find_conflicts(req)) == {"f1", "night-only"}
 
 
 def test_disabled_constraints_are_not_reported():

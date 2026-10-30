@@ -1,7 +1,5 @@
 """솔버 hard 규칙(프리셋 이름의 식 규칙과 칸 고정). 병렬 탐색이라 정확한 배정값이 아니라 제약 충족 여부를 검증한다."""
 
-import pytest
-from pydantic import ValidationError
 
 from backend.domain.models import ScheduleRequest, SolveInfeasible, SolveOk
 from backend.solver import select
@@ -14,10 +12,8 @@ from backend.tests.rules import (
     max_nights,
     max_work,
     min_off,
-    night_only,
     off_after_night,
     sample_data,
-    skill_mix,
 )
 
 # 2026-11: 30일, 1일이 일요일. 주말 = 1, 7, 8, 14, 15, 21, 22, 28, 29
@@ -25,8 +21,8 @@ START, DAYS = "2026-11-01", 30
 WEEKENDS = {1, 7, 8, 14, 15, 21, 22, 28, 29}
 
 
-def nurse(nid: str, years: int = 5, tags: list[str] | None = None) -> dict:
-    return {"id": nid, "name": f"간호사{nid}", "years": years, "tags": tags or []}
+def nurse(nid: str, tags: list[str] | None = None) -> dict:
+    return {"id": nid, "name": f"간호사{nid}", "tags": tags or []}
 
 
 def request(nurses: list[dict] | None = None, constraints: list[dict] | None = None, **extra) -> ScheduleRequest:
@@ -73,25 +69,6 @@ def test_every_nurse_has_one_shift_per_day():
     a = solve_ok(req)
     assert set(a) == {n.id for n in req.nurses}
     assert all(len(row) == DAYS and set(row) <= set("DENO") for row in a.values())
-
-
-def test_night_only_nurse_gets_only_n_or_o():
-    nurses = [nurse("n1", tags=["나이트전담"]), nurse("n2"), nurse("n3")]
-    req = request(nurses, [coverage("N", "weekday", 1, 1), coverage("N", "weekend", 1, 1), night_only()])
-    a = solve_ok(req)
-    assert set(a["n1"]) <= {"N", "O"}
-
-
-def test_night_only_tag_without_rule_is_not_special():
-    """나이트 전담은 태그 + 기본 규칙이다. 솔버는 태그만으로는 아무것도 막지 않는다."""
-    nurses = [nurse("n1", tags=["나이트전담"]), nurse("n2"), nurse("n3")]
-    req = request(nurses, [fixed("fx", "n1", 1, "D")])
-    assert solve_ok(req)["n1"][0] == "D"
-
-
-def test_old_night_only_field_is_rejected():
-    with pytest.raises(ValidationError):
-        request([{**nurse("n1"), "night_only": True}])
 
 
 def test_is_weekend_includes_sat_sun_and_holidays():
@@ -230,16 +207,6 @@ def test_off_after_night_block_carry_n_then_day1_work_is_infeasible():
     assert isinstance(solve(req), SolveInfeasible)
 
 
-def test_skill_mix():
-    nurses = [nurse("n1", 1), nurse("n2", 1), nurse("n3", 2), nurse("n4", 4), nurse("n5", 6), nurse("n6", 8)]
-    req = request(nurses, [coverage("N", "weekday", 2, 2), coverage("N", "weekend", 2, 2),
-                           skill_mix("sm", "N", 3, 1)])
-    a = solve_ok(req)
-    senior = {n.id for n in req.nurses if n.years >= 3}
-    for d in range(DAYS):
-        assert sum(a[nid][d] == "N" for nid in senior) >= 1, d + 1
-
-
 def test_leave_days_are_off():
     req = request(constraints=[coverage("D", "weekday", 5, 6), coverage("D", "weekend", 5, 6),
                                leave("lv", "n2", [4, 5, 6])])
@@ -281,8 +248,6 @@ def test_soft_toggled_template_is_skipped_in_hard_phase():
 def test_sample_ward_has_solution():
     req = ScheduleRequest.model_validate(sample_data())
     a = solve_ok(req)
-    night_only_ids = {n.id for n in req.nurses if "나이트전담" in n.tags}
-    assert night_only_ids and all(set(a[nid]) <= {"N", "O"} for nid in night_only_ids)
     for c in req.constraints:
         if not c.id.startswith("cov-"):
             continue

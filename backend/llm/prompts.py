@@ -15,7 +15,6 @@ from backend.domain.constants import (
     MAX_SHIFT_CODES,
     MIN_COND_CMPS,
     MIN_OFFSET,
-    NIGHT_ONLY_TAG,
 )
 from backend.domain.models import (
     Balance,
@@ -122,9 +121,9 @@ TRANSLATE_EXAMPLES: list[tuple[str, dict]] = [
         {"rules": [_rule({"per": "day"}, _cmp(_n(D, who={"tags": ["책임"]}), "ge", _ref("min")), values={"min": _val(1, "최소 인원")})]},
     ),
     (
-        "근무조마다 3년차 이상 1명은 꼭",
+        "근무조마다 책임 1명은 꼭",
         {"rules": [
-            _rule({"per": "day"}, _cmp(_n(s, who={"min_years": 3}), "ge", _ref("min")), values={"min": _val(1, "최소 인원")}, hardness="hard")
+            _rule({"per": "day"}, _cmp(_n(s, who={"tags": ["책임"]}), "ge", _ref("min")), values={"min": _val(1, "최소 인원")}, hardness="hard")
             for s in (D, E, N)
         ]},
     ),
@@ -222,7 +221,7 @@ TRANSLATE_EXAMPLES: list[tuple[str, dict]] = [
     ),
     (
         "나이트는 고르게",
-        {"rules": [{"body": {"kind": "balance", "people": {"exclude_tags": [NIGHT_ONLY_TAG]}, "shifts": N}}]},
+        {"rules": [{"body": {"kind": "balance", "shifts": N}}]},
     ),
     (
         "주말·공휴일 근무는 차이가 1번을 넘지 않게 무조건 고르게",
@@ -298,8 +297,8 @@ TRANSLATE_SYSTEM = f"""\
 - "M", "미드"처럼 말한 근무가 config.shifts에 없으면 그 근무를 쓰는 규칙을 만들지 말고, 근무 형태 변경(config_changes)으로 추가하거나 되묻는다.
 
 ## 고르기(셀렉터). 조건은 모두 AND이고, 비우면 전체다
-- people {{ids, tags, exclude_tags, min_years, max_years}}: 간호사. ids는 명단 id, tags는 이 태그 중 하나라도 가진 사람.
-  태그는 context.known_tags에 있는 것만 쓴다. 나이트 전담은 태그 "{NIGHT_ONLY_TAG}"이다.
+- people {{ids, tags, exclude_tags}}: 간호사. ids는 명단 id, tags는 이 태그 중 하나라도 가진 사람.
+  태그는 context.known_tags에 있는 것만 쓴다.
 - days {{kind: all|weekday|weekend|holiday, weekdays, days}}: 날짜. weekend는 토·일·공휴일, weekday는 그 나머지, holiday는 공휴일만.
   weekdays는 요일 번호(0=월 … 6=일), days는 기간 안 날짜 인덱스 목록.
 - shifts {{in}} 또는 {{not_in}} 둘 중 하나만: 근무. in은 그 근무들, not_in은 그 근무들을 뺀 모두.
@@ -414,11 +413,11 @@ EXPLAIN_SYSTEM = f"""\
 제안은 서버가 다시 풀어 보고 해가 나오는 것만 사용자에게 보여 준다.
 
 ## 입력
-- context: 근무 형태(config.shifts: code, name, hours, parts), 명단(nurses: id, years, tags), 기간(period: start, end, length),
+- context: 근무 형태(config.shifts: code, name, hours, parts), 명단(nurses: id, tags), 기간(period: start, end, length),
   기간의 날짜 목록(days: day, date), 주말·공휴일 day 목록(토·일·공휴일).
 - 근무 코드는 config.shifts에 있는 것만 있다. O는 휴무이고, parts가 있는 코드는 그 근무조들로 함께 세는 더블이다.
 - conflicts: 동시에 지킬 수 없는 제약들. 이 중 하나 이상을 완화해야 해가 생긴다.
-- 셀렉터: people {{ids, tags, exclude_tags, min_years, max_years}}, days {{kind, weekdays, days}}, shifts {{in}} 또는 {{not_in}}.
+- 셀렉터: people {{ids, tags, exclude_tags}}, days {{kind, weekdays, days}}, shifts {{in}} 또는 {{not_in}}.
 - day, days, offset은 기간 안의 날짜 인덱스(1..length) 기준이다. 달력 날짜는 context.days에서 같은 day의 date로 찾는다.
 
 ### 규칙 식 (type "rule": id, hardness, values, body, source_text)
@@ -447,7 +446,6 @@ EXPLAIN_SYSTEM = f"""\
 - 고정 칸(fixed_assignment)이 충돌에 있으면 그 고정을 해제하는 disable을 제안한다.
 - 한 사람의 근무를 막는 기간 요청(휴가: 한 사람, 휴무 말고 모두를 0번)을 줄이거나 끄는 제안은
   다른 방법이 없을 때만 마지막 수단으로, 마지막 순서에 둔다. 휴가와 고정 칸의 hardness는 바꾸지 않는다.
-- people.tags에 "{NIGHT_ONLY_TAG}"이 있는 규칙(나이트 전담)은 끄거나 바꾸자는 제안을 하지 않는다.
 
 ## 간호사
 - 이름은 가명 id(예: n01)로 바뀌어 있다. 사람을 가리킬 때는 그 id를 그대로 쓴다.

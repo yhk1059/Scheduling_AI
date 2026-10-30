@@ -294,7 +294,7 @@ export default function ConstraintCard({
   const setValue = (id: string, name: string, value: number) =>
     isRule ? store.setRuleValue(id, name, value) : store.setRequestValue(period!.id, id, name, value);
   const removeCard = (id: string) => (isRule ? store.removeRule(id) : store.removeRequest(period!.id, id));
-  // 기본 규칙(필요 인원·나이트 전담)은 [삭제] 대신 [끄기]다. 병동 규칙 원본에서 끈 것(enabled=false)
+  // 기본 규칙(필요 인원)은 [삭제] 대신 [끄기]다. 병동 규칙 원본에서 끈 것(enabled=false)
   const isDefault = card.type === "rule" && card.default === true;
   const wardOff = isDefault && !pending && !readOnly && card.enabled === false;
   const dim = off || wardOff;

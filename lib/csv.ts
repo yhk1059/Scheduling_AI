@@ -21,7 +21,7 @@ function cell(value: string | number): string {
 }
 
 /**
- * 행은 간호사(이름, 연차, 날짜별 코드, 활성 코드별 수, 주말·공휴일 근무), 하단은 날짜별 근무조 합계.
+ * 행은 간호사(이름, 날짜별 코드, 활성 코드별 수, 주말·공휴일 근무), 하단은 날짜별 근무조 합계.
  * 근무조는 활성 기본 코드(복합·휴무 제외)이고, 복합 코드는 세는 근무조마다 더한다.
  */
 export function toScheduleCsv({ nurses, period, holidays, assignments, config }: ScheduleCsvInput): string {
@@ -38,16 +38,15 @@ export function toScheduleCsv({ nurses, period, holidays, assignments, config }:
     return holidays.includes(day) ? `${w}(공휴일)` : w;
   });
   const rows: (string | number)[][] = [
-    ["이름", "연차", ...weekdays, ...totals, "주말근무"],
-    ["", "", ...pdays.map((p) => p.dom), ...blankTotals],
+    ["이름", ...weekdays, ...totals, "주말근무"],
+    ["", ...pdays.map((p) => p.dom), ...blankTotals],
     ...listed.map((n) => {
       const row = assignments[n.id];
       const weekend = row.filter((code, i) => code !== OFF && isWeekendDay(period, i + 1, holidays)).length;
-      return [n.name, n.years, ...row, ...totals.map((code) => row.filter((c) => c === code).length), weekend];
+      return [n.name, ...row, ...totals.map((code) => row.filter((c) => c === code).length), weekend];
     }),
     ...groups.map((group) => [
       `${group} 합계`,
-      "",
       ...dayList.map((d) => listed.filter((n) => covers(assignments[n.id][d - 1]).includes(group)).length),
       ...blankTotals,
     ]),

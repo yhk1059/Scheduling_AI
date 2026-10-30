@@ -17,7 +17,6 @@ import {
 import {
   COVERAGE_RULE_PREFIX,
   DEFAULT_CONFIG,
-  nightOnlyRule,
   normalizeRule,
   OFF_CODE,
   ruleShape,
@@ -278,7 +277,7 @@ function emptyWard(): Ward {
     config: DEFAULT_CONFIG,
     nurses: [],
     nextNurseNo: 1,
-    rules: [nightOnlyRule()],
+    rules: [],
     pendingRules: [],
     pendingConfig: [],
     unconverted: [],
@@ -328,7 +327,7 @@ function isStaffingRule(c: ConstraintSpec): boolean {
   const s = ruleShape(c);
   if (c.scope !== "ward" || s?.kind !== "count" || s.per !== "day" || s.measure !== "count") return false;
   const p = s.people;
-  return !p.ids && !p.tags && !p.exclude_tags?.length && p.min_years == null && p.max_years == null;
+  return !p.ids && !p.tags && !p.exclude_tags?.length;
 }
 
 /** 필요 인원 폼 모양: 병동 규칙, 날마다 모든 사람, 평일 또는 주말·공휴일, 코드 하나의 개수. 그 (코드, 요일 종류). */
@@ -336,7 +335,7 @@ function coverageKey(c: ConstraintSpec): { code: Code; kind: DayKind; min: numbe
   const s = ruleShape(c);
   if (c.scope !== "ward" || s?.kind !== "count") return null;
   const { people, days, shifts } = s;
-  const noPeople = !people.ids && !people.tags && !people.exclude_tags?.length && people.min_years == null && people.max_years == null;
+  const noPeople = !people.ids && !people.tags && !people.exclude_tags?.length;
   const ok =
     s.per === "day" &&
     s.measure === "count" &&
@@ -556,7 +555,7 @@ export function toScheduleRequest(
   const prev = previousConfirmedPeriod(periods, period);
   return {
     config: ward.config,
-    nurses: active.map(({ id, name, years, tags }) => ({ id, name, years, tags })) as ScheduleRequest["nurses"],
+    nurses: active.map(({ id, name, tags }) => ({ id, name, tags })) as ScheduleRequest["nurses"],
     period: { start_date: period.start_date, length: period.length },
     holidays: period.holidays,
     constraints: [...constraints, ...locks],
@@ -828,10 +827,9 @@ export function createAppStore(getStorage: () => Storage, now: () => Date = () =
           ...w,
           nurses: [
             ...w.nurses,
-            ...rows.map(({ name, years, tags }, i) => ({
+            ...rows.map(({ name, tags }, i) => ({
               id: nurseId(w.nextNurseNo + i),
               name,
-              years,
               tags: tags ?? [],
               active: true,
             })),
@@ -1098,7 +1096,7 @@ export function createAppStore(getStorage: () => Storage, now: () => Date = () =
               );
             } else if (w?.rules.some((c) => c.id === id)) {
               const rule = w.rules.find((c) => c.id === id)!;
-              // 기본 규칙(필요 인원·나이트 전담)은 지우지 않고 끈다
+              // 기본 규칙(필요 인원)은 지우지 않고 끈다
               if (rule.type === "rule" && rule.default) {
                 editWard((w) => ({ ...w, rules: w.rules.map((c) => (c.id === id ? { ...c, enabled: false } : c)) }));
               } else {

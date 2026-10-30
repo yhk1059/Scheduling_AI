@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { DEFAULT_CONFIG, nightOnlyRule } from "./rules";
+import { DEFAULT_CONFIG } from "./rules";
 import { balance, count, fixedCell, forbid, maxRun, minRun, OFF, offAfter, WORK } from "./test-rules";
 import { isLeaveRule, type Ward, type WorkPeriod } from "./store";
 import type { ConstraintSpec, Nurse, Rule, Shifts, WardConfig } from "./types.gen";
@@ -22,10 +22,10 @@ import {
 
 const NOV = { start_date: "2026-11-01", length: 30 };
 const NURSES: Nurse[] = [
-  { id: "n01", name: "이영희", years: 12 },
-  { id: "n02", name: "박민수", years: 9 },
-  { id: "n03", name: "정유진", years: 5 },
-  { id: "n04", name: "최지훈", years: 3 },
+  { id: "n01", name: "이영희" },
+  { id: "n02", name: "박민수" },
+  { id: "n03", name: "정유진" },
+  { id: "n04", name: "최지훈" },
 ];
 const CONFIG: WardConfig = {
   shifts: [
@@ -114,7 +114,6 @@ describe("presetName / describeRule: 프리셋 모양", () => {
     ["최대만", count({ days: { kind: "weekend" }, shifts: E, per: "day", max: 4 }), "필요 인원", "주말·공휴일마다 이브닝 4명까지"],
     ["정확히", count({ shifts: N, per: "day", min: 2, max: 2 }), "필요 인원", "매일 나이트 2명"],
     ["기본 필요 인원", count({ shifts: D, per: "day", min: 3, max: 3 }, { id: "cov-D", default: true }), "필요 인원", "매일 데이 3명"],
-    ["연차", count({ people: { min_years: 3 }, shifts: E, per: "day", min: 1 }), "연차별 배치", "매일 3년차 이상 이브닝 1명 이상"],
     ["하루 근무 시간", count({ shifts: WORK, per: "day", measure: "hours", max: 80 }), "세는 규칙", "매일 근무 시간 80시간 이하"],
     ["금지 순서", forbid([N, D]), "금지 순서", "나이트 다음 날 데이 금지"],
     ["금지 순서 다른 쌍", forbid([N, E]), "금지 순서", "나이트 다음 날 이브닝 금지"],
@@ -141,13 +140,12 @@ describe("presetName / describeRule: 프리셋 모양", () => {
     ["기피 날짜", count({ ...person, days: { days: [5, 6] }, shifts: E, max: 0 }, soft), "희망·기피 근무", "박민수 · 11/5~11/6 · 이브닝 피하기"],
     ["중요도 높은 기피", count({ ...person, shifts: N, max: 0 }, { ...soft, priority: "high" }), "희망·기피 근무", "박민수 · 근무표 전체 · 나이트 피하기"],
     ["명단에 없는 기피", count({ people: { ids: ["n1"] }, per: "person", days: { kind: "weekend" }, shifts: N, max: 0 }, soft), "희망·기피 근무", "(명단에 없는 간호사) · 주말·공휴일 · 나이트 피하기"],
-    ["나이트 고르게", balance({ people: { exclude_tags: ["나이트전담"] }, shifts: N }), "나이트 고르게", "나이트전담 빼고 나이트 수를 고르게(최근 4주 포함)"],
-    ["나이트 고르게 반드시", balance({ people: { exclude_tags: ["나이트전담"] }, shifts: N }, hard), "나이트 고르게", "나이트전담 빼고 나이트 수를 고르게(최근 4주 포함) · 차이 1 이하"],
+    ["나이트 고르게", balance({ people: { exclude_tags: ["신규"] }, shifts: N }), "나이트 고르게", "신규 빼고 나이트 수를 고르게(최근 4주 포함)"],
+    ["나이트 고르게 반드시", balance({ people: { exclude_tags: ["신규"] }, shifts: N }, hard), "나이트 고르게", "신규 빼고 나이트 수를 고르게(최근 4주 포함) · 차이 1 이하"],
     ["차이 0", balance({ shifts: N, max_gap: 0 }, hard), "나이트 고르게", "나이트 수를 고르게(최근 4주 포함) · 차이 0 이하"],
     ["주말 고르게", balance({ days: { kind: "weekend" }, shifts: WORK }), "주말·공휴일 고르게", "주말·공휴일 근무 수를 고르게(최근 4주 포함)"],
     ["주말 고르게 반드시", balance({ days: { kind: "weekend" }, shifts: WORK }, hard), "주말·공휴일 고르게", "주말·공휴일 근무 수를 고르게(최근 4주 포함) · 차이 1 이하"],
     ["시간 고르게(최근 4주 뺌)", balance({ days: { kind: "weekend" }, shifts: WORK, measure: "hours", with_history: false }), "고르게 규칙", "주말·공휴일 근무 시간을 고르게"],
-    ["나이트 전담", nightOnlyRule(), "나이트 전담", "나이트전담 태그 나이트 말고 다른 근무 없음"],
   ];
 
   for (const [name, r, preset, sentence] of CASES) {
@@ -164,7 +162,7 @@ describe("presetName / describeRule: 프리셋 모양", () => {
 describe("presetName / describeRule: 새 모양", () => {
   const d = (b: ConstraintSpec) => [presetName(b), text(b, CONFIG)];
 
-  it("태그·연차·요일·공휴일로 고른 날마다 인원", () => {
+  it("태그·요일·공휴일로 고른 날마다 인원", () => {
     expect(d(count({ people: { tags: ["책임"] }, shifts: { in: ["D"] }, per: "day", min: 1 }))).toEqual([
       "태그별 배치",
       "매일 책임 태그 데이 1명 이상",
@@ -178,8 +176,8 @@ describe("presetName / describeRule: 새 모양", () => {
       "평일 중 월·수요일마다 이브닝 2명까지",
     ]);
     expect(
-      d(count({ people: { min_years: 3, max_years: 5 }, days: { kind: "holiday" }, shifts: { in: ["N"] }, per: "day", min: 1 })),
-    ).toEqual(["연차별 배치", "공휴일마다 3~5년차 나이트 1명 이상"]);
+      d(count({ people: { tags: ["책임"] }, days: { kind: "holiday" }, shifts: { in: ["N"] }, per: "day", min: 1 })),
+    ).toEqual(["태그별 배치", "공휴일마다 책임 태그 나이트 1명 이상"]);
     expect(d(count({ days: { kind: "weekday" }, shifts: { in: ["M"] }, per: "day", min: 1, max: 1 }))).toEqual([
       "필요 인원",
       "평일마다 미드 1명",

@@ -33,7 +33,6 @@ RULES = [
     rules.max_nights("c4", 3),
     rules.min_off("c5", 8),
     rules.off_after_night("c6", 1),
-    rules.skill_mix("c7", "N", 3, 1),
     rules.leave("c8", "n01", [15, 16, 17]),
     rules.fixed("c9", "n02", 3, "E"),
     rules.preference("c10", "n03", "O", 9, weekends_only=True),
@@ -51,7 +50,7 @@ def _block(cid: str, type_: str, params: dict) -> dict:
 
 
 def nurses(n: int = 3) -> list[dict]:
-    return [{"id": f"n{i:02d}", "name": f"간호사{i}", "years": i, "tags": []} for i in range(1, n + 1)]
+    return [{"id": f"n{i:02d}", "name": f"간호사{i}", "tags": []} for i in range(1, n + 1)]
 
 
 def request(constraints: list[dict], **extra) -> dict:
@@ -179,7 +178,7 @@ def test_period_rejects_old_shape():
 
 def test_schedule_request_accepts_all_rules():
     req = ScheduleRequest.model_validate(request(RULES))
-    assert len(req.constraints) == 12
+    assert len(req.constraints) == 11
     assert req.carry_over == []
     assert req.previous is None
     assert req.history is None
@@ -230,10 +229,10 @@ def test_previous_must_match_roster_and_period():
 
 
 def test_duplicate_nurse_ids_or_names_rejected():
-    dup_id = nurses() + [{"id": "n01", "name": "다른이름", "years": 1}]
+    dup_id = nurses() + [{"id": "n01", "name": "다른이름"}]
     with pytest.raises(ValidationError):
         ScheduleRequest.model_validate({**request([]), "nurses": dup_id})
-    dup_name = nurses() + [{"id": "n09", "name": "간호사1", "years": 1}]
+    dup_name = nurses() + [{"id": "n09", "name": "간호사1"}]
     with pytest.raises(ValidationError):
         ScheduleRequest.model_validate({**request([]), "nurses": dup_name})
 
@@ -242,13 +241,6 @@ def test_duplicate_constraint_ids_rejected():
     raw = rules.night_fair("same")
     with pytest.raises(ValidationError, match="same"):
         ScheduleRequest.model_validate(request([raw, raw]))
-
-
-def test_negative_years_rejected():
-    bad = nurses()
-    bad[0]["years"] = -1
-    with pytest.raises(ValidationError):
-        ScheduleRequest.model_validate({**request([]), "nurses": bad})
 
 
 # --- 샘플 ---
@@ -266,17 +258,13 @@ def test_sample_ward_is_rule_format():
     assert all(c.scope == "ward" and c.hardness == "hard" for c in coverage)
     assert {c.type for c in req.constraints} == {"rule"}
     assert req.config == DEFAULT_CONFIG
-    assert req.constraints[-1].id == rules.NIGHT_ONLY_RULE_ID
     assert req.input_version == 0
     assert req.period == Period(start_date=date(2026, 11, 1), length=30)
     assert req.holidays == []
     assert len(req.nurses) == 15
-    assert sum("나이트전담" in n.tags for n in req.nurses) == 2
     names = {n.name for n in req.nurses}
     assert {"이영희", "박민수", "김철수", "정유진", "최지훈"} <= names
-    years = [n.years for n in req.nurses]
-    assert min(years) >= 1 and max(years) <= 15 and len(set(years)) >= 8
-    assert all(c.default for c in req.constraints if c.id.startswith("cov-") or c.id == rules.NIGHT_ONLY_RULE_ID)
+    assert all(c.default for c in req.constraints if c.id.startswith("cov-"))
 
 
 # --- 응답/요청 모델 ---

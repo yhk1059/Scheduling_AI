@@ -50,7 +50,6 @@ export interface ShiftDef {
 export interface Nurse {
   id: string;
   name: string;
-  years: number;
   /**
    * @maxItems 5
    */
@@ -107,8 +106,6 @@ export interface People {
   ids?: string[] | null;
   tags?: string[] | null;
   exclude_tags?: string[];
-  min_years?: number | null;
-  max_years?: number | null;
 }
 export interface Days {
   kind?: "all" | "weekday" | "weekend" | "holiday";
@@ -134,8 +131,6 @@ export interface People1 {
   ids?: string[] | null;
   tags?: string[] | null;
   exclude_tags?: string[];
-  min_years?: number | null;
-  max_years?: number | null;
 }
 export interface Days1 {
   kind?: "all" | "weekday" | "weekend" | "holiday";
@@ -182,8 +177,6 @@ export interface People2 {
   ids?: string[] | null;
   tags?: string[] | null;
   exclude_tags?: string[];
-  min_years?: number | null;
-  max_years?: number | null;
 }
 export interface Days2 {
   kind?: "all" | "weekday" | "weekend" | "holiday";

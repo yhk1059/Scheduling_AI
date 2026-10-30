@@ -3,8 +3,6 @@ import type { Cmp, ConstraintSpec, Count, Days, People, Rule, Shifts, ValueRef, 
 
 /** 저장 문서 버전. 6 = 식 규칙(ADR-019) */
 export const STORAGE_VERSION = 6;
-export const NIGHT_ONLY_TAG = "나이트전담"; // backend/domain/constants.py NIGHT_ONLY_TAG
-export const NIGHT_ONLY_RULE_ID = "night-only";
 export const COVERAGE_RULE_PREFIX = "cov-";
 export const OFF_CODE = "O";
 /** 중요도 → 가중치. backend/domain/constants.py PRIORITY_WEIGHTS */
@@ -96,31 +94,13 @@ export function normalizeRule(c: ConstraintSpec): ConstraintSpec {
   };
 }
 
-/** 기본 규칙 "나이트 전담은 나이트와 휴무만"(hard, default). 태그만 붙이면 동작한다. */
-export function nightOnlyRule(): ConstraintSpec {
-  return normalizeRule({
-    id: NIGHT_ONLY_RULE_ID,
-    type: "rule",
-    scope: "ward",
-    hardness: "hard",
-    source_text: "나이트 전담은 나이트와 휴무만",
-    default: true,
-    values: { max: { value: 0, label: "최대 횟수" } },
-    body: {
-      kind: "require",
-      for_each: { per: "person", people: { tags: [NIGHT_ONLY_TAG] } },
-      then: { left: { shifts: { not_in: ["N", OFF_CODE] } }, op: "le", right: { value: "max" } },
-    },
-  } as ConstraintSpec);
-}
-
 // --- 식 → 블록 모양(카드 제목·문장·필요 인원 폼이 읽는다) ---
 
 const condCmps = (c: Cond | null | undefined): Cmp[] => (!c ? [] : "all" in c ? c.all : "any" in c ? c.any : [c]);
 /** not S: in ↔ not_in. */
 const flip = (s: Shifts): Shifts => (s.in ? { not_in: s.in } : { in: s.not_in! });
 const noPeople = (p: People | undefined) =>
-  !p?.ids && !p?.tags && !p?.exclude_tags?.length && p?.min_years == null && p?.max_years == null;
+  !p?.ids && !p?.tags && !p?.exclude_tags?.length;
 
 /** 키를 정렬한 JSON(모양 비교용). */
 export function stableJson(v: unknown): string {

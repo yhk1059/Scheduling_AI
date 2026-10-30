@@ -1,6 +1,6 @@
 // 화면 문구를 만드는 순수 함수(UI_GUIDE "문구"). 데이터 이름(period, hard 등)은 그대로 두고 화면에 보이는 말만 여기서 만든다.
 import { monthDay, type PeriodRange, type PeriodUnit } from "./period";
-import { NIGHT_ONLY_TAG, normalizeRule, ruleShape, type Bound } from "./rules";
+import { normalizeRule, ruleShape, type Bound } from "./rules";
 import { homeSummary, upcomingRange, type Ward, type WorkPeriod } from "./store";
 import type { Cmp, ConstraintSpec, Count, Days, Nurse, People, Rule, ShiftChange, Shifts, WardConfig } from "./types.gen";
 
@@ -104,7 +104,7 @@ const sameSet = (codes: string[] | null | undefined, want: string[]) =>
 const onlyIn = (s: Selector, code: string) => sameSet(s?.in, [code]);
 const anyWork = (s: Selector) => sameSet(s?.not_in, [OFF]);
 const noPeople = (p: People | null | undefined) =>
-  !p?.ids && !p?.tags && !p?.exclude_tags?.length && p?.min_years == null && p?.max_years == null;
+  !p?.ids && !p?.tags && !p?.exclude_tags?.length;
 const noDays = (d: Days | undefined) => (d?.kind ?? "all") === "all" && !d?.weekdays && !d?.days;
 
 function shiftName(code: string, config: WardConfig): string {
@@ -123,7 +123,7 @@ function shiftsLabel(s: Selector, config: WardConfig): string {
   return rest.length ? `${names(rest)} 말고 다른 근무` : "근무";
 }
 
-/** 사람 고르기: 이름(3명 넘으면 "김OO 외 2명"), "책임 태그", "3년차 이상", "나이트전담 빼고". 비어 있으면 "". */
+/** 사람 고르기: 이름(3명 넘으면 "김OO 외 2명"), "책임 태그", "신규 빼고". 비어 있으면 "". */
 function peopleLabel(p: People | null | undefined, nurses: Nurse[]): string {
   if (!p) return "";
   const parts: string[] = [];
@@ -132,10 +132,6 @@ function peopleLabel(p: People | null | undefined, nurses: Nurse[]): string {
     parts.push(names.length > 3 ? `${names[0]} 외 ${names.length - 1}명` : names.join(" "));
   }
   if (p.tags?.length) parts.push(`${p.tags.join("·")} 태그`);
-  const { min_years: lo, max_years: hi } = p;
-  if (lo != null && hi != null) parts.push(lo === hi ? `${lo}년차` : `${lo}~${hi}년차`);
-  else if (lo != null) parts.push(`${lo}년차 이상`);
-  else if (hi != null) parts.push(`${hi}년차 이하`);
   if (p.exclude_tags?.length) parts.push(`${p.exclude_tags.join("·")} 빼고`);
   return parts.join(" ");
 }
@@ -228,12 +224,10 @@ function shapeName(s: Shape, hardness: string): string {
       if (s.per === "day") {
         if (hours) return "세는 규칙";
         if (noPeople(s.people)) return "필요 인원";
-        const { ids, tags, exclude_tags, min_years, max_years } = s.people;
-        if (!ids && !exclude_tags?.length && tags?.length && min_years == null && max_years == null) return "태그별 배치";
-        if (!ids && !tags && !exclude_tags?.length) return "연차별 배치";
+        const { ids, tags, exclude_tags } = s.people;
+        if (!ids && !exclude_tags?.length && tags?.length) return "태그별 배치";
         return "세는 규칙";
       }
-      if (s.people.tags?.length === 1 && s.people.tags[0] === NIGHT_ONLY_TAG && s.max?.n === 0) return "나이트 전담";
       if (isLeaveShape(s, hardness)) return "휴가";
       if (isPreferenceShape(s, hardness)) return "희망·기피 근무";
       if (hours) return "근무 시간";

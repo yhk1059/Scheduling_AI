@@ -33,7 +33,6 @@ DEFAULT_SHIFTS: list[tuple[str, str, float]] = [
     ("N", "나이트", 8),
     (OFF_CODE, "휴무", 0),
 ]
-NIGHT_ONLY_TAG = "나이트전담"
 
 # LLM
 LLM_MAX_RETRIES = 2

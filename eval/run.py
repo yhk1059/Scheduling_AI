@@ -31,7 +31,7 @@ if str(ROOT) not in sys.path:
 
 from pydantic import BaseModel, TypeAdapter, ValidationError  # noqa: E402
 
-from backend.domain.constants import CARRY_OVER_DAYS, NIGHT_ONLY_TAG, OFF_CODE  # noqa: E402
+from backend.domain.constants import CARRY_OVER_DAYS, OFF_CODE  # noqa: E402
 from backend.domain.models import (  # noqa: E402
     DEFAULT_CONFIG,
     Balance,
@@ -78,7 +78,7 @@ K_RANDOM = 50
 FLIPS_PER_COUNT = 4
 SEED = 20261030
 
-# eval 병동 = 샘플 병동 + 태그(책임 2명, 신규 3명). 샘플의 나이트전담 태그는 그대로 둔다
+# eval 병동 = 샘플 병동 + 태그(책임 2명, 신규 3명)
 EVAL_TAGS = {"n01": ["책임"], "n06": ["책임"], "n11": ["신규"], "n12": ["신규"], "n13": ["신규"]}
 
 _spec_adapter = TypeAdapter(ConstraintSpec)
@@ -95,7 +95,7 @@ def _ward() -> dict:
 
 
 def _known_tags(ward: dict) -> set[str]:
-    return {t for n in ward["nurses"] for t in n["tags"]} | {NIGHT_ONLY_TAG}
+    return {t for n in ward["nurses"] for t in n["tags"]}
 
 
 def load_dataset(path: Path) -> list[dict]:

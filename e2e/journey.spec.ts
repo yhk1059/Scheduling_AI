@@ -274,7 +274,7 @@ test("S6. 처음 설정 ③ 병동 규칙 → 첫 근무표 만들기", async ()
   for (const c of r3) {
     const s = ruleShape(c);
     expect(s?.kind).toBe("count");
-    if (s?.kind === "count") expect({ min_years: s.people.min_years, min: s.min?.n }).toEqual({ min_years: 3, min: 1 });
+    if (s?.kind === "count") expect(s.min?.n).toBe(1);
   }
   const shifts = r3.flatMap((c) => {
     const s = ruleShape(c);

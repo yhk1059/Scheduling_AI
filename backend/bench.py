@@ -22,7 +22,6 @@ from backend.domain.constants import (
     MAX_PERIOD_DAYS,
     MAX_SHIFT_CODES,
     MAX_WINDOW_DAYS,
-    NIGHT_ONLY_TAG,
     SOLVE_TIME_LIMIT_S,
 )
 from backend.domain.models import ScheduleRequest, SolveInfeasible, SolveOk
@@ -54,17 +53,15 @@ ALL_N = IN("N")
 
 
 def nurses() -> list[dict]:
-    """40명. 태그 3종: 나이트전담 4명, 책임 8명, 신규 6명."""
+    """40명. 태그 2종: 책임 8명, 신규 6명."""
     rows = []
     for i in range(MAX_NURSES):
         tags = []
-        if i >= MAX_NURSES - 4:
-            tags.append(NIGHT_ONLY_TAG)
-        elif i % 5 == 0:
+        if i % 5 == 0:
             tags.append("책임")
         elif i % 6 == 1:
             tags.append("신규")
-        rows.append({"id": f"n{i:02d}", "name": f"간호사{i:02d}", "years": 1 if "신규" in tags else 2 + i % 12, "tags": tags})
+        rows.append({"id": f"n{i:02d}", "name": f"간호사{i:02d}", "tags": tags})
     return rows
 
 
@@ -75,11 +72,9 @@ def past_rows(people: list[dict]) -> dict[str, list[str]]:
     (식 규칙은 이월 마지막 날 직전에 끝난 나이트 뒤 휴무 2일을 1일까지 이어서 본다).
     """
     general = "DDEEONNOOO"
-    night = "NNOONNNOOO"
     rows = {}
     for i, n in enumerate(people):
-        cycle = night if NIGHT_ONLY_TAG in n["tags"] else general
-        rows[n["id"]] = [cycle[(i + i // 5 + d) % len(cycle)] for d in range(HISTORY_DAYS)]
+        rows[n["id"]] = [general[(i + i // 5 + d) % len(general)] for d in range(HISTORY_DAYS)]
     return rows
 
 
@@ -170,20 +165,16 @@ def balance(cid: str, shifts: dict, **extra: Any) -> dict:
 
 
 def rules(people: list[dict]) -> list[dict]:
-    """옛 블록 60개를 식으로 옮긴 규칙(금지 패턴 블록 2개는 패턴마다 나뉘어 66개)."""
-    general = {"exclude_tags": [NIGHT_ONLY_TAG]}
-    # 기본 규칙 "나이트 전담은 나이트와 휴무만"
-    rows: list[dict] = [{**count("night-only", {"not_in": ["N", "O"]}, "person", hi=0, people={"tags": [NIGHT_ONLY_TAG]}),
-                         "default": True}]
+    """옛 블록 60개를 식으로 옮긴 규칙(금지 패턴 블록 2개는 패턴마다 나뉘어 62개)."""
+    rows: list[dict] = []
     # 필요 인원: 근무조 4개 × 평일/주말 (8)
     staffing = {"D": (7, 6), "E": (7, 6), "N": (5, 5), "M": (2, 1)}
     for code, (weekday, weekend) in staffing.items():
         rows.append(count(f"cov-{code}-wd", IN(code), "day", weekday, weekday, days={"kind": "weekday"}))
         rows.append(count(f"cov-{code}-we", IN(code), "day", weekend, weekend, days={"kind": "weekend"}))
-    # 태그·연차 배치 (10)
+    # 태그 배치 (7)
     for code in "DEN":
         rows.append(count(f"charge-{code}", IN(code), "day", lo=1, people={"tags": ["책임"]}))
-        rows.append(count(f"senior-{code}", IN(code), "day", lo=2, people={"min_years": 3}))
         rows.append(count(f"new-{code}", IN(code), "day", hi=2, people={"tags": ["신규"]}))
     rows.append(count("charge-D-max", IN("D"), "day", hi=3, people={"tags": ["책임"]}))
     # 사람마다 세기 (9)
@@ -196,7 +187,7 @@ def rules(people: list[dict]) -> list[dict]:
         count("double-max", IN("DE", "ME"), "person", hi=2),
         count("mid-max", IN("M"), "person", hi=8),
         count("weekend-max", WORK, "person", hi=7, days={"kind": "weekend"}),
-        count("night-max", ALL_N, "person", hi=8, people=general),
+        count("night-max", ALL_N, "person", hi=8),
     ]
     # 순서: 금지 패턴 8개(옛 블록 2개, 패턴 수·길이 상한), 연속 구간 3개, 구간 뒤 휴무 1개 (12)
     rows += forbid("forbid-after-night", [[ALL_N, IN(c)] for c in ("D", "E", "M", "DE")][:MAX_PATTERNS])
@@ -210,7 +201,7 @@ def rules(people: list[dict]) -> list[dict]:
     ]
     # 고르게 (3)
     rows += [
-        balance("fair-night", ALL_N, people=general),
+        balance("fair-night", ALL_N),
         balance("fair-weekend", WORK, days={"kind": "weekend"}),
         balance("fair-hours", WORK, measure="hours"),
     ]
@@ -240,10 +231,10 @@ def expr_rules() -> list[dict]:
     ids = lambda *ns: {"ids": [f"n{i:02d}" for i in ns]}  # noqa: E731
     day, person_day = {"per": "day"}, {"per": "person_day"}
     return [
-        # 조건부: 신규가 나이트면 책임과 5년차 이상도 나이트에
-        expr_rule("if-new-night", day, {"all": [cmp(cnt(ALL_N, charge), "ge", 1), cmp(cnt(ALL_N, {"min_years": 5}), "ge", 1)]},
+        # 조건부: 신규가 나이트면 책임도 나이트에
+        expr_rule("if-new-night", day, cmp(cnt(ALL_N, charge), "ge", 1),
                   when=cmp(cnt(ALL_N, new), "ge", 1)),
-        expr_rule("if-new-day", day, {"all": [cmp(cnt(IN("D"), charge), "ge", 1), cmp(cnt(IN("D"), {"min_years": 3}), "ge", 3)]},
+        expr_rule("if-new-day", day, cmp(cnt(IN("D"), charge), "ge", 1),
                   when=cmp(cnt(IN("D"), new), "ge", 1)),
         expr_rule("if-night-next", person_day, {"all": [cmp(cnt(IN("D"), offset=(1, 1)), "eq", 0), cmp(cnt(IN("M"), offset=(1, 1)), "eq", 0)]},
                   when=cmp(cnt(ALL_N, offset=(0, 0)), "ge", 1)),
@@ -259,8 +250,8 @@ def expr_rules() -> list[dict]:
         expr_rule("pair-together", day, cmp(cnt(ALL_N, ids(27)), "ge", 1), when=cmp(cnt(ALL_N, ids(2)), "ge", 1)),
         # 세기끼리 비교
         expr_rule("charge-ge-new-night", day, cmp(cnt(ALL_N, charge), "ge", cnt(ALL_N, new))),
-        expr_rule("senior-ge-junior-day", {"per": "day", "days": {"kind": "weekday"}},
-                  cmp(cnt(IN("D"), {"min_years": 5}), "ge", cnt(IN("D"), {"max_years": 4}))),
+        expr_rule("charge-ge-new-day", {"per": "day", "days": {"kind": "weekday"}},
+                  cmp(cnt(IN("D"), charge), "ge", cnt(IN("D"), new))),
         # offset 폭 상한: 더블 뒤 14일 안에 더블 없음, 앞뒤 14일 나이트 7번 이하
         expr_rule("double-gap", person_day, cmp(cnt(IN("DE", "ME"), offset=(1, MAX_OFFSET_SPAN)), "eq", 0),
                   when=cmp(cnt(IN("DE", "ME"), offset=(0, 0)), "ge", 1)),
@@ -285,8 +276,8 @@ def worst_ward() -> dict:
 
 
 def with_leave_conflict(data: dict) -> dict:
-    """휴가 규칙 하나: 일반 간호사 30명이 같은 날 쉬면 필요 인원을 채울 수 없다."""
-    ids = [n["id"] for n in data["nurses"] if NIGHT_ONLY_TAG not in n["tags"]][:30]
+    """휴가 규칙 하나: 간호사 30명이 같은 날 쉬면 필요 인원을 채울 수 없다."""
+    ids = [n["id"] for n in data["nurses"]][:30]
     leave = count("leave-crowd", IN("O"), "person", lo=1, people={"ids": ids}, days={"days": [LEAVE_DAY]})
     return {**data, "constraints": data["constraints"] + [leave]}
 

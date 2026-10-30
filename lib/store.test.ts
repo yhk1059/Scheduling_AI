@@ -25,7 +25,7 @@ import {
   viewForPeriod,
   type WardRemote,
 } from "./store";
-import { DEFAULT_CONFIG, NIGHT_ONLY_RULE_ID, NIGHT_ONLY_TAG, nightOnlyRule, STORAGE_VERSION } from "./rules";
+import { DEFAULT_CONFIG, STORAGE_VERSION } from "./rules";
 import { balance, count, fixedCell, forbid as forbidRule, maxRun, OFF, WORK } from "./test-rules";
 import type { ConstraintSpec, Rule, RuleExample, ScheduleResult } from "./types.gen";
 
@@ -54,8 +54,8 @@ class MemoryStorage implements Storage {
 const TODAY = "2026-10-28"; // 수요일
 const CONFIRMED_AT = new Date("2026-10-28T05:00:00.000Z");
 const rows = [
-  { name: "이영희", years: 12 },
-  { name: "박민수", years: 9 },
+  { name: "이영희" },
+  { name: "박민수" },
 ];
 
 const CARD = { scope: "ward", hardness: "hard", source_text: "원문" } as const;
@@ -69,10 +69,10 @@ const val = (c: ConstraintSpec, name: string) => (c as Rule).values![name].value
 const maxWork = (id: string, days: number) => maxRun(WORK, days, undefined, { ...CARD, id });
 const maxNights = (id: string, days: number) => maxRun({ in: ["N"] }, days, undefined, { ...CARD, id });
 const minOff = (id: string, days: number) => countCard(id, { shifts: OFF, per: "person", min: days });
-const skillMix = (id: string, shift: string) => countCard(id, { people: { min_years: 3 }, shifts: { in: [shift] }, per: "day", min: 1 });
+const skillMix = (id: string, shift: string) => countCard(id, { people: { tags: ["책임"] }, shifts: { in: [shift] }, per: "day", min: 1 });
 const forbid = (id: string, first: string, second: string) => forbidRule([{ in: [first] }, { in: [second] }], undefined, { ...CARD, id });
 const nightFair = (id: string) =>
-  balance({ people: { exclude_tags: [NIGHT_ONLY_TAG] }, shifts: { in: ["N"] } }, { ...CARD, id, hardness: "soft", priority: "low" });
+  balance({ shifts: { in: ["N"] } }, { ...CARD, id, hardness: "soft", priority: "low" });
 const leave = (id: string, nurse: string, days: number[]) =>
   countCard(id, { people: { ids: [nurse] }, days: { days }, shifts: WORK, per: "person", max: 0 }, { scope: "period" });
 const fixed = (id: string, nurse: string, day: number, shift: string) =>
@@ -80,8 +80,7 @@ const fixed = (id: string, nurse: string, day: number, shift: string) =>
 const avoid = (id: string, nurse: string, shift: string) =>
   countCard(id, { people: { ids: [nurse] }, shifts: { in: [shift] }, per: "person", max: 0 }, { scope: "period", hardness: "soft" });
 
-/** 기본 규칙(나이트 전담)을 뺀 병동 규칙 id. */
-const ruleIds = (rules: ConstraintSpec[]) => rules.map((c) => c.id).filter((id) => id !== NIGHT_ONLY_RULE_ID);
+const ruleIds = (rules: ConstraintSpec[]) => rules.map((c) => c.id);
 const byId = (list: ConstraintSpec[], id: string) => list.find((c) => c.id === id)!;
 
 const result = (assignments: Record<string, string[]>) =>
@@ -134,9 +133,9 @@ describe("병동", () => {
     store.getState().startWard();
     const s = store.getState();
     expect(s.ward).toMatchObject({ name: "", unit: "month", nurses: [], nextNurseNo: 1, pendingConfig: [], unconverted: [] });
-    // 기본 근무 형태와 기본 규칙 "나이트 전담은 나이트와 휴무만"
+    // 기본 근무 형태, 기본 규칙 없음
     expect(s.ward!.config).toEqual(DEFAULT_CONFIG);
-    expect(s.ward!.rules).toEqual([nightOnlyRule()]);
+    expect(s.ward!.rules).toEqual([]);
     expect(s.view).toEqual({ screen: "setup", step: 1 });
     expect(s.hasInput()).toBe(true);
     expect(s.inputVersion).toBe(1);
@@ -289,10 +288,8 @@ describe("병동 규칙 카드", () => {
     const store = fresh();
     store.getState().startWard();
     store.getState().setCoverage("D", "weekday", 3, 3);
-    store.getState().removeRule(NIGHT_ONLY_RULE_ID);
     store.getState().removeRule("cov-weekday-D");
     expect(store.getState().ward!.rules.map((c) => [c.id, c.enabled])).toEqual([
-      [NIGHT_ONLY_RULE_ID, false],
       ["cov-weekday-D", false],
     ]);
   });
@@ -320,7 +317,7 @@ describe("병동 규칙 카드", () => {
     store.getState().removeRule("p");
     expect(store.getState().inputVersion).toBe(v);
     store.getState().removeRule("q");
-    expect(store.getState().ward!.rules).toEqual([nightOnlyRule()]);
+    expect(store.getState().ward!.rules).toEqual([]);
     expect(store.getState().inputVersion).toBe(v + 1);
   });
 });
@@ -384,12 +381,12 @@ describe("카드 순서", () => {
     store.getState().addPendingRules([minOff("b", 8), maxNights("c", 3)]);
     const w = () => store.getState().ward!;
     const order = () => ids(cardsInOrder(w().pendingRules, w().rules, w().cardOrder));
-    expect(order()).toEqual(["b?", "c?", "a?", NIGHT_ONLY_RULE_ID]);
+    expect(order()).toEqual(["b?", "c?", "a?"]);
     store.getState().applyRule("c");
-    expect(order()).toEqual(["b?", "c", "a?", NIGHT_ONLY_RULE_ID]);
+    expect(order()).toEqual(["b?", "c", "a?"]);
     store.getState().applyRule("a");
     store.getState().applyRule("b");
-    expect(order()).toEqual(["b", "c", "a", NIGHT_ONLY_RULE_ID]);
+    expect(order()).toEqual(["b", "c", "a"]);
   });
 
   it("요청: 적용해도 제자리에 남고, 교체된 카드 자리에는 새 카드만 남는다", () => {
@@ -433,8 +430,8 @@ describe("간호사 id", () => {
     store.getState().addNurses(rows);
     const w = store.getState().ward!;
     expect(w.nurses).toEqual([
-      { id: "n01", name: "이영희", years: 12, tags: [], active: true },
-      { id: "n02", name: "박민수", years: 9, tags: [], active: true },
+      { id: "n01", name: "이영희", tags: [], active: true },
+      { id: "n02", name: "박민수", tags: [], active: true },
     ]);
     expect(w.nextNurseNo).toBe(3);
   });
@@ -444,7 +441,7 @@ describe("간호사 id", () => {
     store.getState().startWard();
     store.getState().addNurses(rows);
     store.getState().removeNurse("n02");
-    store.getState().addNurses([{ name: "김철수", years: 7 }]);
+    store.getState().addNurses([{ name: "김철수" }]);
     expect(store.getState().ward!.nurses.map((n) => n.id)).toEqual(["n01", "n03"]);
     expect(store.getState().ward!.nextNurseNo).toBe(4);
   });
@@ -453,11 +450,11 @@ describe("간호사 id", () => {
     const store = fresh();
     store.getState().startWard();
     store.getState().addNurses(rows);
-    store.getState().updateNurse("n01", { name: "이영희A", years: 13 });
+    store.getState().updateNurse("n01", { name: "이영희A" });
     store.getState().setNurseActive("n02", false);
     expect(store.getState().ward!.nurses).toEqual([
-      { id: "n01", name: "이영희A", years: 13, tags: [], active: true },
-      { id: "n02", name: "박민수", years: 9, tags: [], active: false },
+      { id: "n01", name: "이영희A", tags: [], active: true },
+      { id: "n02", name: "박민수", tags: [], active: false },
     ]);
   });
 
@@ -653,23 +650,22 @@ describe("toScheduleRequest", () => {
     store.getState().toggleHoliday(id, 18);
     store.getState().setDisabled(id, "l", true);
     store.getState().applyChanges(id, [{ action: "set_value", constraint_id: "r", name: "max_len", value: 4 }]);
-    store.getState().addTag("n02", NIGHT_ONLY_TAG);
+    store.getState().addTag("n02", "책임");
 
     const req = toScheduleRequest(store.getState().ward!, period(), store.getState().periods, TODAY);
     expect(req.config).toEqual(DEFAULT_CONFIG);
     expect(req.nurses).toEqual([
-      { id: "n01", name: "이영희", years: 12, tags: [] },
-      { id: "n02", name: "박민수", years: 9, tags: [NIGHT_ONLY_TAG] },
+      { id: "n01", name: "이영희", tags: [] },
+      { id: "n02", name: "박민수", tags: ["책임"] },
     ]);
     expect(req.period).toEqual({ start_date: "2026-11-01", length: 30 });
     expect(req.holidays).toEqual([18]);
     expect(req.constraints!.map((c) => [c.id, c.enabled])).toEqual([
-      [NIGHT_ONLY_RULE_ID, true],
       ["cov-weekday-D", true],
       ["r", true],
       ["l", false],
     ]);
-    expect(val(req.constraints![2], "max_len")).toBe(4);
+    expect(val(req.constraints![1], "max_len")).toBe(4);
     // 카드 예시는 요청 본문에 넣지 않는다
     expect(JSON.stringify(req)).not.toContain("examples");
     expect(req.history).toBeNull();
@@ -691,7 +687,7 @@ describe("toScheduleRequest", () => {
 
     const req = toScheduleRequest(store.getState().ward!, period(), store.getState().periods, TODAY);
     expect(req.nurses.map((n) => n.id)).toEqual(["n01"]);
-    expect(req.constraints!.map((c) => c.id)).toEqual([NIGHT_ONLY_RULE_ID, "l1"]);
+    expect(req.constraints!.map((c) => c.id)).toEqual(["l1"]);
     expect(req.carry_over).toEqual([{ nurse_id: "n01", shifts: ["N"] }]);
     expect(req.previous).toEqual({ n01: ["D", "E"] });
   });
@@ -703,7 +699,7 @@ describe("toScheduleRequest", () => {
     store.getState().confirm(id);
 
     store.getState().setCoverage("D", "weekday", 2, 2);
-    store.getState().addNurses([{ name: "김철수", years: 7 }]);
+    store.getState().addNurses([{ name: "김철수" }]);
     store.getState().setNurseActive("n02", false);
 
     const confirmedReq = toScheduleRequest(store.getState().ward!, period(), store.getState().periods, TODAY);
@@ -718,7 +714,7 @@ describe("confirm", () => {
     store.getState().addPendingRules([maxNights("r", 3)]);
     store.getState().applyRule("r");
     store.getState().applyChanges(id, [{ action: "set_value", constraint_id: "r", name: "max_len", value: 4 }]);
-    store.getState().addNurses([{ name: "김철수", years: 7 }]);
+    store.getState().addNurses([{ name: "김철수" }]);
     store.getState().setNurseActive("n03", false);
 
     store.getState().confirm(id);
@@ -1009,7 +1005,7 @@ describe("homeSummary", () => {
 describe("rosterChangesFor", () => {
   it("지난 확정 기간 snapshot 대비 추가·비활성화된 간호사", () => {
     const { store, id } = withConfirmed();
-    store.getState().addNurses([{ name: "김철수", years: 7 }]);
+    store.getState().addNurses([{ name: "김철수" }]);
     store.getState().setNurseActive("n02", false);
     const nextId = store.getState().createPeriod(TODAY)!;
     const { ward, periods } = store.getState();
@@ -1555,7 +1551,7 @@ describe("prepareNeedsReview", () => {
     expect(prepareNeedsReview(store.getState().ward!, store.getState().periods, id)).toBe(false);
     expect(review()).toBe(false);
 
-    store.getState().addNurses([{ name: "김철수", years: 7 }]);
+    store.getState().addNurses([{ name: "김철수" }]);
     expect(review()).toBe(true);
     store.getState().setNurseActive("n03", false);
     expect(review()).toBe(false); // 추가했다가 뺀 사람은 변동이 아니다
@@ -1669,7 +1665,7 @@ describe("근무 형태", () => {
     expect(codes(store)).toEqual(["D", "E", "N", "M-", "O"]);
     const { ward, periods } = store.getState();
     expect(isShiftUsed("M", ward!, periods)).toBe(true);
-    expect(isShiftUsed("N", ward!, periods)).toBe(true); // 기본 규칙이 쓴다
+    expect(isShiftUsed("N", ward!, periods)).toBe(false); // 어떤 규칙도 쓰지 않는다
     store.getState().addShift({ code: "S", name: "짧은", hours: 4 });
     store.getState().setResult(id, result({ n01: ["S"], n02: ["O"] }), []);
     store.getState().removeShift("S");
@@ -1725,7 +1721,7 @@ describe("태그", () => {
   it("addTag는 공백을 지우고 중복·빈 값·10자 초과·5개 초과를 무시한다, removeTag는 지운다", () => {
     const store = fresh();
     store.getState().startWard();
-    store.getState().addNurses([{ name: "이영희", years: 12, tags: ["책임"] }]);
+    store.getState().addNurses([{ name: "이영희", tags: ["책임"] }]);
     const tags = () => store.getState().ward!.nurses[0].tags;
     expect(tags()).toEqual(["책임"]);
     const v = store.getState().inputVersion;

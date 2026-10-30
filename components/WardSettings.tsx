@@ -2,7 +2,6 @@
 
 import { useEffect, useRef, useState } from "react";
 
-import { NIGHT_ONLY_TAG } from "@/lib/rules";
 import type { PeriodUnit } from "@/lib/period";
 import { MAX_NURSES } from "@/lib/roster-import";
 import { isNurseUsed, MAX_TAG_CHARS, MAX_TAGS_PER_NURSE, orphanConstraintIds, useAppStore, type WardNurse } from "@/lib/store";
@@ -151,7 +150,7 @@ export function RosterSection() {
       <div className="flex flex-col gap-1">
         <h2 className={ui.cardTitle}>명단</h2>
         <p className={ui.help}>
-          맨 아래 줄에 이름과 연차를 적고 Enter를 누르면 한 명씩 더해져요. 이름 입력란에는 이니셜을 써도 됩니다. 바꾼 내용은 바로 저장돼요.
+          맨 아래 줄에 이름을 적고 Enter를 누르면 한 명씩 더해져요. 이름 입력란에는 이니셜을 써도 됩니다. 바꾼 내용은 바로 저장돼요.
         </p>
       </div>
       <NurseTable nurses={ward.nurses} />
@@ -197,8 +196,8 @@ function NurseTable({ nurses }: { nurses: WardNurse[] }) {
   const [showInactive, setShowInactive] = useState(false);
   const active = nurses.filter((n) => n.active);
   const inactive = nurses.filter((n) => !n.active);
-  // 자동 완성 후보: 병동에 있는 태그 + 추천 태그
-  const knownTags = [...new Set([NIGHT_ONLY_TAG, ...nurses.flatMap((n) => n.tags)])];
+  // 자동 완성 후보: 병동에 있는 태그
+  const knownTags = [...new Set(nurses.flatMap((n) => n.tags))];
 
   return (
     <div className="flex flex-col gap-2">
@@ -213,7 +212,6 @@ function NurseTable({ nurses }: { nurses: WardNurse[] }) {
             <tr className="border-b border-[#E2E2DC] text-left text-xs font-medium text-[#66665E]">
               <th className="w-10 px-2 py-2 font-mono font-medium">#</th>
               <th className="px-2 py-2 font-medium">이름</th>
-              <th className="px-2 py-2 font-medium">연차</th>
               <th className="px-2 py-2 font-medium">태그</th>
               <th />
             </tr>
@@ -242,7 +240,7 @@ function NurseTable({ nurses }: { nurses: WardNurse[] }) {
 const cellInput = ui.cell;
 const TAG_LIST_ID = "ward-tags";
 
-/** 태그 칩 입력. Enter나 쉼표로 칩을 만들고, 병동 태그를 자동 완성하며, 추천 태그(나이트전담)는 늘 보인다. */
+/** 태그 칩 입력. Enter나 쉼표로 칩을 만들고, 병동 태그를 자동 완성한다. */
 function TagInput({
   tags,
   onAdd,
@@ -315,16 +313,6 @@ function TagInput({
             </button>
           </span>
         ))}
-        {!tags.includes(NIGHT_ONLY_TAG) && !full && (
-          <button
-            type="button"
-            onClick={() => onAdd(NIGHT_ONLY_TAG)}
-            aria-label={`${label} ${NIGHT_ONLY_TAG} 붙이기`}
-            className="inline-flex h-6 items-center rounded-sm border border-dashed border-[#C9C9C1] px-2 text-xs text-[#3D3D38] hover:bg-[#EFEFEB]"
-          >
-            + {NIGHT_ONLY_TAG}
-          </button>
-        )}
         {!full && (
           <input
             value={draft}
@@ -353,7 +341,6 @@ function NurseRow({ nurse, index, nurses }: { nurse: WardNurse; index: number; n
   const removeNurse = useAppStore((s) => s.removeNurse);
   const deletable = useAppStore((s) => (s.ward ? !isNurseUsed(nurse.id, s.ward, s.periods) : false));
   const [name, setName] = useState<string | null>(null);
-  const [years, setYears] = useState<string | null>(null);
   const [tagDraft, setTagDraft] = useState("");
 
   const nameError = (v: string) =>
@@ -363,17 +350,11 @@ function NurseRow({ nurse, index, nurses }: { nurse: WardNurse; index: number; n
         ? "같은 이름이 이미 있어요"
         : null;
   const nameMsg = name === null ? null : nameError(name);
-  const yearsMsg = years === null ? null : "연차는 숫자여야 해요";
 
   const onName = (v: string) => {
     if (nameError(v)) return setName(v);
     updateNurse(nurse.id, { name: v.trim() });
     setName(null);
-  };
-  const onYears = (v: string) => {
-    if (!/^\d+$/.test(v.trim())) return setYears(v);
-    updateNurse(nurse.id, { years: Number(v.trim()) });
-    setYears(null);
   };
 
   const row = index + 1;
@@ -394,17 +375,6 @@ function NurseRow({ nurse, index, nurses }: { nurse: WardNurse; index: number; n
             {nameMsg && <p className={`${ui.error} mt-0.5`}>{nameMsg}</p>}
           </td>
           <td className="px-1 py-1">
-            <input
-              inputMode="numeric"
-              value={years ?? String(nurse.years)}
-              onChange={(e) => onYears(e.target.value)}
-              aria-label={`${row}행 연차`}
-              aria-invalid={yearsMsg !== null || undefined}
-              className={`${cellInput} w-20 font-mono ${yearsMsg ? err : "border-[#8A8A80]"}`}
-            />
-            {yearsMsg && <p className={`${ui.error} mt-0.5`}>{yearsMsg}</p>}
-          </td>
-          <td className="px-1 py-1">
             <TagInput
               tags={nurse.tags}
               onAdd={(t) => addTag(nurse.id, t)}
@@ -423,7 +393,6 @@ function NurseRow({ nurse, index, nurses }: { nurse: WardNurse; index: number; n
               <span className={`${ui.badge} bg-[#EFEFEB] text-[#66665E]`}>제외</span>
             </span>
           </td>
-          <td className="px-2 py-1 font-mono text-[#66665E]">{nurse.years}</td>
           <td className="px-2 py-1 text-[#66665E]">{nurse.tags.join(", ")}</td>
         </>
       )}
@@ -443,7 +412,6 @@ function NurseRow({ nurse, index, nurses }: { nurse: WardNurse; index: number; n
 function NewNurseRow({ nurses }: { nurses: WardNurse[] }) {
   const addNurses = useAppStore((s) => s.addNurses);
   const [name, setName] = useState("");
-  const [years, setYears] = useState("");
   const [tags, setTags] = useState<string[]>([]);
   const [tagDraft, setTagDraft] = useState("");
   const [tried, setTried] = useState(false);
@@ -452,17 +420,15 @@ function NewNurseRow({ nurses }: { nurses: WardNurse[] }) {
   const full = nurses.filter((n) => n.active).length >= MAX_NURSES;
   const nameMsg =
     name.trim() === "" ? "이름을 적어 주세요" : nurses.some((o) => o.name === name.trim()) ? "같은 이름이 이미 있어요" : null;
-  const yearsMsg = /^\d+$/.test(years.trim()) ? null : "연차는 숫자여야 해요";
 
   const add = () => {
     if (full) return;
-    if (nameMsg || yearsMsg) return setTried(true);
+    if (nameMsg) return setTried(true);
     // 칸에 적다 만 태그도 함께 넣는다
     const draft = tagDraft.trim();
     const all = draft && draft.length <= MAX_TAG_CHARS && !tags.includes(draft) ? [...tags, draft] : tags;
-    addNurses([{ name: name.trim(), years: Number(years.trim()), tags: all.slice(0, MAX_TAGS_PER_NURSE) }]);
+    addNurses([{ name: name.trim(), tags: all.slice(0, MAX_TAGS_PER_NURSE) }]);
     setName("");
-    setYears("");
     setTags([]);
     setTagDraft("");
     setTried(false);
@@ -477,7 +443,7 @@ function NewNurseRow({ nurses }: { nurses: WardNurse[] }) {
   if (full) {
     return (
       <tr>
-        <td colSpan={5} className={`${ui.help} px-2 py-2`}>
+        <td colSpan={4} className={`${ui.help} px-2 py-2`}>
           간호사는 최대 {MAX_NURSES}명까지 넣을 수 있어요.
         </td>
       </tr>
@@ -485,7 +451,6 @@ function NewNurseRow({ nurses }: { nurses: WardNurse[] }) {
   }
   const err = ui.cellErr;
   const showName = tried && nameMsg;
-  const showYears = tried && yearsMsg;
   return (
     <tr className="bg-[#FAFAF7]">
       <td className="px-2 py-1 font-mono text-xs text-[#66665E]">+</td>
@@ -501,19 +466,6 @@ function NewNurseRow({ nurses }: { nurses: WardNurse[] }) {
           className={`${cellInput} w-48 placeholder:text-[#8A8A80] ${showName ? err : "border-[#8A8A80]"}`}
         />
         {showName && <p className={`${ui.error} mt-0.5`}>{nameMsg}</p>}
-      </td>
-      <td className="px-1 py-1">
-        <input
-          inputMode="numeric"
-          value={years}
-          onChange={(e) => setYears(e.target.value)}
-          onKeyDown={onEnter}
-          placeholder="연차"
-          aria-label="새 간호사 연차"
-          aria-invalid={showYears ? true : undefined}
-          className={`${cellInput} w-20 font-mono placeholder:font-sans placeholder:text-[#8A8A80] ${showYears ? err : "border-[#8A8A80]"}`}
-        />
-        {showYears && <p className={`${ui.error} mt-0.5`}>{yearsMsg}</p>}
       </td>
       <td className="px-1 py-1">
         <TagInput
