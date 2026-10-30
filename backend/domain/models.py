@@ -1,7 +1,8 @@
 """도메인 모델. tool input_schema, 입력 검증, 솔버 입력, TS 타입의 단일 기준이다(ADR-003)."""
 
 from datetime import date, timedelta
-from typing import Annotated, Any, Literal, Union
+import typing
+from typing import Annotated, Literal, Union
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
@@ -11,11 +12,18 @@ from backend.domain.constants import (
     HISTORY_DAYS,
     MAX_PATTERN_LEN,
     MAX_PATTERNS,
+    MAX_COND_CMPS,
+    MAX_OFFSET,
+    MAX_OFFSET_SPAN,
     MAX_PERIOD_DAYS,
+    MAX_RULE_CMPS,
+    MAX_RULE_VALUES,
     MAX_SHIFT_CODES,
     MAX_TAG_CHARS,
     MAX_TAGS_PER_NURSE,
     MAX_WINDOW_DAYS,
+    MIN_COND_CMPS,
+    MIN_OFFSET,
     MIN_PATTERN_LEN,
     MIN_WINDOW_DAYS,
     OFF_CODE,
@@ -279,7 +287,162 @@ class BalanceRule(_BlockBase):
     params: BalanceParams
 
 
-ConstraintSpec = Annotated[Union[CountRule, SequenceRule, BalanceRule, FixedAssignment], Field(discriminator="type")]
+# --- 규칙 식(ADR-019). 재귀하지 않는다: 조건은 비교 하나, 또는 비교 2~4개의 그리고/또는 ---
+
+ValueName = Annotated[str, Field(pattern=r"^[a-z][a-z0-9_]{0,23}$")]
+
+
+class Value(_Strict):
+    """조정 가능한 값. 카드 [수정]과 완화 제안은 이 값만 바꾼다."""
+
+    value: float = Field(ge=0)
+    label: str = Field(min_length=1)
+
+
+class ValueRef(_Strict):
+    value: ValueName  # Rule.values에 있어야 한다
+
+
+class ForEach(_Strict):
+    per: Literal["period", "day", "person", "person_day", "person_week", "person_window"]
+    people: People = People()
+    days: Days = Days()
+    window: int | None = Field(default=None, ge=MIN_WINDOW_DAYS, le=MAX_WINDOW_DAYS)
+
+    @model_validator(mode="after")
+    def _window(self):
+        if (self.per == "person_window") != (self.window is not None):
+            raise ValueError("window는 per=person_window일 때만, 그리고 반드시 있어야 합니다")
+        return self
+
+
+OffsetDay = Annotated[int, Field(ge=MIN_OFFSET, le=MAX_OFFSET)]
+
+
+class Count(_Strict):
+    """세는 칸: (who 또는 묶인 사람) × (묶인 날을 days로 거른 것) 중 shifts에 맞는 칸의 수(또는 근무 시간)."""
+
+    who: People | None = None
+    days: Days = Days()
+    offset: tuple[OffsetDay, OffsetDay] | None = None  # 날이 묶인 범위(day, person_day)에서만. d+a..d+b
+    shifts: Shifts
+    measure: Literal["count", "hours"] = "count"
+
+    @model_validator(mode="after")
+    def _offset(self):
+        if self.offset is not None:
+            a, b = self.offset
+            if a > b:
+                raise ValueError(f"offset ({a}, {b}): 앞이 뒤보다 큽니다")
+            if b - a + 1 > MAX_OFFSET_SPAN:
+                raise ValueError(f"offset ({a}, {b}): 폭이 {MAX_OFFSET_SPAN}일을 넘습니다")
+        return self
+
+
+class Cmp(_Strict):
+    left: Count
+    op: Literal["ge", "le", "eq"]
+    right: float | ValueRef | Count
+
+
+CondList = Annotated[list[Cmp], Field(min_length=MIN_COND_CMPS, max_length=MAX_COND_CMPS)]
+
+
+class All(_Strict):
+    all: CondList
+
+
+class Any(_Strict):
+    any: CondList
+
+
+Cond = Cmp | All | Any
+
+
+class Require(_Strict):
+    kind: Literal["require"]
+    for_each: ForEach
+    when: Cond | None = None  # 이 조건이 참인 인스턴스에서만
+    then: Cond
+
+
+class Balance(_Strict):
+    """내장 함수 고르게: 고른 사람 사이 차이를 줄인다(고르게 블록과 같다)."""
+
+    kind: Literal["balance"]
+    people: People = People()
+    days: Days = Days()
+    shifts: Shifts
+    measure: Literal["count", "hours"] = "count"
+    with_history: bool = True
+    max_gap: Annotated[float, Field(ge=0)] | ValueRef = 1  # hard일 때만: (최대 − 최소) ≤ max_gap
+
+
+def cond_cmps(cond: Cond | None) -> list[Cmp]:
+    if cond is None:
+        return []
+    if isinstance(cond, All):
+        return cond.all
+    if isinstance(cond, Any):
+        return cond.any
+    return [cond]
+
+
+def rule_counts(body: "Require | Balance") -> list[Count]:
+    """본문의 모든 세기(비교 양쪽)."""
+    if isinstance(body, Balance):
+        return []
+    cmps = cond_cmps(body.when) + cond_cmps(body.then)
+    return [c.left for c in cmps] + [c.right for c in cmps if isinstance(c.right, Count)]
+
+
+def _value_refs(body: "Require | Balance") -> list[str]:
+    if isinstance(body, Balance):
+        return [body.max_gap.value] if isinstance(body.max_gap, ValueRef) else []
+    cmps = cond_cmps(body.when) + cond_cmps(body.then)
+    return [c.right.value for c in cmps if isinstance(c.right, ValueRef)]
+
+
+class Rule(_BlockBase):
+    """규칙 = 범위 + 본문. 기본 hardness는 require가 hard, balance가 soft·낮음(블록과 같다)."""
+
+    type: Literal["rule"]
+    default: bool = False  # 기본 규칙(필요 인원·나이트전담)
+    values: dict[ValueName, Value] = Field(default={}, max_length=MAX_RULE_VALUES)
+    body: Annotated[Require | Balance, Field(discriminator="kind")]
+
+    @model_validator(mode="before")
+    @classmethod
+    def _balance_defaults(cls, data: typing.Any):
+        if isinstance(data, dict):
+            body = data.get("body")
+            kind = body.get("kind") if isinstance(body, dict) else getattr(body, "kind", None)
+            if kind == "balance":
+                return {"hardness": "soft", "priority": "low", **data}
+        return data
+
+    @model_validator(mode="after")
+    def _check_expr(self):
+        body = self.body
+        if isinstance(body, Require):
+            cmps = len(cond_cmps(body.when)) + len(cond_cmps(body.then))
+            if cmps > MAX_RULE_CMPS:
+                raise ValueError(f"비교가 {cmps}개, {MAX_RULE_CMPS}개까지입니다")
+            if body.for_each.per not in ("day", "person_day") and any(c.offset for c in rule_counts(body)):
+                raise ValueError(f"offset은 날이 묶인 범위(day, person_day)에서만 씁니다(지금 {body.for_each.per})")
+        refs = set(_value_refs(body))
+        missing = sorted(refs - set(self.values))
+        if missing:
+            raise ValueError(f"values에 없는 값 {missing}")
+        unused = sorted(set(self.values) - refs)
+        if unused:
+            raise ValueError(f"식에서 쓰지 않는 값 {unused}")
+        return self
+
+
+ConstraintSpec = Annotated[
+    Union[CountRule, SequenceRule, BalanceRule, Rule, FixedAssignment], Field(discriminator="type")
+]
 
 
 # --- 요청 ---
@@ -309,8 +472,17 @@ def _check_roster(nurses: list[Nurse]) -> None:
             raise ValueError(f"명단의 {attr}가 중복됩니다: {dups}")
 
 
-def _constraint_refs(c: Any) -> tuple[list[str], list[int]]:
+def _constraint_refs(c: typing.Any) -> tuple[list[str], list[int]]:
     """제약이 참조하는 (nurse_ids, days)."""
+    if isinstance(c, Rule):
+        b = c.body
+        if isinstance(b, Balance):
+            people, days = [b.people], [b.days]
+        else:
+            counts = rule_counts(b)
+            people = [b.for_each.people, *(n.who for n in counts if n.who)]
+            days = [b.for_each.days, *(n.days for n in counts)]
+        return [i for p in people for i in p.ids or []], [d for s in days for d in s.days or []]
     p = c.params
     if isinstance(p, FixedAssignmentParams):
         return [p.nurse_id], [p.day]
@@ -318,8 +490,11 @@ def _constraint_refs(c: Any) -> tuple[list[str], list[int]]:
     return p.people.ids or [], (days.days if days else None) or []
 
 
-def _constraint_codes(c: Any) -> list[str]:
+def _constraint_codes(c: typing.Any) -> list[str]:
     """제약이 직접 적은 근무 코드."""
+    if isinstance(c, Rule):
+        selectors = [c.body.shifts] if isinstance(c.body, Balance) else [n.shifts for n in rule_counts(c.body)]
+        return [code for s in selectors for code in s.codes]
     p = c.params
     if isinstance(p, FixedAssignmentParams):
         return [p.shift]
@@ -526,7 +701,7 @@ TranslateResponse = Annotated[
 class ConstraintChange(_Strict):
     action: Literal["disable", "update"]
     constraint_id: str
-    params: dict[str, Any] | None = None
+    params: dict[str, typing.Any] | None = None
     hardness: Hardness | None = None
 
 

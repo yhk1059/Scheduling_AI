@@ -17,6 +17,14 @@ MIN_PATTERN_LEN = 2  # 금지 패턴 한 개의 칸 수
 MAX_PATTERN_LEN = 4
 MIN_WINDOW_DAYS = 2  # 세기 블록 per=person_window의 창 길이
 MAX_WINDOW_DAYS = 14
+# 규칙 식 상한(ADR-019, 초과 시 422)
+MAX_RULE_VALUES = 5  # 규칙 하나의 조정 가능한 값 수
+MAX_RULE_CMPS = 6  # 규칙 하나의 비교 수(when + then). 그리고/또는 하나는 2..4개
+MIN_COND_CMPS = 2
+MAX_COND_CMPS = 4
+MIN_OFFSET = -7  # 세기의 날짜 이동(d+a..d+b)
+MAX_OFFSET = 14
+MAX_OFFSET_SPAN = 14  # 이동 구간의 날 수(b − a + 1)
 
 # 병동 구조 기본값: (코드, 이름, 시간). O는 휴무이고 필수다.
 OFF_CODE = "O"

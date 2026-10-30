@@ -3,7 +3,8 @@
 cases.json은 블록화(ADR-018) 전 솔버의 목적값·배정 기록이다. 요청은 옛 형식(backend/domain/legacy.py)이고
 옛 솔버가 없어져 다시 만들지 않는다(test_golden이 convert_request로 바꿔 풀어 목적값을 비교한다).
 이 스크립트는 convert-cases.json(TS 변환이 같은 결과를 내야 하는 공유 픽스처)과
-blocks-cases.json(블록 솔버의 목적값·배정 기록. 식 언어 전환(ADR-019)이 같은 결과를 내야 하는 기준)을 쓴다.
+blocks-cases.json(블록 솔버의 목적값·배정 기록. 식 언어 전환(ADR-019)이 같은 결과를 내야 하는 기준),
+expr-convert-cases.json(블록 → 식 변환. TS 변환이 같은 결과를 내야 하는 공유 픽스처)을 쓴다.
 `--check`는 파일을 쓰지 않고 다시 만들어 기존 파일과 비교한다(다르면 exit 1).
 """
 
@@ -16,7 +17,13 @@ from ortools.sat.python import cp_model
 from pydantic import TypeAdapter
 
 from backend.domain.constants import NIGHT_ONLY_TAG, SOLVE_TIME_LIMIT_S
-from backend.domain.convert import NIGHT_ONLY_RULE_ID, convert_request, legacy_to_block, night_dedicated_rule
+from backend.domain.convert import (
+    NIGHT_ONLY_RULE_ID,
+    block_to_rules,
+    convert_request,
+    legacy_to_block,
+    night_dedicated_rule,
+)
 from backend.domain.legacy import LegacyScheduleRequest, LegacySpec
 from backend.domain.models import ConstraintSpec, Period, ScheduleRequest
 from backend.solver.conflicts import find_conflicts
@@ -26,6 +33,7 @@ ROOT = Path(__file__).resolve().parent.parent
 CASES_PATH = ROOT / "backend" / "tests" / "golden" / "cases.json"
 CONVERT_CASES_PATH = ROOT / "backend" / "tests" / "golden" / "convert-cases.json"
 BLOCKS_CASES_PATH = ROOT / "backend" / "tests" / "golden" / "blocks-cases.json"
+EXPR_CONVERT_CASES_PATH = ROOT / "backend" / "tests" / "golden" / "expr-convert-cases.json"
 
 
 # --- 풀이 ---
@@ -283,12 +291,73 @@ def build_blocks_cases() -> list[dict]:
     ]
 
 
+# --- 변환 픽스처(블록 → 식) ---
+
+
+def _expr_shape_blocks() -> list[tuple[str, dict]]:
+    """변환표(설계 §2.5)의 모든 모양. (이름, 블록)."""
+    n, d, e, o = ({"in": [c]} for c in "NDEO")
+    work = {"not_in": ["O"]}
+    return [
+        ("count-day-min", _count("c", d, "day", 3)),
+        ("count-day-max", _count("c", e, "day", hi=4, days={"kind": "weekend"})),
+        ("count-day-min-max", _count("c", d, "day", 3, 4, days={"kind": "weekday"})),
+        ("count-day-eq", _count("c", n, "day", 2, 2)),
+        ("count-day-people", _count("c", e, "day", 1, people={"min_years": 3})),
+        ("count-day-hours", _count("c", work, "day", hi=80, measure="hours")),
+        ("count-person-min", _count("c", o, "person", 8)),
+        ("count-person-max-soft", {**_count("c", n, "person", hi=0, hardness="soft", scope="period",
+                                            people={"ids": ["n1"]}, days={"kind": "weekend"}), "priority": "high"}),
+        ("count-person-leave", _count("c", work, "person", hi=0, scope="period", people={"ids": ["n1"]},
+                                      days={"days": [3, 4, 5]})),
+        ("count-person-week-hours", _count("c", work, "person_week", hi=52, measure="hours")),
+        ("count-person-window", _count("c", o, "person_window", 1, window=7, people={"exclude_tags": ["신규"]})),
+        ("count-disabled", {**_count("c", o, "person", 8), "enabled": False}),
+        ("forbid-1", _c("s", "sequence", {"forbid": [[n, d]]})),
+        ("forbid-2-split", _c("s", "sequence", {"forbid": [[n, d], [n, e]]}, "soft", priority="high")),
+        ("forbid-3-long", _c("s", "sequence", {"people": {"tags": ["신규"]}, "forbid": [[n, o, d]]})),
+        ("run-max-len-night", _c("s", "sequence", {"run": n, "max_len": 3})),
+        ("run-max-len-work", _c("s", "sequence", {"run": work, "max_len": 5})),
+        ("run-min-len", _c("s", "sequence", {"run": n, "min_len": 2})),
+        ("run-min-max-split", _c("s", "sequence", {"run": n, "min_len": 2, "max_len": 3})),
+        ("after-then-off-1", _c("s", "sequence", {"after": n, "then_off": 1})),
+        ("after-then-off-2", _c("s", "sequence", {"after": n, "then_off": 2}, "soft")),
+        ("balance-soft", _c("b", "balance", {"people": {"exclude_tags": [NIGHT_ONLY_TAG]}, "shifts": n}, "soft",
+                            priority="low")),
+        ("balance-hard-gap", _c("b", "balance", {"shifts": n, "max_gap": 0})),
+        ("balance-hours-no-history", _c("b", "balance", {"days": {"kind": "weekend"}, "shifts": work,
+                                                         "measure": "hours", "with_history": False}, "soft")),
+        ("fixed-assignment", _c("f", "fixed_assignment", {"nurse_id": "n1", "day": 2, "shift": "E"}, scope="period")),
+        ("default-coverage", _daily("D", 3)),
+        ("default-night-only", night_dedicated_rule(NIGHT_ONLY_RULE_ID).model_dump(mode="json")),
+    ]
+
+
+def _expr_case(name: str, block: Any) -> dict:
+    return {
+        "name": name,
+        "block": _spec_adapter.dump_python(block, mode="json", exclude_none=True),
+        "rules": [_spec_adapter.dump_python(r, mode="json", exclude_none=True) for r in block_to_rules(block)],
+    }
+
+
+def build_expr_convert_cases() -> list[dict]:
+    cases = [_expr_case(name, _spec_adapter.validate_python(raw)) for name, raw in _expr_shape_blocks()]
+    for cid, _, req in build_blocks_requests():
+        cases += [_expr_case(f"{cid}/{c.id}", c) for c in req.constraints]
+    return cases
+
+
 def render(cases: list[dict]) -> str:
     return json.dumps(cases, ensure_ascii=False, indent=1) + "\n"
 
 
 def main() -> None:
-    outputs = [(CONVERT_CASES_PATH, render(build_convert_cases())), (BLOCKS_CASES_PATH, render(build_blocks_cases()))]
+    outputs = [
+        (CONVERT_CASES_PATH, render(build_convert_cases())),
+        (BLOCKS_CASES_PATH, render(build_blocks_cases())),
+        (EXPR_CONVERT_CASES_PATH, render(build_expr_convert_cases())),
+    ]
     if "--check" in sys.argv[1:]:
         stale = [p for p, text in outputs if not p.exists() or p.read_text(encoding="utf-8") != text]
         for path in stale:
