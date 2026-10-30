@@ -15,7 +15,7 @@ import { ui } from "./ui";
 const TABS = [
   { tab: "roster", label: "명단·필요 인원" },
   { tab: "shifts", label: "근무 형태" },
-  { tab: "rules", label: "병동 규칙" },
+  { tab: "rules", label: "매장 조건" },
 ] as const;
 
 const UNITS: PeriodUnit[] = ["month", "1w", "2w", "4w"];
@@ -29,7 +29,7 @@ export default function ShopSettings() {
   return (
     <div className="flex flex-col gap-5">
       <div className="flex flex-col gap-3">
-        <h1 className="text-[22px] font-semibold text-[#1B1B18]">병동 설정</h1>
+        <h1 className="text-[22px] font-semibold text-[#1B1B18]">매장 설정</h1>
         <div role="tablist" className="flex gap-1 border-b border-[#E2E2DC]">
           {TABS.map((t) => (
             <button
@@ -105,11 +105,11 @@ export function BasicSection() {
       <h2 className={ui.cardTitle}>기본</h2>
       <div className="flex flex-wrap items-end gap-4">
         <label className="flex flex-col gap-1">
-          <span className={ui.label}>병동 이름</span>
+          <span className={ui.label}>매장 이름</span>
           <input
             value={shop.name}
             onChange={(e) => setShopName(e.target.value)}
-            placeholder="예: 내과 병동"
+            placeholder="예: 한강 카페"
             className={`${ui.input} w-64`}
           />
         </label>
@@ -156,7 +156,7 @@ export function RosterSection() {
       <EmployeeTable employees={shop.employees} />
       {orphanCount > 0 && (
         <p className="text-xs font-medium text-[#A15C07]">
-          명단에 없거나 근무표에서 뺀 간호사를 가리키는 병동 규칙이 {orphanCount}개 있어요. [병동 규칙] 탭에서 확인해 주세요.
+          명단에 없거나 근무표에서 뺀 직원을 가리키는 매장 조건이 {orphanCount}개 있어요. [매장 조건] 탭에서 확인해 주세요.
         </p>
       )}
     </section>
@@ -171,7 +171,7 @@ export function CoverageSection({ collapsible = false }: { collapsible?: boolean
     <>
       <div className="flex flex-col gap-1">
         <h2 className={ui.cardTitle}>근무조별 필요 인원</h2>
-        <p className={ui.help}>하루에 그 근무조에 들어갈 간호사 수예요. 최대를 비우면 그 이상이면 돼요.</p>
+        <p className={ui.help}>하루에 그 근무조에 들어갈 직원 수예요. 최대를 비우면 그 이상이면 돼요.</p>
       </div>
       <div className="self-start">
         <CoverageForm drafts={coverageDrafts} setDrafts={setCoverageDrafts} />
@@ -228,7 +228,7 @@ function EmployeeTable({ employees }: { employees: ShopEmployee[] }) {
       <div className="flex items-center gap-3">
         {inactive.length > 0 && (
           <button type="button" onClick={() => setShowInactive((v) => !v)} className={ui.textSm}>
-            {showInactive ? `제외된 간호사 ${inactive.length}명 접기` : `제외된 간호사 ${inactive.length}명 보기`}
+            {showInactive ? `제외된 직원 ${inactive.length}명 접기` : `제외된 직원 ${inactive.length}명 보기`}
           </button>
         )}
         {employees.length > 0 && <p className={ui.help}>근무표에서 빼도 지난 근무표와 통계에는 남아요.</p>}
@@ -444,7 +444,7 @@ function NewEmployeeRow({ employees }: { employees: ShopEmployee[] }) {
     return (
       <tr>
         <td colSpan={4} className={`${ui.help} px-2 py-2`}>
-          간호사는 최대 {MAX_EMPLOYEES}명까지 넣을 수 있어요.
+          직원은 최대 {MAX_EMPLOYEES}명까지 넣을 수 있어요.
         </td>
       </tr>
     );
@@ -461,7 +461,7 @@ function NewEmployeeRow({ employees }: { employees: ShopEmployee[] }) {
           onChange={(e) => setName(e.target.value)}
           onKeyDown={onEnter}
           placeholder="이름"
-          aria-label="새 간호사 이름"
+          aria-label="새 직원 이름"
           aria-invalid={showName ? true : undefined}
           className={`${cellInput} w-48 placeholder:text-[#8A8A80] ${showName ? err : "border-[#8A8A80]"}`}
         />
@@ -472,7 +472,7 @@ function NewEmployeeRow({ employees }: { employees: ShopEmployee[] }) {
           tags={tags}
           onAdd={(t) => setTags((ts) => (ts.includes(t) ? ts : [...ts, t]))}
           onRemove={(t) => setTags((ts) => ts.filter((x) => x !== t))}
-          label="새 간호사 태그"
+          label="새 직원 태그"
           onEnterEmpty={add}
           draft={tagDraft}
           setDraft={setTagDraft}

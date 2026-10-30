@@ -11,7 +11,7 @@ import Stepper from "./Stepper";
 import { ui } from "./ui";
 import { BasicSection, CoverageSection, RosterSection } from "./ShopSettings";
 
-const LABELS = ["병동·명단", "병동 소개", "병동 규칙"];
+const LABELS = ["매장·명단", "매장 소개", "매장 조건"];
 
 /** 처음 설정: ① 매장·명단 → ② 매장 소개 → ③ 매장 규칙 → [첫 근무표 만들기]. 근무표가 없는 매장에서만 보인다. */
 export default function SetupFlow() {
@@ -54,20 +54,20 @@ export default function SetupFlow() {
 
       {step === 1 ? (
         <>
-          {title("병동·명단")}
+          {title("매장·명단")}
           <BasicSection />
           <RosterSection />
         </>
       ) : step === 2 ? (
         <>
-          {title("병동 소개")}
+          {title("매장 소개")}
           <ShiftSummary />
           <RulesStep key="intro" scope="shop" intro />
           <CoverageSection collapsible />
         </>
       ) : (
         <>
-          {title("병동 규칙")}
+          {title("매장 조건")}
           <RulesStep key="shop" scope="shop" pendingNote={false} />
         </>
       )}
@@ -83,7 +83,7 @@ export default function SetupFlow() {
         <div className="flex items-center gap-3">
           {step < 3 ? (
             <>
-              {!canNext && <p className={ui.help}>명단에 간호사를 1명 이상 넣으면 다음으로 넘어갈 수 있어요</p>}
+              {!canNext && <p className={ui.help}>명단에 직원을 1명 이상 넣으면 다음으로 넘어갈 수 있어요</p>}
               {step === 2 && !hasStaffing && <p className={ui.help}>필요 인원 없이 만들면 인원을 맞추지 않아요</p>}
               <button
                 type="button"
@@ -102,7 +102,7 @@ export default function SetupFlow() {
               {applied === 0 && <p className={ui.help}>규칙 없이 만들면 기본 규칙만 지켜요</p>}
               {pending > 0 && <p className={ui.help}>적용하지 않은 규칙 {pending}개는 빠져요</p>}
               {!isShopReady(shop) && (
-                <p className={ui.help}>명단에 간호사를 1명 이상 넣으면 만들 수 있어요</p>
+                <p className={ui.help}>명단에 직원을 1명 이상 넣으면 만들 수 있어요</p>
               )}
               <button type="button" disabled={!isShopReady(shop)} onClick={() => createPeriod(today())} className={ui.primary}>
                 첫 근무표 만들기

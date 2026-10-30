@@ -65,7 +65,7 @@ export default function AppShell() {
   const tabs = [
     { label: "근무표", current: view.screen === "home", onClick: () => go({ screen: "home" }) },
     {
-      label: "병동 설정",
+      label: "매장 설정",
       current: view.screen === "settings",
       onClick: () => go({ screen: "settings", tab: "roster" }),
     },
@@ -76,10 +76,10 @@ export default function AppShell() {
       <header className="border-b border-[#E2E2DC] bg-white">
         <div className="mx-auto flex h-14 max-w-[1360px] items-center justify-between px-8">
           <div className="flex items-baseline gap-3">
-            <span className="text-[15px] font-semibold text-[#1B1B18]">간호사 근무표</span>
+            <span className="text-[15px] font-semibold text-[#1B1B18]">매장 직원 근무표</span>
             {started && (
               <span className="text-xs font-medium text-[#66665E]">
-                {shop.name || "이름 없는 병동"} · {unitShort(shop.unit)}
+                {shop.name || "이름 없는 매장"} · {unitShort(shop.unit)}
               </span>
             )}
           </div>

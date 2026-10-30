@@ -103,14 +103,14 @@ export default function ShopHome() {
   return (
     <div className="flex flex-col gap-5">
       <div className="flex items-center justify-between gap-4">
-        <h1 className="text-[22px] font-semibold text-[#1B1B18]">{shop.name || "이름 없는 병동"}</h1>
+        <h1 className="text-[22px] font-semibold text-[#1B1B18]">{shop.name || "이름 없는 매장"}</h1>
         <div className="flex items-center gap-2 text-sm text-[#3D3D38]">
           <span>
-            간호사 <span className="font-mono">{employeeCount}</span>명 · 병동 규칙{" "}
+            직원 <span className="font-mono">{employeeCount}</span>명 · 매장 조건{" "}
             <span className="font-mono">{shopRuleCount(shop.rules)}</span>개 · {unitShort(shop.unit)}
           </span>
           <button type="button" onClick={() => go({ screen: "settings", tab: "roster" })} className={ui.text}>
-            병동 설정
+            매장 설정
           </button>
         </div>
       </div>
@@ -121,7 +121,7 @@ export default function ShopHome() {
             명단과 필요 인원을 입력하면 첫 근무표를 만들 수 있어요.
           </p>
           <button type="button" onClick={() => go({ screen: "settings", tab: "roster" })} className={ui.primary}>
-            병동 설정 열기
+            매장 설정 열기
           </button>
         </section>
       ) : (

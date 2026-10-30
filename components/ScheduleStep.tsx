@@ -583,7 +583,7 @@ function ProposalCard({
   onDismiss,
 }: {
   proposal: RelaxationProposal;
-  /** 바꾸는 것("최대 연속 나이트 3 → 4")과 그 규칙의 원문 */
+  /** 바꾸는 것("최대 연속 근무 5 → 6")과 그 규칙의 원문 */
   changes: { change: string; quote: string }[];
   busy: boolean;
   onAccept: () => void;

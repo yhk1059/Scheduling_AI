@@ -53,7 +53,7 @@ describe("toScheduleCsv", () => {
     expect(head[1 + 16]).toBe("화(공휴일)");
   });
 
-  it("간호사 행은 이름, 근무 코드, 합계다", () => {
+  it("직원 행은 이름, 근무 코드, 합계다", () => {
     const r = rows(toScheduleCsv(feb()));
     expect(r[2].slice(0, 5)).toEqual(["이영희", "D", "E", "N", "O"]);
     expect(r[2].slice(-5)).toEqual(["7", "7", "7", "7", "6"]); // 주말 1·7·8·14·15·21·22·28일 중 휴무가 아닌 날

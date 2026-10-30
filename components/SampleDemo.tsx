@@ -31,7 +31,7 @@ export default function SampleDemo() {
       <header className="border-b border-[#E2E2DC] bg-white">
         <div className="mx-auto flex h-14 max-w-[1360px] items-center px-8">
           <Link href="/" className="text-[15px] font-semibold text-[#1B1B18]">
-            간호사 근무표
+            매장 직원 근무표
           </Link>
         </div>
       </header>
@@ -42,18 +42,18 @@ export default function SampleDemo() {
             <p className="font-mono text-xs font-semibold text-[#155E75]">샘플 데모</p>
             <h1 className="text-[22px] font-semibold text-[#1B1B18]">{shop.name}</h1>
             <p className="text-sm leading-relaxed text-[#3D3D38]">
-              간호사 {EMPLOYEES.length}명과 병동 규칙 {SHOP_RULES.length}개로 만든 4주 근무표예요. 모두에게 같은 화면이고, 바꾸거나 저장할
+              직원 {EMPLOYEES.length}명과 매장 조건 {SHOP_RULES.length}개로 만든 4주 근무표예요. 모두에게 같은 화면이고, 바꾸거나 저장할
               수 없어요.
             </p>
           </div>
           <Link href="/app?start=new" className={ui.primary}>
-            내 병동으로 시작하기
+            내 매장으로 시작하기
           </Link>
         </div>
 
         <section className="flex flex-col gap-3">
           <div className="flex flex-col gap-1">
-            <h2 className={h2}>병동 규칙</h2>
+            <h2 className={h2}>매장 조건</h2>
             <p className="text-sm text-[#3D3D38]">말로 적은 규칙이 카드로 정리돼요.</p>
           </div>
           <div className="grid grid-cols-3 gap-4">
