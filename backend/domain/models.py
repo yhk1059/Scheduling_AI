@@ -361,6 +361,25 @@ class Rule(_BlockBase):
         return self
 
 
+def with_value(rule: Rule, name: str, value: float) -> Rule:
+    """조정 가능한 값 하나를 바꾼 규칙(검증 실패는 ValidationError).
+    최대 연속(창 = 값 + 1마다 ≤ 값)은 창 길이도 함께 바꾼다(클라이언트 withRuleValue와 같음)."""
+    data = rule.model_dump()
+    data["values"][name]["value"] = value
+    body = rule.body
+    if (
+        isinstance(body, Require)
+        and body.for_each.per == "person_window"
+        and body.when is None
+        and isinstance(body.then, Cmp)
+        and body.then.op == "le"
+        and body.then.right == ValueRef(value=name)
+        and body.for_each.window == rule.values[name].value + 1
+    ):
+        data["body"]["for_each"]["window"] = value + 1
+    return Rule.model_validate(data)
+
+
 ConstraintSpec = Annotated[Union[Rule, FixedAssignment], Field(discriminator="type")]
 
 

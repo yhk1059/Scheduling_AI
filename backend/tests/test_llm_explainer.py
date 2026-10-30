@@ -356,6 +356,12 @@ def test_set_value_kept_with_name_and_value():
     assert change.hardness is None
 
 
+def test_set_value_max_run_out_of_window_bounds_rejected():
+    """최대 연속은 창도 값+1로 바뀐다. 창이 상한(14일)을 넘는 값은 버린다."""
+    props = explain_rules(proposal("14", set_value("mx", "max_len", 14)), proposal("13", set_value("mx", "max_len", 13)))
+    assert [p.title for p in props] == ["13"]
+
+
 def test_set_hardness_and_disable_on_rule_kept():
     props = explain_rules(proposal("가능하면으로", set_hardness("mx")), proposal("끄기", disable("cov-r")))
     assert [p.changes[0].action for p in props] == ["set_hardness", "disable"]

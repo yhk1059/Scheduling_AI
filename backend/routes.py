@@ -45,6 +45,7 @@ from backend.domain.models import (
     TranslateRequest,
     TranslateUnsupported,
     WardConfig,
+    with_value,
 )
 from backend.env import load_local_env
 from backend.llm.client import (
@@ -281,11 +282,11 @@ def _apply(request: ScheduleRequest, changes: list[ConstraintChange]) -> Schedul
         if change.action == "disable":
             specs[spec.id] = spec.model_copy(update={"enabled": False})
             continue
-        data = spec.model_dump()
         if change.action == "set_value":
-            data["values"][change.name]["value"] = change.value
-        if change.action == "set_hardness":
-            data["hardness"] = change.hardness
+            specs[spec.id] = with_value(spec, change.name, change.value)
+            continue
+        data = spec.model_dump()
+        data["hardness"] = change.hardness
         specs[spec.id] = _spec_adapter.validate_python(data)
     return request.model_copy(update={"constraints": list(specs.values())})
 

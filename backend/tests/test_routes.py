@@ -427,6 +427,18 @@ def test_apply_set_value_and_set_hardness():
     assert req.constraints[0].values["min"].value == len(req.nurses) - 1  # 원본은 그대로
 
 
+def test_apply_set_value_max_run_moves_window():
+    """'최대 연속 나이트 3 → 4'는 창 4일·≤4(사실상 끄기)가 아니라 창 5일·≤4로 검증한다."""
+    from backend.domain.models import ConstraintChange, ScheduleRequest
+    from backend.tests.rules import max_nights
+
+    body = rule_explain_body()["request"]
+    body["constraints"] = [max_nights("mx", 3)]
+    req = ScheduleRequest.model_validate(body)
+    (mx,) = routes._apply(req, [ConstraintChange(action="set_value", constraint_id="mx", name="max_len", value=4)]).constraints
+    assert mx.values["max_len"].value == 4 and mx.body.for_each.window == 5
+
+
 @pytest.mark.parametrize("error", [LLMUnavailableError("down"), None])
 def test_explain_fallback_on_llm_failure(llm, error):
     invalid = ok({"text": ""})

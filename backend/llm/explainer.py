@@ -13,6 +13,7 @@ from backend.domain.models import (
     RelaxationProposal,
     Rule,
     ScheduleRequest,
+    with_value,
 )
 from backend.llm.client import LLMClient, LLMInvalidOutputError, ToolCallResult
 from backend.llm.prompts import EXPLAIN_SYSTEM, EXPLAIN_TOOL, ExplainerOutput, ProposalDraft
@@ -87,15 +88,13 @@ def _check_rule_change(change: ConstraintChange, spec: Rule) -> ConstraintChange
         return None
     if change.action == "disable":
         return ConstraintChange(action="disable", constraint_id=change.constraint_id)
-    data = spec.model_dump(mode="json")
-    if change.action == "set_value":
-        if change.name not in spec.values or change.value is None or change.value < 0:
-            return None
-        data["values"][change.name]["value"] = change.value
-    else:
-        data["hardness"] = change.hardness
     try:
-        _spec_adapter.validate_python(data)
+        if change.action == "set_value":
+            if change.name not in spec.values or change.value is None or change.value < 0:
+                return None
+            with_value(spec, change.name, change.value)
+        else:
+            _spec_adapter.validate_python({**spec.model_dump(mode="json"), "hardness": change.hardness})
     except ValidationError:
         return None
     keep = {"name", "value"} if change.action == "set_value" else {"hardness"}
