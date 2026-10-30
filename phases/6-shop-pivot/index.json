@@ -13,7 +13,10 @@
     {
       "step": 1,
       "name": "remove-legacy-client",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-10-30T22:59:10+0900",
+      "summary": "lib/migrate.ts를 없애고 계속 쓰는 상수·normalizeRule·ruleShape·stableJson·nightOnlyRule을 lib/rules.ts로 옮김, 옛 변환과 그 테스트 삭제, store.ts는 버전이 다르거나 손상된 문서를 변환 없이 초기화(resetNotice), import를 lib/rules로 교체, ward-oct-v5.json 삭제, 프론트 테스트가 백엔드 골든을 읽지 않음. 결정: 테스트 식 규칙은 lib/test-rules.ts 도우미(backend/tests/rules.py와 같은 역할)로 적음; e2e/fixtures/ward-oct.json은 지우기 전 변환 코드로 v6으로 한 번 바꿔 둠(그래야 S3·S16이 열림); e2e S16은 삭제 대신 ward-oct.json을 여는 \"저장된 병동 열기\"로 바꿈(S17이 이어받음); setCoverage는 식 규칙을 직접 만들되 결과는 이전과 같음; persist migrate는 null을 돌려 resetNotice 경로를 유지; 화면이 쓰는 ward.unconverted·dismissUnconverted와 ScheduleStep의 isLegacyResult는 범위 밖이라 남김(더 생기지 않는 값이라 뒤 step에서 정리 필요)",
+      "completed_at": "2026-10-30T23:05:08+0900"
     },
     {
       "step": 2,
