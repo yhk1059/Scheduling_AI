@@ -45,7 +45,10 @@
     {
       "step": 5,
       "name": "shift-times",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-10-30T23:23:30+0900",
+      "summary": "ShiftDef에 end 추가(start·end 30분 단위 HH:MM, 24:00 허용, 휴무·복합 코드는 없음, 그 밖은 필수, start<end), DEFAULT_SHIFTS·DEFAULT_CONFIG를 A/M/C/O로, 기본 주기 1w, ShiftTable에 끝 시각·실근무 시간 입력, HistoryLoad.nights→closings, shop-12.json을 D1·D2·J7로 재작성, types·demo 재생성, 골든 20케이스 목적값 불변, 벤치 풀이 4.90s/10s·충돌 분석 5.00s/5s. 결정: 샘플 규칙은 7개다(J7의 '마감·주말 공정성'은 식 하나로 못 써서 D3처럼 둘로 나눔. PRD의 6개와 다름, 규칙 id rule-no-close-open·rule-max-run·rule-week-hours·rule-week-off·rule-leader-open·rule-close-fair·rule-weekend-fair); 샘플·데모 기간을 11/1 30일에서 11/2 월요일 28일로 바꿈(person_week가 잘린 주에도 적용돼 주 최소 휴무 2일이면 1일짜리 주에서 해가 없음, 같은 문제가 월요일이 아닌 시작일의 실제 매장에도 남아 있음); 누적 부담의 마감은 코드 대신 closingShift(활성 기본 코드 중 가장 늦게 끝나는 것)로 정하고 열 이름도 그 근무조 이름을 씀; 시각 입력은 24:00과 textbox 역할 때문에 type=time 대신 텍스트+shiftTimesError; 시각 입력은 시작·끝이 함께 유효할 때만 저장; 더블은 새 줄에서 시각 칸 비활성; 샘플 이름은 shop-12.json의 name 필드; 옛 D/E/N 15명 샘플은 backend/tests/golden/den-shop.json으로 옮겨 sample_data()와 eval이 읽음(step 8에서 eval을 shop-12로 옮겨야 함); 테스트 도우미 DEN_CONFIG(rules.py, test-rules.ts)와 startDenShop; eval/dataset.jsonl은 시각만 더함(M 11:00~19:00, b24 E 15:00~24:00); 프롬프트 예시는 end만 더함(문맥의 시각은 step 7); describeShiftChange는 '11:00~14:00 · 3시간'; e2e는 컴파일만 맞춤: shop-oct.json에 시각이 없고 11월 1일·규칙 id·라벨이 옛 값이라 samples-e2e까지 실행되지 않음; 랜딩 app/page.tsx의 '15명·한 달 근무표' 문구는 step 6",
+      "completed_at": "2026-10-30T23:34:09+0900"
     },
     {
       "step": 6,
