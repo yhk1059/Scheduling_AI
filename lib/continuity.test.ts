@@ -48,7 +48,7 @@ function confirmed(start_date: string, length: number, ...versions: Assignments[
 
 /** "DENO..." 문자열 → 코드 배열 */
 const row = (s: string) => s.split("") as Code[];
-const nurse = (id: string, name: string, active = true): WardNurse => ({ id, name, years: 3, tags: [], active });
+const nurse = (id: string, name: string, active = true): WardNurse => ({ id, name, tags: [], active });
 
 describe("HISTORY_DAYS", () => {
   it("백엔드와 같은 28일", () => {

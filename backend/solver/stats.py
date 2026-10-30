@@ -92,10 +92,6 @@ def _who_label(request: ScheduleRequest, who: People | None, names: bool = True)
         names = {n.id: n.name for n in request.nurses}
         return "·".join(names[i] for i in who.ids) + " "
     parts = list(who.tags or [])
-    if who.min_years is not None:
-        parts.append(f"{who.min_years}년차 이상")
-    if who.max_years is not None:
-        parts.append(f"{who.max_years}년차 이하")
     return " ".join(parts) + " " if parts else ""
 
 

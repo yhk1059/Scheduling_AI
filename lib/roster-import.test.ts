@@ -6,15 +6,15 @@ import { parseCarryOver, parseDelimited } from "./roster-import";
 
 describe("parseDelimited", () => {
   it("탭으로 구분한다", () => {
-    expect(parseDelimited("이름\t연차\n이영희\t12")).toEqual([
-      ["이름", "연차"],
+    expect(parseDelimited("이름\t번호\n이영희\t12")).toEqual([
+      ["이름", "번호"],
       ["이영희", "12"],
     ]);
   });
 
   it("탭이 없으면 쉼표로 구분한다", () => {
-    expect(parseDelimited("이름,연차\r\n이영희,12\r\n")).toEqual([
-      ["이름", "연차"],
+    expect(parseDelimited("이름,번호\r\n이영희,12\r\n")).toEqual([
+      ["이름", "번호"],
       ["이영희", "12"],
     ]);
   });
@@ -38,8 +38,8 @@ describe("parseDelimited", () => {
 
 describe("parseCarryOver", () => {
   const nurses: Nurse[] = [
-    { id: "n01", name: "이영희", years: 12 },
-    { id: "n02", name: "박민수", years: 9 },
+    { id: "n01", name: "이영희" },
+    { id: "n02", name: "박민수" },
   ];
   const parse = (text: string, config: WardConfig = DEFAULT_CONFIG) => parseCarryOver(text, nurses, config);
 

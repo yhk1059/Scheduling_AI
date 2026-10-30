@@ -14,29 +14,27 @@ from backend.llm.prompts import EXPLAIN_SYSTEM, EXPLAIN_TOOL
 from backend.tests import rules
 
 NURSES = [
-    Nurse(id="n01", name="이영희", years=12),
-    Nurse(id="n02", name="박민수", years=9),
-    Nurse(id="n03", name="김지훈", years=2, tags=["나이트전담"]),
+    Nurse(id="n01", name="이영희"),
+    Nurse(id="n02", name="박민수"),
+    Nurse(id="n03", name="김지훈", tags=["리더"]),
 ]
 
 COVERAGE = rules.count("cov", {"in": ["D"]}, "day", 3, 3, days={"kind": "weekend"}, source_text="주말 D 최소 3명")
 LEAVE = rules.leave("lv1", "n01", [14, 15], source_text="이영희 14~15일 휴가")
 FIXED = rules.fixed("fx1", "n02", 14, "N", source_text="박민수 14일 N 고정")
 UNRELATED = rules.forbid("seq", "N", "D", source_text="나이트 다음 날 데이 금지")
-NIGHT_ONLY = rules.night_only()
 
 REQUEST = ScheduleRequest(
     nurses=NURSES,
     period=Period(start_date=date(2026, 11, 1), length=30),
     holidays=[5],
-    constraints=[COVERAGE, LEAVE, FIXED, UNRELATED, NIGHT_ONLY],
+    constraints=[COVERAGE, LEAVE, FIXED, UNRELATED],
     input_version=3,
 )
 CONFLICTS = [
     Conflict(constraint_id="cov", type="rule", source_text="주말 D 최소 3명"),
     Conflict(constraint_id="lv1", type="rule", source_text="이영희 14~15일 휴가"),
     Conflict(constraint_id="fx1", type="fixed_assignment", source_text="박민수 14일 N 고정"),
-    Conflict(constraint_id="night-only", type="rule", source_text="나이트 전담은 나이트와 휴무만"),
 ]
 
 TEXT = "n01의 14~15일 휴가 때문에 주말 데이 인원 3명을 채울 수 없습니다. n02도 14일 나이트로 고정되어 있습니다."
@@ -133,7 +131,7 @@ def test_request_is_pseudonymized_and_uses_tool():
     assert context["weekend_and_holiday_days"][:4] == [1, 5, 7, 8]
     assert [s["code"] for s in context["config"]["shifts"]] == ["D", "E", "N", "O"]
     assert context["config"]["shifts"][2] == {"code": "N", "name": "나이트", "hours": 8, "parts": [], "active": True}
-    assert {"id": "n03", "years": 2, "tags": ["나이트전담"]} in context["nurses"]
+    assert {"id": "n03", "tags": ["리더"]} in context["nurses"]
 
 
 def test_context_days_cross_month():
@@ -156,7 +154,7 @@ def test_tool_schema_from_pydantic():
 def test_prompt_instructions():
     assert "휴가" in EXPLAIN_SYSTEM and "마지막 수단" in EXPLAIN_SYSTEM
     assert "fixed_assignment" in EXPLAIN_SYSTEM and "disable" in EXPLAIN_SYSTEM
-    assert "나이트전담" in EXPLAIN_SYSTEM and "config.shifts" in EXPLAIN_SYSTEM
+    assert "config.shifts" in EXPLAIN_SYSTEM
     for word in ("balance", "not_in"):
         assert word in EXPLAIN_SYSTEM
     for old in ("daily_coverage", "night_fairness", "sequence", '"update"', "블록"):
@@ -194,18 +192,6 @@ def test_drop_invalid_changes():
 
     assert [p.title for p in proposals] == ["정상"]
     assert proposals[0].changes[0].value == 2
-
-
-def test_drop_proposal_disabling_night_only_rule():
-    props = [
-        proposal("나이트 전담 규칙 끄기", disable("night-only")),
-        proposal("함께 끄기", disable("fx1"), disable("night-only")),
-        proposal("정상", disable("fx1")),
-    ]
-    client = FakeClient(ok({"text": TEXT, "proposals": props}))
-    _, proposals = explain(REQUEST, CONFLICTS, client)
-
-    assert [p.title for p in proposals] == ["정상"]
 
 
 def test_proposals_truncated_to_max():
@@ -298,30 +284,16 @@ MAX_NIGHTS = {
     },
     "source_text": "나이트 3연속까지",
 }
-NIGHT_ONLY_RULE = {
-    "id": "night-only",
-    "scope": "ward",
-    "type": "rule",
-    "default": True,
-    "values": {"max": {"value": 0, "label": "최대 횟수"}},
-    "body": {
-        "kind": "require",
-        "for_each": {"per": "person", "people": {"tags": ["나이트전담"]}},
-        "then": {"left": {"shifts": {"not_in": ["N", "O"]}}, "op": "le", "right": {"value": "max"}},
-    },
-    "source_text": "나이트 전담은 나이트와 휴무만",
-}
 RULE_REQUEST = ScheduleRequest(
     nurses=NURSES,
     period=Period(start_date=date(2026, 11, 1), length=30),
     holidays=[5],
-    constraints=[COV_RULE, MAX_NIGHTS, NIGHT_ONLY_RULE, LEAVE, FIXED, UNRELATED],
+    constraints=[COV_RULE, MAX_NIGHTS, LEAVE, FIXED, UNRELATED],
     input_version=4,
 )
 RULE_CONFLICTS = [
     Conflict(constraint_id="cov-r", type="rule", source_text="주말 데이 3명"),
     Conflict(constraint_id="mx", type="rule", source_text="나이트 3연속까지"),
-    Conflict(constraint_id="night-only", type="rule", source_text="나이트 전담은 나이트와 휴무만"),
     Conflict(constraint_id="lv1", type="rule", source_text="이영희 14~15일 휴가"),
     Conflict(constraint_id="fx1", type="fixed_assignment", source_text="박민수 14일 N 고정"),
 ]
@@ -387,16 +359,6 @@ def test_set_value_and_set_hardness_rejected_for_fixed():
     assert [p.title for p in props] == ["고정 칸 해제는 그대로"]
 
 
-def test_night_only_rule_never_relaxed():
-    props = explain_rules(
-        proposal("끄기", disable("night-only")),
-        proposal("값", set_value("night-only", "max", 3)),
-        proposal("가능하면", set_hardness("night-only")),
-        proposal("정상", disable("fx1")),
-    )
-    assert [p.title for p in props] == ["정상"]
-
-
 def test_set_value_without_name_is_schema_error_and_retried():
     bad = {"action": "set_value", "constraint_id": "mx", "value": 4}
     client = FakeClient(
@@ -421,8 +383,7 @@ def test_prompt_explains_rules_and_relaxation_kinds():
 def test_fallback_lists_conflict_source_texts():
     text = fallback_explanation(REQUEST, CONFLICTS)
     assert text == (
-        "다음 규칙들이 동시에 지켜질 수 없습니다: “주말 D 최소 3명”, “이영희 14~15일 휴가”, “박민수 14일 N 고정”, "
-        "“나이트 전담은 나이트와 휴무만”."
+        "다음 규칙들이 동시에 지켜질 수 없습니다: “주말 D 최소 3명”, “이영희 14~15일 휴가”, “박민수 14일 N 고정”."
     )
 
 

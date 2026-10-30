@@ -38,11 +38,11 @@ def _hard_rule_violations(req: ScheduleRequest, a: dict) -> dict[str, list]:
 START = date(2026, 11, 5)  # 목요일. 1=목 2=금 3=토 4=일 5=월 6=화 7=수
 LENGTH = 7
 NURSES = [
-    {"id": "n1", "name": "가", "years": 5},
-    {"id": "n2", "name": "나", "years": 2, "tags": ["신규"]},
-    {"id": "n3", "name": "다", "years": 10, "tags": ["책임"]},
-    {"id": "n4", "name": "라", "years": 1, "tags": ["신규"]},
-    {"id": "n5", "name": "마", "years": 8, "tags": ["나이트전담", "책임"]},
+    {"id": "n1", "name": "가"},
+    {"id": "n2", "name": "나", "tags": ["신규"]},
+    {"id": "n3", "name": "다", "tags": ["책임"]},
+    {"id": "n4", "name": "라", "tags": ["신규"]},
+    {"id": "n5", "name": "마", "tags": ["책임"]},
 ]
 CODES = ["D", "E", "N", "O"]
 
@@ -103,7 +103,7 @@ FEATURE_RULES: list[dict] = [
     rule("window-weekend", require("person_window", cmp(cnt(not_in=["O"]), "le", 2), window=3,
                                    days={"kind": "weekend"})),
     rule("balance-hard", {"kind": "balance", "shifts": {"in": ["N"]}, "max_gap": {"value": "gap"}}, {"gap": 1}),
-    rule("balance-hours", {"kind": "balance", "people": {"exclude_tags": ["나이트전담"]},
+    rule("balance-hours", {"kind": "balance", "people": {"exclude_tags": ["신규"]},
                            "shifts": {"not_in": ["O"]}, "measure": "hours"}, hardness="soft", priority="low"),
 ]
 
@@ -122,7 +122,7 @@ SHAPE_RULES: dict[str, list[dict]] = {
     "count-day-max": [R.count("c", _E, "day", hi=4, days={"kind": "weekend"})],
     "count-day-min-max": [R.count("c", _D, "day", 3, 4, days={"kind": "weekday"})],
     "count-day-eq": [R.count("c", _N, "day", 2, 2)],
-    "count-day-people": [R.count("c", _E, "day", 1, people={"min_years": 3})],
+    "count-day-people": [R.count("c", _E, "day", 1, people={"tags": ["책임"]})],
     "count-day-hours": [R.count("c", _WORK, "day", hi=80, measure="hours")],
     "count-person-min": [R.count("c", _O, "person", 8)],
     "count-person-max-soft": [R.count("c", _N, "person", hi=0, hardness="soft", scope="period", priority="high",
@@ -145,7 +145,6 @@ SHAPE_RULES: dict[str, list[dict]] = {
     "balance-hard-gap": [R.balance("b", _N, 0, hardness="hard")],
     "balance-hours-no-history": [R.balance("b", _WORK, days={"kind": "weekend"}, measure="hours", with_history=False)],
     "default-coverage": [R.count("cov-D", _D, "day", 3, 3, default=True)],
-    "default-night-only": [R.night_only()],
 }
 
 

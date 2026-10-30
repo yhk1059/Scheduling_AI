@@ -10,7 +10,7 @@ spec_adapter = TypeAdapter(ConstraintSpec)
 
 
 def nurses(n: int = 3) -> list[dict]:
-    return [{"id": f"n{i:02d}", "name": f"간호사{i}", "years": i, "tags": []} for i in range(1, n + 1)]
+    return [{"id": f"n{i:02d}", "name": f"간호사{i}", "tags": []} for i in range(1, n + 1)]
 
 
 def request(constraints: list[dict], **extra) -> dict:

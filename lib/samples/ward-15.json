@@ -39,96 +39,77 @@
     {
       "id": "n01",
       "name": "이영희",
-      "years": 12,
       "tags": []
     },
     {
       "id": "n02",
       "name": "박민수",
-      "years": 9,
       "tags": []
     },
     {
       "id": "n03",
       "name": "김철수",
-      "years": 7,
       "tags": []
     },
     {
       "id": "n04",
       "name": "정유진",
-      "years": 5,
       "tags": []
     },
     {
       "id": "n05",
       "name": "최지훈",
-      "years": 3,
       "tags": []
     },
     {
       "id": "n06",
       "name": "강서연",
-      "years": 15,
       "tags": []
     },
     {
       "id": "n07",
       "name": "윤지민",
-      "years": 10,
       "tags": []
     },
     {
       "id": "n08",
       "name": "임하늘",
-      "years": 8,
       "tags": []
     },
     {
       "id": "n09",
       "name": "한소율",
-      "years": 6,
       "tags": []
     },
     {
       "id": "n10",
       "name": "오민준",
-      "years": 4,
       "tags": []
     },
     {
       "id": "n11",
       "name": "서예린",
-      "years": 2,
       "tags": []
     },
     {
       "id": "n12",
       "name": "신도윤",
-      "years": 1,
       "tags": []
     },
     {
       "id": "n13",
       "name": "조은비",
-      "years": 2,
       "tags": []
     },
     {
       "id": "n14",
       "name": "문가람",
-      "years": 11,
-      "tags": [
-        "나이트전담"
-      ]
+      "tags": []
     },
     {
       "id": "n15",
       "name": "배수아",
-      "years": 4,
-      "tags": [
-        "나이트전담"
-      ]
+      "tags": []
     }
   ],
   "period": {
@@ -160,9 +141,7 @@
           "people": {
             "ids": null,
             "tags": null,
-            "exclude_tags": [],
-            "min_years": null,
-            "max_years": null
+            "exclude_tags": []
           },
           "days": {
             "kind": "weekday",
@@ -219,9 +198,7 @@
           "people": {
             "ids": null,
             "tags": null,
-            "exclude_tags": [],
-            "min_years": null,
-            "max_years": null
+            "exclude_tags": []
           },
           "days": {
             "kind": "weekday",
@@ -278,9 +255,7 @@
           "people": {
             "ids": null,
             "tags": null,
-            "exclude_tags": [],
-            "min_years": null,
-            "max_years": null
+            "exclude_tags": []
           },
           "days": {
             "kind": "weekday",
@@ -337,9 +312,7 @@
           "people": {
             "ids": null,
             "tags": null,
-            "exclude_tags": [],
-            "min_years": null,
-            "max_years": null
+            "exclude_tags": []
           },
           "days": {
             "kind": "weekend",
@@ -396,9 +369,7 @@
           "people": {
             "ids": null,
             "tags": null,
-            "exclude_tags": [],
-            "min_years": null,
-            "max_years": null
+            "exclude_tags": []
           },
           "days": {
             "kind": "weekend",
@@ -455,9 +426,7 @@
           "people": {
             "ids": null,
             "tags": null,
-            "exclude_tags": [],
-            "min_years": null,
-            "max_years": null
+            "exclude_tags": []
           },
           "days": {
             "kind": "weekend",
@@ -509,9 +478,7 @@
           "people": {
             "ids": null,
             "tags": null,
-            "exclude_tags": [],
-            "min_years": null,
-            "max_years": null
+            "exclude_tags": []
           },
           "days": {
             "kind": "all",
@@ -618,9 +585,7 @@
           "people": {
             "ids": null,
             "tags": null,
-            "exclude_tags": [],
-            "min_years": null,
-            "max_years": null
+            "exclude_tags": []
           },
           "days": {
             "kind": "all",
@@ -677,9 +642,7 @@
           "people": {
             "ids": null,
             "tags": null,
-            "exclude_tags": [],
-            "min_years": null,
-            "max_years": null
+            "exclude_tags": []
           },
           "days": {
             "kind": "all",
@@ -736,9 +699,7 @@
           "people": {
             "ids": null,
             "tags": null,
-            "exclude_tags": [],
-            "min_years": null,
-            "max_years": null
+            "exclude_tags": []
           },
           "days": {
             "kind": "all",
@@ -793,11 +754,7 @@
         "people": {
           "ids": null,
           "tags": null,
-          "exclude_tags": [
-            "나이트전담"
-          ],
-          "min_years": null,
-          "max_years": null
+          "exclude_tags": []
         },
         "days": {
           "kind": "all",
@@ -838,9 +795,7 @@
         "people": {
           "ids": null,
           "tags": null,
-          "exclude_tags": [],
-          "min_years": null,
-          "max_years": null
+          "exclude_tags": []
         },
         "days": {
           "kind": "weekend",
@@ -857,68 +812,6 @@
         "with_history": true,
         "max_gap": {
           "value": "max_gap"
-        }
-      }
-    },
-    {
-      "id": "night-only",
-      "scope": "ward",
-      "hardness": "hard",
-      "weight": 10,
-      "source_text": "나이트 전담은 나이트와 휴무만",
-      "enabled": true,
-      "priority": "normal",
-      "type": "rule",
-      "default": true,
-      "values": {
-        "max": {
-          "value": 0.0,
-          "label": "최대 횟수"
-        }
-      },
-      "body": {
-        "kind": "require",
-        "for_each": {
-          "per": "person",
-          "people": {
-            "ids": null,
-            "tags": [
-              "나이트전담"
-            ],
-            "exclude_tags": [],
-            "min_years": null,
-            "max_years": null
-          },
-          "days": {
-            "kind": "all",
-            "weekdays": null,
-            "days": null
-          },
-          "window": null
-        },
-        "when": null,
-        "then": {
-          "left": {
-            "who": null,
-            "days": {
-              "kind": "all",
-              "weekdays": null,
-              "days": null
-            },
-            "offset": null,
-            "shifts": {
-              "in": null,
-              "not_in": [
-                "N",
-                "O"
-              ]
-            },
-            "measure": "count"
-          },
-          "op": "le",
-          "right": {
-            "value": "max"
-          }
         }
       }
     }
@@ -953,9 +846,7 @@
               "n01"
             ],
             "tags": null,
-            "exclude_tags": [],
-            "min_years": null,
-            "max_years": null
+            "exclude_tags": []
           },
           "days": {
             "kind": "all",
@@ -1018,9 +909,7 @@
               "n02"
             ],
             "tags": null,
-            "exclude_tags": [],
-            "min_years": null,
-            "max_years": null
+            "exclude_tags": []
           },
           "days": {
             "kind": "weekend",
@@ -1079,9 +968,7 @@
               "n04"
             ],
             "tags": null,
-            "exclude_tags": [],
-            "min_years": null,
-            "max_years": null
+            "exclude_tags": []
           },
           "days": {
             "kind": "all",

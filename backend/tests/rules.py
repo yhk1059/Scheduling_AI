@@ -4,11 +4,10 @@ import json
 from datetime import date, timedelta
 from pathlib import Path
 
-from backend.domain.constants import HISTORY_DAYS, NIGHT_ONLY_TAG
+from backend.domain.constants import HISTORY_DAYS
 
 SAMPLE_PATH = Path(__file__).resolve().parents[2] / "lib" / "samples" / "ward-15.json"
 
-NIGHT_ONLY_RULE_ID = "night-only"
 
 N, O = {"in": ["N"]}, {"in": ["O"]}
 WORK = {"not_in": ["O"]}
@@ -117,10 +116,6 @@ def min_off(cid: str, days: int, **extra) -> dict:
     return count(cid, O, "person", lo=days, **extra)
 
 
-def skill_mix(cid: str, shift: str, min_years: int, n: int, **extra) -> dict:
-    return count(cid, {"in": [shift]}, "day", lo=n, people={"min_years": min_years}, **extra)
-
-
 def weekly_hours(cid: str, hours: float, **extra) -> dict:
     """사람·달력 주마다 근무 시간 hours 이하."""
     return count(cid, WORK, "person_week", hi=hours, measure="hours", **extra)
@@ -163,7 +158,7 @@ def balance(cid: str, shifts: dict, max_gap: float = 1, **extra) -> dict:
 
 
 def night_fair(cid: str = "nf", **extra) -> dict:
-    return balance(cid, N, people={"exclude_tags": [NIGHT_ONLY_TAG]}, **extra)
+    return balance(cid, N, **extra)
 
 
 def weekend_fair(cid: str = "wf", **extra) -> dict:
@@ -180,12 +175,6 @@ def conditional(cid: str, shift: str, if_who: dict, then_who: dict, n: int = 1, 
 def pair_forbid(cid: str, ids: list[str], shift: str, **extra) -> dict:
     """짝 따로(설계 §2.6): 날마다 두 사람 중 shift는 1명 이하."""
     return con(cid, require("day", cmp(cnt({"in": [shift]}, who={"ids": ids}), "le", 1)), **extra)
-
-
-def night_only(cid: str = NIGHT_ONLY_RULE_ID) -> dict:
-    """기본 규칙 "나이트 전담은 나이트와 휴무만": 나이트 전담 태그는 사람마다 나이트·휴무 말고 0번."""
-    return count(cid, {"not_in": ["N", "O"]}, "person", hi=0, people={"tags": [NIGHT_ONLY_TAG]}, default=True,
-                 source_text="나이트 전담은 나이트와 휴무만")
 
 
 def history(start: str, rows: dict[str, list[str]], holidays: list[str] = ()) -> dict:

@@ -158,10 +158,9 @@ OLD_LEAVE = {"id": "lv", "type": "leave", "scope": "period", "source_text": "x",
     "make_old",
     [
         lambda d: d.update(history_load=[{"nurse_id": "n03", "nights": 8, "weekends": 2}]),
-        lambda d: d["nurses"][0].update(night_only=True),
         lambda d: d["constraints"].append(OLD_LEAVE),
     ],
-    ids=["history_load", "night_only", "template"],
+    ids=["history_load", "template"],
 )
 def test_solve_rejects_old_format(make_old):
     data = sample()
@@ -221,13 +220,13 @@ def test_translate_conditional_rule(llm):
         "body": {
             "kind": "require",
             "for_each": {"per": "day"},
-            "when": {"left": {"who": {"min_years": 10}, "shifts": {"in": ["N"]}}, "op": "ge", "right": 1},
-            "then": {"left": {"who": {"max_years": 5}, "shifts": {"in": ["N"]}}, "op": "le", "right": 1},
+            "when": {"left": {"who": {"ids": ["n01"]}, "shifts": {"in": ["N"]}}, "op": "ge", "right": 1},
+            "then": {"left": {"who": {"ids": ["n02"]}, "shifts": {"in": ["N"]}}, "op": "le", "right": 1},
         },
-        "source_text": "고연차가 나이트면 저연차는 1명까지",
+        "source_text": "이영희가 나이트면 박민수는 1번까지",
     }
     llm.responses = [ok({"rules": [conditional]})]
-    r = client.post("/api/py/translate", json=translate_body("고연차가 나이트면 저연차는 1명까지"))
+    r = client.post("/api/py/translate", json=translate_body("이영희가 나이트면 박민수는 1번까지"))
     (rule,) = r.json()["constraints"]
     assert rule["body"]["when"]["op"] == "ge" and rule["body"]["then"]["right"] == 1
 
@@ -507,7 +506,7 @@ def test_explain_stops_when_verify_budget_exhausted(llm, monkeypatch):
 
 def test_413_too_many_nurses():
     data = sample()
-    data["nurses"] = [{"id": f"x{i}", "name": f"이름{i}", "years": 1} for i in range(MAX_NURSES + 1)]
+    data["nurses"] = [{"id": f"x{i}", "name": f"이름{i}"} for i in range(MAX_NURSES + 1)]
     data["constraints"] = []
     assert_error(client.post("/api/py/solve", json=data), 413, "PAYLOAD_TOO_LARGE")
 
@@ -711,9 +710,9 @@ def test_constraint_cap_counts_rules():
 
 def test_422_pydantic_error_has_field_path():
     data = sample()
-    data["nurses"][0]["years"] = -1
+    data["nurses"][0]["name"] = ""
     err = assert_error(client.post("/api/py/solve", json=data), 422, "VALIDATION_ERROR")
-    assert "nurses.0.years" in err["message"]
+    assert "nurses.0.name" in err["message"]
 
 
 def test_422_referential_integrity_has_constraint_id():

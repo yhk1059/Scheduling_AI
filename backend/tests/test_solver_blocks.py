@@ -22,8 +22,8 @@ def config(*extra: dict) -> dict:
     return {"shifts": BASE_SHIFTS[:3] + list(extra) + BASE_SHIFTS[3:]}
 
 
-def nurse(nid: str, years: int = 5, tags: list[str] | None = None) -> dict:
-    return {"id": nid, "name": f"간호사{nid}", "years": years, "tags": tags or []}
+def nurse(nid: str, tags: list[str] | None = None) -> dict:
+    return {"id": nid, "name": f"간호사{nid}", "tags": tags or []}
 
 
 def daily(code: str, n: int, **params) -> dict:
@@ -63,14 +63,13 @@ def runs(seq: list[str], pred) -> list[tuple[int, int]]:
 
 def test_people_selector():
     req = request(
-        [nurse("a", 1, ["신규"]), nurse("b", 3, ["책임"]), nurse("c", 10, ["책임", "나이트전담"]), nurse("d", 7)],
+        [nurse("a", ["신규"]), nurse("b", ["책임"]), nurse("c", ["책임", "파트"]), nurse("d")],
         [],
     )
     assert select.people(req, People()) == ["a", "b", "c", "d"]
     assert select.people(req, People(ids=["d", "a"])) == ["a", "d"]
     assert select.people(req, People(tags=["책임", "신규"])) == ["a", "b", "c"]
-    assert select.people(req, People(tags=["책임"], exclude_tags=["나이트전담"])) == ["b"]
-    assert select.people(req, People(min_years=3, max_years=7)) == ["b", "d"]
+    assert select.people(req, People(tags=["책임"], exclude_tags=["파트"])) == ["b"]
 
 
 def test_days_selector():
@@ -250,16 +249,16 @@ def test_soft_hours_violation_normalized_by_base_shift():
 
 
 def test_infeasible_rule_ids_in_core():
-    nurses = [nurse("a", tags=["나이트전담"]), nurse("b", tags=["나이트전담"])]
+    nurses = [nurse("a", tags=["파트"]), nurse("b", tags=["파트"])]
     rules = [
-        count("night-only", {"not_in": ["N", "O"]}, "person", hi=0, people={"tags": ["나이트전담"]}),
+        count("part-n", {"not_in": ["N", "O"]}, "person", hi=0, people={"tags": ["파트"]}),
         daily("D", 1),
         daily("N", 1),
         max_run("max-n", N, 5),
     ]
     req = request(nurses, rules, length=3)
     assert isinstance(solve(req, analyze_conflicts=False), SolveInfeasible)
-    assert {c.constraint_id for c in find_conflicts(req)} == {"night-only", "cov-D"}
+    assert {c.constraint_id for c in find_conflicts(req)} == {"part-n", "cov-D"}
     assert {c.type for c in find_conflicts(req)} == {"rule"}
 
 

@@ -5,7 +5,7 @@ from typing import Any
 
 from pydantic import TypeAdapter, ValidationError
 
-from backend.domain.constants import LLM_MAX_RETRIES, MAX_PROPOSALS, NIGHT_ONLY_TAG
+from backend.domain.constants import LLM_MAX_RETRIES, MAX_PROPOSALS
 from backend.domain.models import (
     Conflict,
     ConstraintChange,
@@ -30,12 +30,6 @@ def fallback_explanation(request: ScheduleRequest, conflicts: list[Conflict]) ->
     return f"다음 규칙들이 동시에 지켜질 수 없습니다: {quoted}."
 
 
-def _is_night_dedicated_rule(spec: Rule) -> bool:
-    body = spec.body
-    people = body.people if body.kind == "balance" else body.for_each.people
-    return NIGHT_ONLY_TAG in (people.tags or [])
-
-
 def _conflict_item(c: Conflict, spec: Any, nurses: list) -> dict:
     """충돌 제약 하나. 식 규칙은 식 JSON(기본값 생략) + label 있는 values, 칸 고정은 params."""
     item: dict[str, Any] = {"id": c.constraint_id, "type": c.type, "hardness": spec.hardness if spec else None}
@@ -57,7 +51,7 @@ def _context_message(request: ScheduleRequest, specs: dict[str, Any], conflicts:
     context = {
         "config": {"shifts": [s.model_dump(include={"code", "name", "hours", "parts", "active"}) for s in request.config.shifts]},
         "nurse_count": len(nurses),
-        "nurses": [{"id": n.id, "years": n.years, "tags": n.tags} for n in nurses],
+        "nurses": [{"id": n.id, "tags": n.tags} for n in nurses],
         "period": {"start": period.start_date.isoformat(), "end": period.date_of(days).isoformat(), "length": days},
         "days": [{"day": d, "date": period.date_of(d).isoformat()} for d in range(1, days + 1)],
         "weekend_and_holiday_days": weekends,
@@ -83,9 +77,7 @@ def _parse(result: ToolCallResult) -> ExplainerOutput:
 
 
 def _check_rule_change(change: ConstraintChange, spec: Rule) -> ConstraintChange | None:
-    """식 규칙은 값·켜기/끄기·반드시/가능하면만 바꾼다(★7). 나이트 전담 규칙 완화는 거부한다."""
-    if _is_night_dedicated_rule(spec):
-        return None
+    """식 규칙은 값·켜기/끄기·반드시/가능하면만 바꾼다(★7)."""
     if change.action == "disable":
         return ConstraintChange(action="disable", constraint_id=change.constraint_id)
     try:

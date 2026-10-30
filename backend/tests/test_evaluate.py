@@ -9,12 +9,12 @@ from backend.solver.evaluate import Instance, RuleViolation, evaluate_rule, inst
 
 START = date(2026, 11, 5)  # 목요일. 1=목 2=금 3=토 4=일 5=월 … 14=수
 NURSES = [
-    {"id": "n1", "name": "가", "years": 5},
-    {"id": "n2", "name": "나", "years": 2, "tags": ["신규"]},
-    {"id": "n3", "name": "다", "years": 10, "tags": ["책임"]},
-    {"id": "n4", "name": "라", "years": 1, "tags": ["신규"]},
-    {"id": "n5", "name": "마", "years": 8, "tags": ["나이트전담"]},
-    {"id": "n6", "name": "바", "years": 3, "tags": ["책임"]},
+    {"id": "n1", "name": "가"},
+    {"id": "n2", "name": "나", "tags": ["신규"]},
+    {"id": "n3", "name": "다", "tags": ["책임"]},
+    {"id": "n4", "name": "라", "tags": ["신규"]},
+    {"id": "n5", "name": "마"},
+    {"id": "n6", "name": "바", "tags": ["책임"]},
 ]
 
 

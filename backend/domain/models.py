@@ -100,7 +100,6 @@ def covers(config: WardConfig, code: str) -> set[str]:
 class Nurse(_Strict):
     id: str = Field(min_length=1)
     name: str = Field(min_length=1)
-    years: int = Field(ge=0)
     tags: list[Tag] = Field(default=[], max_length=MAX_TAGS_PER_NURSE)
 
 
@@ -161,14 +160,6 @@ class People(_Strict):
     ids: list[str] | None = None
     tags: list[Tag] | None = None  # 이 태그 중 하나라도
     exclude_tags: list[Tag] = []
-    min_years: int | None = Field(default=None, ge=0)
-    max_years: int | None = Field(default=None, ge=0)
-
-    @model_validator(mode="after")
-    def _years(self):
-        if self.min_years is not None and self.max_years is not None and self.min_years > self.max_years:
-            raise ValueError(f"min_years({self.min_years})가 max_years({self.max_years})보다 큽니다")
-        return self
 
 
 class Days(_Strict):
@@ -328,7 +319,7 @@ class Rule(_BlockBase):
     """규칙 = 범위 + 본문. 기본 hardness는 require가 hard, balance가 soft·낮음(블록과 같다)."""
 
     type: Literal["rule"]
-    default: bool = False  # 기본 규칙(필요 인원·나이트전담)
+    default: bool = False  # 기본 규칙(필요 인원)
     values: dict[ValueName, Value] = Field(default={}, max_length=MAX_RULE_VALUES)
     body: Annotated[Require | Balance, Field(discriminator="kind")]
 

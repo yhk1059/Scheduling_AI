@@ -31,10 +31,10 @@ from backend.llm.pseudonym import restore
 from backend.llm.translator import translate
 
 NURSES = [
-    Nurse(id="n01", name="이영희", years=12),
-    Nurse(id="n02", name="박민수", years=9),
-    Nurse(id="n03", name="김민수", years=2),
-    Nurse(id="n14", name="문가람", years=11, tags=["나이트전담"]),
+    Nurse(id="n01", name="이영희"),
+    Nurse(id="n02", name="박민수"),
+    Nurse(id="n03", name="김민수"),
+    Nurse(id="n14", name="문가람", tags=["주방"]),
 ]
 
 
@@ -121,7 +121,7 @@ def staffing(shifts: dict, at_least: float, who: dict | None = None, days: dict 
     return rule(for_each, cmp(left, "ge", {"value": "min"}), values={"min": val(at_least, "최소 인원")})
 
 
-NIGHT_FAIR = balance(people={"exclude_tags": ["나이트전담"]}, shifts=N)
+NIGHT_FAIR = balance(shifts=N)
 MID = {"code": "M", "name": "미드", "hours": 8, "start": "11:00"}
 AFTER_NIGHT = rule(
     {"per": "person_day"},
@@ -131,12 +131,12 @@ AFTER_NIGHT = rule(
     hardness="hard",
 )
 TAGGED = [
-    Nurse(id="n01", name="이영희", years=12, tags=["책임"]),
-    Nurse(id="n02", name="박민수", years=9),
-    Nurse(id="n03", name="김민수", years=2, tags=["신규"]),
-    Nurse(id="n04", name="정유진", years=5, tags=["책임"]),
-    Nurse(id="n05", name="최지훈", years=3, tags=["신규"]),
-    Nurse(id="n14", name="문가람", years=11, tags=["나이트전담"]),
+    Nurse(id="n01", name="이영희", tags=["책임"]),
+    Nurse(id="n02", name="박민수"),
+    Nurse(id="n03", name="김민수", tags=["신규"]),
+    Nurse(id="n04", name="정유진", tags=["책임"]),
+    Nurse(id="n05", name="최지훈", tags=["신규"]),
+    Nurse(id="n14", name="문가람", tags=["주방"]),
 ]
 
 
@@ -173,7 +173,7 @@ def test_context_has_period_and_days():
 
 
 def test_context_has_config_tags_and_known_tags():
-    nurses = [*NURSES[:3], Nurse(id="n04", name="정유진", years=5, tags=["책임"])]
+    nurses = [*NURSES[:3], Nurse(id="n04", name="정유진", tags=["책임"])]
     req = request("나이트 공평하게")
     req = req.model_copy(update={"context": req.context.model_copy(update={"nurses": nurses + NURSES[3:]})})
     client = FakeClient(ok({"rules": [NIGHT_FAIR]}))
@@ -182,9 +182,9 @@ def test_context_has_config_tags_and_known_tags():
     assert [s["code"] for s in context["config"]["shifts"]] == ["D", "E", "N", "O"]
     assert context["config"]["shifts"][0] == {"code": "D", "name": "데이", "hours": 8, "parts": [], "active": True}
     by_id = {n["id"]: n for n in context["nurses"]}
-    assert by_id["n04"] == {"id": "n04", "years": 5, "tags": ["책임"]}
-    assert by_id["n14"]["tags"] == ["나이트전담"]
-    assert context["known_tags"] == ["나이트전담", "책임"]
+    assert by_id["n04"] == {"id": "n04", "tags": ["책임"]}
+    assert by_id["n14"]["tags"] == ["주방"]
+    assert context["known_tags"] == ["주방", "책임"]
 
 
 def test_context_cross_month_period():
@@ -448,14 +448,14 @@ def test_missing_value_ref_then_fixed():
 
 
 def test_empty_people_clarify():
-    # 30년차 이상 아무도 없음 → 세기 who 0명
-    res, _ = retry_then_clarify({"rules": [staffing(D, 1, who={"min_years": 30})]}, request("30년차 이상 1명은 데이에", "ward"))
+    # 이영희는 주방 태그가 아님 → 세기 who 0명
+    res, _ = retry_then_clarify({"rules": [staffing(D, 1, who={"ids": ["n01"], "tags": ["주방"]})]}, request("주방 이영희 1명은 데이에", "ward"))
     assert "간호사가 없어요" in res.question
 
 
 def test_empty_scope_people_clarify():
-    min_off = rule({"per": "person", "people": {"min_years": 30}}, cmp(n({"in": ["O"]}), "ge", 8))
-    res, retry = retry_then_clarify({"rules": [min_off]}, request("30년차 이상 8일 휴무", "ward"))
+    min_off = rule({"per": "person", "people": {"ids": ["n01"], "tags": ["주방"]}}, cmp(n({"in": ["O"]}), "ge", 8))
+    res, retry = retry_then_clarify({"rules": [min_off]}, request("주방 이영희 8일 휴무", "ward"))
     assert "간호사가 없어요" in res.question
     assert "for_each.people" in retry
 
@@ -467,30 +467,9 @@ def test_empty_days_clarify():
     assert "날이 없어요" in res.question
 
 
-def test_night_only_tag_with_nobody_is_empty_target():
-    req = request("나이트 전담은 나이트만")
-    nurses = [x.model_copy(update={"tags": []}) for x in NURSES]
-    req = req.model_copy(update={"context": req.context.model_copy(update={"nurses": nurses})})
-    night_only = rule(
-        {"per": "person", "people": {"tags": ["나이트전담"]}},
-        cmp(n({"not_in": ["N", "O"]}), "le", {"value": "max"}),
-        values={"max": val(0)},
-    )
-    res, _ = retry_then_clarify({"rules": [night_only]}, req)
-    assert "나이트전담" in res.question
-
-
-def test_exclude_night_only_tag_is_known_even_if_unused():
-    nurses = [x.model_copy(update={"tags": []}) for x in NURSES]
-    req = request("나이트 고르게", "ward")
-    req = req.model_copy(update={"context": req.context.model_copy(update={"nurses": nurses})})
-    res = translate(req, FakeClient(ok({"rules": [NIGHT_FAIR]})))
-    assert isinstance(res, TranslateOk)
-
-
 def test_staffing_more_than_people_clarify():
-    # 3년차 이상은 n01, n02, n14 세 명뿐인데 하루 4명
-    res, _ = retry_then_clarify({"rules": [staffing(D, 4, who={"min_years": 3})]}, request("3년차 이상 데이 4명", "ward"))
+    # 주방을 빼면 n01, n02, n03 세 명뿐인데 하루 4명
+    res, _ = retry_then_clarify({"rules": [staffing(D, 4, who={"exclude_tags": ["주방"]})]}, request("주방 빼고 데이 4명", "ward"))
     assert "4" in res.question and "3" in res.question
 
 

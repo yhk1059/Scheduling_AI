@@ -4,10 +4,10 @@ from backend.domain.models import Nurse
 from backend.llm.pseudonym import pseudonymize, restore
 
 NURSES = [
-    Nurse(id="n01", name="이영희", years=12),
-    Nurse(id="n02", name="김민수", years=9),
-    Nurse(id="n03", name="박민수", years=7),
-    Nurse(id="n10", name="최지훈", years=3),
+    Nurse(id="n01", name="이영희"),
+    Nurse(id="n02", name="김민수"),
+    Nurse(id="n03", name="박민수"),
+    Nurse(id="n10", name="최지훈"),
 ]
 
 
@@ -36,7 +36,7 @@ def test_restore():
 
 
 def test_restore_does_not_touch_longer_ids():
-    nurses = [Nurse(id="n1", name="가나다", years=1), Nurse(id="n10", name="라마바", years=1)]
+    nurses = [Nurse(id="n1", name="가나다"), Nurse(id="n10", name="라마바")]
     assert restore("n10과 n1", nurses) == "라마바과 가나다"
 
 

@@ -3,16 +3,13 @@
 import json
 from pathlib import Path
 
-from backend.domain.constants import NIGHT_ONLY_TAG
 from backend.domain.models import ScheduleRequest, SolveOk
 from backend.gen_demo import DEMO_PERIOD, demo_request
 from backend.solver.model import solve
-from backend.tests.rules import NIGHT_ONLY_RULE_ID
 
 ROOT = Path(__file__).resolve().parents[2]
 WARD = json.loads((ROOT / "lib" / "samples" / "ward-15.json").read_text(encoding="utf-8"))
 DEMO = json.loads((ROOT / "lib" / "samples" / "demo-schedule.json").read_text(encoding="utf-8"))
-NIGHT_ONLY = {n["id"] for n in WARD["nurses"] if NIGHT_ONLY_TAG in n["tags"]}
 
 
 def _assignments() -> dict[str, list[str]]:
@@ -28,7 +25,7 @@ def _max_run(row: list[str]) -> int:
 
 
 def test_sample_ward_rules():
-    """샘플 병동 파일(lib/samples)은 식 규칙이다. 필요 인원·나이트전담은 기본 규칙."""
+    """샘플 병동 파일(lib/samples)은 식 규칙이다. 필요 인원은 기본 규칙."""
     rules = {c["id"]: c for c in WARD["constraints"] if not c["id"].startswith("cov-")}
     assert all(c["scope"] == "ward" and c["type"] == "rule" for c in WARD["constraints"])
     assert all(c["default"] for c in WARD["constraints"] if c["id"].startswith("cov-"))
@@ -39,7 +36,6 @@ def test_sample_ward_rules():
         "rule-min-off": ("hard", False),
         "rule-night-fair": ("soft", False),
         "rule-weekend-fair": ("soft", False),
-        NIGHT_ONLY_RULE_ID: ("hard", True),
     }
     assert rules["rule-max-work"]["values"]["max_len"]["value"] == 5
     assert rules["rule-max-nights"]["values"]["max_len"]["value"] == 3
@@ -53,7 +49,6 @@ def test_demo_request_uses_ward_rules_only():
     assert req.holidays == [] and req.carry_over == [] and req.previous is None
     assert [c.id for c in req.constraints] == [c["id"] for c in WARD["constraints"]]
     assert {c.type for c in req.constraints} == {"rule"}
-    assert {n.id for n in req.nurses if NIGHT_ONLY_TAG in n.tags} == NIGHT_ONLY
 
 
 def test_file_records_period():
@@ -66,13 +61,11 @@ def test_schedule_shape():
     assert all(len(row) == DEMO_PERIOD["length"] for row in a.values())
 
 
-def test_night_only_gets_days_off():
+def test_everyone_gets_days_off():
     a = _assignments()
     for nid, row in a.items():
         assert row.count("O") >= 8, nid
         assert _max_run(row) <= 5, nid
-    for nid in NIGHT_ONLY:
-        assert set(a[nid]) <= {"N", "O"}
 
 
 def test_schedule_satisfies_ward_rules():

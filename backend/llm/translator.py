@@ -5,7 +5,7 @@ import json
 import uuid
 from pydantic import ValidationError
 
-from backend.domain.constants import LLM_MAX_RETRIES, NIGHT_ONLY_TAG, OFF_CODE
+from backend.domain.constants import LLM_MAX_RETRIES, OFF_CODE
 from backend.domain.models import (
     All,
     Balance,
@@ -46,8 +46,8 @@ class _OutputError(Exception):
 
 
 def _known_tags(ctx: TranslateContext) -> list[str]:
-    """병동 태그 목록: 명단의 태그 ∪ 나이트 전담(추천 태그라 늘 있다)."""
-    return sorted({t for n in ctx.nurses for t in n.tags} | {NIGHT_ONLY_TAG})
+    """병동 태그 목록: 명단의 태그."""
+    return sorted({t for n in ctx.nurses for t in n.tags})
 
 
 def _context_message(req: TranslateRequest, text: str) -> str:
@@ -70,7 +70,7 @@ def _context_message(req: TranslateRequest, text: str) -> str:
         "weekend_and_holiday_days": [d["day"] for d in days if d["weekend"]],
         "holidays": sorted(ctx.holidays),
         "config": {"shifts": [s.model_dump(include={"code", "name", "hours", "parts", "active"}) for s in ctx.config.shifts]},
-        "nurses": [{"id": n.id, "years": n.years, "tags": n.tags} for n in ctx.nurses],
+        "nurses": [{"id": n.id, "tags": n.tags} for n in ctx.nurses],
         "known_tags": _known_tags(ctx),
     }
     return f"<context>\n{json.dumps(context, ensure_ascii=False)}\n</context>\n<input>\n{text}\n</input>"
@@ -112,10 +112,6 @@ def _people(nurses: list[Nurse], sel: People) -> list[str]:
         if sel.tags is not None and not set(sel.tags) & tags:
             continue
         if set(sel.exclude_tags) & tags:
-            continue
-        if sel.min_years is not None and n.years < sel.min_years:
-            continue
-        if sel.max_years is not None and n.years > sel.max_years:
             continue
         out.append(n.id)
     return out

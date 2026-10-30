@@ -29,7 +29,7 @@ const COPY = {
     placeholder: "예: 나이트 다음 날은 무조건 쉬게",
     submit: "규칙 만들기",
     empty: "아직 규칙이 없어요.",
-    examples: ["나이트 다음 날은 무조건 쉬게", "3년차 이상이 매 근무 1명은 있게", "나이트는 3일 넘게 연속으로 하지 않게"],
+    examples: ["나이트 다음 날은 무조건 쉬게", "책임 태그가 매 근무 1명은 있게", "나이트는 3일 넘게 연속으로 하지 않게"],
   },
   intro: {
     title: "병동 소개",
@@ -102,7 +102,7 @@ export default function RulesStep({
   const pendingCount = pending.length + configCards.length;
   const order = ward.cardOrder ?? [];
   const rank = (id: string) => (order.includes(id) ? order.indexOf(id) : order.length);
-  // 기본 규칙(필요 인원·나이트 전담)은 맨 위에 둔다
+  // 기본 규칙(필요 인원)은 맨 위에 둔다
   const isDefault = (c: ConstraintSpec | null) => c?.type === "rule" && c.default === true;
   const items = [
     ...configCards.map((cfg) => ({ id: cfg.id, cfg, entry: null })),
@@ -157,7 +157,7 @@ export default function RulesStep({
       const { nurses, period: range, holidays } = period
         ? toScheduleRequest(ward, period, useAppStore.getState().periods, today())
         : {
-            nurses: ward.nurses.filter((n) => n.active).map(({ id, name, years, tags }) => ({ id, name, years, tags })),
+            nurses: ward.nurses.filter((n) => n.active).map(({ id, name, tags }) => ({ id, name, tags })),
             period: previewRange(ward.unit),
             holidays: [],
           };

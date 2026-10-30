@@ -33,7 +33,7 @@ NF = R.night_fair()
 # 블록(옛 기대값 모양). 채점기·데이터셋 검증이 거절하는지 볼 때만 쓴다
 LEAVE_BLOCK = {"type": "count", "hardness": "hard", "params": {"people": {"ids": ["n01"]}, "days": {"days": [15]},
                                                                "shifts": {"not_in": ["O"]}, "per": "person", "max": 0}}
-NF_BLOCK = {"type": "balance", "hardness": "soft", "params": {"people": {"exclude_tags": ["나이트전담"]}, "shifts": {"in": ["N"]}}}
+NF_BLOCK = {"type": "balance", "hardness": "soft", "params": {"shifts": {"in": ["N"]}}}
 RUN_BLOCK = {"type": "sequence", "hardness": "hard", "params": {"run": {"in": ["N"]}, "max_len": 3}}
 
 
@@ -250,12 +250,10 @@ def test_expr_shapes_mismatch(expected, actual):
         (R.min_run("x", R.N, 2), R.min_run("x", R.N, 3)),
         (R.count("x", {"in": ["D"]}, "day", 3, 4, days={"kind": "weekday"}),
          R.count("x", {"in": ["D"]}, "day", 3, 3, days={"kind": "weekday"})),
-        (R.skill_mix("x", "N", 3, 1), R.skill_mix("x", "N", 4, 1)),
         (R.weekly_hours("x", 52), R.weekly_hours("x", 40)),
         (R.window_off("x", 7), R.window_off("x", 8)),
         (R.count("x", {"in": ["D"]}, "day", lo=1, people={"tags": ["책임"]}),
          R.count("x", {"in": ["D"]}, "day", lo=1, people={"tags": ["신규"]})),
-        (NF, R.balance("x", R.N)),
     ],
 )
 def test_different_rule_mismatch(expected, actual):
@@ -367,7 +365,6 @@ def test_eval_ward_tags():
     tags = {n["id"]: n.get("tags", []) for n in ward["nurses"]}
     assert sum("책임" in t for t in tags.values()) == 2
     assert sum("신규" in t for t in tags.values()) == 3
-    assert {i for i, t in tags.items() if "나이트전담" in t} == {"n14", "n15"}
 
 
 CROSS = {"start_date": "2026-11-23", "length": 14}
@@ -402,8 +399,8 @@ def test_real_dataset_valid():
     cases = run.load_dataset(run.DATASET)
     assert run.validate_dataset(cases) == []
     sets = [c["set"] for c in cases]
-    assert sets.count("basic") == 49  # 기존 케이스 전부(w·h·m·c·u 44건 + 기간 경계 p 5건)
-    assert sets.count("new") == 30
+    assert sets.count("basic") == 47  # w·h·m·c·u 42건 + 기간 경계 p 5건
+    assert sets.count("new") == 27
     assert sets.count("expr") >= 20
 
 

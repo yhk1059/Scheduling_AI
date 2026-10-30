@@ -5,7 +5,7 @@ import { useState, type ReactNode } from "react";
 import { ApiError, errorMessage, explain, solve } from "@/lib/api";
 import { toScheduleCsv } from "@/lib/csv";
 import { historyLoadFor, isOperating } from "@/lib/continuity";
-import { DEFAULT_CONFIG, NIGHT_ONLY_TAG } from "@/lib/rules";
+import { DEFAULT_CONFIG } from "@/lib/rules";
 import { dayHeader, dayOfDate, isWeekendDay, monthDay, periodDays, periodEnd } from "@/lib/period";
 import {
   carryOverChanged,
@@ -83,17 +83,16 @@ type Load = { nights: number; weekends: number };
 
 /**
  * 누적 부담 근거 한 줄. 최근 4주 나이트가 평균보다 많았던 간호사 중 이번 근무표 N이 평균 이하인 사람.
- * 나이트 전담은 나이트 공정성에서 빠지므로 제외한다. 해당자가 없거나 history가 비면 null.
+ * 해당자가 없거나 history가 비면 null.
  */
 function historyEvidence(rows: Nurse[], result: ScheduleResult, history: Map<string, Load>): string | null {
-  const pool = rows.filter((n) => !n.tags?.includes(NIGHT_ONLY_TAG));
-  if (history.size === 0 || pool.length === 0) return null;
+  if (history.size === 0 || rows.length === 0) return null;
   const past = (n: Nurse) => history.get(n.id)?.nights ?? 0;
   const now = (n: Nurse) => result.stats[n.id]?.counts?.N ?? result.assignments[n.id].filter((c) => c === "N").length;
-  const avg = (f: (n: Nurse) => number) => pool.reduce((sum, n) => sum + f(n), 0) / pool.length;
+  const avg = (f: (n: Nurse) => number) => rows.reduce((sum, n) => sum + f(n), 0) / rows.length;
   const pastAvg = avg(past);
   const nowAvg = avg(now);
-  const eased = pool.filter((n) => past(n) > pastAvg && now(n) <= nowAvg);
+  const eased = rows.filter((n) => past(n) > pastAvg && now(n) <= nowAvg);
   if (eased.length === 0) return null;
   if (eased.length === 1) return `${eased[0].name} 최근 4주 나이트 ${past(eased[0])}회 → 이번 근무표 ${now(eased[0])}회`;
   return `최근 4주 나이트가 많았던 ${eased.length}명은 이번 근무표에서 나이트를 줄였어요`;
@@ -791,9 +790,9 @@ export function ScheduleGrid({
   // 최근 4주 기록이 하나도 없으면(첫 근무표) 누적 부담 열을 그리지 않는다
   const showHistory = [...(history?.values() ?? [])].some((h) => h.nights > 0 || h.weekends > 0);
   const dayList = pdays.map((p) => p.day);
-  // grid-cols-[150px_44px_repeat(N,30px)_repeat(K,34px)_repeat(2,44px)], N = 기간 길이, K = 근무 코드 수
+  // grid-cols-[150px_repeat(N,30px)_repeat(K,34px)_repeat(2,44px)], N = 기간 길이, K = 근무 코드 수
   const grid = {
-    gridTemplateColumns: `150px 44px repeat(${period.length}, 30px) repeat(${codes.length}, 34px)${showHistory ? " repeat(2, 44px)" : ""}`,
+    gridTemplateColumns: `150px repeat(${period.length}, 30px) repeat(${codes.length}, 34px)${showHistory ? " repeat(2, 44px)" : ""}`,
   };
   const rowClass = "grid gap-x-0.5";
   const weekendBg = (d: number) => (isWeekend(d) ? "bg-[#F1EEE6]" : "");
@@ -811,7 +810,6 @@ export function ScheduleGrid({
       <div className="flex w-max flex-col gap-0.5">
         <div className={rowClass} style={grid}>
           <span className="flex items-end text-xs font-medium text-[#66665E]">이름</span>
-          <span className="flex items-end text-xs font-medium text-[#66665E]">연차</span>
           {pdays.map(({ day: d, weekday: w }) => {
             const color = w === 0 || holidays.includes(d) ? "text-[#B42318]" : w === 6 ? "text-[#155E75]" : "text-[#66665E]";
             return (
@@ -850,7 +848,6 @@ export function ScheduleGrid({
                 {n.name}
                 {n.tags?.length ? <span className="ml-1.5 truncate text-xs font-medium text-[#66665E]">{n.tags.join(" · ")}</span> : null}
               </span>
-              <span className="flex h-7 items-center font-mono text-[13px] text-[#3D3D38]">{n.years}</span>
               {row.map((code, i) => {
                 const d = i + 1;
                 const { month: m, dom } = pdays[i];

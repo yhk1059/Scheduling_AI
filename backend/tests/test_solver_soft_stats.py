@@ -9,6 +9,8 @@ from backend.solver.model import build_model, solve
 from backend.solver.stats import compute_result
 from backend.tests import rules
 from backend.tests.rules import (
+    N,
+    balance,
     coverage,
     history,
     max_nights,
@@ -17,7 +19,6 @@ from backend.tests.rules import (
     night_fair,
     off_after_night,
     sample_data,
-    skill_mix,
     weekend_fair,
 )
 from backend.tests.test_solver_hard import START, WEEKENDS, forbid, nurse, request, solve_ok
@@ -72,9 +73,9 @@ def test_soft_constraint_creates_no_hard_literal():
 
 
 def test_night_fairness_reduces_or_keeps_spread():
-    nurses = [nurse(f"n{i}") for i in range(1, 6)] + [nurse("n6", tags=["나이트전담"])]
+    nurses = [nurse(f"n{i}") for i in range(1, 7)]
     base = [coverage("N", k, 2, 2) for k in ("weekday", "weekend")]
-    regular = [f"n{i}" for i in range(1, 6)]
+    regular = [f"n{i}" for i in range(1, 7)]
 
     without = solve_ok(request(nurses, base))
     with_fair = solve_ok(request(nurses, base + [night_fair()]))
@@ -134,7 +135,12 @@ def test_solve_fills_result_stats():
 
 
 def stats_request(constraints: list[dict], **extra) -> ScheduleRequest:
-    return request([nurse("a"), nurse("b"), nurse("c", tags=["나이트전담"])], constraints, **extra)
+    return request([nurse("a"), nurse("b"), nurse("c", tags=["파트"])], constraints, **extra)
+
+
+def regular_night_fair() -> dict:
+    """파트 태그(c)를 뺀 나이트 고르게."""
+    return balance("nf", N, people={"exclude_tags": ["파트"]})
 
 
 def row(pattern: str) -> list[str]:
@@ -214,10 +220,10 @@ def test_compute_result_soft_violations_for_toggled_rules():
 
 
 def test_compute_result_fairness_violation():
-    cons = [night_fair(), weekend_fair()]
+    cons = [regular_night_fair(), weekend_fair()]
     r = compute_result(stats_request(cons), {"a": A, "b": B, "c": C}, optimal=True)
     ids = [x.constraint_id for x in r.soft_violations]
-    # 비전담 a(N 3), b(N 0) → 편차 3. 주말 근무 a 3, b 0, c 6 → 편차 6
+    # 파트 빼고 a(N 3), b(N 0) → 편차 3. 주말 근무 a 3, b 0, c 6 → 편차 6
     assert ids.count("nf") == 1 and ids.count("wf") == 1
 
 
@@ -231,7 +237,7 @@ def test_compute_result_disabled_soft_not_listed():
 
 
 def history_sample(constraints: list[dict], rows: dict[str, list[str]] | None = None) -> ScheduleRequest:
-    """15명 샘플 병동. N 연속 3일 + N-OFF 2일(hard)이라 나이트 전담 2명만으로는 N을 다 채우지 못한다."""
+    """15명 샘플 병동. N 연속 3일 + N-OFF 2일(hard)."""
     data = sample_data()
     data["constraints"] += [max_nights("mcn", 3), off_after_night("noff", 2), *constraints]
     if rows is not None:
@@ -265,16 +271,6 @@ def test_night_history_reduces_nights_this_period():
     assert after < before
 
 
-def test_night_only_history_is_excluded_from_night_fairness():
-    nf = [night_fair()]
-    base = objective(history_sample(nf))
-    loaded = history_sample(nf, {"n14": WEEKDAYS_ONLY_N[:20]})
-    assert objective(loaded) == base
-    r = solve(loaded)
-    assert isinstance(r, SolveOk)
-    assert not any(v.constraint_id == "nf" and "20" in v.detail for v in r.result.soft_violations)
-
-
 def test_weekend_history_reduces_weekend_work_this_period():
     wf = [weekend_fair()]
     req = history_sample(wf)
@@ -294,7 +290,7 @@ def test_empty_or_zero_history_keeps_objective():
 
 
 def test_compute_result_fairness_includes_history():
-    cons = [night_fair(), weekend_fair()]
+    cons = [regular_night_fair(), weekend_fair()]
     b_row = ["N" if i in (0, 6, 7) else "O" for i in range(28)]  # 주말 나이트 3번
     req = stats_request(cons, history=history(START, {"b": b_row}))
     r = compute_result(req, {"a": A, "b": B, "c": C}, optimal=True)
@@ -305,7 +301,7 @@ def test_compute_result_fairness_includes_history():
 
 
 def test_compute_result_fairness_detail_without_history_unchanged():
-    r = compute_result(stats_request([night_fair()]), {"a": A, "b": B, "c": C}, optimal=True)
+    r = compute_result(stats_request([regular_night_fair()]), {"a": A, "b": B, "c": C}, optimal=True)
     assert r.soft_violations[0].detail == "나이트 개수 편차 3"
 
 
@@ -323,7 +319,6 @@ def test_sample_ward_31_days_solves_within_10s():
         max_nights("mcn", 3),
         off_after_night("noff", 2),
         min_off("mdo", 8),
-        *[skill_mix(f"sm-{s}", s, 3, 1) for s in "DEN"],
         night_fair(),
         weekend_fair(),
         rules.preference("p1", "n01", "O", 2, [24, 25]),
@@ -347,7 +342,6 @@ def test_sample_ward_31_days_with_history_solves_within_10s():
         max_nights("mcn", 3),
         off_after_night("noff", 2),
         min_off("mdo", 8),
-        *[skill_mix(f"sm-{s}", s, 3, 1) for s in "DEN"],
         night_fair(),
         weekend_fair(),
     ]
