@@ -1,4 +1,5 @@
 {
+  "version": 6,
   "state": {
     "ward": {
       "name": "외과 병동",
@@ -8,270 +9,793 @@
           "id": "n01",
           "name": "이영희",
           "years": 12,
-          "night_only": false,
-          "active": true
+          "active": true,
+          "tags": []
         },
         {
           "id": "n02",
           "name": "박민수",
           "years": 9,
-          "night_only": false,
-          "active": true
+          "active": true,
+          "tags": []
         },
         {
           "id": "n03",
           "name": "김철수",
           "years": 7,
-          "night_only": false,
-          "active": true
+          "active": true,
+          "tags": []
         },
         {
           "id": "n04",
           "name": "정유진",
           "years": 5,
-          "night_only": false,
-          "active": true
+          "active": true,
+          "tags": []
         },
         {
           "id": "n05",
           "name": "최지훈",
           "years": 3,
-          "night_only": false,
-          "active": true
+          "active": true,
+          "tags": []
         },
         {
           "id": "n06",
           "name": "강서연",
           "years": 15,
-          "night_only": false,
-          "active": true
+          "active": true,
+          "tags": []
         },
         {
           "id": "n07",
           "name": "윤지민",
           "years": 10,
-          "night_only": false,
-          "active": true
+          "active": true,
+          "tags": []
         },
         {
           "id": "n08",
           "name": "임하늘",
           "years": 8,
-          "night_only": false,
-          "active": true
+          "active": true,
+          "tags": []
         },
         {
           "id": "n09",
           "name": "한소율",
           "years": 6,
-          "night_only": false,
-          "active": true
+          "active": true,
+          "tags": []
         },
         {
           "id": "n10",
           "name": "오민준",
           "years": 4,
-          "night_only": false,
-          "active": true
+          "active": true,
+          "tags": []
         },
         {
           "id": "n11",
           "name": "서예린",
           "years": 2,
-          "night_only": false,
-          "active": true
+          "active": true,
+          "tags": []
         },
         {
           "id": "n12",
           "name": "신도윤",
           "years": 1,
-          "night_only": false,
-          "active": true
+          "active": true,
+          "tags": []
         },
         {
           "id": "n13",
           "name": "조은비",
           "years": 2,
-          "night_only": false,
-          "active": true
+          "active": true,
+          "tags": []
         },
         {
           "id": "n14",
           "name": "문가람",
           "years": 11,
-          "night_only": true,
-          "active": true
+          "active": true,
+          "tags": [
+            "나이트전담"
+          ]
         },
         {
           "id": "n15",
           "name": "배수아",
           "years": 4,
-          "night_only": true,
-          "active": true
+          "active": true,
+          "tags": [
+            "나이트전담"
+          ]
         }
       ],
       "nextNurseNo": 16,
       "rules": [
         {
           "id": "cov-weekday-D",
-          "type": "daily_coverage",
+          "type": "rule",
           "scope": "ward",
           "hardness": "hard",
+          "priority": "normal",
           "weight": 10,
           "source_text": "평일 데이 3~4명",
           "enabled": true,
-          "params": {
-            "shift": "D",
-            "day_kind": "weekday",
-            "min": 3,
-            "max": 4
+          "default": true,
+          "values": {
+            "min": {
+              "value": 3,
+              "label": "최소 인원"
+            },
+            "max": {
+              "value": 4,
+              "label": "최대 인원"
+            }
+          },
+          "body": {
+            "kind": "require",
+            "for_each": {
+              "per": "day",
+              "people": {
+                "exclude_tags": []
+              },
+              "days": {
+                "kind": "weekday"
+              }
+            },
+            "then": {
+              "all": [
+                {
+                  "left": {
+                    "days": {
+                      "kind": "all"
+                    },
+                    "shifts": {
+                      "in": [
+                        "D"
+                      ]
+                    },
+                    "measure": "count"
+                  },
+                  "op": "ge",
+                  "right": {
+                    "value": "min"
+                  }
+                },
+                {
+                  "left": {
+                    "days": {
+                      "kind": "all"
+                    },
+                    "shifts": {
+                      "in": [
+                        "D"
+                      ]
+                    },
+                    "measure": "count"
+                  },
+                  "op": "le",
+                  "right": {
+                    "value": "max"
+                  }
+                }
+              ]
+            }
           }
         },
         {
           "id": "cov-weekday-E",
-          "type": "daily_coverage",
+          "type": "rule",
           "scope": "ward",
           "hardness": "hard",
+          "priority": "normal",
           "weight": 10,
           "source_text": "평일 이브닝 3명",
           "enabled": true,
-          "params": {
-            "shift": "E",
-            "day_kind": "weekday",
-            "min": 3,
-            "max": 3
+          "default": true,
+          "values": {
+            "min": {
+              "value": 3,
+              "label": "인원"
+            }
+          },
+          "body": {
+            "kind": "require",
+            "for_each": {
+              "per": "day",
+              "people": {
+                "exclude_tags": []
+              },
+              "days": {
+                "kind": "weekday"
+              }
+            },
+            "then": {
+              "left": {
+                "days": {
+                  "kind": "all"
+                },
+                "shifts": {
+                  "in": [
+                    "E"
+                  ]
+                },
+                "measure": "count"
+              },
+              "op": "eq",
+              "right": {
+                "value": "min"
+              }
+            }
           }
         },
         {
           "id": "cov-weekday-N",
-          "type": "daily_coverage",
+          "type": "rule",
           "scope": "ward",
           "hardness": "hard",
+          "priority": "normal",
           "weight": 10,
           "source_text": "평일 나이트 2명",
           "enabled": true,
-          "params": {
-            "shift": "N",
-            "day_kind": "weekday",
-            "min": 2,
-            "max": 2
+          "default": true,
+          "values": {
+            "min": {
+              "value": 2,
+              "label": "인원"
+            }
+          },
+          "body": {
+            "kind": "require",
+            "for_each": {
+              "per": "day",
+              "people": {
+                "exclude_tags": []
+              },
+              "days": {
+                "kind": "weekday"
+              }
+            },
+            "then": {
+              "left": {
+                "days": {
+                  "kind": "all"
+                },
+                "shifts": {
+                  "in": [
+                    "N"
+                  ]
+                },
+                "measure": "count"
+              },
+              "op": "eq",
+              "right": {
+                "value": "min"
+              }
+            }
           }
         },
         {
           "id": "cov-weekend-D",
-          "type": "daily_coverage",
+          "type": "rule",
           "scope": "ward",
           "hardness": "hard",
+          "priority": "normal",
           "weight": 10,
           "source_text": "주말·공휴일 데이 3명",
           "enabled": true,
-          "params": {
-            "shift": "D",
-            "day_kind": "weekend",
-            "min": 3,
-            "max": 3
+          "default": true,
+          "values": {
+            "min": {
+              "value": 3,
+              "label": "인원"
+            }
+          },
+          "body": {
+            "kind": "require",
+            "for_each": {
+              "per": "day",
+              "people": {
+                "exclude_tags": []
+              },
+              "days": {
+                "kind": "weekend"
+              }
+            },
+            "then": {
+              "left": {
+                "days": {
+                  "kind": "all"
+                },
+                "shifts": {
+                  "in": [
+                    "D"
+                  ]
+                },
+                "measure": "count"
+              },
+              "op": "eq",
+              "right": {
+                "value": "min"
+              }
+            }
           }
         },
         {
           "id": "cov-weekend-E",
-          "type": "daily_coverage",
+          "type": "rule",
           "scope": "ward",
           "hardness": "hard",
+          "priority": "normal",
           "weight": 10,
           "source_text": "주말·공휴일 이브닝 2명",
           "enabled": true,
-          "params": {
-            "shift": "E",
-            "day_kind": "weekend",
-            "min": 2,
-            "max": 2
+          "default": true,
+          "values": {
+            "min": {
+              "value": 2,
+              "label": "인원"
+            }
+          },
+          "body": {
+            "kind": "require",
+            "for_each": {
+              "per": "day",
+              "people": {
+                "exclude_tags": []
+              },
+              "days": {
+                "kind": "weekend"
+              }
+            },
+            "then": {
+              "left": {
+                "days": {
+                  "kind": "all"
+                },
+                "shifts": {
+                  "in": [
+                    "E"
+                  ]
+                },
+                "measure": "count"
+              },
+              "op": "eq",
+              "right": {
+                "value": "min"
+              }
+            }
           }
         },
         {
           "id": "cov-weekend-N",
-          "type": "daily_coverage",
+          "type": "rule",
           "scope": "ward",
           "hardness": "hard",
+          "priority": "normal",
           "weight": 10,
           "source_text": "주말·공휴일 나이트 2명",
           "enabled": true,
-          "params": {
-            "shift": "N",
-            "day_kind": "weekend",
-            "min": 2,
-            "max": 2
+          "default": true,
+          "values": {
+            "min": {
+              "value": 2,
+              "label": "인원"
+            }
+          },
+          "body": {
+            "kind": "require",
+            "for_each": {
+              "per": "day",
+              "people": {
+                "exclude_tags": []
+              },
+              "days": {
+                "kind": "weekend"
+              }
+            },
+            "then": {
+              "left": {
+                "days": {
+                  "kind": "all"
+                },
+                "shifts": {
+                  "in": [
+                    "N"
+                  ]
+                },
+                "measure": "count"
+              },
+              "op": "eq",
+              "right": {
+                "value": "min"
+              }
+            }
           }
         },
         {
           "id": "rule-noff",
-          "type": "off_after_night_block",
+          "type": "rule",
           "scope": "ward",
           "hardness": "hard",
+          "priority": "normal",
           "weight": 10,
           "source_text": "나이트 끝나면 다음 날은 무조건 쉬게",
           "enabled": true,
-          "params": {
-            "days": 1
+          "default": false,
+          "values": {},
+          "body": {
+            "kind": "require",
+            "for_each": {
+              "per": "person_day",
+              "people": {
+                "exclude_tags": []
+              },
+              "days": {
+                "kind": "all"
+              }
+            },
+            "when": {
+              "all": [
+                {
+                  "left": {
+                    "days": {
+                      "kind": "all"
+                    },
+                    "offset": [
+                      0,
+                      0
+                    ],
+                    "shifts": {
+                      "in": [
+                        "N"
+                      ]
+                    },
+                    "measure": "count"
+                  },
+                  "op": "ge",
+                  "right": 1
+                },
+                {
+                  "left": {
+                    "days": {
+                      "kind": "all"
+                    },
+                    "offset": [
+                      1,
+                      1
+                    ],
+                    "shifts": {
+                      "not_in": [
+                        "N"
+                      ]
+                    },
+                    "measure": "count"
+                  },
+                  "op": "ge",
+                  "right": 1
+                }
+              ]
+            },
+            "then": {
+              "left": {
+                "days": {
+                  "kind": "all"
+                },
+                "offset": [
+                  1,
+                  1
+                ],
+                "shifts": {
+                  "not_in": [
+                    "O"
+                  ]
+                },
+                "measure": "count"
+              },
+              "op": "eq",
+              "right": 0
+            }
           }
         },
         {
           "id": "rule-max-work",
-          "type": "max_consecutive_work",
+          "type": "rule",
           "scope": "ward",
           "hardness": "hard",
+          "priority": "normal",
           "weight": 10,
           "source_text": "6일 연속 근무는 안 돼요",
           "enabled": true,
-          "params": {
-            "days": 5
+          "default": false,
+          "values": {
+            "max_len": {
+              "value": 5,
+              "label": "최대 연속 근무"
+            }
+          },
+          "body": {
+            "kind": "require",
+            "for_each": {
+              "per": "person_window",
+              "people": {
+                "exclude_tags": []
+              },
+              "days": {
+                "kind": "all"
+              },
+              "window": 6
+            },
+            "then": {
+              "left": {
+                "days": {
+                  "kind": "all"
+                },
+                "shifts": {
+                  "not_in": [
+                    "O"
+                  ]
+                },
+                "measure": "count"
+              },
+              "op": "le",
+              "right": {
+                "value": "max_len"
+              }
+            }
           }
         },
         {
           "id": "rule-max-nights",
-          "type": "max_consecutive_nights",
+          "type": "rule",
           "scope": "ward",
           "hardness": "hard",
+          "priority": "normal",
           "weight": 10,
           "source_text": "나이트는 3번 연속까지만",
           "enabled": true,
-          "params": {
-            "days": 3
+          "default": false,
+          "values": {
+            "max_len": {
+              "value": 3,
+              "label": "최대 연속 나이트"
+            }
+          },
+          "body": {
+            "kind": "require",
+            "for_each": {
+              "per": "person_window",
+              "people": {
+                "exclude_tags": []
+              },
+              "days": {
+                "kind": "all"
+              },
+              "window": 4
+            },
+            "then": {
+              "left": {
+                "days": {
+                  "kind": "all"
+                },
+                "shifts": {
+                  "in": [
+                    "N"
+                  ]
+                },
+                "measure": "count"
+              },
+              "op": "le",
+              "right": {
+                "value": "max_len"
+              }
+            }
           }
         },
         {
           "id": "rule-min-off",
-          "type": "min_days_off",
+          "type": "rule",
           "scope": "ward",
           "hardness": "hard",
+          "priority": "normal",
           "weight": 10,
           "source_text": "한 달에 최소 8일은 쉬게",
           "enabled": true,
-          "params": {
-            "days": 8
+          "default": false,
+          "values": {
+            "min": {
+              "value": 8,
+              "label": "최소 휴무 일수"
+            }
+          },
+          "body": {
+            "kind": "require",
+            "for_each": {
+              "per": "person",
+              "people": {
+                "exclude_tags": []
+              },
+              "days": {
+                "kind": "all"
+              }
+            },
+            "then": {
+              "left": {
+                "days": {
+                  "kind": "all"
+                },
+                "shifts": {
+                  "in": [
+                    "O"
+                  ]
+                },
+                "measure": "count"
+              },
+              "op": "ge",
+              "right": {
+                "value": "min"
+              }
+            }
           }
         },
         {
           "id": "rule-night-fair",
-          "type": "night_fairness",
+          "type": "rule",
           "scope": "ward",
           "hardness": "soft",
+          "priority": "low",
           "weight": 5,
           "source_text": "나이트는 골고루",
           "enabled": true,
-          "params": {}
+          "default": false,
+          "values": {
+            "max_gap": {
+              "value": 1,
+              "label": "최대 차이"
+            }
+          },
+          "body": {
+            "kind": "balance",
+            "people": {
+              "exclude_tags": [
+                "나이트전담"
+              ]
+            },
+            "days": {
+              "kind": "all"
+            },
+            "shifts": {
+              "in": [
+                "N"
+              ]
+            },
+            "measure": "count",
+            "with_history": true,
+            "max_gap": {
+              "value": "max_gap"
+            }
+          }
         },
         {
           "id": "rule-weekend-fair",
-          "type": "weekend_fairness",
+          "type": "rule",
           "scope": "ward",
           "hardness": "soft",
+          "priority": "low",
           "weight": 5,
           "source_text": "주말 근무도 골고루",
           "enabled": true,
-          "params": {}
+          "default": false,
+          "values": {
+            "max_gap": {
+              "value": 1,
+              "label": "최대 차이"
+            }
+          },
+          "body": {
+            "kind": "balance",
+            "people": {
+              "exclude_tags": []
+            },
+            "days": {
+              "kind": "weekend"
+            },
+            "shifts": {
+              "not_in": [
+                "O"
+              ]
+            },
+            "measure": "count",
+            "with_history": true,
+            "max_gap": {
+              "value": "max_gap"
+            }
+          }
+        },
+        {
+          "id": "night-only",
+          "type": "rule",
+          "scope": "ward",
+          "hardness": "hard",
+          "priority": "normal",
+          "weight": 10,
+          "source_text": "나이트 전담은 나이트와 휴무만",
+          "enabled": true,
+          "default": true,
+          "values": {
+            "max": {
+              "value": 0,
+              "label": "최대 횟수"
+            }
+          },
+          "body": {
+            "kind": "require",
+            "for_each": {
+              "per": "person",
+              "people": {
+                "tags": [
+                  "나이트전담"
+                ],
+                "exclude_tags": []
+              },
+              "days": {
+                "kind": "all"
+              }
+            },
+            "then": {
+              "left": {
+                "days": {
+                  "kind": "all"
+                },
+                "shifts": {
+                  "not_in": [
+                    "N",
+                    "O"
+                  ]
+                },
+                "measure": "count"
+              },
+              "op": "le",
+              "right": {
+                "value": "max"
+              }
+            }
+          }
         }
       ],
-      "pendingRules": []
+      "pendingRules": [],
+      "config": {
+        "shifts": [
+          {
+            "code": "D",
+            "name": "데이",
+            "hours": 8
+          },
+          {
+            "code": "E",
+            "name": "이브닝",
+            "hours": 8
+          },
+          {
+            "code": "N",
+            "name": "나이트",
+            "hours": 8
+          },
+          {
+            "code": "O",
+            "name": "휴무",
+            "hours": 0
+          }
+        ]
+      },
+      "pendingConfig": [],
+      "unconverted": [],
+      "introSeen": true
     },
     "periods": [
       {
@@ -944,7 +1468,7 @@
           "diff": null,
           "optimal": true
         },
-        "resultVersion": null,
+        "resultVersion": -1,
         "status": "confirmed",
         "versions": [
           {
@@ -1455,266 +1979,712 @@
               "id": "n01",
               "name": "이영희",
               "years": 12,
-              "night_only": false,
-              "active": true
+              "active": true,
+              "tags": []
             },
             {
               "id": "n02",
               "name": "박민수",
               "years": 9,
-              "night_only": false,
-              "active": true
+              "active": true,
+              "tags": []
             },
             {
               "id": "n03",
               "name": "김철수",
               "years": 7,
-              "night_only": false,
-              "active": true
+              "active": true,
+              "tags": []
             },
             {
               "id": "n04",
               "name": "정유진",
               "years": 5,
-              "night_only": false,
-              "active": true
+              "active": true,
+              "tags": []
             },
             {
               "id": "n05",
               "name": "최지훈",
               "years": 3,
-              "night_only": false,
-              "active": true
+              "active": true,
+              "tags": []
             },
             {
               "id": "n06",
               "name": "강서연",
               "years": 15,
-              "night_only": false,
-              "active": true
+              "active": true,
+              "tags": []
             },
             {
               "id": "n07",
               "name": "윤지민",
               "years": 10,
-              "night_only": false,
-              "active": true
+              "active": true,
+              "tags": []
             },
             {
               "id": "n08",
               "name": "임하늘",
               "years": 8,
-              "night_only": false,
-              "active": true
+              "active": true,
+              "tags": []
             },
             {
               "id": "n09",
               "name": "한소율",
               "years": 6,
-              "night_only": false,
-              "active": true
+              "active": true,
+              "tags": []
             },
             {
               "id": "n10",
               "name": "오민준",
               "years": 4,
-              "night_only": false,
-              "active": true
+              "active": true,
+              "tags": []
             },
             {
               "id": "n11",
               "name": "서예린",
               "years": 2,
-              "night_only": false,
-              "active": true
+              "active": true,
+              "tags": []
             },
             {
               "id": "n12",
               "name": "신도윤",
               "years": 1,
-              "night_only": false,
-              "active": true
+              "active": true,
+              "tags": []
             },
             {
               "id": "n13",
               "name": "조은비",
               "years": 2,
-              "night_only": false,
-              "active": true
+              "active": true,
+              "tags": []
             },
             {
               "id": "n14",
               "name": "문가람",
               "years": 11,
-              "night_only": true,
-              "active": true
+              "active": true,
+              "tags": [
+                "나이트전담"
+              ]
             },
             {
               "id": "n15",
               "name": "배수아",
               "years": 4,
-              "night_only": true,
-              "active": true
+              "active": true,
+              "tags": [
+                "나이트전담"
+              ]
             }
           ],
           "rules": [
             {
               "id": "cov-weekday-D",
-              "type": "daily_coverage",
+              "type": "rule",
               "scope": "ward",
               "hardness": "hard",
+              "priority": "normal",
               "weight": 10,
               "source_text": "평일 데이 3~4명",
               "enabled": true,
-              "params": {
-                "shift": "D",
-                "day_kind": "weekday",
-                "min": 3,
-                "max": 4
+              "default": true,
+              "values": {
+                "min": {
+                  "value": 3,
+                  "label": "최소 인원"
+                },
+                "max": {
+                  "value": 4,
+                  "label": "최대 인원"
+                }
+              },
+              "body": {
+                "kind": "require",
+                "for_each": {
+                  "per": "day",
+                  "people": {
+                    "exclude_tags": []
+                  },
+                  "days": {
+                    "kind": "weekday"
+                  }
+                },
+                "then": {
+                  "all": [
+                    {
+                      "left": {
+                        "days": {
+                          "kind": "all"
+                        },
+                        "shifts": {
+                          "in": [
+                            "D"
+                          ]
+                        },
+                        "measure": "count"
+                      },
+                      "op": "ge",
+                      "right": {
+                        "value": "min"
+                      }
+                    },
+                    {
+                      "left": {
+                        "days": {
+                          "kind": "all"
+                        },
+                        "shifts": {
+                          "in": [
+                            "D"
+                          ]
+                        },
+                        "measure": "count"
+                      },
+                      "op": "le",
+                      "right": {
+                        "value": "max"
+                      }
+                    }
+                  ]
+                }
               }
             },
             {
               "id": "cov-weekday-E",
-              "type": "daily_coverage",
+              "type": "rule",
               "scope": "ward",
               "hardness": "hard",
+              "priority": "normal",
               "weight": 10,
               "source_text": "평일 이브닝 3명",
               "enabled": true,
-              "params": {
-                "shift": "E",
-                "day_kind": "weekday",
-                "min": 3,
-                "max": 3
+              "default": true,
+              "values": {
+                "min": {
+                  "value": 3,
+                  "label": "인원"
+                }
+              },
+              "body": {
+                "kind": "require",
+                "for_each": {
+                  "per": "day",
+                  "people": {
+                    "exclude_tags": []
+                  },
+                  "days": {
+                    "kind": "weekday"
+                  }
+                },
+                "then": {
+                  "left": {
+                    "days": {
+                      "kind": "all"
+                    },
+                    "shifts": {
+                      "in": [
+                        "E"
+                      ]
+                    },
+                    "measure": "count"
+                  },
+                  "op": "eq",
+                  "right": {
+                    "value": "min"
+                  }
+                }
               }
             },
             {
               "id": "cov-weekday-N",
-              "type": "daily_coverage",
+              "type": "rule",
               "scope": "ward",
               "hardness": "hard",
+              "priority": "normal",
               "weight": 10,
               "source_text": "평일 나이트 2명",
               "enabled": true,
-              "params": {
-                "shift": "N",
-                "day_kind": "weekday",
-                "min": 2,
-                "max": 2
+              "default": true,
+              "values": {
+                "min": {
+                  "value": 2,
+                  "label": "인원"
+                }
+              },
+              "body": {
+                "kind": "require",
+                "for_each": {
+                  "per": "day",
+                  "people": {
+                    "exclude_tags": []
+                  },
+                  "days": {
+                    "kind": "weekday"
+                  }
+                },
+                "then": {
+                  "left": {
+                    "days": {
+                      "kind": "all"
+                    },
+                    "shifts": {
+                      "in": [
+                        "N"
+                      ]
+                    },
+                    "measure": "count"
+                  },
+                  "op": "eq",
+                  "right": {
+                    "value": "min"
+                  }
+                }
               }
             },
             {
               "id": "cov-weekend-D",
-              "type": "daily_coverage",
+              "type": "rule",
               "scope": "ward",
               "hardness": "hard",
+              "priority": "normal",
               "weight": 10,
               "source_text": "주말·공휴일 데이 3명",
               "enabled": true,
-              "params": {
-                "shift": "D",
-                "day_kind": "weekend",
-                "min": 3,
-                "max": 3
+              "default": true,
+              "values": {
+                "min": {
+                  "value": 3,
+                  "label": "인원"
+                }
+              },
+              "body": {
+                "kind": "require",
+                "for_each": {
+                  "per": "day",
+                  "people": {
+                    "exclude_tags": []
+                  },
+                  "days": {
+                    "kind": "weekend"
+                  }
+                },
+                "then": {
+                  "left": {
+                    "days": {
+                      "kind": "all"
+                    },
+                    "shifts": {
+                      "in": [
+                        "D"
+                      ]
+                    },
+                    "measure": "count"
+                  },
+                  "op": "eq",
+                  "right": {
+                    "value": "min"
+                  }
+                }
               }
             },
             {
               "id": "cov-weekend-E",
-              "type": "daily_coverage",
+              "type": "rule",
               "scope": "ward",
               "hardness": "hard",
+              "priority": "normal",
               "weight": 10,
               "source_text": "주말·공휴일 이브닝 2명",
               "enabled": true,
-              "params": {
-                "shift": "E",
-                "day_kind": "weekend",
-                "min": 2,
-                "max": 2
+              "default": true,
+              "values": {
+                "min": {
+                  "value": 2,
+                  "label": "인원"
+                }
+              },
+              "body": {
+                "kind": "require",
+                "for_each": {
+                  "per": "day",
+                  "people": {
+                    "exclude_tags": []
+                  },
+                  "days": {
+                    "kind": "weekend"
+                  }
+                },
+                "then": {
+                  "left": {
+                    "days": {
+                      "kind": "all"
+                    },
+                    "shifts": {
+                      "in": [
+                        "E"
+                      ]
+                    },
+                    "measure": "count"
+                  },
+                  "op": "eq",
+                  "right": {
+                    "value": "min"
+                  }
+                }
               }
             },
             {
               "id": "cov-weekend-N",
-              "type": "daily_coverage",
+              "type": "rule",
               "scope": "ward",
               "hardness": "hard",
+              "priority": "normal",
               "weight": 10,
               "source_text": "주말·공휴일 나이트 2명",
               "enabled": true,
-              "params": {
-                "shift": "N",
-                "day_kind": "weekend",
-                "min": 2,
-                "max": 2
+              "default": true,
+              "values": {
+                "min": {
+                  "value": 2,
+                  "label": "인원"
+                }
+              },
+              "body": {
+                "kind": "require",
+                "for_each": {
+                  "per": "day",
+                  "people": {
+                    "exclude_tags": []
+                  },
+                  "days": {
+                    "kind": "weekend"
+                  }
+                },
+                "then": {
+                  "left": {
+                    "days": {
+                      "kind": "all"
+                    },
+                    "shifts": {
+                      "in": [
+                        "N"
+                      ]
+                    },
+                    "measure": "count"
+                  },
+                  "op": "eq",
+                  "right": {
+                    "value": "min"
+                  }
+                }
               }
             },
             {
               "id": "rule-noff",
-              "type": "off_after_night_block",
+              "type": "rule",
               "scope": "ward",
               "hardness": "hard",
+              "priority": "normal",
               "weight": 10,
               "source_text": "나이트 끝나면 다음 날은 무조건 쉬게",
               "enabled": true,
-              "params": {
-                "days": 1
+              "default": false,
+              "values": {},
+              "body": {
+                "kind": "require",
+                "for_each": {
+                  "per": "person_day",
+                  "people": {
+                    "exclude_tags": []
+                  },
+                  "days": {
+                    "kind": "all"
+                  }
+                },
+                "when": {
+                  "all": [
+                    {
+                      "left": {
+                        "days": {
+                          "kind": "all"
+                        },
+                        "offset": [
+                          0,
+                          0
+                        ],
+                        "shifts": {
+                          "in": [
+                            "N"
+                          ]
+                        },
+                        "measure": "count"
+                      },
+                      "op": "ge",
+                      "right": 1
+                    },
+                    {
+                      "left": {
+                        "days": {
+                          "kind": "all"
+                        },
+                        "offset": [
+                          1,
+                          1
+                        ],
+                        "shifts": {
+                          "not_in": [
+                            "N"
+                          ]
+                        },
+                        "measure": "count"
+                      },
+                      "op": "ge",
+                      "right": 1
+                    }
+                  ]
+                },
+                "then": {
+                  "left": {
+                    "days": {
+                      "kind": "all"
+                    },
+                    "offset": [
+                      1,
+                      1
+                    ],
+                    "shifts": {
+                      "not_in": [
+                        "O"
+                      ]
+                    },
+                    "measure": "count"
+                  },
+                  "op": "eq",
+                  "right": 0
+                }
               }
             },
             {
               "id": "rule-max-work",
-              "type": "max_consecutive_work",
+              "type": "rule",
               "scope": "ward",
               "hardness": "hard",
+              "priority": "normal",
               "weight": 10,
               "source_text": "6일 연속 근무는 안 돼요",
               "enabled": true,
-              "params": {
-                "days": 5
+              "default": false,
+              "values": {
+                "max_len": {
+                  "value": 5,
+                  "label": "최대 연속 근무"
+                }
+              },
+              "body": {
+                "kind": "require",
+                "for_each": {
+                  "per": "person_window",
+                  "people": {
+                    "exclude_tags": []
+                  },
+                  "days": {
+                    "kind": "all"
+                  },
+                  "window": 6
+                },
+                "then": {
+                  "left": {
+                    "days": {
+                      "kind": "all"
+                    },
+                    "shifts": {
+                      "not_in": [
+                        "O"
+                      ]
+                    },
+                    "measure": "count"
+                  },
+                  "op": "le",
+                  "right": {
+                    "value": "max_len"
+                  }
+                }
               }
             },
             {
               "id": "rule-max-nights",
-              "type": "max_consecutive_nights",
+              "type": "rule",
               "scope": "ward",
               "hardness": "hard",
+              "priority": "normal",
               "weight": 10,
               "source_text": "나이트는 3번 연속까지만",
               "enabled": true,
-              "params": {
-                "days": 3
+              "default": false,
+              "values": {
+                "max_len": {
+                  "value": 3,
+                  "label": "최대 연속 나이트"
+                }
+              },
+              "body": {
+                "kind": "require",
+                "for_each": {
+                  "per": "person_window",
+                  "people": {
+                    "exclude_tags": []
+                  },
+                  "days": {
+                    "kind": "all"
+                  },
+                  "window": 4
+                },
+                "then": {
+                  "left": {
+                    "days": {
+                      "kind": "all"
+                    },
+                    "shifts": {
+                      "in": [
+                        "N"
+                      ]
+                    },
+                    "measure": "count"
+                  },
+                  "op": "le",
+                  "right": {
+                    "value": "max_len"
+                  }
+                }
               }
             },
             {
               "id": "rule-min-off",
-              "type": "min_days_off",
+              "type": "rule",
               "scope": "ward",
               "hardness": "hard",
+              "priority": "normal",
               "weight": 10,
               "source_text": "한 달에 최소 8일은 쉬게",
               "enabled": true,
-              "params": {
-                "days": 8
+              "default": false,
+              "values": {
+                "min": {
+                  "value": 8,
+                  "label": "최소 휴무 일수"
+                }
+              },
+              "body": {
+                "kind": "require",
+                "for_each": {
+                  "per": "person",
+                  "people": {
+                    "exclude_tags": []
+                  },
+                  "days": {
+                    "kind": "all"
+                  }
+                },
+                "then": {
+                  "left": {
+                    "days": {
+                      "kind": "all"
+                    },
+                    "shifts": {
+                      "in": [
+                        "O"
+                      ]
+                    },
+                    "measure": "count"
+                  },
+                  "op": "ge",
+                  "right": {
+                    "value": "min"
+                  }
+                }
               }
             },
             {
               "id": "rule-night-fair",
-              "type": "night_fairness",
+              "type": "rule",
               "scope": "ward",
               "hardness": "soft",
+              "priority": "low",
               "weight": 5,
               "source_text": "나이트는 골고루",
               "enabled": true,
-              "params": {}
+              "default": false,
+              "values": {
+                "max_gap": {
+                  "value": 1,
+                  "label": "최대 차이"
+                }
+              },
+              "body": {
+                "kind": "balance",
+                "people": {
+                  "exclude_tags": [
+                    "나이트전담"
+                  ]
+                },
+                "days": {
+                  "kind": "all"
+                },
+                "shifts": {
+                  "in": [
+                    "N"
+                  ]
+                },
+                "measure": "count",
+                "with_history": true,
+                "max_gap": {
+                  "value": "max_gap"
+                }
+              }
             },
             {
               "id": "rule-weekend-fair",
-              "type": "weekend_fairness",
+              "type": "rule",
               "scope": "ward",
               "hardness": "soft",
+              "priority": "low",
               "weight": 5,
               "source_text": "주말 근무도 골고루",
               "enabled": true,
-              "params": {}
+              "default": false,
+              "values": {
+                "max_gap": {
+                  "value": 1,
+                  "label": "최대 차이"
+                }
+              },
+              "body": {
+                "kind": "balance",
+                "people": {
+                  "exclude_tags": []
+                },
+                "days": {
+                  "kind": "weekend"
+                },
+                "shifts": {
+                  "not_in": [
+                    "O"
+                  ]
+                },
+                "measure": "count",
+                "with_history": true,
+                "max_gap": {
+                  "value": "max_gap"
+                }
+              }
             }
           ]
         }
@@ -1727,53 +2697,157 @@
         "requests": [
           {
             "id": "req-leave-n01",
-            "type": "leave",
+            "type": "rule",
             "scope": "period",
             "hardness": "hard",
+            "priority": "normal",
             "weight": 10,
             "source_text": "이영희 10~12일 휴가",
             "enabled": true,
-            "params": {
-              "nurse_id": "n01",
-              "days": [
-                10,
-                11,
-                12
-              ]
+            "default": false,
+            "values": {
+              "max": {
+                "value": 0,
+                "label": "최대 횟수"
+              }
+            },
+            "body": {
+              "kind": "require",
+              "for_each": {
+                "per": "person",
+                "people": {
+                  "ids": [
+                    "n01"
+                  ],
+                  "exclude_tags": []
+                },
+                "days": {
+                  "days": [
+                    10,
+                    11,
+                    12
+                  ],
+                  "kind": "all"
+                }
+              },
+              "then": {
+                "left": {
+                  "days": {
+                    "kind": "all"
+                  },
+                  "shifts": {
+                    "not_in": [
+                      "O"
+                    ]
+                  },
+                  "measure": "count"
+                },
+                "op": "le",
+                "right": {
+                  "value": "max"
+                }
+              }
             }
           },
           {
             "id": "req-avoid-n02",
-            "type": "shift_preference",
+            "type": "rule",
             "scope": "period",
             "hardness": "soft",
+            "priority": "normal",
             "weight": 10,
             "source_text": "박민수는 주말엔 나이트 빼 주세요",
             "enabled": true,
-            "params": {
-              "nurse_id": "n02",
-              "shift": "N",
-              "prefer": false,
-              "days": null,
-              "weekends_only": true
+            "default": false,
+            "values": {
+              "max": {
+                "value": 0,
+                "label": "최대 횟수"
+              }
+            },
+            "body": {
+              "kind": "require",
+              "for_each": {
+                "per": "person",
+                "people": {
+                  "ids": [
+                    "n02"
+                  ],
+                  "exclude_tags": []
+                },
+                "days": {
+                  "kind": "weekend"
+                }
+              },
+              "then": {
+                "left": {
+                  "days": {
+                    "kind": "all"
+                  },
+                  "shifts": {
+                    "in": [
+                      "N"
+                    ]
+                  },
+                  "measure": "count"
+                },
+                "op": "le",
+                "right": {
+                  "value": "max"
+                }
+              }
             }
           },
           {
             "id": "req-prefer-n04",
-            "type": "shift_preference",
+            "type": "rule",
             "scope": "period",
             "hardness": "soft",
+            "priority": "normal",
             "weight": 10,
             "source_text": "정유진 20일은 데이로 해 주세요",
             "enabled": true,
-            "params": {
-              "nurse_id": "n04",
-              "shift": "D",
-              "prefer": true,
-              "days": [
-                20
-              ],
-              "weekends_only": false
+            "default": false,
+            "values": {
+              "min": {
+                "value": 1,
+                "label": "최소 횟수"
+              }
+            },
+            "body": {
+              "kind": "require",
+              "for_each": {
+                "per": "person",
+                "people": {
+                  "ids": [
+                    "n04"
+                  ],
+                  "exclude_tags": []
+                },
+                "days": {
+                  "days": [
+                    20
+                  ],
+                  "kind": "all"
+                }
+              },
+              "then": {
+                "left": {
+                  "days": {
+                    "kind": "all"
+                  },
+                  "shifts": {
+                    "in": [
+                      "D"
+                    ]
+                  },
+                  "measure": "count"
+                },
+                "op": "ge",
+                "right": {
+                  "value": "min"
+                }
+              }
             }
           }
         ],
@@ -1793,6 +2867,5 @@
       "screen": "home"
     },
     "inputVersion": 1
-  },
-  "version": 4
+  }
 }

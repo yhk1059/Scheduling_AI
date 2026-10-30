@@ -13,7 +13,7 @@ import {
   rosterChanges,
   sameCarryOver,
 } from "./continuity";
-import { DEFAULT_CONFIG } from "./migrate";
+import { DEFAULT_CONFIG } from "./rules";
 import type { Assignments, Code, WardNurse, WorkPeriod } from "./store";
 
 // 기준: 2026-11-02 월요일, 2026-11-01 일요일

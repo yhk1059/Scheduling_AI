@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 
-import { NIGHT_ONLY_TAG } from "@/lib/migrate";
+import { NIGHT_ONLY_TAG } from "@/lib/rules";
 import type { PeriodUnit } from "@/lib/period";
 import { MAX_NURSES } from "@/lib/roster-import";
 import { isNurseUsed, MAX_TAG_CHARS, MAX_TAGS_PER_NURSE, orphanConstraintIds, useAppStore, type WardNurse } from "@/lib/store";

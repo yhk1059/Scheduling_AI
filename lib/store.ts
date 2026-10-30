@@ -15,7 +15,6 @@ import {
   sameCarryOver,
 } from "./continuity";
 import {
-  blockToRules,
   COVERAGE_RULE_PREFIX,
   DEFAULT_CONFIG,
   nightOnlyRule,
@@ -24,14 +23,12 @@ import {
   ruleShape,
   stableJson,
   STORAGE_VERSION,
-  upgradeDoc,
   type Priority,
-} from "./migrate";
+} from "./rules";
 import {
   dateOfDay,
   dayOfDate,
   firstPeriodStart,
-  localDate,
   monthDay,
   nextPeriod,
   periodFrom,
@@ -42,6 +39,7 @@ import {
 import { deleteWard, loadWard, saveWard, supabaseConfigured, type AuthUser } from "./supabase";
 import type {
   CarryOverRow,
+  Cmp,
   Count,
   ConstraintChange,
   ConstraintSpec,
@@ -910,7 +908,7 @@ export function createAppStore(getStorage: () => Storage, now: () => Date = () =
             if (row) {
               // 서버 우선
               const d = row.data as { version?: unknown; state?: unknown } | null;
-              const state = typeof d?.version === "number" ? upgradeDoc(d.state, d.version, localDate(now())) : null;
+              const state = d?.version === STORAGE_VERSION ? d.state : null;
               const ok = isData(state);
               replace(ok ? loaded(state) : initialData(), {
                 sync: { status: "saved", savedAt: row.updatedAt },
@@ -956,15 +954,29 @@ export function createAppStore(getStorage: () => Storage, now: () => Date = () =
             editWard((w) => {
               // 폼 모양의 같은 칸 규칙을 제자리에서 바꾼다(id는 그대로)
               const old = coverageRule(w.rules, code, dayKind);
-              const [rule] = blockToRules({
-                id: `${COVERAGE_RULE_PREFIX}${dayKind}-${code}`,
-                type: "count",
+              const left: Count = { shifts: { in: [code] } };
+              const ge: Cmp = { left, op: "ge", right: { value: "min" } };
+              const le: Cmp = { left, op: "le", right: { value: "max" } };
+              const card = normalizeRule({
+                id: old?.id ?? `${COVERAGE_RULE_PREFIX}${dayKind}-${code}`,
+                type: "rule",
                 scope: "ward",
                 hardness: "hard",
                 source_text: COVERAGE_SOURCE_TEXT,
-                params: { days: { kind: dayKind }, shifts: { in: [code] }, per: "day", min, max },
-              });
-              const card = { ...rule, ...(old && { id: old.id }), default: true } as ConstraintSpec;
+                default: true,
+                values:
+                  max === min
+                    ? { min: { value: min, label: "인원" } }
+                    : {
+                        min: { value: min, label: "최소 인원" },
+                        ...(max !== null && { max: { value: max, label: "최대 인원" } }),
+                      },
+                body: {
+                  kind: "require",
+                  for_each: { per: "day", days: { kind: dayKind } },
+                  then: max === min ? { left, op: "eq", right: { value: "min" } } : max === null ? ge : { all: [ge, le] },
+                },
+              } as ConstraintSpec);
               return { ...w, rules: old ? w.rules.map((c) => (c === old ? card : c)) : [...w.rules, card] };
             });
           },
@@ -1328,8 +1340,8 @@ export function createAppStore(getStorage: () => Storage, now: () => Date = () =
         version: STORAGE_VERSION,
         storage,
         partialize: (s): Data => persisted(s),
-        // v4·v5는 v6으로 바꾼다. 그 밖의 버전이나 파싱 실패는 버리고, merge에서 초기 상태 + resetNotice로 처리한다
-        migrate: (state, version) => upgradeDoc(state, version, localDate(now())) as unknown as Data,
+        // 다른 버전이나 파싱 실패는 변환하지 않고 버린다. merge에서 초기 상태 + resetNotice로 처리한다
+        migrate: () => null as unknown as Data,
         // 지금은 쓰지 않는 옛 필드는 버리고 Data 필드만 가져온다
         merge: (saved, current) =>
           saved === undefined

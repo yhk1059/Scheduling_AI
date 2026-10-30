@@ -2,7 +2,7 @@
 
 import { useRef, useState } from "react";
 
-import { OFF_CODE } from "@/lib/migrate";
+import { OFF_CODE } from "@/lib/rules";
 import { isShiftUsed, MAX_SHIFT_CODES, useAppStore } from "@/lib/store";
 import type { ShiftDef } from "@/lib/types.gen";
 

@@ -5,7 +5,7 @@ import { useState, type ReactNode } from "react";
 import { ApiError, errorMessage, explain, solve } from "@/lib/api";
 import { toScheduleCsv } from "@/lib/csv";
 import { historyLoadFor, isOperating } from "@/lib/continuity";
-import { DEFAULT_CONFIG, NIGHT_ONLY_TAG } from "@/lib/migrate";
+import { DEFAULT_CONFIG, NIGHT_ONLY_TAG } from "@/lib/rules";
 import { dayHeader, dayOfDate, isWeekendDay, monthDay, periodDays, periodEnd } from "@/lib/period";
 import {
   carryOverChanged,

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 
-import type { Priority } from "@/lib/migrate";
+import type { Priority } from "@/lib/rules";
 import {
   applyShiftChange,
   type CardPatch,

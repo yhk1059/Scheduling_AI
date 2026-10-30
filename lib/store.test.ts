@@ -25,10 +25,8 @@ import {
   viewForPeriod,
   type WardRemote,
 } from "./store";
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
-
-import { blockToRules, DEFAULT_CONFIG, migrateV4, NIGHT_ONLY_RULE_ID, NIGHT_ONLY_TAG, nightOnlyRule, type BlockSpec } from "./migrate";
+import { DEFAULT_CONFIG, NIGHT_ONLY_RULE_ID, NIGHT_ONLY_TAG, nightOnlyRule, STORAGE_VERSION } from "./rules";
+import { balance, count, fixedCell, forbid as forbidRule, maxRun, OFF, WORK } from "./test-rules";
 import type { ConstraintSpec, Rule, RuleExample, ScheduleResult } from "./types.gen";
 
 class MemoryStorage implements Storage {
@@ -60,48 +58,27 @@ const rows = [
   { name: "박민수", years: 9 },
 ];
 
-/** 블록 모양으로 적은 카드를 식 규칙으로(변환표). 나뉘는 블록은 첫 규칙. */
-function card(over: Partial<BlockSpec> & Pick<BlockSpec, "id" | "type" | "params">): ConstraintSpec {
-  return blockToRules({ scope: "ward", hardness: "hard", weight: 1, source_text: "원문", enabled: true, ...over } as BlockSpec)[0];
-}
+const CARD = { scope: "ward", hardness: "hard", source_text: "원문" } as const;
+/** 세는 규칙 카드. */
+const countCard = (id: string, params: Parameters<typeof count>[0], over: Parameters<typeof count>[1] = {}) =>
+  count(params, { ...CARD, id, ...over });
 /** 규칙의 조정 가능한 값. */
 const val = (c: ConstraintSpec, name: string) => (c as Rule).values![name].value;
 
-// 템플릿 이름의 카드
-const maxWork = (id: string, days: number) => card({ id, type: "sequence", params: { run: { not_in: ["O"] }, max_len: days } });
-const maxNights = (id: string, days: number) => card({ id, type: "sequence", params: { run: { in: ["N"] }, max_len: days } });
-const minOff = (id: string, days: number) =>
-  card({ id, type: "count", params: { shifts: { in: ["O"] }, per: "person", min: days } });
-const skillMix = (id: string, shift: string) =>
-  card({ id, type: "count", params: { people: { min_years: 3 }, shifts: { in: [shift] }, per: "day", min: 1 } });
-const forbid = (id: string, first: string, second: string) =>
-  card({ id, type: "sequence", params: { forbid: [[{ in: [first] }, { in: [second] }]] } });
+// 프리셋 이름의 카드
+const maxWork = (id: string, days: number) => maxRun(WORK, days, undefined, { ...CARD, id });
+const maxNights = (id: string, days: number) => maxRun({ in: ["N"] }, days, undefined, { ...CARD, id });
+const minOff = (id: string, days: number) => countCard(id, { shifts: OFF, per: "person", min: days });
+const skillMix = (id: string, shift: string) => countCard(id, { people: { min_years: 3 }, shifts: { in: [shift] }, per: "day", min: 1 });
+const forbid = (id: string, first: string, second: string) => forbidRule([{ in: [first] }, { in: [second] }], undefined, { ...CARD, id });
 const nightFair = (id: string) =>
-  card({ id, type: "balance", hardness: "soft", priority: "low", params: { people: { exclude_tags: [NIGHT_ONLY_TAG] }, shifts: { in: ["N"] } } });
+  balance({ people: { exclude_tags: [NIGHT_ONLY_TAG] }, shifts: { in: ["N"] } }, { ...CARD, id, hardness: "soft", priority: "low" });
 const leave = (id: string, nurse: string, days: number[]) =>
-  card({
-    id,
-    type: "count",
-    scope: "period",
-    params: { people: { ids: [nurse] }, days: { days }, shifts: { not_in: ["O"] }, per: "person", max: 0 },
-  });
+  countCard(id, { people: { ids: [nurse] }, days: { days }, shifts: WORK, per: "person", max: 0 }, { scope: "period" });
 const fixed = (id: string, nurse: string, day: number, shift: string) =>
-  card({ id, type: "fixed_assignment", scope: "period", params: { nurse_id: nurse, day, shift } });
+  ({ ...fixedCell(nurse, day, shift, { id, weight: 1 }), source_text: "원문" }) as ConstraintSpec;
 const avoid = (id: string, nurse: string, shift: string) =>
-  card({ id, type: "count", scope: "period", hardness: "soft", params: { people: { ids: [nurse] }, shifts: { in: [shift] }, per: "person", max: 0 } });
-
-const V4_FIXTURE = JSON.parse(readFileSync(join(__dirname, "..", "e2e/fixtures/ward-oct.json"), "utf-8"));
-
-/** e2e 픽스처를 v5로 바꾼 상태: 규칙·요청 수가 같고(+기본 규칙), 블록과 태그로 바뀌었다. */
-function expectMigrated(s: { ward: import("./store").Ward | null; periods: import("./store").WorkPeriod[] }) {
-  const v4 = V4_FIXTURE.state;
-  expect(s.ward!.config).toEqual(DEFAULT_CONFIG);
-  expect(s.ward!.rules).toHaveLength(v4.ward.rules.length + 1);
-  expect(s.ward!.rules.every((r) => r.type === "rule")).toBe(true);
-  expect(s.ward!.nurses.filter((n) => n.tags.includes(NIGHT_ONLY_TAG))).toHaveLength(2);
-  expect(s.periods.map((p) => p.requests.length)).toEqual(v4.periods.map((p: { requests: unknown[] }) => p.requests.length));
-  expect(s.periods[1].requests.every((r) => r.type === "rule")).toBe(true);
-}
+  countCard(id, { people: { ids: [nurse] }, shifts: { in: [shift] }, per: "person", max: 0 }, { scope: "period", hardness: "soft" });
 
 /** 기본 규칙(나이트 전담)을 뺀 병동 규칙 id. */
 const ruleIds = (rules: ConstraintSpec[]) => rules.map((c) => c.id).filter((id) => id !== NIGHT_ONLY_RULE_ID);
@@ -214,10 +191,10 @@ describe("병동", () => {
   });
 
   it("coverageRange는 폼 모양 규칙만 읽는다(토요일만·사람을 고른 규칙은 null)", () => {
-    const saturday = card({ id: "s", type: "count", params: { days: { weekdays: [5] }, shifts: { in: ["D"] }, per: "day", min: 2 } });
-    const charge = card({ id: "c", type: "count", params: { people: { tags: ["책임"] }, days: { kind: "weekday" }, shifts: { in: ["D"] }, per: "day", min: 1 } });
+    const saturday = countCard("s", { days: { weekdays: [5] }, shifts: { in: ["D"] }, per: "day", min: 2 });
+    const charge = countCard("c", { people: { tags: ["책임"] }, days: { kind: "weekday" }, shifts: { in: ["D"] }, per: "day", min: 1 });
     expect(coverageRange([saturday, charge], "D", "weekday")).toBeNull();
-    const weekday = card({ id: "w", type: "count", params: { days: { kind: "weekday" }, shifts: { in: ["D"] }, per: "day", max: 4 } });
+    const weekday = countCard("w", { days: { kind: "weekday" }, shifts: { in: ["D"] }, per: "day", max: 4 });
     expect(coverageRange([weekday], "D", "weekday")).toEqual({ min: 0, max: 4 });
   });
 });
@@ -238,7 +215,7 @@ describe("병동 규칙 카드", () => {
   it("말로 만든 필요 인원 카드(날마다 모든 사람의 개수)는 기본 규칙이 된다", () => {
     const store = fresh();
     store.getState().startWard();
-    const sat = card({ id: "sat-D", type: "count", params: { days: { kind: "all", weekdays: [5] }, shifts: { in: ["D"] }, per: "day", min: 2 } });
+    const sat = countCard("sat-D", { days: { kind: "all", weekdays: [5] }, shifts: { in: ["D"] }, per: "day", min: 2 });
     store.getState().addPendingRules([sat, skillMix("s", "D"), minOff("m", 8)]);
     expect(store.getState().ward!.pendingRules.map((c) => [c.id, (c as Rule).default])).toEqual([
       ["sat-D", true],
@@ -444,7 +421,7 @@ describe("findReplaced", () => {
     expect(findReplaced(existing, leave("l", "n01", [9]))).toBeUndefined();
     expect(findReplaced(existing, maxNights("n", 4))).toBeUndefined();
     // 같은 사람·근무의 희망은 기피를 대체한다(수만 다르다)
-    const prefer = card({ id: "q", type: "count", scope: "period", hardness: "soft", params: { people: { ids: ["n02"], exclude_tags: [] }, shifts: { in: ["N"] }, per: "person", min: 30 } });
+    const prefer = countCard("q", { people: { ids: ["n02"], exclude_tags: [] }, shifts: { in: ["N"] }, per: "person", min: 30 }, { scope: "period", hardness: "soft" });
     expect(findReplaced(existing, prefer)?.id).toBe("p");
   });
 });
@@ -1108,6 +1085,15 @@ describe("persist", () => {
     expect(JSON.parse(storage.getItem(STORAGE_KEY)!).state.ward).toBeNull();
   });
 
+  it("모양이 맞아도 버전이 다르면 변환하지 않고 초기화한다", () => {
+    const storage = new MemoryStorage();
+    const { state } = serverDoc();
+    storage.setItem(STORAGE_KEY, JSON.stringify({ version: STORAGE_VERSION - 1, state }));
+    const s = fresh(storage).getState();
+    expect(s.ward).toBeNull();
+    expect(s.resetNotice).toBe(true);
+  });
+
   it("JSON 파싱에 실패하면 초기화한다", () => {
     const storage = new MemoryStorage();
     storage.setItem(STORAGE_KEY, "{not json");
@@ -1118,33 +1104,14 @@ describe("persist", () => {
 
   it("모양이 손상되면 초기화한다", () => {
     const storage = new MemoryStorage();
-    storage.setItem(STORAGE_KEY, JSON.stringify({ version: 4, state: { ward: { nurses: "x" }, periods: [], inputVersion: 1 } }));
+    storage.setItem(STORAGE_KEY, JSON.stringify({ version: STORAGE_VERSION, state: { ward: { nurses: "x" }, periods: [], inputVersion: 1 } }));
     const s = fresh(storage).getState();
     expect(s.ward).toBeNull();
     expect(s.resetNotice).toBe(true);
-    // v5인데 근무 형태가 없는 병동도 손상으로 본다
+    // 근무 형태가 없는 병동도 손상으로 본다
     const ward = { name: "", unit: "month", nurses: [], nextNurseNo: 1, rules: [], pendingRules: [], pendingConfig: [], unconverted: [] };
-    storage.setItem(STORAGE_KEY, JSON.stringify({ version: 5, state: { ward, periods: [], view: { screen: "home" }, inputVersion: 1 } }));
+    storage.setItem(STORAGE_KEY, JSON.stringify({ version: STORAGE_VERSION, state: { ward, periods: [], view: { screen: "home" }, inputVersion: 1 } }));
     expect(fresh(storage).getState().resetNotice).toBe(true);
-  });
-
-  it("v4 저장본(e2e 픽스처)은 v6으로 바꿔 열고 규칙·요청 수가 같으며 resetNotice가 없다", () => {
-    const storage = new MemoryStorage();
-    storage.setItem(STORAGE_KEY, JSON.stringify(V4_FIXTURE));
-    const s = fresh(storage).getState();
-    expect(s.resetNotice).toBe(false);
-    expectMigrated(s);
-  });
-
-  it("v5 저장본(블록)은 v6(식 규칙)으로 바꿔 열고 다시 저장한다", () => {
-    const storage = new MemoryStorage();
-    storage.setItem(STORAGE_KEY, JSON.stringify({ version: 5, state: migrateV4(V4_FIXTURE.state, TODAY) }));
-    const store = fresh(storage);
-    expect(store.getState().resetNotice).toBe(false);
-    expectMigrated(store.getState());
-    expect(store.getState().ward!.introSeen).toBe(true);
-    store.getState().setWardName("다시 저장");
-    expect(JSON.parse(storage.getItem(STORAGE_KEY)!).version).toBe(6);
   });
 
   it("dismissResetNotice로 안내를 끈다", () => {
@@ -1227,7 +1194,7 @@ function serverDoc() {
   s.getState().setWardName("서버 병동");
   s.getState().addNurses([rows[0]]);
   const { ward, periods, view, inputVersion } = s.getState();
-  return { version: 5, state: { ward, periods, view, inputVersion } };
+  return { version: STORAGE_VERSION, state: { ward, periods, view, inputVersion } };
 }
 
 const savedState = (doc: unknown) => (doc as { version: number; state: Record<string, unknown> }).state;
@@ -1306,18 +1273,17 @@ describe("로그인 분기", () => {
     expect(f.calls.save).toHaveLength(1);
   });
 
-  it("서버 문서 v4·v5는 v6으로 바꿔 연다", async () => {
-    for (const data of [V4_FIXTURE, { version: 5, state: migrateV4(V4_FIXTURE.state, TODAY) }]) {
-      const f = fakeRemote({ data, updatedAt: SERVER_AT });
-      const store = synced(f.remote);
-      await store.getState().signedIn(USER);
-      expect(store.getState().resetNotice).toBe(false);
-      expectMigrated(store.getState());
-    }
+  it("서버 문서 버전이 지금과 다르면 변환하지 않고 빈 상태로 시작한다", async () => {
+    const { state } = serverDoc();
+    const f = fakeRemote({ data: { version: STORAGE_VERSION - 1, state }, updatedAt: SERVER_AT });
+    const store = synced(f.remote);
+    await store.getState().signedIn(USER);
+    expect(store.getState().ward).toBeNull();
+    expect(store.getState().resetNotice).toBe(true);
   });
 
   it("모양이 손상된 서버 문서도 빈 상태로 시작한다", async () => {
-    const f = fakeRemote({ data: { version: 4, state: { ward: { nurses: "x" } } }, updatedAt: SERVER_AT });
+    const f = fakeRemote({ data: { version: STORAGE_VERSION, state: { ward: { nurses: "x" } } }, updatedAt: SERVER_AT });
     const store = synced(f.remote);
     await store.getState().signedIn(USER);
     expect(store.getState().ward).toBeNull();
@@ -1610,7 +1576,7 @@ describe("옛 화면 상태 불러오기", () => {
   function reload(store: ReturnType<typeof createAppStore>, view: unknown) {
     const storage = new MemoryStorage();
     const { ward, periods, inputVersion } = store.getState();
-    storage.setItem(STORAGE_KEY, JSON.stringify({ version: 5, state: { ward, periods, view, inputVersion } }));
+    storage.setItem(STORAGE_KEY, JSON.stringify({ version: STORAGE_VERSION, state: { ward, periods, view, inputVersion } }));
     return fresh(storage).getState();
   }
 
@@ -1647,7 +1613,7 @@ describe("옛 화면 상태 불러오기", () => {
     const { store, id } = withConfirmed();
     const { ward, periods, inputVersion } = store.getState();
     const f = fakeRemote({
-      data: { version: 5, state: { ward, periods, view: { screen: "period", periodId: id, step: 3 }, inputVersion } },
+      data: { version: STORAGE_VERSION, state: { ward, periods, view: { screen: "period", periodId: id, step: 3 }, inputVersion } },
       updatedAt: SERVER_AT,
     });
     const s = synced(f.remote);
@@ -1697,7 +1663,7 @@ describe("근무 형태", () => {
     const { store, id } = withPeriod();
     store.getState().addShift({ code: "M", name: "미드", hours: 8 });
     store.getState().addShift({ code: "S", name: "짧은", hours: 4 });
-    store.getState().addPendingRules([card({ id: "m", type: "count", params: { shifts: { in: ["M"] }, per: "day", min: 1 } })]);
+    store.getState().addPendingRules([countCard("m", { shifts: { in: ["M"] }, per: "day", min: 1 })]);
     store.getState().removeShift("S");
     store.getState().removeShift("M");
     expect(codes(store)).toEqual(["D", "E", "N", "M-", "O"]);
@@ -1781,7 +1747,7 @@ describe("태그", () => {
 
 describe("설정 변경 카드", () => {
   const double = { action: "add" as const, shift: { code: "DE", name: "더블", hours: 16, parts: ["D", "E"] } };
-  const deLimit = card({ id: "de2", type: "count", source_text: "더블 월 2회", params: { shifts: { in: ["DE"] }, per: "person", max: 2 } });
+  const deLimit = countCard("de2", { shifts: { in: ["DE"] }, per: "person", max: 2 }, { source_text: "더블 월 2회" });
   const other = maxWork("w5", 5);
 
   function withConfigCard() {
