@@ -2,21 +2,62 @@
 
 솔버와 stats는 이제 식 규칙만 평가한다. test_evaluate가 expr-convert-cases의 (블록, 식) 쌍에서 이 함수의 위반과
 evaluate.py의 위반이 같은지 본다. 코드는 지우기 전 그대로다(이름만 공개 함수로).
+블록 dict는 옛 형식 모델 없이 parse로 읽는다.
 """
 
 import math
+from types import SimpleNamespace
 from typing import Any
 
 from backend.domain.constants import FAIRNESS_TOLERANCE, OFF_CODE
-from backend.domain.legacy import CountParams
-from backend.domain.models import Assignments, ScheduleRequest
+from backend.domain.models import Assignments, Days, People, ScheduleRequest, Shifts
 from backend.solver import select
 from backend.solver.stats import _balance_detail, _num, _runs, _shift_label
 
 Cells = list[tuple[str, int]]  # (nurse_id, 날짜)
 
+_BLOCK_TYPES = ("count", "sequence", "balance")
 
-def count_groups(request: ScheduleRequest, p: CountParams) -> list[tuple[str | None, int | None, Cells]]:
+
+def _shifts(raw: dict | None) -> Shifts | None:
+    return None if raw is None else Shifts.model_validate(raw)
+
+
+def parse(raw: dict) -> Any:
+    """블록 dict(count·sequence·balance)를 속성으로 읽는 객체로. 빠진 값은 옛 블록 모델의 기본값이다."""
+    if raw["type"] not in _BLOCK_TYPES:
+        raise ValueError(f"블록이 아닙니다: {raw['type']}")
+    p = raw["params"]
+    balance = raw["type"] == "balance"
+    params = SimpleNamespace(
+        people=People.model_validate(p.get("people", {})),
+        days=Days.model_validate(p.get("days", {})),
+        shifts=_shifts(p.get("shifts")),
+        per=p.get("per"),
+        window=p.get("window"),
+        measure=p.get("measure", "count"),
+        min=p.get("min"),
+        max=p.get("max"),
+        forbid=None if p.get("forbid") is None else [[_shifts(s) for s in pattern] for pattern in p["forbid"]],
+        run=_shifts(p.get("run")),
+        min_len=p.get("min_len"),
+        max_len=p.get("max_len"),
+        after=_shifts(p.get("after")),
+        then_off=p.get("then_off"),
+        with_history=p.get("with_history", True),
+        max_gap=p.get("max_gap", 1),
+    )
+    return SimpleNamespace(
+        id=raw["id"],
+        type=raw["type"],
+        scope=raw["scope"],
+        hardness=raw.get("hardness", "soft" if balance else "hard"),
+        enabled=raw.get("enabled", True),
+        params=params,
+    )
+
+
+def count_groups(request: ScheduleRequest, p: Any) -> list[tuple[str | None, int | None, Cells]]:
     """세기 블록의 묶음: (nurse_id, 대표 날짜, 칸 목록).
 
     - day: 날마다 대상 사람들의 칸. 대표 날짜는 그날
@@ -57,7 +98,7 @@ def count_groups(request: ScheduleRequest, p: CountParams) -> list[tuple[str | N
     return out
 
 
-def count_bounds(p: CountParams) -> tuple[int | None, int | None]:
+def count_bounds(p: Any) -> tuple[int | None, int | None]:
     """세기 블록 범위를 계산 단위 정수로(min은 올림, max는 내림)."""
     scale = select.measure_scale(p.measure)
     lo = None if p.min is None else math.ceil(p.min * scale - 1e-9)

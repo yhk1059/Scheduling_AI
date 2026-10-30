@@ -15,8 +15,9 @@ from backend.domain.convert import (
     night_dedicated_block,
     night_dedicated_rule,
 )
-from backend.domain.legacy import LegacyScheduleRequest, LegacySpec
+from backend.domain.legacy import BlockSpec, LegacyScheduleRequest, LegacySpec
 from backend.domain.models import ConstraintSpec, Period, ScheduleRequest
+from backend.gen_golden import CONVERT_CASES_PATH, build_convert_cases, render
 
 CASES = json.loads((Path(__file__).parent / "golden" / "cases.json").read_text(encoding="utf-8"))
 spec_adapter = TypeAdapter(ConstraintSpec)
@@ -215,3 +216,26 @@ def test_golden_requests_convert_to_valid_rules(case):
     assert out.constraints == expected  # 템플릿 → 블록 → 식(블록을 거친 것과 같다)
     revalidated = ScheduleRequest.model_validate(out.model_dump(mode="json"))
     assert revalidated == out
+
+
+# --- 변환 픽스처(convert-cases.json): TS 변환과 같은 결과를 내야 하는 공유 픽스처 ---
+
+
+def test_convert_cases_fixture_up_to_date():
+    assert Path(CONVERT_CASES_PATH).read_text(encoding="utf-8") == render(build_convert_cases())
+
+
+def test_convert_cases_cover_templates_toggles_and_night_only():
+    block_adapter = TypeAdapter(BlockSpec)
+    cases = json.loads(Path(CONVERT_CASES_PATH).read_text(encoding="utf-8"))
+    pairs = {(c["template"]["type"], c["template"]["hardness"]) for c in cases if c["template"]}
+    for t in ("daily_coverage", "forbidden_sequence", "max_consecutive_work", "max_consecutive_nights",
+              "min_days_off", "off_after_night_block", "skill_mix", "night_fairness", "weekend_fairness"):
+        assert (t, "hard") in pairs and (t, "soft") in pairs, t
+    assert {t for t, _ in pairs} >= {"leave", "fixed_assignment", "shift_preference"}
+    assert any(c["template"] is None and c["block"]["id"] == "night-only" for c in cases)
+    for c in cases:
+        if c["template"]:
+            got = legacy_to_block(legacy_adapter.validate_python(c["template"]), Period.model_validate(c["period"]),
+                                  c["holidays"])
+            assert block_adapter.dump_python(got, mode="json", exclude_none=True) == c["block"], c["name"]

@@ -7,10 +7,8 @@ from datetime import date, timedelta
 from pathlib import Path
 
 import pytest
-from pydantic import TypeAdapter
 
 from backend.domain.constants import CARRY_OVER_DAYS, HISTORY_DAYS
-from backend.domain.legacy import BlockSpec
 from backend.domain.models import Rule, ScheduleRequest
 from backend.solver import select, stats
 from backend.solver.evaluate import Instance, RuleViolation, evaluate_rule, instances
@@ -22,7 +20,6 @@ BLOCK_REQUESTS = {  # 병동·기간·이월만 쓴다(규칙은 케이스의 �
     c["id"]: {**c["request"], "constraints": []}
     for c in json.loads((GOLDEN / "blocks-cases.json").read_text(encoding="utf-8"))
 }
-block_adapter = TypeAdapter(BlockSpec)
 
 START = date(2026, 11, 5)  # 목요일. 1=목 2=금 3=토 4=일 5=월 … 14=수
 NURSES = [
@@ -383,7 +380,7 @@ PAIRS = [c for c in EXPR_CASES if c["block"]["type"] != "fixed_assignment"]
 
 @pytest.mark.parametrize("case", PAIRS, ids=[c["name"] for c in PAIRS])
 def test_rules_match_block_violations(case):
-    block = block_adapter.validate_python(case["block"])
+    block = block_oracle.parse(case["block"])
     rules = [Rule.model_validate(r) for r in case["rules"]]
     for request, a in schedules(case, block):
         expected = block_keys(request, a, block)
@@ -404,7 +401,7 @@ def test_rules_match_block_amounts_except_min_max_min_len_and_then_off(case):
     - 끝난 뒤 휴무: 양은 같지만 칸이 두 구간에 걸칠 수 있어 블록 목록에서 되짚을 수 없다
     - 고르게: test_balance_amount_matches_spread
     """
-    block = block_adapter.validate_python(case["block"])
+    block = block_oracle.parse(case["block"])
     rules = [Rule.model_validate(r) for r in case["rules"]]
     for request, a in schedules(case, block):
         expected = block_amounts(request, a, block)

@@ -4,10 +4,10 @@ import json
 from pathlib import Path
 
 from backend.domain.constants import NIGHT_ONLY_TAG
-from backend.domain.convert import NIGHT_ONLY_RULE_ID
 from backend.domain.models import ScheduleRequest, SolveOk
 from backend.gen_demo import DEMO_PERIOD, demo_request
 from backend.solver.model import solve
+from backend.tests.rules import NIGHT_ONLY_RULE_ID
 
 ROOT = Path(__file__).resolve().parents[2]
 WARD = json.loads((ROOT / "lib" / "samples" / "ward-15.json").read_text(encoding="utf-8"))
