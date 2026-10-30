@@ -21,7 +21,10 @@
     {
       "step": 2,
       "name": "evaluate-expr",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-10-30T13:26:07+0900",
+      "completed_at": "2026-10-30T13:35:51+0900",
+      "summary": "backend/solver/evaluate.py(순수, CP-SAT·llm 미사용): Instance(nurse_id, days)·RuleViolation(instance, amount), instances(request, rule), evaluate_rule(request, assignments, rule)과 보조 count_cells·count_total·cmp_sides·cmp_holds·cond_holds·balance_values·code_at·resolve. stats.violations가 type=rule이면 evaluate_rule을 위반 목록으로 바꾸고(표시 날: 날·주는 첫날(이월이면 1일), 창은 끝날, 사람·기간은 없음), describe_violation이 '{묶음} {값} (기준 {범위})'(사람 이름·태그·연차, 날 종류, 코드 이름은 config; 그리고/또는은 어긴 비교를 ' · '로 이음, 고르게는 블록 문구 공유 _balance_detail). test_evaluate 345개: expr-convert-cases의 블록·식 쌍 163개 × (무작위 30 + 대상 칸 뒤집기 4)에서 위반 집합이 같고, 위반량도 세기·금지 순서·최대 연속에서 같음. §2.6 예시 6개, 모르는 날, 주·창 경계, 시간 올림, 고르게 이력. 전체 pytest 1016 통과. 위반량이 다른 모양: 세기 min·max(다른 값)는 All이라 1(블록은 벗어난 양), 최소 연속(soft)은 뒤 칸 중 다른 근무 수(블록은 구간마다 1). 결정: day·person_day 인스턴스는 이월 날(d<=0)까지 보되 세는 offset 구간이 기간과 겹칠 때만 평가(이월만 세는 인스턴스는 상수라 건너뜀); 그래서 블록보다 넓게 보는 경계 두 가지가 생김: 최소 연속은 이월에서 끝난 짧은 구간 뒤 1일이 다른 근무면 위반, then_off≥2는 이월 앞날 N의 휴무가 기간으로 이어짐(골든 케이스에는 해당 없음, 테스트는 블록 ⊆ 식 + 차이는 d<=0만). 사람마다·count·대상 날짜 전부/0 모양(희망·기피·휴가)은 블록처럼 어긴 날마다 SoftViolation 하나. 고르게 위반량은 차이(시간은 기본 근무 단위 올림), hard 기준 max_gap·soft 기준 FAIRNESS_TOLERANCE. Count 오른쪽 숫자·값은 왼쪽 세기 단위로 환산. compute_result의 희망 반영(_preference_cells)은 아직 블록만 셈(규칙 미반영, 이후 step)."
     },
     {
       "step": 3,
