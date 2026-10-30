@@ -13,8 +13,7 @@ MAX_TAGS_PER_NURSE = 5
 MAX_TAG_CHARS = 10
 # 블록 형식 상한(초과 시 422). 최악 병동 벤치(python -m backend.bench)가 시간 예산 안에 해를 내는 값이다
 MAX_PATTERNS = 4  # 순서 블록의 금지 패턴 수
-MIN_PATTERN_LEN = 2  # 금지 패턴 한 개의 칸 수
-MAX_PATTERN_LEN = 4
+MAX_PATTERN_LEN = 4  # 금지 패턴 한 개의 칸 수
 MIN_WINDOW_DAYS = 2  # 세기 블록 per=person_window의 창 길이
 MAX_WINDOW_DAYS = 14
 # 규칙 식 상한(ADR-019, 초과 시 422)

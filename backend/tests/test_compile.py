@@ -5,27 +5,21 @@
   고르게(soft)는 블록처럼 (최대 − 최소)를 그대로 벌점으로 둔다(evaluate는 FAIRNESS_TOLERANCE 이하를 위반으로 나열하지 않음).
 """
 
-import json
 import math
 import random
 import zlib
 from datetime import date, timedelta
-from pathlib import Path
 
 import pytest
 from pydantic import TypeAdapter
 
 from backend.domain.constants import HISTORY_DAYS
 from backend.domain.models import Balance, ConstraintSpec, Rule, ScheduleRequest
-from backend.gen_golden import SOLVER_CASES_PATH, solve_case
-from backend.solver import evaluate, select, stats
+from backend.gen_golden import solve_case
+from backend.solver import evaluate, select
 from backend.solver.model import solve
-from backend.tests import block_oracle
+from backend.tests import rules as R
 
-GOLDEN = Path(__file__).parent / "golden"
-BLOCK_CASES = json.loads((GOLDEN / "blocks-cases.json").read_text(encoding="utf-8"))
-SOLVER_CASES = json.loads(SOLVER_CASES_PATH.read_text(encoding="utf-8"))
-EXPR_CASES = json.loads((GOLDEN / "expr-convert-cases.json").read_text(encoding="utf-8"))
 spec_adapter = TypeAdapter(ConstraintSpec)
 
 
@@ -114,15 +108,49 @@ FEATURE_RULES: list[dict] = [
 ]
 
 
+def _forbid(cid: str, patterns: list[dict], people: dict | None = None, **extra) -> dict:
+    """금지 패턴: 사람·날마다 칸 중 하나는 패턴과 다르다."""
+    then = {"any": [R.cmp(R.cnt(s, (i, i)), "eq", 0) for i, s in enumerate(patterns)]}
+    return R.con(cid, R.require("person_day", then, people=people), **extra)
+
+
+_D, _E, _N, _O, _WORK = {"in": ["D"]}, {"in": ["E"]}, R.N, R.O, R.WORK
+
+# 식 모양마다 하나씩(세기, 금지 순서, 연속 구간, 끝난 뒤 휴무, 고르게, 기본 규칙)
+SHAPE_RULES: dict[str, list[dict]] = {
+    "count-day-min": [R.count("c", _D, "day", 3)],
+    "count-day-max": [R.count("c", _E, "day", hi=4, days={"kind": "weekend"})],
+    "count-day-min-max": [R.count("c", _D, "day", 3, 4, days={"kind": "weekday"})],
+    "count-day-eq": [R.count("c", _N, "day", 2, 2)],
+    "count-day-people": [R.count("c", _E, "day", 1, people={"min_years": 3})],
+    "count-day-hours": [R.count("c", _WORK, "day", hi=80, measure="hours")],
+    "count-person-min": [R.count("c", _O, "person", 8)],
+    "count-person-max-soft": [R.count("c", _N, "person", hi=0, hardness="soft", scope="period", priority="high",
+                                      people={"ids": ["n1"]}, days={"kind": "weekend"})],
+    "count-person-leave": [R.leave("c", "n1", [3, 4, 5])],
+    "count-person-week-hours": [R.weekly_hours("c", 52)],
+    "count-person-window": [R.window_off("c", 7, people={"exclude_tags": ["신규"]})],
+    "count-disabled": [R.count("c", _O, "person", 8, enabled=False)],
+    "forbid-1": [R.forbid("s", "N", "D")],
+    "forbid-2-split": [R.forbid("s", "N", "D", hardness="soft", priority="high"),
+                       R.forbid("s-2", "N", "E", hardness="soft", priority="high")],
+    "forbid-3-long": [_forbid("s", [_N, _O, _D], people={"tags": ["신규"]})],
+    "run-max-len-night": [R.max_nights("s", 3)],
+    "run-max-len-work": [R.max_work("s", 5)],
+    "run-min-len": [R.min_run("s", _N, 2)],
+    "run-min-max-split": [R.max_nights("s", 3), R.min_run("s-2", _N, 2)],
+    "after-then-off-1": [R.off_after("s", 1)],
+    "after-then-off-2": [R.off_after("s", 2, hardness="soft")],
+    "balance-soft": [R.night_fair("b")],
+    "balance-hard-gap": [R.balance("b", _N, 0, hardness="hard")],
+    "balance-hours-no-history": [R.balance("b", _WORK, days={"kind": "weekend"}, measure="hours", with_history=False)],
+    "default-coverage": [R.count("cov-D", _D, "day", 3, 3, default=True)],
+    "default-night-only": [R.night_only()],
+}
+
+
 def _shape_rules() -> list[dict]:
-    """변환표 모양(expr-convert-cases의 모양 케이스)의 식 규칙."""
-    shapes = [c for c in EXPR_CASES if "/" not in c["name"]]
-    out = []
-    for c in shapes:
-        for r in c["rules"]:
-            if r["type"] == "rule":
-                out.append({**r, "id": f"{c['name']}:{r['id']}"})
-    return out
+    return [{**r, "id": f"{name}:{r['id']}"} for name, rs in SHAPE_RULES.items() for r in rs]
 
 
 ALL_RULES = _shape_rules() + FEATURE_RULES
@@ -261,30 +289,3 @@ def test_feature_rule_infeasible_core_contains_rule(cid):
     assert out.status == "infeasible"
     assert cid in {c.constraint_id for c in out.conflicts}
     assert all(c.type in ("rule", "fixed_assignment") for c in out.conflicts)
-
-
-# --- 결과 통계: 규칙도 희망·기피로 센다 ---
-
-
-def test_preference_summary_same_for_block_and_rules():
-    """블록 기준(block_oracle: 지우기 전 stats의 블록 경로)과 식 규칙의 희망 반영·soft 위반이 같다."""
-    case = next(c for c in BLOCK_CASES if c["id"] == "block-soft-prefs")
-    blocks = [block_oracle.parse(c) for c in case["request"]["constraints"] if c["type"] != "fixed_assignment"]
-    req = ScheduleRequest.model_validate(next(c for c in SOLVER_CASES if c["id"] == case["id"])["request"])
-    a = case["expected"]["assignments"]
-    rule_res = stats.compute_result(req, a, optimal=True)
-    cells = [x for c in blocks if c.enabled for x in block_oracle.preference_cells(req, c)]
-    met = {n.id: 0 for n in req.nurses}
-    total = {n.id: 0 for n in req.nurses}
-    for nid, d, sel, prefer in cells:
-        total[nid] += 1
-        met[nid] += select.matches(req.config, a[nid][d - 1], sel) == prefer
-    assert sum(total.values()) > 0
-    assert (rule_res.summary.preferences_total, rule_res.summary.preferences_met) == (sum(total.values()), sum(met.values()))
-    assert {k: v.preference_rate for k, v in rule_res.stats.items()} == {
-        k: met[k] / total[k] if total[k] else None for k in total
-    }
-    soft = [c for c in blocks if c.enabled and c.hardness == "soft"]
-    assert [(v.constraint_id, v.nurse_id, v.day) for v in rule_res.soft_violations] == [
-        (c.id, nid, day) for c in soft for _, nid, day in block_oracle.violations(req, a, c)
-    ]
