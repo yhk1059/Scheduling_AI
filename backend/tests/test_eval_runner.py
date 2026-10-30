@@ -4,58 +4,37 @@ import importlib.util
 from pathlib import Path
 
 import pytest
-from pydantic import TypeAdapter, ValidationError
+from pydantic import ValidationError
 
-from backend.domain.convert import block_to_rules
-from backend.domain.legacy import BlockSpec
 from backend.llm.client import ToolCallResult
+from backend.tests import rules as R
 
 ROOT = Path(__file__).resolve().parents[2]
 _spec = importlib.util.spec_from_file_location("eval_run", ROOT / "eval" / "run.py")
 run = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(run)
 
-
-_block_adapter = TypeAdapter(BlockSpec)
-_BLOCK_TYPES = ("count", "sequence", "balance")
-
-
-def _rules_of(c: dict) -> list:
-    """블록 dict(옛 기대값 모양)는 식 규칙 스펙으로(convert_dataset.py와 같은 변환), 그 밖은 그대로."""
-    if c.get("type") not in _BLOCK_TYPES:
-        return [c]
-    return block_to_rules(_block_adapter.validate_python({**run._FILLER, **c}))
-
-
-def as_rules(*blocks: dict) -> list[dict]:
-    """블록을 데이터셋 기대값 형식(식 규칙 dict)으로. 식·칸 고정은 그대로."""
-    return [r if isinstance(r, dict) else run._dump(r) for b in blocks for r in _rules_of(b)]
-
-
-def score(expected: list, actual: list, **kwargs) -> tuple[int, int, int]:
-    """블록 모양 테스트 입력을 식 규칙으로 바꿔 채점한다(채점기는 식 규칙과 칸 고정만 받는다)."""
-    specs = lambda cs: [r for c in cs for r in _rules_of(c)]  # noqa: E731
-    return run.score_constraints(specs(expected), specs(actual), **kwargs)
-
-
-def count(params: dict, hardness: str | None = None, **extra) -> dict:
-    c = {"type": "count", "params": params, **extra}
-    if hardness:
-        c["hardness"] = hardness
-    return c
+score = run.score_constraints
 
 
 def leave(nurse_id: str, days: list[int], **extra) -> dict:
-    """휴가 블록(변환표 8번 모양)."""
-    params = {"people": {"ids": [nurse_id]}, "days": {"days": days}, "shifts": {"not_in": ["O"]}, "per": "person", "max": 0}
-    return count(params, "hard", **extra)
+    """휴가 규칙(변환표 8번 모양)."""
+    return R.leave("x", nurse_id, days, **extra)
 
 
-NF = {"type": "balance", "hardness": "soft", "params": {"people": {"exclude_tags": ["나이트전담"]}, "shifts": {"in": ["N"]}}}
+def forbid(*pattern: dict, **extra) -> dict:
+    """금지 순서: 사람마다 d부터 pattern이 이어지면 안 된다."""
+    then = {"any": [R.cmp(R.cnt(s, (i, i)), "eq", 0) for i, s in enumerate(pattern)]}
+    return R.con("x", R.require("person_day", then), **extra)
 
 
-def seq(params: dict, hardness: str = "hard") -> dict:
-    return {"type": "sequence", "hardness": hardness, "params": params}
+NF = R.night_fair()
+
+# 블록(옛 기대값 모양). 채점기·데이터셋 검증이 거절하는지 볼 때만 쓴다
+LEAVE_BLOCK = {"type": "count", "hardness": "hard", "params": {"people": {"ids": ["n01"]}, "days": {"days": [15]},
+                                                               "shifts": {"not_in": ["O"]}, "per": "person", "max": 0}}
+NF_BLOCK = {"type": "balance", "hardness": "soft", "params": {"people": {"exclude_tags": ["나이트전담"]}, "shifts": {"in": ["N"]}}}
+RUN_BLOCK = {"type": "sequence", "hardness": "hard", "params": {"run": {"in": ["N"]}, "max_len": 3}}
 
 
 # --- 채점(의미 기준) ---
@@ -86,8 +65,10 @@ def test_score_multiset():
 
 
 def test_score_fills_defaults():
-    expected = count({"shifts": {"in": ["O"]}, "per": "person", "min": 8})
-    actual = count({"people": {}, "days": {"kind": "all"}, "shifts": {"in": ["O"]}, "per": "person", "measure": "count", "min": 8}, "hard")
+    expected = R.min_off("x", 8)
+    then = R.cmp(R.cnt(R.O, measure="count"), "ge", {"value": "min"})
+    actual = R.con("x", R.require("person", then, days={"kind": "all"}), {"min": {"value": 8, "label": "최소 휴무 일수"}},
+                   priority="normal", enabled=True)
     assert score([expected], [actual]) == (1, 1, 1)
 
 
@@ -95,51 +76,54 @@ def test_score_rejects_template_expected():
     """기대값은 식 규칙만 쓴다(템플릿은 step 5, 블록은 step 7에서 모두 바꿨다)."""
     template = {"type": "leave", "hardness": "hard", "params": {"nurse_id": "n01", "days": [15, 16]}}
     with pytest.raises(ValidationError):
-        run.score_constraints([template], as_rules(leave("n01", [16, 15])))
+        run.score_constraints([template], [leave("n01", [16, 15])])
 
 
-@pytest.mark.parametrize("block", [leave("n01", [15]), NF, seq({"run": {"in": ["N"]}, "max_len": 3})], ids=_BLOCK_TYPES)
-def test_score_rejects_block_specs(block):
+@pytest.mark.parametrize(
+    "block, rule",
+    [(LEAVE_BLOCK, leave("n01", [15])), (NF_BLOCK, NF), (RUN_BLOCK, R.max_nights("x", 3))],
+    ids=("count", "balance", "sequence"),
+)
+def test_score_rejects_block_specs(block, rule):
     """채점기는 블록을 식으로 바꾸지 않는다(ADR-019 ★2: 블록은 변환에만 남는다)."""
     with pytest.raises(ValidationError):
-        run.score_constraints([block], as_rules(block))
+        run.score_constraints([block], [rule])
 
 
 # 같은 규칙의 다른 모양은 일치
 
 
 def test_same_rule_leave_per_person_vs_per_day():
-    per_day = count({"people": {"ids": ["n01"]}, "days": {"days": [15, 16, 17]}, "shifts": {"not_in": ["O"]}, "per": "day", "max": 0}, "hard")
+    per_day = R.count("x", R.WORK, "day", hi=0, people={"ids": ["n01"]}, days={"days": [15, 16, 17]})
     assert score([leave("n01", [15, 16, 17])], [per_day]) == (1, 1, 1)
 
 
 def test_same_rule_leave_as_off_exactly():
-    off = count({"people": {"ids": ["n01"]}, "days": {"days": [15, 16, 17]}, "shifts": {"in": ["O"]}, "per": "person", "min": 3}, "hard")
+    off = R.count("x", R.O, "person", lo=3, people={"ids": ["n01"]}, days={"days": [15, 16, 17]})
     assert score([leave("n01", [15, 16, 17])], [off]) == (1, 1, 1)
 
 
 def test_same_rule_in_vs_not_in():
-    a = seq({"forbid": [[{"in": ["N"]}, {"in": ["D", "E"]}]]})
-    b = seq({"forbid": [[{"in": ["N"]}, {"not_in": ["N", "O"]}]]})
+    a = forbid(R.N, {"in": ["D", "E"]})
+    b = forbid(R.N, {"not_in": ["N", "O"]})
     assert score([a], [b]) == (1, 1, 1)
 
 
 def test_same_rule_selector_list_order():
-    a = count({"people": {"ids": ["n01", "n02"]}, "days": {"weekdays": [0, 4]}, "shifts": {"in": ["D", "E"]}, "per": "person", "max": 0}, "soft")
-    b = count({"people": {"ids": ["n02", "n01"]}, "days": {"weekdays": [4, 0]}, "shifts": {"in": ["E", "D"]}, "per": "person", "max": 0}, "soft")
+    a = R.count("x", {"in": ["D", "E"]}, "person", hi=0, people={"ids": ["n01", "n02"]}, days={"weekdays": [0, 4]}, hardness="soft")
+    b = R.count("x", {"in": ["E", "D"]}, "person", hi=0, people={"ids": ["n02", "n01"]}, days={"weekdays": [4, 0]}, hardness="soft")
     assert score([a], [b]) == (1, 1, 1)
 
 
 def test_same_rule_fixed_vs_count():
     fixed = {"type": "fixed_assignment", "hardness": "hard", "params": {"nurse_id": "n03", "day": 25, "shift": "N"}}
-    block = count({"people": {"ids": ["n03"]}, "days": {"days": [25]}, "shifts": {"in": ["N"]}, "per": "person", "min": 1}, "hard")
-    assert score([fixed], [block]) == (1, 1, 1)
+    once = R.count("x", R.N, "person", lo=1, people={"ids": ["n03"]}, days={"days": [25]})
+    assert score([fixed], [once]) == (1, 1, 1)
 
 
 def test_same_rule_off_after_night_vs_forbid():
-    after = seq({"after": {"in": ["N"]}, "then_off": 1})
-    forbid = seq({"forbid": [[{"in": ["N"]}, {"not_in": ["N", "O"]}]]})
-    assert score([after], [forbid]) == (1, 1, 1)
+    after = R.off_after_night("x", 1)
+    assert score([after], [forbid(R.N, {"not_in": ["N", "O"]})]) == (1, 1, 1)
 
 
 # 식 규칙: 같은 규칙의 다른 식 모양은 일치(위반은 evaluate.evaluate_rule로 센다)
@@ -209,8 +193,8 @@ def test_same_rule_value_names_ignored():
 
 
 def test_same_rule_block_vs_expr():
-    # 블록(옛 기대값)을 식으로 바꾼 것과 손으로 쓴 다른 식 모양이 같다
-    after = seq({"after": {"in": ["N"]}, "then_off": 1})
+    # 변환표 모양(구간 뒤 휴무)과 손으로 쓴 다른 식 모양이 같다
+    after = R.off_after_night("x", 1)
     forbid = rule({"per": "person_day"}, {"any": [cmp(cnt(N_, offset=[0, 0]), "eq", 0), cmp(cnt({"not_in": ["N", "O"]}, offset=[1, 1]), "eq", 0)]})
     assert score([after], [forbid]) == (1, 1, 1)
 
@@ -260,21 +244,18 @@ def test_expr_shapes_mismatch(expected, actual):
     [
         (leave("n01", [15, 16, 17]), leave("n01", [15, 16])),
         (leave("n01", [15]), leave("n01", [16])),
-        (count({"shifts": {"in": ["O"]}, "per": "person", "min": 8}), count({"shifts": {"in": ["O"]}, "per": "person", "min": 9})),
-        (seq({"run": {"in": ["N"]}, "max_len": 3}), seq({"run": {"in": ["N"]}, "max_len": 4})),
-        (seq({"after": {"in": ["N"]}, "then_off": 2}), seq({"after": {"in": ["N"]}, "then_off": 1})),
-        (seq({"run": {"in": ["N"]}, "min_len": 2}), seq({"run": {"in": ["N"]}, "min_len": 3})),
-        (count({"days": {"kind": "weekday"}, "shifts": {"in": ["D"]}, "per": "day", "min": 3, "max": 4}),
-         count({"days": {"kind": "weekday"}, "shifts": {"in": ["D"]}, "per": "day", "min": 3, "max": 3})),
-        (count({"people": {"min_years": 3}, "shifts": {"in": ["N"]}, "per": "day", "min": 1}),
-         count({"people": {"min_years": 4}, "shifts": {"in": ["N"]}, "per": "day", "min": 1})),
-        (count({"shifts": {"not_in": ["O"]}, "per": "person_week", "measure": "hours", "max": 52}),
-         count({"shifts": {"not_in": ["O"]}, "per": "person_week", "measure": "hours", "max": 40})),
-        (count({"shifts": {"in": ["O"]}, "per": "person_window", "window": 7, "min": 1}),
-         count({"shifts": {"in": ["O"]}, "per": "person_window", "window": 8, "min": 1})),
-        (count({"people": {"tags": ["책임"]}, "shifts": {"in": ["D"]}, "per": "day", "min": 1}),
-         count({"people": {"tags": ["신규"]}, "shifts": {"in": ["D"]}, "per": "day", "min": 1})),
-        (NF, {"type": "balance", "hardness": "soft", "params": {"shifts": {"in": ["N"]}}}),
+        (R.min_off("x", 8), R.min_off("x", 9)),
+        (R.max_nights("x", 3), R.max_nights("x", 4)),
+        (R.off_after_night("x", 2), R.off_after_night("x", 1)),
+        (R.min_run("x", R.N, 2), R.min_run("x", R.N, 3)),
+        (R.count("x", {"in": ["D"]}, "day", 3, 4, days={"kind": "weekday"}),
+         R.count("x", {"in": ["D"]}, "day", 3, 3, days={"kind": "weekday"})),
+        (R.skill_mix("x", "N", 3, 1), R.skill_mix("x", "N", 4, 1)),
+        (R.weekly_hours("x", 52), R.weekly_hours("x", 40)),
+        (R.window_off("x", 7), R.window_off("x", 8)),
+        (R.count("x", {"in": ["D"]}, "day", lo=1, people={"tags": ["책임"]}),
+         R.count("x", {"in": ["D"]}, "day", lo=1, people={"tags": ["신규"]})),
+        (NF, R.balance("x", R.N)),
     ],
 )
 def test_different_rule_mismatch(expected, actual):
@@ -282,22 +263,22 @@ def test_different_rule_mismatch(expected, actual):
 
 
 def test_score_compares_priority_only_when_soft():
-    soft = count({"shifts": {"in": ["O"]}, "per": "person", "min": 8}, "soft")
+    soft = R.min_off("x", 8, hardness="soft")
     assert score([{**soft, "priority": "high"}], [soft]) == (0, 1, 1)
-    hard = count({"shifts": {"in": ["O"]}, "per": "person", "min": 8}, "hard")
+    hard = R.min_off("x", 8)
     assert score([{**hard, "priority": "high"}], [hard]) == (1, 1, 1)
 
 
 def test_score_rare_violation_distinguished_by_flips():
-    # 무작위 근무표에서 한 칸이 정확히 맞기는 드물다. 기대 블록의 대상 칸을 뒤집은 근무표로 구분한다
-    a = count({"people": {"ids": ["n01"]}, "days": {"days": [15]}, "shifts": {"in": ["D"]}, "per": "person", "min": 1}, "soft")
-    b = count({"people": {"ids": ["n01"]}, "days": {"days": [15]}, "shifts": {"in": ["E"]}, "per": "person", "min": 1}, "soft")
+    # 무작위 근무표에서 한 칸이 정확히 맞기는 드물다. 기대 규칙의 대상 칸을 뒤집은 근무표로 구분한다
+    a = R.count("x", {"in": ["D"]}, "person", lo=1, people={"ids": ["n01"]}, days={"days": [15]}, hardness="soft")
+    b = R.count("x", {"in": ["E"]}, "person", lo=1, people={"ids": ["n01"]}, days={"days": [15]}, hardness="soft")
     assert score([a], [b]) == (0, 1, 1)
 
 
 def test_schedules_deterministic():
     case_ = {"id": "x", "today": "2026-10-26", "scope": "ward", "text": "t", "expected": {"status": "ok", "constraints": [leave("n01", [3])]}}
-    expected = [run._spec(r) for r in as_rules(leave("n01", [3]))]
+    expected = [run._spec(leave("n01", [3]))]
     s1 = run.judge_schedules(case_, run.judge_config([]), expected)
     s2 = run.judge_schedules(case_, run.judge_config([]), expected)
     assert len(s1) >= run.K_RANDOM
@@ -321,13 +302,13 @@ def test_score_config_changes():
 
 def test_score_constraints_with_new_code():
     config = run.judge_config([DE])
-    a = count({"shifts": {"in": ["DE"]}, "per": "person", "max": 2})
-    b = count({"shifts": {"in": ["DE"]}, "per": "person", "max": 3})
+    a = R.count("x", {"in": ["DE"]}, "person", hi=2)
+    b = R.count("x", {"in": ["DE"]}, "person", hi=3)
     assert score([a], [a], config=config) == (1, 1, 1)
     assert score([a], [b], config=config) == (0, 1, 1)
     # 더블 DE가 있어도 in [D, E] ↔ not_in [N, O]는 같다(DE는 D·E를 센다)
-    x = count({"shifts": {"in": ["D", "E"]}, "per": "day", "max": 10})
-    y = count({"shifts": {"not_in": ["N", "O"]}, "per": "day", "max": 10})
+    x = R.count("x", {"in": ["D", "E"]}, "day", hi=10)
+    y = R.count("x", {"not_in": ["N", "O"]}, "day", hi=10)
     assert score([x], [y], config=config) == (1, 1, 1)
 
 
@@ -340,11 +321,11 @@ def case(id_: str, expected: dict, **extra) -> dict:
 
 def test_validate_dataset_ok():
     cases = [
-        case("a", {"status": "ok", "constraints": as_rules(leave("n01", [15]))}, holidays=[5]),
+        case("a", {"status": "ok", "constraints": [leave("n01", [15])]}, holidays=[5]),
         case("b", {"status": "clarify"}),
         case("c", {"status": "ok", "config_changes": [M]}, set="new"),
-        case("d", {"status": "ok", "config_changes": [DE], "constraints": as_rules(count({"shifts": {"in": ["DE"]}, "per": "person", "max": 2}))}, set="new"),
-        case("e", {"status": "ok", "constraints": as_rules(count({"people": {"tags": ["책임"]}, "shifts": {"in": ["D"]}, "per": "day", "min": 1}))}),
+        case("d", {"status": "ok", "config_changes": [DE], "constraints": [R.count("x", {"in": ["DE"]}, "person", hi=2)]}, set="new"),
+        case("e", {"status": "ok", "constraints": [R.count("x", {"in": ["D"]}, "day", lo=1, people={"tags": ["책임"]})]}),
         case("f", {"status": "ok", "constraints": [{"type": "fixed_assignment", "params": {"nurse_id": "n03", "day": 25, "shift": "N"}}]}),
         case("g", {"status": "ok", "constraints": [PAIR_LE]}, set="expr"),
         case("h", {"status": "ok", "constraints": [rule({"per": "day"}, cmp(cnt(N_, who={"tags": ["책임"]}), "ge", 1), when=cmp(cnt(N_, who={"tags": ["신규"]}), "ge", 1))]}, set="expr"),
@@ -357,11 +338,11 @@ def test_validate_dataset_ok():
     [
         [case("a", {"status": "clarify"}), case("a", {"status": "clarify"})],  # id 중복
         [case("a", {"status": "maybe"})],  # status 값
-        [case("a", {"status": "ok", "constraints": as_rules(leave("n99", [15]))})],  # 명단 밖
-        [case("a", {"status": "ok", "constraints": as_rules(leave("n01", [31]))})],  # 11월 31일
+        [case("a", {"status": "ok", "constraints": [leave("n99", [15])]})],  # 명단 밖
+        [case("a", {"status": "ok", "constraints": [leave("n01", [31])]})],  # 11월 31일
         [case("a", {"status": "ok", "constraints": [{"type": "nope", "params": {}}]})],  # 식 밖
         [case("a", {"status": "ok", "constraints": [{"type": "leave", "hardness": "hard", "params": {"nurse_id": "n01", "days": [15]}}]})],  # 템플릿
-        [case("a", {"status": "ok", "constraints": [leave("n01", [15])]})],  # 블록(식으로 바꾸지 않은 기대값)
+        [case("a", {"status": "ok", "constraints": [LEAVE_BLOCK]})],  # 블록(식으로 바꾸지 않은 기대값)
         [case("a", {"status": "ok", "constraints": [rule({"per": "day"}, cmp(cnt(N_), "le", 1), values={"max": val(1)})]})],  # 안 쓰는 값
         [case("a", {"status": "ok", "constraints": [rule({"per": "person"}, cmp(cnt(N_, offset=[0, 1]), "le", 1))]})],  # person 범위 offset
         [case("a", {"status": "ok", "constraints": [rule({"per": "day"}, cmp(cnt(N_, who={"tags": ["프리셉터"]}), "ge", 1))]})],  # who에 없는 태그
@@ -372,9 +353,9 @@ def test_validate_dataset_ok():
         [case("a", {"status": "clarify"}, scope="year")],
         [case("a", {"status": "clarify"}, set="other")],  # set 값
         [{k: v for k, v in case("a", {"status": "clarify"}).items() if k != "set"}],  # set 없음
-        [case("a", {"status": "ok", "constraints": as_rules(count({"shifts": {"in": ["M"]}, "per": "day", "min": 1}))})],  # 없는 코드
+        [case("a", {"status": "ok", "constraints": [R.count("x", {"in": ["M"]}, "day", lo=1)]})],  # 없는 코드
         [case("a", {"status": "ok", "config_changes": [{"action": "add", "shift": {"code": "D", "name": "데이", "hours": 8}}]})],  # 있는 코드 add
-        [case("a", {"status": "ok", "constraints": as_rules(count({"people": {"tags": ["프리셉터"]}, "shifts": {"in": ["D"]}, "per": "day", "min": 1}))})],  # 없는 태그
+        [case("a", {"status": "ok", "constraints": [R.count("x", {"in": ["D"]}, "day", lo=1, people={"tags": ["프리셉터"]})]})],  # 없는 태그
     ],
 )
 def test_validate_dataset_errors(cases):
@@ -394,8 +375,8 @@ CROSS = {"start_date": "2026-11-23", "length": 14}
 
 def test_validate_dataset_uses_case_period():
     # 14일 기간에는 15일이 없고, 기본(샘플) 30일 기간에는 있다
-    assert run.validate_dataset([case("a", {"status": "ok", "constraints": as_rules(leave("n01", [15]))}, period=CROSS)])
-    assert run.validate_dataset([case("a", {"status": "ok", "constraints": as_rules(leave("n01", [9, 10, 11]))}, period=CROSS)]) == []
+    assert run.validate_dataset([case("a", {"status": "ok", "constraints": [leave("n01", [15])]}, period=CROSS)])
+    assert run.validate_dataset([case("a", {"status": "ok", "constraints": [leave("n01", [9, 10, 11])]}, period=CROSS)]) == []
 
 
 @pytest.mark.parametrize("period", [{"start_date": "2026-11-23"}, {"start_date": "x", "length": 14}, {"start_date": "2026-11-23", "length": 40}])
@@ -444,7 +425,8 @@ def test_convert_dataset_blocks_to_rules():
     spec = importlib.util.spec_from_file_location("convert_dataset", ROOT / "eval" / "convert_dataset.py")
     conv = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(conv)
-    block_case = case("a", {"status": "ok", "constraints": [seq({"run": {"in": ["N"]}, "min_len": 2, "max_len": 3})]})
+    run_block = {"type": "sequence", "hardness": "hard", "params": {"run": {"in": ["N"]}, "min_len": 2, "max_len": 3}}
+    block_case = case("a", {"status": "ok", "constraints": [run_block]})
     out = conv.convert_case(block_case, run._ward())
     assert [c["type"] for c in out["expected"]["constraints"]] == ["rule", "rule"]
     assert out["set"] == "legacy"
@@ -468,51 +450,42 @@ class FakeClient:
         return self.responses.pop(0)
 
 
-def draft(type_: str, params: dict, hardness: str | None = None) -> dict:
-    d = {"type": type_, "params": params, "source_text": "원문"}
-    if hardness:
-        d["hardness"] = hardness
-    return d
+def draft(rule: dict) -> dict:
+    """규칙 dict를 translator가 받는 규칙 초안(RuleDraft)으로."""
+    return {k: v for k, v in rule.items() if k not in _SERVER_FIELDS}
 
 
 def leave_draft(nurse_id: str, days) -> dict:
-    """translator가 내는 블록 모양의 휴가."""
-    params = {"people": {"ids": [nurse_id]}, "days": {"days": days}, "shifts": {"not_in": ["O"]}, "per": "person", "max": 0}
-    return draft("count", params)
+    return draft(leave(nurse_id, days))
 
 
-NF_DRAFT = draft("balance", {"people": {"exclude_tags": ["나이트전담"]}, "shifts": {"in": ["N"]}}, "hard")
 _SERVER_FIELDS = {"id", "scope", "enabled", "default", "type", "weight"}
+NF_DRAFT = draft(R.night_fair(hardness="hard"))
 
 
 BAD_RULE = {"body": {"kind": "require", "for_each": {"per": "person"}, "then": "많이"}, "source_text": "원문"}  # 스키마 위반
 
 
-def rules(*blocks: dict) -> list[dict]:
-    """블록 초안을 translator가 받는 규칙 초안(RuleDraft)으로(설계 §2.5 변환표)."""
-    return [r.model_dump(mode="json", exclude=_SERVER_FIELDS) for b in blocks for r in _rules_of(b)]
-
-
 def test_score_compares_expected_with_draft_actual():
-    block = {**leave_draft("n01", [16, 15]), "hardness": "hard"}
-    del block["source_text"]
-    assert score([leave("n01", [15, 16])], [block]) == (1, 1, 1)
-    assert score([NF], [{**NF_DRAFT, "hardness": "soft"}]) == (1, 1, 1)
-    assert score([NF], [NF_DRAFT]) == (0, 1, 1)
+    actual = {**leave_draft("n01", [16, 15]), "type": "rule"}
+    del actual["source_text"]
+    assert score([leave("n01", [15, 16])], [actual]) == (1, 1, 1)
+    assert score([NF], [{**NF_DRAFT, "type": "rule", "hardness": "soft"}]) == (1, 1, 1)
+    assert score([NF], [{**NF_DRAFT, "type": "rule"}]) == (0, 1, 1)
 
 
 def test_run_cases_aggregates():
     cases = [
         case(
             "a",
-            {"status": "ok", "constraints": as_rules(leave("n01", [15, 16]), NF)},
+            {"status": "ok", "constraints": [leave("n01", [15, 16]), NF]},
             scope="ward",
         ),
         case("b", {"status": "clarify"}),
     ]
     client = FakeClient(
         ok({"rules": [BAD_RULE]}),  # 스키마 위반 → 재시도
-        ok({"rules": rules(leave_draft("n01", [16, 15]), NF_DRAFT)}),
+        ok({"rules": [leave_draft("n01", [16, 15]), NF_DRAFT]}),
         ok({"unsupported_reason": "템플릿 없음"}),
     )
     results = run.run_cases(cases, client)
@@ -535,11 +508,11 @@ def test_run_cases_aggregates():
 
 def test_run_cases_exact_and_error():
     cases = [
-        case("a", {"status": "ok", "constraints": as_rules(leave("n01", [15]))}),
-        case("b", {"status": "ok", "constraints": as_rules(leave("n02", [3]))}),
+        case("a", {"status": "ok", "constraints": [leave("n01", [15])]}),
+        case("b", {"status": "ok", "constraints": [leave("n02", [3])]}),
     ]
     bad = ok({"rules": [BAD_RULE]})
-    client = FakeClient(ok({"rules": rules(leave_draft("n01", [15]))}), bad, bad, bad)
+    client = FakeClient(ok({"rules": [leave_draft("n01", [15])]}), bad, bad, bad)
     results = run.run_cases(cases, client)
     m = run.aggregate(results)
 
@@ -553,7 +526,7 @@ def test_run_cases_exact_and_error():
 
 def test_write_results(tmp_path):
     cases = [case("a", {"status": "clarify"})]
-    results = run.run_cases(cases, FakeClient(ok({"rules": rules(leave_draft("n01", [1]))})))
+    results = run.run_cases(cases, FakeClient(ok({"rules": [leave_draft("n01", [1])]})))
     out = tmp_path / "results.md"
     run.write_results(out, run.aggregate(results), results, model="fake-model", by_set=run.aggregate_by_set(results))
     text = out.read_text(encoding="utf-8")
@@ -561,26 +534,26 @@ def test_write_results(tmp_path):
 
 
 def test_run_case_config_changes():
-    de_rule = count({"shifts": {"in": ["DE"]}, "per": "person", "max": 2})
-    cases = [case("a", {"status": "ok", "config_changes": [DE], "constraints": as_rules(de_rule)}, set="new", scope="ward")]
-    client = FakeClient(ok({"config_changes": [DE], "rules": rules(draft("count", de_rule["params"]))}))
+    de_rule = R.count("x", {"in": ["DE"]}, "person", hi=2)
+    cases = [case("a", {"status": "ok", "config_changes": [DE], "constraints": [de_rule]}, set="new", scope="ward")]
+    client = FakeClient(ok({"config_changes": [DE], "rules": [draft(de_rule)]}))
     (r,) = run.run_cases(cases, client)
     assert (r.tp, r.n_expected, r.n_actual, r.exact, r.set) == (2, 2, 2, True, "new")
     assert r.actual_changes == [DE["shift"] | {"start": None, "active": True}]
 
-    client = FakeClient(ok({"config_changes": [DE], "rules": rules(draft("count", {**de_rule["params"], "max": 3}))}))
+    client = FakeClient(ok({"config_changes": [DE], "rules": [draft(R.count("x", {"in": ["DE"]}, "person", hi=3))]}))
     (r,) = run.run_cases(cases, client)
     assert (r.tp, r.exact) == (1, False)
 
 
 def test_aggregate_by_set_and_gate():
     cases = [
-        case("a", {"status": "ok", "constraints": as_rules(leave("n01", [15]))}),
+        case("a", {"status": "ok", "constraints": [leave("n01", [15])]}),
         case("b", {"status": "clarify"}),
         case("c", {"status": "unsupported"}, set="new"),
     ]
     client = FakeClient(
-        ok({"rules": rules(leave_draft("n01", [15]))}),
+        ok({"rules": [leave_draft("n01", [15])]}),
         ok({"clarification_question": "누구?"}),
         ok({"clarification_question": "뭐?"}),
     )
@@ -661,9 +634,7 @@ def test_missing_key_exit_2(monkeypatch, capsys):
 
 
 def test_score_keeps_forbid_pattern_order():
-    def forbid(*patterns):
-        return {"type": "sequence", "hardness": "hard", "params": {"forbid": [[{"in": [a]}, {"in": [b]}] for a, b in patterns]}}
-
-    # 금지 패턴 여럿은 패턴마다 규칙으로 나뉘어 규칙 단위로 맞춘다
-    assert score([forbid(("N", "D"), ("N", "E"))], [forbid(("N", "E"), ("N", "D"))]) == (2, 2, 2)
-    assert score([forbid(("N", "D"))], [forbid(("D", "N"))]) == (0, 1, 1)
+    nd, ne, dn = (forbid({"in": [x]}, {"in": [y]}) for x, y in ("ND", "NE", "DN"))
+    # 금지 패턴 여럿은 패턴마다 규칙이라 규칙 단위로 맞춘다
+    assert score([nd, ne], [ne, nd]) == (2, 2, 2)
+    assert score([nd], [dn]) == (0, 1, 1)

@@ -25,7 +25,6 @@ from backend.domain.constants import (
     NIGHT_ONLY_TAG,
     SOLVE_TIME_LIMIT_S,
 )
-from backend.domain.convert import night_dedicated_rule
 from backend.domain.models import ScheduleRequest, SolveInfeasible, SolveOk
 from backend.solver.conflicts import find_conflicts
 from backend.solver.model import solve
@@ -173,7 +172,9 @@ def balance(cid: str, shifts: dict, **extra: Any) -> dict:
 def rules(people: list[dict]) -> list[dict]:
     """옛 블록 60개를 식으로 옮긴 규칙(금지 패턴 블록 2개는 패턴마다 나뉘어 66개)."""
     general = {"exclude_tags": [NIGHT_ONLY_TAG]}
-    rows: list[dict] = [night_dedicated_rule("night-only").model_dump(by_alias=True)]
+    # 기본 규칙 "나이트 전담은 나이트와 휴무만"
+    rows: list[dict] = [{**count("night-only", {"not_in": ["N", "O"]}, "person", hi=0, people={"tags": [NIGHT_ONLY_TAG]}),
+                         "default": True}]
     # 필요 인원: 근무조 4개 × 평일/주말 (8)
     staffing = {"D": (7, 6), "E": (7, 6), "N": (5, 5), "M": (2, 1)}
     for code, (weekday, weekend) in staffing.items():

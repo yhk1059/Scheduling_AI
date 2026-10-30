@@ -3,7 +3,9 @@
 cases.json은 블록화(ADR-018) 전 솔버의, blocks-cases.json은 식 언어 전환(ADR-019) 전 블록 솔버의 목적값·배정
 기록이다. 요청은 옛 형식(backend/domain/legacy.py)이고 옛 솔버가 없어져 다시 만들지 않는다. 대신 식 규칙으로
 바꿔 풀어 기록과 같은지 본다(cases.json은 test_golden, blocks-cases.json은 이 스크립트와 test_golden).
-이 스크립트는 convert-cases.json(템플릿 → 블록. TS 변환이 같은 결과를 내야 하는 공유 픽스처)과
+solver-cases.json은 blocks-cases.json 요청을 식 규칙으로 바꿔 둔 솔버 회귀 기준이다(옛 형식 없이 읽는다).
+이 스크립트는 solver-cases.json의 요청을 지금 솔버로 다시 풀어 기대값(status, 목적값·배정 또는 충돌 규칙 id)을 쓴다.
+또 convert-cases.json(템플릿 → 블록. TS 변환이 같은 결과를 내야 하는 공유 픽스처)과
 expr-convert-cases.json(블록 → 식 변환. TS 변환이 같은 결과를 내야 하는 공유 픽스처)을 쓴다.
 `--check`는 파일을 쓰지 않고 다시 만들어 기존 파일과 비교하고, blocks-cases.json의 블록 요청을 식으로 바꿔 푼
 결과가 기록과 같은지 본다(다르면 exit 1). 쓰기 모드에서도 blocks-cases.json 비교는 한다.
@@ -36,6 +38,7 @@ CASES_PATH = ROOT / "backend" / "tests" / "golden" / "cases.json"
 CONVERT_CASES_PATH = ROOT / "backend" / "tests" / "golden" / "convert-cases.json"
 BLOCKS_CASES_PATH = ROOT / "backend" / "tests" / "golden" / "blocks-cases.json"
 EXPR_CONVERT_CASES_PATH = ROOT / "backend" / "tests" / "golden" / "expr-convert-cases.json"
+SOLVER_CASES_PATH = ROOT / "backend" / "tests" / "golden" / "solver-cases.json"
 
 
 # --- 풀이 ---
@@ -67,6 +70,18 @@ def solve_case(request: ScheduleRequest, conflicts: bool = True) -> dict[str, An
 
 def _c(cid: str, type_: str, params: dict, hardness: str = "hard", scope: str = "ward", **extra) -> dict:
     return {"id": cid, "type": type_, "scope": scope, "hardness": hardness, "source_text": cid, "params": params, **extra}
+
+
+# --- 솔버 회귀 기준(solver-cases.json): 식 규칙 요청만 읽는다 ---
+
+
+def build_solver_cases() -> list[dict]:
+    """solver-cases.json의 요청(id·설명·요청은 그대로)을 지금 솔버로 풀어 기대값을 다시 쓴다."""
+    cases = json.loads(SOLVER_CASES_PATH.read_text(encoding="utf-8"))
+    return [
+        {**case, "expected": solve_case(ScheduleRequest.model_validate(case["request"]))}
+        for case in cases
+    ]
 
 
 # --- 변환 픽스처(템플릿 → 블록) ---
@@ -256,6 +271,7 @@ def render(cases: list[dict]) -> str:
 
 def main() -> None:
     outputs = [
+        (SOLVER_CASES_PATH, render(build_solver_cases())),
         (CONVERT_CASES_PATH, render(build_convert_cases())),
         (EXPR_CONVERT_CASES_PATH, render(build_expr_convert_cases())),
     ]

@@ -1,13 +1,14 @@
-"""테스트용 식 규칙 dict. 프리셋 이름의 규칙을 설계 §2.5 변환표 모양(block_to_rules와 같은 식·값 이름·label)으로 만든다."""
+"""테스트용 식 규칙 dict. 프리셋 이름의 규칙을 설계 §2.5 변환표 모양(옛 블록을 옮긴 식·값 이름·label)으로 만든다."""
 
 import json
 from datetime import date, timedelta
 from pathlib import Path
 
 from backend.domain.constants import HISTORY_DAYS, NIGHT_ONLY_TAG
-from backend.domain.convert import NIGHT_ONLY_RULE_ID, night_dedicated_rule
 
 SAMPLE_PATH = Path(__file__).resolve().parents[2] / "lib" / "samples" / "ward-15.json"
+
+NIGHT_ONLY_RULE_ID = "night-only"
 
 N, O = {"in": ["N"]}, {"in": ["O"]}
 WORK = {"not_in": ["O"]}
@@ -182,8 +183,9 @@ def pair_forbid(cid: str, ids: list[str], shift: str, **extra) -> dict:
 
 
 def night_only(cid: str = NIGHT_ONLY_RULE_ID) -> dict:
-    """기본 규칙 "나이트 전담은 나이트와 휴무만"."""
-    return night_dedicated_rule(cid).model_dump(mode="json", by_alias=True)
+    """기본 규칙 "나이트 전담은 나이트와 휴무만": 나이트 전담 태그는 사람마다 나이트·휴무 말고 0번."""
+    return count(cid, {"not_in": ["N", "O"]}, "person", hi=0, people={"tags": [NIGHT_ONLY_TAG]}, default=True,
+                 source_text="나이트 전담은 나이트와 휴무만")
 
 
 def history(start: str, rows: dict[str, list[str]], holidays: list[str] = ()) -> dict:

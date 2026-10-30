@@ -8,8 +8,6 @@ import pytest
 from pydantic import TypeAdapter, ValidationError
 
 from backend.domain import constants
-from backend.domain.convert import NIGHT_ONLY_RULE_ID
-from backend.domain.legacy import BlockSpec
 from backend.domain.models import (
     DEFAULT_CONFIG,
     ConstraintChange,
@@ -112,8 +110,7 @@ OLD_BLOCKS = [
 
 @pytest.mark.parametrize("raw", OLD_BLOCKS, ids=[b["type"] for b in OLD_BLOCKS])
 def test_block_types_rejected(raw):
-    """블록 3종은 옛 형식이다(ADR-019 ★2). legacy.py 모델로만 읽고, 요청은 식 규칙만 받는다."""
-    TypeAdapter(BlockSpec).validate_python(raw)
+    """블록 3종은 옛 형식이다(ADR-019 ★2). 요청은 식 규칙만 받는다."""
     with pytest.raises(ValidationError, match="does not match any of the expected tags"):
         spec_adapter.validate_python(raw)
 
@@ -258,7 +255,7 @@ def test_negative_years_rejected():
 
 
 def test_sample_ward_is_rule_format():
-    """샘플 병동(lib/samples)은 블록을 convert.block_to_rules로 기계 변환한 식 규칙이다. 파일이 그대로 요청이 된다."""
+    """샘플 병동(lib/samples)은 식 규칙이다. 파일이 그대로 요청이 된다."""
     raw = json.loads(SAMPLE_PATH.read_text(encoding="utf-8"))
     next_requests = TypeAdapter(list[ConstraintSpec]).validate_python(raw.pop("next_requests"))
     assert next_requests and all(c.scope == "period" and c.type == "rule" for c in next_requests)
@@ -269,7 +266,7 @@ def test_sample_ward_is_rule_format():
     assert all(c.scope == "ward" and c.hardness == "hard" for c in coverage)
     assert {c.type for c in req.constraints} == {"rule"}
     assert req.config == DEFAULT_CONFIG
-    assert req.constraints[-1].id == NIGHT_ONLY_RULE_ID
+    assert req.constraints[-1].id == rules.NIGHT_ONLY_RULE_ID
     assert req.input_version == 0
     assert req.period == Period(start_date=date(2026, 11, 1), length=30)
     assert req.holidays == []
@@ -279,7 +276,7 @@ def test_sample_ward_is_rule_format():
     assert {"이영희", "박민수", "김철수", "정유진", "최지훈"} <= names
     years = [n.years for n in req.nurses]
     assert min(years) >= 1 and max(years) <= 15 and len(set(years)) >= 8
-    assert all(c.default for c in req.constraints if c.id.startswith("cov-") or c.id == NIGHT_ONLY_RULE_ID)
+    assert all(c.default for c in req.constraints if c.id.startswith("cov-") or c.id == rules.NIGHT_ONLY_RULE_ID)
 
 
 # --- 응답/요청 모델 ---

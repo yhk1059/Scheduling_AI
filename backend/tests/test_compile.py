@@ -1,10 +1,6 @@
 """식 규칙 → CP-SAT 컴파일(ADR-019, 설계 §3). 의미의 기준은 evaluate.py다.
 
-- 골든: blocks-cases.json의 블록 요청을 rules_request로 바꿔 풀어도 status·목적값·conflict가 같고,
-  기록된 블록 배정이 식 규칙 hard 위반 0이다.
-  목적값이 바뀌는 soft 모양(위반량 모양이 다른 것)은 hard 위반 0만 본다:
-  - 세기 min·max(다른 값): 식은 그리고(All)라 묶음마다 1, 블록은 벗어난 양
-  - 최소 연속(run.min_len): 식은 짧은 구간 뒤 칸 중 다른 근무 수, 블록은 구간마다 1
+- 골든(솔버 회귀 기준)은 test_golden이 solver-cases.json으로 본다.
 - 컴파일 = 평가: 모든 칸을 고정한 근무표에서 soft 목적값 = Σ 위반량 × weight, hard는 풀리면 위반 0·안 풀리면 위반 있음.
   고르게(soft)는 블록처럼 (최대 − 최소)를 그대로 벌점으로 둔다(evaluate는 FAIRNESS_TOLERANCE 이하를 위반으로 나열하지 않음).
 """
@@ -20,43 +16,17 @@ import pytest
 from pydantic import TypeAdapter
 
 from backend.domain.constants import HISTORY_DAYS
-from backend.domain.convert import block_to_rules, rules_request
-from backend.domain.legacy import BlockScheduleRequest
 from backend.domain.models import Balance, ConstraintSpec, Rule, ScheduleRequest
-from backend.gen_golden import solve_case
+from backend.gen_golden import SOLVER_CASES_PATH, solve_case
 from backend.solver import evaluate, select, stats
 from backend.solver.model import solve
 from backend.tests import block_oracle
 
 GOLDEN = Path(__file__).parent / "golden"
 BLOCK_CASES = json.loads((GOLDEN / "blocks-cases.json").read_text(encoding="utf-8"))
+SOLVER_CASES = json.loads(SOLVER_CASES_PATH.read_text(encoding="utf-8"))
 EXPR_CASES = json.loads((GOLDEN / "expr-convert-cases.json").read_text(encoding="utf-8"))
 spec_adapter = TypeAdapter(ConstraintSpec)
-
-
-def _ids(cases):
-    return [c["id"] for c in cases]
-
-
-# --- 골든 동등성 ---
-
-
-def _block_req(case) -> BlockScheduleRequest:
-    return BlockScheduleRequest.model_validate(case["request"])
-
-
-def _shape_changed(req: BlockScheduleRequest) -> list[str]:
-    """식으로 바꾸면 soft 위반량 모양이 달라지는 블록 id."""
-    out = []
-    for c in req.constraints:
-        if not c.enabled or c.hardness != "soft":
-            continue
-        p = getattr(c, "params", None)
-        if c.type == "count" and p.min is not None and p.max is not None and p.min != p.max:
-            out.append(c.id)
-        if c.type == "sequence" and p.run is not None and (p.min_len or 1) > 1:
-            out.append(c.id)
-    return out
 
 
 def _hard_rule_violations(req: ScheduleRequest, a: dict) -> dict[str, list]:
@@ -67,43 +37,6 @@ def _hard_rule_violations(req: ScheduleRequest, a: dict) -> dict[str, list]:
             if vs:
                 out[c.id] = vs
     return out
-
-
-FEASIBLE = [c for c in BLOCK_CASES if c["expected"]["status"] == "ok"]
-INFEASIBLE = [c for c in BLOCK_CASES if c["expected"]["status"] == "infeasible"]
-
-
-def test_no_golden_case_changes_soft_shape():
-    # 지금 골든에는 위반량 모양이 바뀌는 soft 블록이 없어 모든 feasible 케이스의 목적값을 비교한다.
-    # 생기면 그 케이스는 목적값 대신 hard 위반 0만 본다(test_golden_rules_objective_equal).
-    assert {c["id"]: ids for c in FEASIBLE if (ids := _shape_changed(_block_req(c)))} == {}
-
-
-@pytest.mark.parametrize("case", FEASIBLE, ids=_ids(FEASIBLE))
-def test_golden_rules_objective_equal(case):
-    block_req = _block_req(case)
-    req = rules_request(block_req)
-    assert {c.type for c in req.constraints} <= {"rule", "fixed_assignment"}
-    out = solve_case(req)
-    assert out["status"] == "ok" and out["optimal"]
-    if not _shape_changed(block_req):
-        assert out["objective"] == case["expected"]["objective"]
-    assert _hard_rule_violations(req, out["assignments"]) == {}
-
-
-@pytest.mark.parametrize("case", FEASIBLE, ids=_ids(FEASIBLE))
-def test_golden_recorded_assignments_satisfy_hard_rules(case):
-    req = rules_request(_block_req(case))
-    assert _hard_rule_violations(req, case["expected"]["assignments"]) == {}
-
-
-@pytest.mark.parametrize("case", INFEASIBLE, ids=_ids(INFEASIBLE))
-def test_golden_rules_infeasible_same_conflicts(case):
-    block_req = _block_req(case)
-    origin = {r.id: c.id for c in block_req.constraints for r in block_to_rules(c)}
-    out = solve_case(rules_request(block_req))
-    assert out["status"] == "infeasible"
-    assert {origin[i] for i in out["conflict_ids"]} == set(case["expected"]["conflict_ids"])
 
 
 # --- 컴파일 = 평가 ---
@@ -336,11 +269,11 @@ def test_feature_rule_infeasible_core_contains_rule(cid):
 def test_preference_summary_same_for_block_and_rules():
     """블록 기준(block_oracle: 지우기 전 stats의 블록 경로)과 식 규칙의 희망 반영·soft 위반이 같다."""
     case = next(c for c in BLOCK_CASES if c["id"] == "block-soft-prefs")
-    block_req = _block_req(case)
-    req = rules_request(block_req)
+    blocks = [block_oracle.parse(c) for c in case["request"]["constraints"] if c["type"] != "fixed_assignment"]
+    req = ScheduleRequest.model_validate(next(c for c in SOLVER_CASES if c["id"] == case["id"])["request"])
     a = case["expected"]["assignments"]
     rule_res = stats.compute_result(req, a, optimal=True)
-    cells = [x for c in block_req.constraints if c.enabled for x in block_oracle.preference_cells(req, c)]
+    cells = [x for c in blocks if c.enabled for x in block_oracle.preference_cells(req, c)]
     met = {n.id: 0 for n in req.nurses}
     total = {n.id: 0 for n in req.nurses}
     for nid, d, sel, prefer in cells:
@@ -351,7 +284,7 @@ def test_preference_summary_same_for_block_and_rules():
     assert {k: v.preference_rate for k, v in rule_res.stats.items()} == {
         k: met[k] / total[k] if total[k] else None for k in total
     }
-    soft = [c for c in block_req.constraints if c.enabled and c.hardness == "soft"]
+    soft = [c for c in blocks if c.enabled and c.hardness == "soft"]
     assert [(v.constraint_id, v.nurse_id, v.day) for v in rule_res.soft_violations] == [
         (c.id, nid, day) for c in soft for _, nid, day in block_oracle.violations(req, a, c)
     ]
