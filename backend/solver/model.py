@@ -12,10 +12,13 @@ from ortools.sat.python import cp_model
 
 from backend.domain.constants import CONFLICT_TIME_LIMIT_S, DIFF_WEIGHT, SOLVE_TIME_LIMIT_S
 from backend.domain.models import ScheduleRequest, Shifts, SolveInfeasible, SolveOk, SolveTimeout
-from backend.solver import hard, select, soft, stats
+from backend.solver import compile, hard, select, soft, stats
 from backend.solver.conflicts import find_conflicts
 
 Cell = cp_model.IntVar | bool | None
+
+HARD_ADDERS = {**hard.ADDERS, "rule": compile.add_rule_hard}
+SOFT_ADDERS = {**soft.ADDERS, "rule": compile.add_rule_soft}
 
 
 @dataclass
@@ -126,11 +129,11 @@ def build_model(request: ScheduleRequest) -> ModelContext:
         if not c.enabled:
             continue
         if c.hardness == "soft":  # 칸 고정은 항상 hard다
-            soft.ADDERS[c.type](ctx, c)
+            SOFT_ADDERS[c.type](ctx, c)
             continue
         lit = model.new_bool_var(f"hard_{c.id}")
         ctx.hard_literals[c.id] = lit
-        hard.ADDERS[c.type](ctx, c, lit)
+        HARD_ADDERS[c.type](ctx, c, lit)
 
     for nid, d, before in stats.common_cells(request):
         # 끈 코드는 다시 배정할 수 없어 반드시 바뀐다

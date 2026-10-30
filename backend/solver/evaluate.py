@@ -98,10 +98,8 @@ def code_at(request: ScheduleRequest, assignments: Assignments, nurse_id: str, d
     return row[i] if day <= 0 and i >= 0 else None
 
 
-def count_cells(
-    request: ScheduleRequest, assignments: Assignments, rule: Rule, inst: Instance, count: Count
-) -> list[tuple[str, int, str]]:
-    """세는 칸 (nurse_id, 날, 코드): 사람 집합 × 날 집합을 Count.days로 거른 것 중 아는 칸."""
+def count_scope(request: ScheduleRequest, rule: Rule, inst: Instance, count: Count) -> list[tuple[str, int]]:
+    """세는 칸 (nurse_id, 날): 사람 집합 × 날 집합을 Count.days로 거른 것 중 아는 칸. 컴파일도 이 목록을 쓴다."""
     body = rule.body
     assert isinstance(body, Require)
     fe = body.for_each
@@ -117,15 +115,22 @@ def count_cells(
     else:
         span = inst.days if fe.per in ("person_week", "person_window") else range(1, request.period.days + 1)
         days = [d for d in span if select.day_matches(request, fe.days, d)]
-    out = []
-    for d in days:
-        if not select.day_matches(request, count.days, d):
-            continue
-        for nid in ids:
-            code = code_at(request, assignments, nid, d)
-            if code is not None:
-                out.append((nid, d, code))
-    return out
+    length = request.period.days
+    first = {nid: select.first_day(request, nid) for nid in ids}
+    return [
+        (nid, d)
+        for d in days
+        if d <= length and select.day_matches(request, count.days, d)
+        for nid in ids
+        if d >= first[nid]
+    ]
+
+
+def count_cells(
+    request: ScheduleRequest, assignments: Assignments, rule: Rule, inst: Instance, count: Count
+) -> list[tuple[str, int, str]]:
+    """세는 칸 (nurse_id, 날, 코드)."""
+    return [(nid, d, code_at(request, assignments, nid, d)) for nid, d in count_scope(request, rule, inst, count)]
 
 
 def count_total(request: ScheduleRequest, assignments: Assignments, rule: Rule, inst: Instance, count: Count) -> int:
