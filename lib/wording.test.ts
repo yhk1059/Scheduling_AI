@@ -13,6 +13,7 @@ import {
   nextTask,
   presetName,
   scheduleName,
+  coverageText,
   TASK_STEPS,
   taskDoneSteps,
   unitName,
@@ -435,7 +436,7 @@ describe("nextTask", () => {
     expect(nextTask(shop, [], TODAY)).toEqual({ kind: "none", name: "11월 근무표" });
   });
 
-  it("작성 중, 생성 전: 적용한 요청 수", () => {
+  it("작성 중, 생성 전", () => {
     const p = period("2026-11-01", 30, {
       requests: [
         fixedCell("e01", 15, "O"),
@@ -443,7 +444,7 @@ describe("nextTask", () => {
       ],
       pendingRequests: [fixedCell("e02", 3, "O")],
     });
-    expect(nextTask(shop, [p], TODAY)).toEqual({ kind: "drafting", name: "11월 근무표", requests: 2 });
+    expect(nextTask(shop, [p], TODAY)).toEqual({ kind: "drafting", name: "11월 근무표" });
   });
 
   it("작성 중, 생성 후", () => {
@@ -469,7 +470,6 @@ describe("nextTask", () => {
     expect(nextTask(shop, [nov, period("2026-12-01", 31)], during)).toEqual({
       kind: "drafting",
       name: "12월 근무표",
-      requests: 0,
     });
   });
 
@@ -478,17 +478,25 @@ describe("nextTask", () => {
   });
 });
 
+describe("coverageText", () => {
+  it("정확히·범위·이상·없음", () => {
+    expect(coverageText({ min: 3, max: 3 })).toBe("3명");
+    expect(coverageText({ min: 1, max: 2 })).toBe("1~2명");
+    expect(coverageText({ min: 2, max: null })).toBe("2명 이상");
+    expect(coverageText(null)).toBe("");
+  });
+});
+
 describe("taskDoneSteps", () => {
   it("홈 진행 단계는 요청 → 근무표 → 확정 세 칸이다", () => {
-    expect(TASK_STEPS).toEqual(["요청", "근무표", "확정"]);
+    expect(TASK_STEPS).toEqual(["가능 시간", "매장 조건", "근무표", "확정"]);
   });
 
   it("상태별로 끝난 단계 수를 센다", () => {
     expect(taskDoneSteps({ kind: "none", name: "" })).toBe(0);
-    expect(taskDoneSteps({ kind: "drafting", name: "", requests: 0 })).toBe(0);
-    expect(taskDoneSteps({ kind: "drafting", name: "", requests: 2 })).toBe(1);
-    expect(taskDoneSteps({ kind: "generated", name: "" })).toBe(2);
-    expect(taskDoneSteps({ kind: "confirmed", name: "", confirmedAt: "" })).toBe(3);
+    expect(taskDoneSteps({ kind: "drafting", name: "" })).toBe(0);
+    expect(taskDoneSteps({ kind: "generated", name: "" })).toBe(3);
+    expect(taskDoneSteps({ kind: "confirmed", name: "", confirmedAt: "" })).toBe(4);
   });
 });
 

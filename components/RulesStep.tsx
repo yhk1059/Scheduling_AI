@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 
 import { ApiError, errorMessage, translate } from "@/lib/api";
 import { firstPeriodStart, periodFrom, type PeriodRange, type PeriodUnit } from "@/lib/period";
@@ -8,14 +8,11 @@ import {
   cardsInOrder,
   currentPeriod,
   findReplaced,
-  orphanConstraintIds,
+  summarizedCoverageIds,
   toScheduleRequest,
   useAppStore,
-  type Shop,
-  type WorkPeriod,
 } from "@/lib/store";
 import type { ConstraintSpec } from "@/lib/types.gen";
-import { presetName, shopRuleCount } from "@/lib/wording";
 
 import ConstraintCard, { ShiftChangeCardView } from "./ConstraintCard";
 import { ui } from "./ui";
@@ -25,23 +22,17 @@ const MAX_TEXT_CHARS = 1000; // backend/domain/constants.py MAX_TEXT_CHARS
 const COPY = {
   shop: {
     title: "매장 조건",
-    description: "근무표가 바뀌어도 똑같이 지키는 규칙을 말로 적어 주세요. 만든 카드를 확인하고 [적용]해야 반영돼요.",
+    noun: "규칙",
+    description: "근무 형태, 필요 인원, 지켜야 할 규칙을 말로 적어 주세요",
     placeholder: "예: 마감 다음 날 오픈은 안 되게",
     submit: "규칙 만들기",
     empty: "아직 규칙이 없어요.",
-    examples: ["마감 다음 날 오픈은 안 되게", "오픈에는 리더가 꼭 1명 있어야 해", "5일 넘게 연속으로 일하지 않게"],
-  },
-  intro: {
-    title: "매장 소개",
-    description: "근무 형태와 날마다 필요한 인원을 말로 적어 주세요. 만든 카드를 확인하고 [적용]해야 반영돼요.",
-    placeholder: "예: 평일 오픈 2명, 주말은 3명",
-    submit: "규칙 만들기",
-    empty: "",
-    examples: ["평일 오픈 2명, 주말은 3명", "12시부터 15시까지는 최소 3명"],
+    examples: ["평일 오픈 2명, 주말은 3명", "12시부터 15시까지는 최소 3명", "마감 다음 날 오픈은 안 되게"],
   },
   period: {
-    title: "요청",
-    description: "이 근무표의 휴가, 고정 근무, 희망·기피 근무를 말로 적어 주세요. 만든 카드를 확인하고 [적용]해야 반영돼요.",
+    title: "예외",
+    noun: "요청",
+    description: "이번 근무표에만 적용할 휴가, 고정 근무, 희망·기피 근무를 말로 적어 주세요. 가능 시간에 이미 있는 내용은 다시 적지 않아도 돼요.",
     placeholder: "예: 이영희 15~17일 휴가",
     submit: "요청 만들기",
     empty: "아직 요청이 없어요.",
@@ -62,37 +53,45 @@ export function previewRange(unit: PeriodUnit): PeriodRange {
 type Notice = { kind: "clarify" | "unsupported"; text: string } | null;
 
 /**
- * pendingNote=false: 처음 설정 ③처럼 화면이 대기 카드 안내를 버튼 옆에 따로 둘 때.
- * intro: 처음 설정 ② 매장 소개. 매장 규칙(scope shop)으로 해석하고, 적용된 카드는 필요 인원만 보여 준다.
+ * 말로 적는 입력 바와 카드 목록. scope shop은 매장 조건(작성 ②, 매장 설정), scope period는 이번 근무표 예외(작성 ③).
+ * pendingNote=false: 화면이 대기 카드 안내를 버튼 옆에 따로 둘 때.
+ * step: 단계 화면. 제목을 두고, 요약표에 든 필요 인원은 카드에서 빼고, 이 근무표의 꺼짐과 수정본을 보여 준다.
+ * summary, afterInput: 입력 바 위·아래에 놓을 영역.
  */
 export default function RulesStep({
   scope,
   pendingNote = true,
-  intro = false,
+  step = false,
+  summary,
+  afterInput,
 }: {
   scope: "shop" | "period";
   pendingNote?: boolean;
-  intro?: boolean;
+  step?: boolean;
+  summary?: ReactNode;
+  afterInput?: ReactNode;
 }) {
-  const copy = COPY[intro ? "intro" : scope];
+  const copy = COPY[scope];
   const shop = useAppStore((s) => s.shop);
   const period = useAppStore(currentPeriod);
   const addPendingRules = useAppStore((s) => s.addPendingRules);
   const addPendingRequests = useAppStore((s) => s.addPendingRequests);
   const setDisabled = useAppStore((s) => s.setDisabled);
-  const go = useAppStore((s) => s.go);
 
   const [text, setText] = useState("");
   const [loading, setLoading] = useState(false);
   const [notice, setNotice] = useState<Notice>(null);
   const [failure, setFailure] = useState<{ message: string; text: string } | null>(null);
-  const [blocked, setBlocked] = useState(false);
 
   if (!shop || (scope === "period" && !period)) return null;
-  const orphanCount = orphanConstraintIds(shop, period).length;
   const pending = scope === "shop" ? shop.pendingRules : period!.pendingRequests;
+  // 작성 ②의 매장 조건: 이 근무표의 꺼짐과 수정본을 반영해 보여 준다
+  const stepPeriod = step && scope === "shop" ? period : null;
+  const summarized = stepPeriod ? summarizedCoverageIds(shop, stepPeriod) : [];
   const applied =
-    scope === "period" ? period!.requests : intro ? shop.rules.filter((c) => presetName(c) === "필요 인원") : shop.rules;
+    scope === "period"
+      ? period!.requests
+      : shop.rules.filter((c) => !summarized.includes(c.id)).map((c) => stepPeriod?.ruleOverrides[c.id] ?? c);
   const cards = cardsInOrder(pending, applied, scope === "shop" ? shop.cardOrder : period!.cardOrder);
   const tooLong = text.length > MAX_TEXT_CHARS;
 
@@ -132,6 +131,16 @@ export default function RulesStep({
         pending={false}
         off={period!.disabledIds.includes(c.id)}
         onToggleOff={(off) => setDisabled(period!.id, c.id, off)}
+      />
+    ) : stepPeriod ? (
+      <ConstraintCard
+        key={c.id}
+        card={c}
+        pending={false}
+        // 이 근무표에서 바꾼 규칙은 원본을 고쳐도 반영되지 않아 끄고 켜기만 한다
+        readOnly={c.id in stepPeriod.ruleOverrides}
+        off={stepPeriod.disabledIds.includes(c.id)}
+        onToggleOff={(off) => setDisabled(stepPeriod.id, c.id, off)}
       />
     ) : (
       <ConstraintCard key={c.id} card={c} pending={false} />
@@ -183,26 +192,19 @@ export default function RulesStep({
     }
   };
 
-  const onNext = () => {
-    if (!period) return;
-    if (orphanCount > 0) {
-      setBlocked(true);
-    } else {
-      go({ screen: "period", periodId: period.id, step: 2 });
-    }
-  };
-
   return (
     <div className="flex flex-col gap-5">
-      {/* 매장 규칙은 매장 설정의 탭 안에 놓이므로 페이지 제목을 두지 않는다 */}
+      {/* 매장 설정의 탭 안과 예외 입력에는 페이지 제목을 두지 않는다 */}
       <div className="flex flex-col gap-1">
-        {scope === "period" && (
+        {step && (
           <h2 tabIndex={-1} data-step-title className={`${ui.cardTitle} outline-none`}>
             {copy.title}
           </h2>
         )}
         <p className="text-sm leading-relaxed text-[#3D3D38]">{copy.description}</p>
       </div>
+
+      {summary}
 
       <section className={`${ui.card} flex flex-col gap-2.5`}>
         <form
@@ -258,6 +260,8 @@ export default function RulesStep({
         </div>
       </section>
 
+      {afterInput}
+
       {items.length === 0 ? (
         copy.empty && <p className="text-sm text-[#66665E]">{copy.empty}</p>
       ) : (
@@ -295,28 +299,10 @@ export default function RulesStep({
         </div>
       )}
 
-      {scope === "period" && period && <PeriodRules shop={shop} period={period} />}
-
-      {scope === "shop" && pendingNote && pendingCount > 0 && (
-        <p className={ui.help}>적용하지 않은 카드 {pendingCount}개는 근무표에 반영되지 않아요.</p>
-      )}
-
-      {scope === "period" && (
-      <div className="flex items-center justify-end gap-4">
-        <div className="flex items-center gap-3">
-          {blocked && orphanCount > 0 && (
-            <p role="alert" className={ui.error}>
-              명단에 없는 직원을 가리키는 규칙·요청 {orphanCount}개를 삭제하거나 고친 뒤 넘어갈 수 있어요.
-            </p>
-          )}
-          {pending.length > 0 && (
-            <p className={ui.help}>적용하지 않은 카드 {pending.length}개는 근무표에 반영되지 않아요.</p>
-          )}
-          <button type="button" onClick={onNext} className={ui.primary}>
-            다음
-          </button>
-        </div>
-      </div>
+      {pendingNote && pendingCount > 0 && (
+        <p className={ui.help}>
+          적용하지 않은 {copy.noun} {pendingCount}개는 빠져요
+        </p>
       )}
     </div>
   );
@@ -327,52 +313,5 @@ export function Spinner() {
     <svg aria-hidden="true" viewBox="0 0 14 14" className="size-3.5 animate-spin" fill="none" stroke="currentColor" strokeWidth={1.6}>
       <path d="M7 1.5A5.5 5.5 0 1 1 1.5 7" strokeLinecap="round" />
     </svg>
-  );
-}
-
-/** 이 근무표에 적용되는 매장 규칙(접힌 목록). [이번 근무표에서만 끄기]는 이 기간의 disabledIds만 바꾼다. */
-function PeriodRules({ shop, period }: { shop: Shop; period: WorkPeriod }) {
-  const setDisabled = useAppStore((s) => s.setDisabled);
-  const periods = useAppStore((s) => s.periods);
-  const [open, setOpen] = useState(false);
-  // 확정 기간의 snapshot, 이 기간의 수정본(ruleOverrides), 꺼짐(enabled=false)이 반영된 목록
-  const rules = (toScheduleRequest(shop, period, periods, today()).constraints ?? []).filter((c) => c.scope === "shop");
-  const offCount = rules.filter((c) => c.enabled === false).length;
-
-  return (
-    <section className={`${ui.card} flex flex-col gap-3`}>
-      <div className="flex items-center justify-between gap-3">
-        <div className="flex flex-col gap-1">
-          <h3 className={ui.cardTitle}>이 근무표에 적용되는 매장 조건</h3>
-          <p className={ui.help}>
-            <span className="font-mono">{shopRuleCount(rules)}</span>개
-            {offCount > 0 && (
-              <>
-                {" "}
-                · 이번 근무표에서 꺼짐 <span className="font-mono">{offCount}</span>개
-              </>
-            )}{" "}
-            · 규칙 원본은 매장 설정에서 고쳐요.
-          </p>
-        </div>
-        <button type="button" aria-expanded={open} onClick={() => setOpen((o) => !o)} className={ui.textSm}>
-          {open ? "접기" : "매장 조건 보기"}
-        </button>
-      </div>
-      {open && (
-        <div className="grid grid-cols-2 gap-4">
-          {rules.map((c) => (
-            <ConstraintCard
-              key={c.id}
-              card={c}
-              pending={false}
-              readOnly
-              off={c.enabled === false}
-              onToggleOff={(off) => setDisabled(period.id, c.id, off)}
-            />
-          ))}
-        </div>
-      )}
-    </section>
   );
 }

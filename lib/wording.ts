@@ -23,6 +23,13 @@ export function unitShort(unit: PeriodUnit): string {
 }
 
 /** 근무 형태 요약 한 줄: "오픈·미들·마감, 각 6시간"(활성 코드만, 더블은 뒤에 코드로). */
+/** 요약표의 필요 인원 한 칸: "3명", "1~2명", "2명 이상". 규칙이 없으면 빈 문자열. */
+export function coverageText(range: { min: number; max: number | null } | null): string {
+  if (!range) return "";
+  if (range.max === null) return `${range.min}명 이상`;
+  return range.min === range.max ? `${range.min}명` : `${range.min}~${range.max}명`;
+}
+
 export function configSummary(config: ShopConfig): string {
   const live = config.shifts.filter((s) => s.active !== false && s.hours > 0);
   const base = live.filter((s) => !s.parts?.length);
@@ -422,7 +429,7 @@ export function formatDeviation(d: number): string {
 /** 홈 "지금 할 일" 카드 상태(다음 근무표). */
 export type NextTask =
   | { kind: "none"; name: string }
-  | { kind: "drafting"; name: string; requests: number }
+  | { kind: "drafting"; name: string }
   | { kind: "generated"; name: string }
   | { kind: "confirmed"; name: string; confirmedAt: string };
 
@@ -432,22 +439,21 @@ export function nextTask(shop: Shop, periods: WorkPeriod[], today: string): Next
   const p = next.period;
   const name = scheduleName(p, shop.unit);
   if (next.state === "confirmed") return { kind: "confirmed", name, confirmedAt: p.versions.at(-1)?.confirmed_at ?? "" };
-  return p.result ? { kind: "generated", name } : { kind: "drafting", name, requests: p.requests.length };
+  return p.result ? { kind: "generated", name } : { kind: "drafting", name };
 }
 
 /** 홈 지금 할 일 카드의 진행 단계. */
-export const TASK_STEPS = ["요청", "근무표", "확정"] as const;
+export const TASK_STEPS = ["가능 시간", "매장 조건", "근무표", "확정"] as const;
 
 /** 지금 할 일 카드에서 끝난 단계 수. */
 export function taskDoneSteps(task: NextTask): number {
   switch (task.kind) {
     case "none":
-      return 0;
     case "drafting":
-      return task.requests > 0 ? 1 : 0;
+      return 0;
     case "generated":
-      return 2;
-    case "confirmed":
       return 3;
+    case "confirmed":
+      return 4;
   }
 }

@@ -150,12 +150,14 @@ export interface WorkPeriod extends PeriodRange {
 }
 
 export type SetupStep = 1 | 2 | 3;
+/** 근무표 작성: ① 가능 시간 → ② 매장 조건 → ③ 근무표 */
+export type PeriodStep = 1 | 2 | 3;
 
 export type View =
   | { screen: "home" }
   | { screen: "setup"; step: SetupStep }
   | { screen: "settings"; tab: "roster" | "shifts" | "rules" }
-  | { screen: "period"; periodId: string; step: 1 | 2 }
+  | { screen: "period"; periodId: string; step: PeriodStep }
   | { screen: "confirmed"; periodId: string };
 
 export interface Data {
@@ -368,6 +370,21 @@ export function coverageRange(rules: ConstraintSpec[], code: Code, kind: DayKind
   const c = coverageRule(rules, code, kind);
   const k = c ? coverageKey(c) : null;
   return k && { min: k.min, max: k.max };
+}
+
+/** 지금 근무표에서 켜져 있는 매장 규칙(이 근무표의 수정본 반영). 근무표가 없으면 매장 규칙 원본. */
+export function liveShopRules(shop: Shop, period: WorkPeriod | null): ConstraintSpec[] {
+  return shop.rules
+    .map((r) => period?.ruleOverrides[r.id] ?? r)
+    .filter((r) => r.enabled !== false && !period?.disabledIds.includes(r.id));
+}
+
+/** 근무조·필요 인원 요약표에 든 규칙 id. 이 규칙들은 ②에서 카드로 다시 보여 주지 않는다. */
+export function summarizedCoverageIds(shop: Shop, period: WorkPeriod | null): string[] {
+  const rules = liveShopRules(shop, period);
+  return coverageCodes(shop.config).flatMap((s) =>
+    (["weekday", "weekend"] as const).flatMap((kind) => coverageRule(rules, s.code, kind)?.id ?? []),
+  );
 }
 
 /** 필요 인원 폼의 행: 활성 기본 코드(복합·휴무 제외). */
@@ -644,10 +661,10 @@ export function setupStep(shop: Shop): SetupStep {
   return shop.introSeen ? 3 : 2;
 }
 
-/** 근무표를 열 때의 화면: 확정 → 확정 근무표, 결과 있음 → 작성 ②, 그 밖 → 작성 ①. */
+/** 근무표를 열 때의 화면: 확정 → 확정 근무표, 결과 있음 → 작성 ③, 그 밖 → 작성 ①. */
 export function viewForPeriod(period: WorkPeriod): View {
   if (period.status === "confirmed") return { screen: "confirmed", periodId: period.id };
-  return { screen: "period", periodId: period.id, step: period.result ? 2 : 1 };
+  return { screen: "period", periodId: period.id, step: period.result ? 3 : 1 };
 }
 
 /** 불러온 화면 상태를 지금 화면 구성에 맞춘다(ADR-017). 근무표가 없는 매장은 처음 설정으로 연다. */
@@ -660,7 +677,7 @@ function normalizeView(d: Data): View {
     const period = periods.find((p) => p.id === periodId);
     if (!period) return { screen: "home" };
     if (period.status === "confirmed") return { screen: "confirmed", periodId };
-    return view.screen === "period" ? { ...view, step: view.step === 1 ? 1 : 2 } : viewForPeriod(period);
+    return view.screen === "period" && [1, 2, 3].includes(view.step) ? view : viewForPeriod(period);
   }
   return view;
 }

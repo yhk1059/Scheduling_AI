@@ -93,9 +93,7 @@ export default function ShopHome() {
         ? "첫 근무표를 만들 차례예요"
         : `${task.name}를 만들 차례예요`
       : task.kind === "drafting"
-        ? task.requests > 0
-          ? `요청 ${task.requests}개를 넣었어요. 아직 근무표를 만들지 않았어요`
-          : "아직 근무표를 만들지 않았어요"
+        ? "직원 링크를 공유하고 조건을 확인하세요. 아직 근무표를 만들지 않았어요"
         : task.kind === "generated"
           ? "근무표를 만들었어요. 확인하고 확정하세요"
           : null;

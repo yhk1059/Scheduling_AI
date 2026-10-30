@@ -7,21 +7,28 @@ import { dateOfDay, formatRange, isWeekendDay, MAX_MONTH_START_DAY, monthDay, pe
 import { parseCarryOver, type CellError } from "@/lib/roster-import";
 import {
   carryOverChanged,
+  coverageCodes,
+  coverageRange,
   currentPeriod,
+  liveShopRules,
+  orphanConstraintIds,
+  type PeriodStep,
   prepareNeedsReview,
   rosterChangesFor,
   useAppStore,
   type WorkPeriod,
 } from "@/lib/store";
-import { scheduleName } from "@/lib/wording";
+import { coverageText, presetName, scheduleName } from "@/lib/wording";
 
 import HolidayCalendar from "./HolidayCalendar";
 import RulesStep from "./RulesStep";
 import ScheduleStep, { CELL, codeClass } from "./ScheduleStep";
 import Stepper from "./Stepper";
+import ShiftTable from "./ShiftTable";
+import { CoverageSection } from "./ShopSettings";
 import { ui } from "./ui";
 
-/** 근무표 작성: 제목(근무표 이름 + 날짜 범위 + 작성 중 배지) + 스테퍼 ① 요청 → ② 근무표. 확정은 ②의 끝 버튼이다. */
+/** 근무표 작성: 제목(근무표 이름 + 날짜 범위 + 작성 중 배지) + 스테퍼 ① 가능 시간 → ② 매장 조건 → ③ 근무표. 확정은 ③의 끝 버튼이다. */
 export default function PeriodWork() {
   const period = useAppStore(currentPeriod);
   const step = useAppStore((s) => (s.view.screen === "period" ? s.view.step : 1));
@@ -38,7 +45,7 @@ export default function PeriodWork() {
   }, [step]);
 
   if (!period) return null;
-  const toStep = (s: 1 | 2) => go({ screen: "period", periodId: period.id, step: s });
+  const toStep = (s: PeriodStep) => go({ screen: "period", periodId: period.id, step: s });
 
   return (
     <div ref={rootRef} className="flex flex-col gap-5">
@@ -53,14 +60,24 @@ export default function PeriodWork() {
           <span className="font-mono text-sm text-[#66665E]">{formatRange(period)}</span>
           <span className={`${ui.badge} border border-[#C9C9C1] bg-white text-[#3D3D38]`}>작성 중</span>
         </div>
-        <Stepper label="근무표 작성 단계" labels={["요청", "근무표"]} current={step} reached={period.result ? 2 : step} onSelect={toStep} />
+        <Stepper label="근무표 작성 단계" labels={["가능 시간", "매장 조건", "근무표"]} current={step} reached={period.result ? 3 : step} onSelect={toStep} />
       </div>
 
       {step === 1 ? (
         <>
+          <h2 tabIndex={-1} data-step-title className={`${ui.cardTitle} outline-none`}>
+            가능 시간
+          </h2>
           <PrepareSummary key={`prep-${period.id}`} period={period} />
-          <RulesStep key={period.id} scope="period" />
+          <LinksSection />
+          <div className="flex justify-end">
+            <button type="button" onClick={() => toStep(2)} className={ui.primary}>
+              다음
+            </button>
+          </div>
         </>
+      ) : step === 2 ? (
+        <ConditionsStep key={period.id} period={period} onStep={toStep} />
       ) : (
         <ScheduleStep key={period.id} />
       )}
@@ -68,7 +85,100 @@ export default function PeriodWork() {
   );
 }
 
-/** ① 요청 위의 준비 요약 한 줄 + [바꾸기]. 명단이나 이어지는 근무가 바뀌었을 때만 처음부터 펼친다. */
+/** ① 직원 링크 표 자리. 행과 [링크 복사]는 링크를 저장할 때 함께 들어온다. */
+function LinksSection() {
+  return (
+    <section className={`${ui.card} flex flex-col gap-1`}>
+      <h3 className={ui.cardTitle}>직원 링크</h3>
+      <p className={ui.help}>직원마다 자기 링크를 보내 주세요. 링크를 연 사람은 그 직원의 가능 시간만 입력할 수 있어요</p>
+    </section>
+  );
+}
+
+/** ② 매장 조건: 근무조·필요 인원 요약표 + 입력 바 하나 + 접힌 숫자 입력 + 규칙 카드. [다음]은 항상 누를 수 있다. */
+function ConditionsStep({ period, onStep }: { period: WorkPeriod; onStep: (s: PeriodStep) => void }) {
+  const shop = useAppStore((s) => s.shop);
+  const [blocked, setBlocked] = useState(false);
+  if (!shop) return null;
+  const orphanCount = orphanConstraintIds(shop, null).length;
+  const pending = shop.pendingRules.length + shop.pendingConfig.length;
+  const hasStaffing = liveShopRules(shop, period).some((r) => presetName(r) === "필요 인원");
+
+  return (
+    <>
+      <RulesStep
+        key="shop"
+        scope="shop"
+        step
+        pendingNote={false}
+        summary={<CoverageSummary period={period} />}
+        afterInput={<CoverageSection collapsible />}
+      />
+      <div className="flex items-center justify-between gap-4">
+        <button type="button" onClick={() => onStep(1)} className={ui.secondary}>
+          이전
+        </button>
+        <div className="flex items-center gap-3">
+          {blocked && orphanCount > 0 && (
+            <p role="alert" className={ui.error}>
+              명단에 없는 직원을 가리키는 규칙 {orphanCount}개를 삭제하거나 고친 뒤 넘어갈 수 있어요.
+            </p>
+          )}
+          {!hasStaffing && <p className={ui.help}>필요 인원 없이 만들면 인원을 맞추지 않아요</p>}
+          {pending > 0 && <p className={ui.help}>적용하지 않은 규칙 {pending}개는 빠져요</p>}
+          <button type="button" onClick={() => (orphanCount > 0 ? setBlocked(true) : onStep(3))} className={ui.primary}>
+            다음
+          </button>
+        </div>
+      </div>
+    </>
+  );
+}
+
+/** ② 맨 위 근무조·필요 인원 요약표. [바꾸기]로 펼치면 근무 코드 표다. */
+function CoverageSummary({ period }: { period: WorkPeriod }) {
+  const shop = useAppStore((s) => s.shop);
+  const [open, setOpen] = useState(false);
+  if (!shop) return null;
+  const rules = liveShopRules(shop, period);
+  const th = "py-1.5 pr-6 text-left text-xs font-medium text-[#66665E]";
+  const td = "py-1.5 pr-6 font-mono text-[13px] text-[#1B1B18]";
+
+  return (
+    <section className={`${ui.card} flex flex-col gap-3`}>
+      <div className="flex items-start justify-between gap-3">
+        <table className="border-collapse">
+          <thead>
+            <tr className="border-b border-[#E2E2DC]">
+              <th className={th}>근무조</th>
+              <th className={th}>시각</th>
+              <th className={th}>평일</th>
+              <th className={th}>주말·공휴일</th>
+            </tr>
+          </thead>
+          <tbody>
+            {coverageCodes(shop.config).map((s) => (
+              <tr key={s.code} className="border-b border-[#EFEFEB] last:border-b-0">
+                <td className="py-1.5 pr-6 text-[13px] font-medium text-[#1B1B18]">{s.name}</td>
+                <td className={td}>
+                  {s.start}~{s.end}
+                </td>
+                <td className={td}>{coverageText(coverageRange(rules, s.code, "weekday"))}</td>
+                <td className={td}>{coverageText(coverageRange(rules, s.code, "weekend"))}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        <button type="button" aria-expanded={open} onClick={() => setOpen((o) => !o)} className={ui.textSm}>
+          {open ? "접기" : "바꾸기"}
+        </button>
+      </div>
+      {open && <ShiftTable />}
+    </section>
+  );
+}
+
+/** ① 가능 시간 위의 준비 요약 한 줄 + [바꾸기]. 명단이나 이어지는 근무가 바뀌었을 때만 처음부터 펼친다. */
 function PrepareSummary({ period }: { period: WorkPeriod }) {
   const shop = useAppStore((s) => s.shop);
   const periods = useAppStore((s) => s.periods);
@@ -108,7 +218,7 @@ function PrepareSummary({ period }: { period: WorkPeriod }) {
       {carryOverChanged(period, periods) && (
         <div role="status" className={ui.banner}>
           지난 근무표가 바뀌어 이어지는 근무가 달라졌어요. 다시 만들면 반영돼요
-          <button type="button" onClick={() => go({ screen: "period", periodId: period.id, step: 2 })} className={ui.textSm}>
+          <button type="button" onClick={() => go({ screen: "period", periodId: period.id, step: 3 })} className={ui.textSm}>
             근무표로
           </button>
         </div>

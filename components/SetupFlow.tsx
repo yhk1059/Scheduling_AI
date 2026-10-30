@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 
 import { isShopReady, setupStep, useAppStore, type SetupStep } from "@/lib/store";
-import { configSummary, presetName, shopRuleCount } from "@/lib/wording";
+import { configSummary, presetName } from "@/lib/wording";
 
 import RulesStep, { today } from "./RulesStep";
 import ShiftTable from "./ShiftTable";
@@ -11,15 +11,14 @@ import Stepper from "./Stepper";
 import { ui } from "./ui";
 import { BasicSection, CoverageSection, RosterSection } from "./ShopSettings";
 
-const LABELS = ["매장·명단", "매장 소개", "매장 조건"];
+const LABELS = ["매장·명단", "매장 조건"];
 
-/** 처음 설정: ① 매장·명단 → ② 매장 소개 → ③ 매장 규칙 → [첫 근무표 만들기]. 근무표가 없는 매장에서만 보인다. */
+/** 처음 설정: ① 매장·명단 → ② 매장 조건 → [첫 근무표 만들기]. 근무표가 없는 매장에서만 보인다. */
 export default function SetupFlow() {
   const shop = useAppStore((s) => s.shop);
-  const step = useAppStore((s) => (s.view.screen === "setup" ? s.view.step : 1));
+  const step = useAppStore((s) => (s.view.screen === "setup" ? Math.min(s.view.step, 2) : 1)) as SetupStep;
   const go = useAppStore((s) => s.go);
   const createPeriod = useAppStore((s) => s.createPeriod);
-  const markIntroSeen = useAppStore((s) => s.markIntroSeen);
 
   // 단계를 옮기면 새 단계 제목으로 포커스를 옮긴다(처음 열 때는 옮기지 않는다)
   const rootRef = useRef<HTMLDivElement>(null);
@@ -33,17 +32,10 @@ export default function SetupFlow() {
   if (!shop) return null;
   const toStep = (s: SetupStep) => go({ screen: "setup", step: s });
   // 끝낸 단계(못 끝낸 첫 단계 앞)까지 눌러 돌아갈 수 있다
-  const reached = Math.max(step, setupStep(shop) - 1) as SetupStep;
-  // ②는 필수 입력이 없다(ADR-019). [다음]을 누르면 매장 소개를 본 것으로 남긴다
-  const canNext = step === 1 ? shop.employees.some((n) => n.active) : true;
-  const applied = shopRuleCount(shop.rules);
+  const reached = Math.min(Math.max(step, setupStep(shop) - 1), 2) as SetupStep;
+  const canNext = shop.employees.some((n) => n.active);
   const hasStaffing = shop.rules.some((r) => presetName(r) === "필요 인원" && r.enabled !== false);
   const pending = shop.pendingRules.length + shop.pendingConfig.length;
-  const title = (text: string) => (
-    <h2 tabIndex={-1} data-step-title className={`${ui.cardTitle} outline-none`}>
-      {text}
-    </h2>
-  );
 
   return (
     <div ref={rootRef} className="flex flex-col gap-5">
@@ -54,22 +46,14 @@ export default function SetupFlow() {
 
       {step === 1 ? (
         <>
-          {title("매장·명단")}
+          <h2 tabIndex={-1} data-step-title className={`${ui.cardTitle} outline-none`}>
+            매장·명단
+          </h2>
           <BasicSection />
           <RosterSection />
         </>
-      ) : step === 2 ? (
-        <>
-          {title("매장 소개")}
-          <ShiftSummary />
-          <RulesStep key="intro" scope="shop" intro />
-          <CoverageSection collapsible />
-        </>
       ) : (
-        <>
-          {title("매장 조건")}
-          <RulesStep key="shop" scope="shop" pendingNote={false} />
-        </>
+        <RulesStep key="shop" scope="shop" step pendingNote={false} summary={<ShiftSummary />} afterInput={<CoverageSection collapsible />} />
       )}
 
       <div className="flex items-center justify-between gap-4">
@@ -81,25 +65,16 @@ export default function SetupFlow() {
           <span />
         )}
         <div className="flex items-center gap-3">
-          {step < 3 ? (
+          {step === 1 ? (
             <>
               {!canNext && <p className={ui.help}>명단에 직원을 1명 이상 넣으면 다음으로 넘어갈 수 있어요</p>}
-              {step === 2 && !hasStaffing && <p className={ui.help}>필요 인원 없이 만들면 인원을 맞추지 않아요</p>}
-              <button
-                type="button"
-                disabled={!canNext}
-                onClick={() => {
-                  if (step === 2) markIntroSeen();
-                  toStep((step + 1) as SetupStep);
-                }}
-                className={ui.primary}
-              >
+              <button type="button" disabled={!canNext} onClick={() => toStep(2)} className={ui.primary}>
                 다음
               </button>
             </>
           ) : (
             <>
-              {applied === 0 && <p className={ui.help}>규칙 없이 만들면 기본 규칙만 지켜요</p>}
+              {!hasStaffing && <p className={ui.help}>필요 인원 없이 만들면 인원을 맞추지 않아요</p>}
               {pending > 0 && <p className={ui.help}>적용하지 않은 규칙 {pending}개는 빠져요</p>}
               {!isShopReady(shop) && (
                 <p className={ui.help}>명단에 직원을 1명 이상 넣으면 만들 수 있어요</p>
