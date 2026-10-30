@@ -1,28 +1,221 @@
 // e2e 공통 도우미. 시나리오는 docs/BROWSER_TEST_SCENARIOS.md. LLM은 mock하지 않는다(ADR-013).
-import { expect, type Locator, type Page, test } from "@playwright/test";
+import { isDeepStrictEqual } from "node:util";
 
-import { isWeekendDay, type PeriodRange, periodDays } from "../lib/period";
+import { type Browser, type BrowserContext, expect, type Locator, type Page, test } from "@playwright/test";
+import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+
+import type { AvailabilitySlots } from "../lib/availability";
+import { dateOfDay, isWeekendDay, type PeriodRange, periodDays } from "../lib/period";
 import type { Shop, WorkPeriod } from "../lib/store";
 import { DEFAULT_CONFIG, ruleShape } from "../lib/rules";
 import type { ConstraintSpec, Days, People, ScheduleRequest, ScheduleResult, Shifts, TranslateResponse } from "../lib/types.gen";
 
-/** 근무 코드. 기본은 D/E/N/O이고 매장이 더한 코드(M, DE 등)도 온다. */
-export type Code = "D" | "E" | "N" | "O" | (string & {});
+/** 근무 코드. 기본은 A/M/C/O이고 매장이 더한 코드(P, AC 등)도 온다. */
+export type Code = "A" | "M" | "C" | "O" | (string & {});
 export type Grid = Record<string, Code[]>;
-export type Load = { nights: number; weekends: number };
+export type Load = { closings: number; weekends: number };
 type StoredState = { shop: Shop; periods: WorkPeriod[]; view: { screen: string; periodId?: string } };
+type StoredDoc = { version: number; state: StoredState };
 
 export const T0 = new Date("2026-10-28T09:00:00+09:00");
-export const EMPLOYEE_COUNT = 15;
+export const EMPLOYEE_COUNT = 12;
 export const CARRY_OVER_DAYS = 7;
+const STORAGE_KEY = "shop-scheduler";
+/** [이름, 태그] (BROWSER_TEST_SCENARIOS D1) */
+export const ROSTER: [string, string | null][] = [
+  ["이영희", "리더"],
+  ["박민수", null],
+  ["김철수", null],
+  ["정유진", null],
+  ["최지훈", null],
+  ["강서연", "리더"],
+  ["윤지민", "리더"],
+  ["임하늘", null],
+  ["한소율", null],
+  ["오민준", null],
+  ["서예린", "신입"],
+  ["신도윤", "신입"],
+];
+
+// ── 계정과 저장 상태: 테스트 계정으로 로그인한 supabase-js(RLS)와 anon만 쓴다. service role 키는 쓰지 않는다 ──
+const env = (name: string) => {
+  const v = process.env[name];
+  if (!v) throw new Error(`.env.local에 ${name}이 필요해요`);
+  return v;
+};
+const newClient = () =>
+  createClient(env("NEXT_PUBLIC_SUPABASE_URL"), env("NEXT_PUBLIC_SUPABASE_ANON_KEY"), {
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
+const anon = newClient();
+let owner: Promise<{ db: SupabaseClient; userId: string }> | null = null;
+
+function account() {
+  owner ??= (async () => {
+    const db = newClient();
+    const { data, error } = await db.auth.signInWithPassword({ email: env("E2E_TEST_EMAIL"), password: env("E2E_TEST_PASSWORD") });
+    if (error) throw new Error(`테스트 계정 로그인 실패: ${error.message}`);
+    return { db, userId: data.user.id };
+  })();
+  return owner;
+}
+
+export const testEmail = () => env("E2E_TEST_EMAIL");
+
+/** 테스트 계정의 shops 행을 지운다. availability_links 행은 함께 지워진다(on delete cascade). */
+export async function clearAccount() {
+  const { db, userId } = await account();
+  const { error } = await db.from("shops").delete().eq("owner_id", userId);
+  if (error) throw new Error(error.message);
+}
+
+export function fullDaySlots(period: PeriodRange): AvailabilitySlots {
+  return Object.fromEntries(periodDays(period).map((d) => [d.date, [["09:00", "23:00"]]])) as AvailabilitySlots;
+}
+
+/** 저장 문서를 넣는다. 근무표마다 직원 수만큼 링크 행을 만들고 토큰은 DB가 새로 정한다. 전일 제출 상태이고 확정 근무표의 행은 잠근다. */
+export async function seedShop(doc: StoredDoc) {
+  const { db, userId } = await account();
+  const { data, error } = await db.from("shops").insert({ owner_id: userId, data: doc }).select("id").single();
+  if (error) throw new Error(error.message);
+  const { shop, periods } = doc.state;
+  const rows = periods.flatMap((p) =>
+    shop.employees.map((n) => ({
+      shop_id: data.id,
+      period_start: p.start_date,
+      period_length: p.length,
+      employee_id: n.id,
+      employee_name: n.name,
+      shop_name: shop.name,
+      slots: fullDaySlots(p),
+      submitted_at: T0.toISOString(),
+      locked_at: p.status === "confirmed" ? T0.toISOString() : null,
+    })),
+  );
+  const { error: linkError } = await db.from("availability_links").insert(rows);
+  if (linkError) throw new Error(linkError.message);
+}
+
+export interface LinkRow {
+  token: string;
+  employee_id: string;
+  employee_name: string;
+  slots: AvailabilitySlots;
+  submitted_at: string | null;
+  locked_at: string | null;
+}
+
+export async function linkRows(periodStart: string): Promise<LinkRow[]> {
+  const { db } = await account();
+  const { data, error } = await db
+    .from("availability_links")
+    .select("token, employee_id, employee_name, slots, submitted_at, locked_at")
+    .eq("period_start", periodStart);
+  if (error) throw new Error(error.message);
+  return data as LinkRow[];
+}
+
+export async function savedDoc(): Promise<StoredDoc | null> {
+  const { db } = await account();
+  const { data, error } = await db.from("shops").select("data").maybeSingle();
+  if (error) throw new Error(error.message);
+  return (data?.data as StoredDoc | undefined) ?? null;
+}
+
+/** 직원 화면을 거치지 않는 제출. 로그인 없는 anon으로 토큰 DB 함수를 부른다. */
+export const submitAvailability = (token: string, slots: AvailabilitySlots) =>
+  anon.rpc("submit_availability", { p_token: token, p_slots: slots });
+export const getAvailability = (token: string) => anon.rpc("get_availability", { p_token: token });
+
+/** 화면이 링크 행을 만들 때까지 기다린 뒤, 그 근무표의 직원들에게 전일 가능 시간을 제출한다. exclude는 빼고. */
+export async function submitFullDay(period: PeriodRange, count: number, exclude: string[] = []) {
+  await expect.poll(async () => (await linkRows(period.start_date)).length, { message: "링크 행", timeout: 15_000 }).toBe(count);
+  for (const row of await linkRows(period.start_date)) {
+    if (exclude.includes(row.employee_name)) continue;
+    const { error } = await submitAvailability(row.token, fullDaySlots(period));
+    expect(error, `${row.employee_name} 제출`).toBeNull();
+  }
+}
+
+/** 지금 화면의 상태가 서버 문서까지 저장될 때까지 기다린다. 새로고침 전에 부른다. */
+export async function expectSaved(page: Page) {
+  await expect
+    .poll(
+      async () => {
+        const local = await page.evaluate((key) => JSON.parse(localStorage.getItem(key) ?? "null"), STORAGE_KEY);
+        const saved = await savedDoc();
+        return isDeepStrictEqual(local?.state, saved?.state);
+      },
+      { message: "서버 저장", timeout: 15_000 },
+    )
+    .toBe(true);
+}
+
+/**
+ * 테스트 로그인 경로로 세션을 만든다. 경로는 NEXT_PUBLIC_E2E_LOGIN=1로 띄운 서버에만 있다(playwright.config.ts).
+ * 이미 떠 있던 개발 서버를 재사용하면 이 값이 없어 여기서 실패한다.
+ */
+export async function loginAsTestUser(page: Page) {
+  if (!new URL(page.url()).pathname.startsWith("/app")) await page.goto("/app");
+  await page.waitForFunction(() => "__e2eSignIn" in window, undefined, { timeout: 30_000 });
+  await page.evaluate(
+    ([email, password]) => (window as unknown as { __e2eSignIn: (e: string, p: string) => Promise<void> }).__e2eSignIn(email, password),
+    [env("E2E_TEST_EMAIL"), env("E2E_TEST_PASSWORD")],
+  );
+  await expect(page.getByRole("button", { name: "Google로 로그인" })).toHaveCount(0);
+  await expect(page.getByText("불러오는 중…")).toHaveCount(0);
+}
+
+// ── 흐름 공통 ──
+const CONTEXT = { locale: "ko-KR", timezoneId: "Asia/Seoul" };
+
+/** 콘솔 error와 /api/* 실패를 모은다(모든 시나리오 공통 검증). */
+export function trackProblems(page: Page): string[] {
+  const problems: string[] = [];
+  page.on("console", (m) => {
+    if (m.type() === "error") problems.push(`console: ${m.text()}`);
+  });
+  page.on("response", (r) => {
+    if (new URL(r.url()).pathname.startsWith("/api/") && !r.ok()) problems.push(`api ${r.status()} ${r.url()}`);
+  });
+  return problems;
+}
+
+/** 시계를 고정한 새 컨텍스트와 페이지. 앞 시나리오의 상태를 잇는 흐름은 이 페이지 하나를 공유한다. */
+export async function openFlow(browser: Browser, viewport = { width: 1440, height: 1000 }): Promise<{ context: BrowserContext; page: Page; problems: string[] }> {
+  const context = await browser.newContext({ ...CONTEXT, viewport });
+  const page = await context.newPage();
+  await page.clock.setFixedTime(T0);
+  return { context, page, problems: trackProblems(page) };
+}
+
+/** 공통 검증: 오류 알림([다시 시도] 포함)과 콘솔 오류·API 실패가 없다. 끝나면 목록을 비운다. */
+export async function expectNoProblems(page: Page, problems: string[]) {
+  // Next 개발 서버의 route announcer도 role=alert라 [다시 시도]로 구분한다
+  await expect(page.getByRole("alert").filter({ hasText: "다시 시도" })).toHaveCount(0);
+  expect(problems.splice(0), "콘솔 오류·API 실패").toEqual([]);
+}
+
+/** 명단 표 맨 아래 줄에 적고 이름 칸에서 Enter. 적다 만 태그도 함께 들어간다. */
+export async function addRoster(page: Page, roster: [string, string | null][]) {
+  const name = page.getByRole("textbox", { name: "새 직원 이름" });
+  const tag = page.getByRole("combobox", { name: "새 직원 태그" });
+  for (const [n, t] of roster) {
+    await name.fill(n);
+    if (t) await tag.fill(t);
+    await name.press("Enter");
+    await expect(name).toHaveValue("");
+    await expect(name).toBeFocused();
+  }
+}
 
 export const pendingCards = (page: Page) => page.locator("article").filter({ hasText: "적용 대기" });
 export const appliedCards = (page: Page) => page.locator("article").filter({ hasText: "적용됨" });
 export const scheduleTitle = (page: Page) => page.getByRole("heading", { name: "근무표", exact: true }).first();
 /** 진행 중이면 비활성이 되는 버튼. 근무표가 없으면 [근무표 만들기], 있으면 [CSV 받기]다. */
 const idleButton = (page: Page) => page.getByRole("button", { name: /^(근무표 만들기|CSV 받기)$/ });
-/** Primary 버튼(UI_GUIDE: 영역마다 하나). */
-export const primaryButtons = (page: Page) => page.locator('main button[class*="bg-[#155E75]"]');
+/** 누를 수 있는 Primary 버튼. 펼친 입력 바의 빈 [요청 만들기]는 비활성이라 세지 않는다. */
+export const primaryButtons = (page: Page) => page.locator('main button[class*="bg-[#155E75]"]:not(:disabled)');
 
 export async function readState(page: Page): Promise<StoredState> {
   return page.evaluate(() => JSON.parse(localStorage.getItem("shop-scheduler")!).state);
@@ -65,17 +258,17 @@ export async function readGrid(page: Page, period: PeriodRange): Promise<Grid> {
   return grid;
 }
 
-/** ① 준비의 지난 근무 마지막 며칠 칸(`<div aria-label="{이름} {M}/{D} {코드}">`)을 읽는다. */
+/** ① 준비의 지난 근무 마지막 며칠 칸(`<div aria-label="{이름} {M}/{D} {코드}">`)을 읽는다. 지난 근무표 끝이 월을 넘을 수 있다. */
 export async function readCarryOver(page: Page, prev: PeriodRange): Promise<Grid> {
-  const first = prev.length - CARRY_OVER_DAYS + 1;
-  const month = periodDays(prev).at(-1)!.month;
+  const index = new Map(periodDays(prev).slice(-CARRY_OVER_DAYS).map((d, i) => [`${d.month}/${d.dom}`, i]));
   const labels = await page.evaluate(() =>
     [...document.querySelectorAll("div[aria-label]")].map((d) => d.getAttribute("aria-label") ?? ""),
   );
   const carry: Grid = {};
   for (const label of labels) {
-    const m = new RegExp(`^(.+) (\\d+)/(\\d+) (${CODE})$`).exec(label);
-    if (m && Number(m[2]) === month) (carry[m[1]] ??= [])[Number(m[3]) - first] = m[4] as Code;
+    const m = new RegExp(`^(.+) (\\d+/\\d+) (${CODE})$`).exec(label);
+    const i = m ? index.get(m[2]) : undefined;
+    if (m && i !== undefined) (carry[m[1]] ??= [])[i] = m[3] as Code;
   }
   return carry;
 }
@@ -92,14 +285,13 @@ export function gridDiff(before: Grid, after: Grid): { name: string; day: number
   return out;
 }
 
-/** 확정본의 fromDay일부터 끝까지(다음 근무표 직전 28일)에서 직원별 나이트 수와 주말·공휴일 근무 수. */
-export function expectedHistory(grid: Grid, period: PeriodRange, holidays: number[], fromDay: number): Record<string, Load> {
+/** 직전 28일 확정본에서 직원별 마감 수와 주말·공휴일 근무 수. */
+export function expectedHistory(grid: Grid, period: PeriodRange, holidays: number[]): Record<string, Load> {
   const out: Record<string, Load> = {};
   for (const [name, row] of Object.entries(grid)) {
-    const window = row.map((c, i) => ({ c, day: i + 1 })).filter(({ day }) => day >= fromDay);
     out[name] = {
-      nights: window.filter(({ c }) => c === "N").length,
-      weekends: window.filter(({ c, day }) => c !== "O" && isWeekendDay(period, day, holidays)).length,
+      closings: row.filter((c) => c === "C").length,
+      weekends: row.filter((c, i) => c !== "O" && isWeekendDay(period, i + 1, holidays)).length,
     };
   }
   return out;
@@ -271,7 +463,36 @@ export async function evaluatedViolations(page: Page, req: ScheduleRequest, grid
   return result.soft_violations.filter((v) => hard.has(v.constraint_id)).map((v) => `${v.constraint_id}: ${v.detail}`);
 }
 
-/** 근무 칸이 모두 있고 마지막 /solve 요청의 반드시 규칙을 지키는지 본다(따로 구현한 검사 + 식 규칙 평가). */
+/** H9: 휴무가 아닌 칸의 근무조 시작~끝 시각 전체가 그 직원의 그날 가능 시간 안에 있는지. 칸 고정은 빼고 본다. lib/availability와 따로 구현한 검사다. */
+export function availabilityViolations(req: ScheduleRequest, grid: Grid, rows: LinkRow[]): string[] {
+  const out: string[] = [];
+  const shifts = (req.config ?? DEFAULT_CONFIG).shifts;
+  const minutes = (t: string) => Number(t.slice(0, 2)) * 60 + Number(t.slice(3));
+  const fixed = new Set(
+    (req.constraints ?? []).flatMap((c) => (c.type === "fixed_assignment" && c.enabled !== false ? [`${c.params.employee_id}@${c.params.day}`] : [])),
+  );
+  for (const n of req.employees) {
+    const slots = rows.find((r) => r.employee_id === n.id)?.slots ?? {};
+    (grid[n.name] ?? []).forEach((code, i) => {
+      if (code === "O" || fixed.has(`${n.id}@${i + 1}`)) return;
+      const def = shifts.find((s) => s.code === code);
+      const parts = def?.parts?.length ? def.parts.map((p) => shifts.find((s) => s.code === p)) : [def];
+      const open = new Set<number>();
+      for (const [from, to] of slots[dateOfDay(req.period, i + 1)] ?? []) for (let t = minutes(from); t < minutes(to); t += 30) open.add(t);
+      for (const part of parts) {
+        for (let t = minutes(part?.start ?? "00:00"); t < minutes(part?.end ?? "00:00"); t += 30) {
+          if (!open.has(t)) {
+            out.push(`${n.name} ${i + 1}번째 날 ${code}`);
+            return;
+          }
+        }
+      }
+    });
+  }
+  return out;
+}
+
+/** 근무 칸이 모두 있고 마지막 /solve 요청의 반드시 규칙을 지키는지 본다(따로 구현한 검사 + 식 규칙 평가 + 가능 시간). */
 export async function expectHardRulesHold(page: Page, period: PeriodRange, lastSolve: ScheduleRequest | undefined) {
   const grid = await readGrid(page, period);
   expect(lastSolve, "마지막 /solve 요청").toBeTruthy();
@@ -279,6 +500,7 @@ export async function expectHardRulesHold(page: Page, period: PeriodRange, lastS
   expect(lastSolve!.period).toEqual(period);
   expect(hardViolations(lastSolve!, grid), "반드시 규칙 위반").toEqual([]);
   expect(await evaluatedViolations(page, lastSolve!, grid), "반드시 규칙 위반(식 규칙 평가)").toEqual([]);
+  expect(availabilityViolations(lastSolve!, grid, await linkRows(period.start_date)), "가능 시간 위반").toEqual([]);
 }
 
 /** 입력칸에 말을 넣고 [규칙 만들기]/[요청 만들기]를 누른 뒤 응답을 돌려준다. */
@@ -363,13 +585,32 @@ export async function readHistoryColumns(page: Page): Promise<Record<string, Loa
     return { grid, stats };
   });
   expect(stats, "근무표 최근 4주 열 = 통계 최근 4주 열").toEqual(grid);
-  return Object.fromEntries(Object.entries(grid).map(([name, [n, w]]) => [name, { nights: Number(n), weekends: Number(w) }]));
+  return Object.fromEntries(Object.entries(grid).map(([name, [n, w]]) => [name, { closings: Number(n), weekends: Number(w) }]));
 }
 
 // 화면에 보이면 안 되는 개발·옛 용어(UI_GUIDE "문구"). LLM이 쓴 문장이 없는 화면에서만 검사한다.
-const DEV_TERMS = /\b(hard|soft)\b|해 있음|해 없음|초안|이월|기간|달력 월|생성|재풀이|\be\d{2}\b/i;
+const DEV_TERMS = /\b(hard|soft)\b|해 있음|해 없음|초안|이월|기간|달력 월|생성|재풀이|availability|토큰|\be\d{2}\b/i;
 
 export async function expectNoDevTerms(page: Page, where: string) {
   const hit = DEV_TERMS.exec(await page.locator("body").innerText());
   expect(hit?.[0], `${where}: 화면에 개발 용어`).toBeUndefined();
 }
+
+/** 칸 가운데를 누르고 같은 열의 끝 칸까지 옮긴 뒤 놓는다. */
+export async function dragCells(page: Page, from: string, to: string) {
+  const center = async (name: string) => {
+    const box = await page.getByRole("button", { name, exact: true }).boundingBox();
+    expect(box, name).toBeTruthy();
+    return { x: box!.x + box!.width / 2, y: box!.y + box!.height / 2 };
+  };
+  const a = await center(from);
+  const b = await center(to);
+  await page.mouse.move(a.x, a.y);
+  await page.mouse.down();
+  await page.mouse.move(b.x, b.y, { steps: 5 });
+  await page.mouse.up();
+}
+
+/** 표에 보이는 직원 링크(`/a/{토큰}`). */
+export const shownLinks = (page: Page) =>
+  page.locator("td").filter({ hasText: "/a/" }).allInnerTexts();

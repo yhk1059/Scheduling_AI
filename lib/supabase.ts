@@ -43,6 +43,14 @@ export async function signInWithGoogle(): Promise<void> {
   if (error) throw new Error(error.message);
 }
 
+// e2e 전용 로그인(ADR-020). NEXT_PUBLIC_E2E_LOGIN이 빌드에 없으면 이 코드는 번들에 들어가지 않는다.
+if (process.env.NEXT_PUBLIC_E2E_LOGIN === "1" && typeof window !== "undefined") {
+  (window as unknown as { __e2eSignIn: (email: string, password: string) => Promise<void> }).__e2eSignIn = async (email, password) => {
+    const { error } = await supabase().auth.signInWithPassword({ email, password });
+    if (error) throw new Error(error.message);
+  };
+}
+
 export async function signOut(): Promise<void> {
   const { error } = await supabase().auth.signOut();
   if (error) throw new Error(error.message);

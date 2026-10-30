@@ -1328,6 +1328,21 @@ describe("로그인 분기", () => {
     expect(f.calls.save).toHaveLength(0);
   });
 
+  it("불러와도 저장 때 최신이던 결과는 최신이고, 이미 지난 결과는 그대로 지난 결과다", async () => {
+    const doc = serverDoc();
+    const v = doc.state.inputVersion;
+    const period = { id: "p-1", start_date: "2026-11-02", length: 7, holidays: [], requests: [], pendingRequests: [], disabledIds: [], ruleOverrides: {}, carryOver: [], carryOverUsed: null, result: null, status: "draft", versions: [], snapshot: null, availability: {}, availabilityUsed: null };
+    const data = {
+      ...doc,
+      state: { ...doc.state, periods: [{ ...period, resultVersion: v }, { ...period, id: "p-2", start_date: "2026-11-09", resultVersion: v - 1 }] },
+    };
+    const store = synced(fakeRemote({ data, updatedAt: SERVER_AT }).remote);
+    await store.getState().signedIn(USER);
+    const s = store.getState();
+    expect(s.periods[0].resultVersion).toBe(s.inputVersion);
+    expect(s.periods[1].resultVersion).not.toBe(s.inputVersion);
+  });
+
   it("서버에 없고 캐시가 있으면(첫 저장 실패) 그대로 올린다", async () => {
     const f = fakeRemote();
     const { store } = withPeriodSynced(f.remote);

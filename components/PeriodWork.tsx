@@ -404,7 +404,7 @@ function DatesSection({ period }: { period: WorkPeriod }) {
           <div className="flex flex-col gap-1">
             <span className={ui.label}>끝 날짜</span>
             <span className="flex h-10 items-center font-mono text-sm text-[#1B1B18]">
-              {periodEnd(period).replaceAll("-", ".")} · {period.length}일
+              {periodEnd(period).split("-").map(Number).join(".")} · {period.length}일
             </span>
           </div>
           {editing && (
@@ -551,12 +551,12 @@ function CarryOverPaste({ period }: { period: WorkPeriod }) {
           value={text}
           onChange={(e) => setText(e.target.value)}
           rows={4}
-          placeholder={"이영희\tD\tD\tE\tE\tN\tN\tO"}
+          placeholder={"이영희\tA\tA\tM\tM\tC\tC\tO"}
           className={`${ui.input} h-auto py-2 font-mono`}
         />
       </label>
       <p className={ui.help}>
-        예: <span className="font-mono">이영희 D E N O O</span> · 엑셀에서 이름과 근무 칸을 함께 복사해 붙여넣어요. 칸은 탭이나 쉼표로 나뉘어요
+        예: <span className="font-mono">이영희 A M C O O</span> · 엑셀에서 이름과 근무 칸을 함께 복사해 붙여넣어요. 칸은 탭이나 쉼표로 나뉘어요
       </p>
       <div className="flex gap-2">
         <button type="button" disabled={text.trim() === ""} onClick={onApply} className={ui.secondary}>

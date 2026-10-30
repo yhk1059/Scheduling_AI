@@ -42,13 +42,13 @@ const WEEKDAYS = ["일", "월", "화", "수", "목", "금", "토"];
 export const CELL =
   "relative w-[30px] h-7 rounded-xs inline-flex items-center justify-center font-mono transition-colors duration-[120ms]";
 const CODE_CLASS: Record<Code, string> = {
-  D: "bg-[#FFF1C2] text-[#5C4300] font-semibold border border-transparent",
-  E: "bg-[#F9CFAE] text-[#6E2A04] font-semibold border border-transparent",
-  N: "bg-[#263248] text-white font-semibold border border-transparent",
+  A: "bg-[#FFF1C2] text-[#5C4300] font-semibold border border-transparent",
+  M: "bg-[#F9CFAE] text-[#6E2A04] font-semibold border border-transparent",
+  C: "bg-[#263248] text-white font-semibold border border-transparent",
   O: "text-[#6B6B63] font-normal border border-[#E2E2DC]",
 };
 
-/** 기본 4개 외 코드(M, DE 등)는 중립 색 */
+/** 기본 4개 외 코드(P, AC 등)는 중립 색 */
 const OTHER_CODE_CLASS = "bg-[#E2E2DC] text-[#1B1B18] font-semibold border border-transparent";
 
 /** 근무 코드 색과 글자 크기(3자 코드는 작게). */
