@@ -1,70 +1,66 @@
-// docs/BROWSER_TEST_SCENARIOS.md S5~S13(데모 저니 1~7). 처음 설정부터 내 매장 첫 근무표를 앞 시나리오의 상태를 이어받아 만드는 하나의 흐름이라
-// 페이지 하나를 공유하며 순서대로 돈다. 게스트 모드만 다룬다(ADR-014). LLM은 mock하지 않는다(ADR-013).
+// docs/BROWSER_TEST_SCENARIOS.md S5~S13(데모 저니 1~7). 매장 준비부터 직원 입력과 첫 근무표까지 앞 시나리오의 상태를 이어받는 하나의 흐름이라
+// 페이지 하나를 공유하며 순서대로 돈다. LLM은 mock하지 않는다(ADR-013).
 import { type BrowserContext, expect, type Page, test } from "@playwright/test";
 
 import { ruleShape } from "../lib/rules";
+import { presetName } from "../lib/wording";
 import type { PeriodRange } from "../lib/period";
 import type { ConstraintSpec, ScheduleRequest } from "../lib/types.gen";
 import {
+  addRoster,
   appliedCards,
   applyAllPending,
+  clearAccount,
   type Code,
   deleteAllPending,
+  dragCells,
+  EMPLOYEE_COUNT,
+  employeeId,
   expectCardChrome,
   expectHardRulesHold,
   expectNoDevTerms,
+  expectNoProblems,
+  expectSaved,
+  fullDaySlots,
+  getAvailability,
   type Grid,
   interpret,
   interpretOk,
   leaveOf,
   leavesOf,
-  EMPLOYEE_COUNT,
-  employeeId,
+  linkRows,
+  loginAsTestUser,
+  openFlow,
   pendingCards,
   periodByStart,
   primaryButtons,
   readGrid,
   readState,
+  ROSTER,
+  savedDoc,
   scheduleTitle,
+  shownLinks,
   solveVia,
-  T0,
+  submitAvailability,
+  submitFullDay,
 } from "./test-helpers";
 
-const NOV: PeriodRange = { start_date: "2026-11-01", length: 30 };
-const NOV_RANGE = "2026.11.1 – 11.30";
-// [이름, 연차, 나이트 전담] 15명 · 나이트 전담 2명 (BROWSER_TEST_SCENARIOS D1)
-const ROSTER: [string, number, boolean][] = [
-  ["이영희", 12, false],
-  ["박민수", 9, false],
-  ["김철수", 7, false],
-  ["정유진", 5, false],
-  ["최지훈", 3, false],
-  ["강서연", 15, false],
-  ["윤지민", 10, false],
-  ["임하늘", 8, false],
-  ["한소율", 6, false],
-  ["오민준", 4, false],
-  ["서예린", 2, false],
-  ["신도윤", 1, false],
-  ["조은비", 2, false],
-  ["문가람", 11, true],
-  ["배수아", 4, true],
-];
-// [요일 종류, 근무 이름, 최소, 최대] (BROWSER_TEST_SCENARIOS D2). 평일 데이는 범위 3~4명
+const WEEK: PeriodRange = { start_date: "2026-11-02", length: 7 };
+const WEEK_NAME = "11/2~11/8 근무표";
+const WEEK_RANGE = "2026.11.2 – 11.8";
+const HOLIDAY = 3; // 11/4
+// [요일 종류, 근무 이름, 최소, 최대] (D2)
 const COVERAGE: [string, string, number, number][] = [
-  ["평일", "데이", 3, 4],
-  ["평일", "이브닝", 3, 3],
-  ["평일", "나이트", 2, 2],
-  ["주말·공휴일", "데이", 3, 3],
-  ["주말·공휴일", "이브닝", 2, 2],
-  ["주말·공휴일", "나이트", 2, 2],
+  ["평일", "오픈", 1, 2],
+  ["평일", "미들", 1, 2],
+  ["평일", "마감", 3, 3],
+  ["주말·공휴일", "오픈", 2, 2],
+  ["주말·공휴일", "미들", 2, 2],
+  ["주말·공휴일", "마감", 3, 3],
 ];
-const SHIFT_CODE: Record<string, string> = { 데이: "D", 이브닝: "E", 나이트: "N" };
-const DEFAULT_CARDS = 7; // 필요 인원 6장 + 나이트 전담
-const HOLIDAY = 18;
-const NOV_WEEKEND_DAYS = [1, 7, 8, 14, 15, 18, 21, 22, 28, 29];
-const RULE_INPUT = "병동 규칙 입력";
-const REQUEST_INPUT = "요청 입력";
+const SHIFT_CODE: Record<string, string> = { 오픈: "A", 미들: "M", 마감: "C" };
+const RULE_INPUT = "매장 조건 입력";
+const REQUEST_INPUT = "예외 입력";
 
 test.describe.configure({ mode: "serial" });
 
@@ -73,12 +69,12 @@ let page: Page;
 let problems: string[] = [];
 let lastSolve: ScheduleRequest | undefined;
 let ruleCount: number;
+let parkLink: string;
 let fixedCell: { day: number; code: Code };
 let finalGrid: Grid;
 
-const setupStepper = () => page.getByRole("list", { name: "처음 설정 단계" });
 const workStepper = () => page.getByRole("list", { name: "근무표 작성 단계" });
-
+const currentStep = () => workStepper().locator('[aria-current="step"]');
 const sectionWith = (heading: string) =>
   page.locator("section").filter({ has: page.getByRole("heading", { name: heading, exact: true }) });
 
@@ -89,107 +85,241 @@ async function solve(action: () => Promise<void>) {
 }
 
 test.beforeAll(async ({ browser }) => {
-  context = await browser.newContext({ locale: "ko-KR", timezoneId: "Asia/Seoul", viewport: { width: 1440, height: 1000 } });
-  page = await context.newPage();
-  await page.clock.setFixedTime(T0);
-  page.on("console", (m) => {
-    if (m.type() === "error") problems.push(`console: ${m.text()}`);
-  });
-  page.on("response", (r) => {
-    if (r.url().includes("/api/") && !r.ok()) problems.push(`api ${r.status()} ${r.url()}`);
-  });
+  ({ context, page, problems } = await openFlow(browser));
+  await context.grantPermissions(["clipboard-read", "clipboard-write"], { origin: "http://localhost:3000" });
 });
 
 test.afterAll(async () => {
   await context.close();
 });
 
-test.beforeEach(() => {
-  problems = [];
-});
-
 test.afterEach(async () => {
-  // 오류 알림([다시 시도]가 있는 alert). Next 개발 서버의 route announcer도 role=alert라 구분한다
-  await expect(page.getByRole("alert").filter({ hasText: "다시 시도" })).toHaveCount(0);
-  expect(problems, "콘솔 오류·API 실패").toEqual([]);
+  await expectNoProblems(page, problems);
 });
 
-test("S5. 처음 설정 ① 병동·명단 → ② 병동 소개(필요 인원 숫자 폼)", async () => {
+test("S5. 매장 준비 → 첫 근무표 시작", async () => {
+  await clearAccount();
   await page.goto("/app");
-  await page.getByRole("button", { name: "내 병동으로 시작하기" }).click();
-  await expect(page.getByRole("heading", { name: "처음 설정", level: 1 })).toBeVisible();
-  await expect(setupStepper().locator('[aria-current="step"]')).toContainText("병동·명단");
-  await expect(page.getByRole("button", { name: "병동 설정", exact: true })).toHaveCount(0);
+  await loginAsTestUser(page);
+  await expect(page.getByRole("heading", { name: "매장 준비", level: 1 })).toBeVisible();
+  await expect(workStepper()).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "매장 설정", exact: true })).toHaveCount(0);
 
-  await page.getByRole("textbox", { name: "병동 이름" }).fill("내과 병동");
-  await expect(page.getByRole("banner")).toContainText("내과 병동 · 한 달 단위");
+  await page.getByRole("textbox", { name: "매장 이름" }).fill("한강 카페");
+  await expect(page.getByRole("banner")).toContainText("한강 카페 · 1주 단위");
   const unit = page.getByRole("combobox", { name: "근무표 주기" });
   await unit.selectOption({ label: "2주" });
-  await expect(page.getByRole("banner")).toContainText("내과 병동 · 2주 단위");
+  await expect(page.getByRole("banner")).toContainText("한강 카페 · 2주 단위");
   // 근무표가 아직 없으니 "다음에 만드는 근무표부터" 안내는 없다
   await expect(page.getByText("다음에 만드는 근무표부터 적용돼요.")).toHaveCount(0);
-  await unit.selectOption({ label: "한 달(1일~말일)" });
-  await expect(page.getByRole("banner")).toContainText("내과 병동 · 한 달 단위");
+  await unit.selectOption({ label: "1주" });
 
-  const next = page.getByRole("button", { name: "다음", exact: true });
-  await expect(next).toBeDisabled();
-  await expect(page.getByText("명단에 간호사를 1명 이상 넣으면 다음으로 넘어갈 수 있어요")).toBeVisible();
+  const start = page.getByRole("button", { name: "첫 근무표 시작하기" });
+  await expect(start).toBeDisabled();
+  await expect(page.getByText("명단에 직원을 1명 이상 넣으면 시작할 수 있어요")).toBeVisible();
   await expect(page.getByText("바꾼 내용은 바로 저장돼요.")).toBeVisible();
-  await expect(page.getByRole("button", { name: "이전" })).toHaveCount(0);
+  await expect(page.getByText("이니셜을 써도 됩니다")).toBeVisible();
+  await expect(page.getByText("태그에는 이름을 쓰지 마세요")).toBeVisible();
 
-  // 맨 아래 입력 줄에 한 명씩 적고 Enter
-  const newName = page.getByRole("textbox", { name: "새 간호사 이름" });
-  const newYears = page.getByRole("textbox", { name: "새 간호사 연차" });
-  const newNight = page.getByRole("button", { name: "새 간호사 태그 나이트전담 붙이기" });
-  for (const [name, years, night] of ROSTER) {
-    await newName.fill(name);
-    await newYears.fill(String(years));
-    if (night) await newNight.click();
-    await newYears.press("Enter");
-    await expect(newName).toHaveValue("");
-    await expect(newName).toBeFocused();
-  }
-  await expect(page.getByRole("textbox", { name: "15행 이름", exact: true })).toHaveValue("배수아");
+  await addRoster(page, ROSTER);
 
   // 잘못된 줄은 더하지 않고 그 칸에 오류를 보인다
+  const newName = page.getByRole("textbox", { name: "새 직원 이름" });
   await newName.fill("이영희");
-  await newYears.fill("abc");
   await page.getByRole("button", { name: "추가", exact: true }).click();
   await expect(newName).toHaveAttribute("aria-invalid", "true");
   await expect(page.getByText("같은 이름이 이미 있어요")).toBeVisible();
-  await expect(newYears).toHaveAttribute("aria-invalid", "true");
-  await expect(page.getByText("연차는 숫자여야 해요")).toBeVisible();
-  await expect(page.getByRole("textbox", { name: "16행 이름", exact: true })).toHaveCount(0);
+  await expect(page.getByRole("textbox", { name: "13행 이름", exact: true })).toHaveCount(0);
   await newName.fill("");
-  await newYears.fill("");
 
   await expect(page.getByRole("textbox", { name: "1행 이름", exact: true })).toHaveValue("이영희");
-  await expect(page.getByRole("textbox", { name: "15행 이름", exact: true })).toHaveValue("배수아");
-  // 나이트 전담은 태그 칩이다. 붙은 사람에게는 [빼기], 아닌 사람에게는 추천 칩 [+ 나이트전담]이 보인다
-  await expect(page.getByRole("button", { name: "14행 태그 나이트전담 빼기" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "15행 태그 나이트전담 빼기" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "13행 태그 나이트전담 붙이기" })).toBeVisible();
+  await expect(page.getByRole("textbox", { name: "12행 이름", exact: true })).toHaveValue("신도윤");
+  for (const label of ["1행 태그 리더 빼기", "6행 태그 리더 빼기", "7행 태그 리더 빼기", "11행 태그 신입 빼기", "12행 태그 신입 빼기"]) {
+    await expect(page.getByRole("button", { name: label })).toBeVisible();
+  }
+  await expect(page.getByRole("button", { name: /붙이기/ })).toHaveCount(0);
 
   // 근무표에서 빼기 → 제외 → 다시 넣기
   const idsBefore = (await readState(page)).shop.employees.map((n) => n.id);
-  const baeRow = page.getByRole("row").filter({ has: page.getByRole("textbox", { name: "15행 이름", exact: true }) });
-  await baeRow.getByRole("button", { name: "근무표에서 빼기" }).click();
-  await expect(page.getByRole("textbox", { name: "15행 이름", exact: true })).toHaveCount(0);
+  const lastRow = page.getByRole("row").filter({ has: page.getByRole("textbox", { name: "12행 이름", exact: true }) });
+  await lastRow.getByRole("button", { name: "근무표에서 빼기" }).click();
+  await expect(page.getByRole("textbox", { name: "12행 이름", exact: true })).toHaveCount(0);
   await expect(page.getByText("근무표에서 빼도 지난 근무표와 통계에는 남아요.")).toBeVisible();
-  await page.getByRole("button", { name: "제외된 간호사 1명 보기" }).click();
-  const excludedRow = page.getByRole("row").filter({ hasText: "배수아" });
+  await page.getByRole("button", { name: "제외된 직원 1명 보기" }).click();
+  const excludedRow = page.getByRole("row").filter({ hasText: "신도윤" });
   await expect(excludedRow.getByText("제외", { exact: true })).toBeVisible();
   await excludedRow.getByRole("button", { name: "다시 넣기" }).click();
-  await expect(page.getByRole("textbox", { name: "15행 이름", exact: true })).toHaveValue("배수아");
+  await expect(page.getByRole("textbox", { name: "12행 이름", exact: true })).toHaveValue("신도윤");
 
-  await expect(next).toBeEnabled();
-  await expectNoDevTerms(page, "처음 설정 ①");
-  await next.click();
+  const { shop } = await readState(page);
+  expect(shop.name).toBe("한강 카페");
+  expect(shop.unit).toBe("1w");
+  expect(shop.employees.map((n) => n.id), "직원 id 유지").toEqual(idsBefore);
+  expect(shop.employees.filter((n) => n.active)).toHaveLength(EMPLOYEE_COUNT);
+  const tagged = (tag: string) => shop.employees.filter((n) => n.tags.includes(tag)).map((n) => n.name);
+  expect(tagged("리더")).toEqual(["이영희", "강서연", "윤지민"]);
+  expect(tagged("신입")).toEqual(["서예린", "신도윤"]);
+  await expectNoDevTerms(page, "매장 준비");
 
-  // ② 매장 소개: 필요 인원은 필수가 아니다. 접힌 "숫자로 입력하기"로 칸마다 최소·최대를 넣는다
-  await expect(setupStepper().locator('[aria-current="step"]')).toContainText("병동 소개");
-  await expect(page.getByRole("heading", { name: "병동 소개", exact: true }).first()).toBeFocused();
-  await expect(page.getByRole("textbox", { name: "병동 소개 입력" })).toBeVisible();
+  await expect(start).toBeEnabled();
+  await start.click();
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText(WEEK_NAME);
+  await expect(page.getByRole("button", { name: "매장 설정", exact: true })).toBeVisible();
+  await expectSaved(page);
+  await page.reload();
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText(WEEK_NAME);
+});
+
+test("S6. ① 가능 시간: 준비 요약과 링크 표", async () => {
+  const titleRow = page.getByRole("heading", { level: 1 }).locator("..");
+  await expect(titleRow).toContainText(WEEK_RANGE);
+  await expect(titleRow.getByText("작성 중", { exact: true })).toBeVisible();
+  await expect(workStepper().getByRole("listitem")).toHaveCount(3);
+  await expect(currentStep()).toContainText("가능 시간");
+  await expect(workStepper().getByRole("button", { name: /매장 조건/ })).toBeDisabled();
+  await expect(page.getByRole("button", { name: "이전" })).toHaveCount(0);
+
+  await expect(page.getByRole("main")).toContainText(`${WEEK_RANGE} · 공휴일 없음 · 직원 ${EMPLOYEE_COUNT}명 · 지난 근무 없음`);
+  const prepare = page.getByRole("button", { name: "바꾸기" });
+  await expect(prepare).toHaveAttribute("aria-expanded", "false");
+  await prepare.click();
+  await expect(page.getByRole("button", { name: "접기" }).first()).toHaveAttribute("aria-expanded", "true");
+  await expect(page.getByLabel("시작일")).toHaveValue(WEEK.start_date);
+  await expect(page.getByRole("main")).toContainText("2026.11.8 · 7일");
+  await expect(page.getByText("2026년 11월")).toBeVisible();
+  await expect(page.getByRole("button", { name: /^\d+월 \d+일 공휴일 (지정|해제)$/ })).toHaveCount(7);
+  await page.getByRole("button", { name: "11월 4일 공휴일 지정" }).click();
+  await expect(page.getByRole("button", { name: "11월 4일 공휴일 해제" })).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByRole("main")).toContainText(`${WEEK_RANGE} · 공휴일 1일 · 직원 ${EMPLOYEE_COUNT}명`);
+
+  await expect(sectionWith("명단 확인")).toContainText(`직원 ${EMPLOYEE_COUNT}명`);
+  await expect(page.getByText("지난 근무표와 명단이 같아요")).toHaveCount(0);
+  const carryToggle = page.getByRole("button", { name: "지난 근무 입력하기 (선택)" });
+  await expect(carryToggle).toHaveAttribute("aria-expanded", "false");
+  await carryToggle.click();
+  await expect(page.getByRole("heading", { name: "지난 근무 마지막 며칠 (선택)" })).toBeVisible();
+  await expect(page.getByText(/지금 반영된 직원:\s*0명/)).toBeVisible();
+  await expectNoDevTerms(page, "① 가능 시간(준비 펼침)");
+  await page.getByRole("button", { name: "접기" }).first().click();
+  await expect(page.getByRole("heading", { name: "명단 확인" })).toHaveCount(0);
+
+  // 링크 표
+  await expect(page.getByText("직원마다 자기 링크를 보내 주세요. 링크를 연 사람은 그 직원의 가능 시간만 입력할 수 있어요")).toBeVisible();
+  const copyButtons = page.getByRole("button", { name: "링크 복사" });
+  await expect(copyButtons).toHaveCount(EMPLOYEE_COUNT);
+  const links = await shownLinks(page);
+  expect(links).toHaveLength(EMPLOYEE_COUNT);
+  const parkRow = page.getByRole("row").filter({ hasText: "박민수" });
+  await parkRow.getByRole("button", { name: "링크 복사" }).click();
+  await expect(parkRow.getByRole("button", { name: "복사했어요" })).toBeVisible();
+  parkLink = await page.evaluate(() => navigator.clipboard.readText());
+  expect(parkLink).toBe((await parkRow.locator("td").nth(1).innerText()).trim());
+  await expect(page.getByRole("button", { name: "다음", exact: true })).toBeEnabled();
+
+  const p = await periodByStart(page, WEEK.start_date);
+  expect({ start_date: p.start_date, length: p.length }).toEqual(WEEK);
+  expect(p.holidays).toEqual([HOLIDAY]);
+  const rows = await linkRows(WEEK.start_date);
+  expect(rows).toHaveLength(EMPLOYEE_COUNT);
+  expect(new Set(rows.map((r) => r.token)).size, "토큰이 모두 다르다").toBe(EMPLOYEE_COUNT);
+  await expectNoDevTerms(page, "① 가능 시간");
+});
+
+test("S7. 직원 화면: 드래그 입력과 제출", async ({ browser }) => {
+  const staff = await openFlow(browser, { width: 1280, height: 800 });
+  const p = staff.page;
+  const cell = (label: string) => p.getByRole("button", { name: label, exact: true });
+  const pressed = p.locator('main button[aria-pressed="true"]');
+
+  await p.goto(parkLink);
+  await expect(p.getByText("박민수님의 가능 시간")).toBeVisible();
+  await expect(p.getByText("한강 카페")).toBeVisible();
+  await expect(p.getByText(WEEK_RANGE)).toBeVisible();
+  await expect(p.getByRole("banner").getByRole("button", { name: "계정 메뉴" })).toHaveCount(0);
+  await expect(p.getByRole("button", { name: "매장 설정", exact: true })).toHaveCount(0);
+  await expect(p.getByRole("button", { name: /^\d+월 \d+일 \d{2}:\d{2}~\d{2}:\d{2}$/ })).toHaveCount(7 * 36);
+  await expect(pressed).toHaveCount(0);
+  const size = await p.evaluate(() => ({
+    width: document.documentElement.scrollWidth,
+    height: document.documentElement.scrollHeight,
+    innerHeight: window.innerHeight,
+  }));
+  expect(size.width, "가로 스크롤 없음").toBeLessThanOrEqual(1280);
+  expect(size.height, "세로 스크롤 없음").toBeLessThanOrEqual(size.innerHeight);
+  await expectNoDevTerms(p, "직원 화면");
+
+  await dragCells(p, "11월 3일 12:00~12:30", "11월 3일 22:30~23:00");
+  await expect(pressed).toHaveCount(22);
+  await dragCells(p, "11월 5일 09:00~09:30", "11월 5일 11:30~12:00");
+  await expect(pressed).toHaveCount(28);
+  // 칠한 칸에서 시작하면 지운다
+  await dragCells(p, "11월 5일 09:00~09:30", "11월 5일 11:30~12:00");
+  await expect(pressed).toHaveCount(22);
+  await dragCells(p, "11월 5일 12:00~12:30", "11월 5일 17:30~18:00");
+  await expect(pressed).toHaveCount(34);
+  // 키보드 토글
+  const keyCell = cell("11월 5일 18:00~18:30");
+  await keyCell.focus();
+  await p.keyboard.press("Space");
+  await expect(keyCell).toHaveAttribute("aria-pressed", "true");
+  await p.keyboard.press("Space");
+  await expect(keyCell).toHaveAttribute("aria-pressed", "false");
+
+  await p.getByRole("button", { name: "제출" }).click();
+  await expect(p.getByText("제출했어요. 이 링크로 다시 고칠 수 있어요")).toBeVisible();
+  await expectNoDevTerms(p, "직원 화면(제출 뒤)");
+
+  // 다시 열어도 같다. 다른 직원 정보는 보이지 않는다
+  const reopen = await openFlow(browser, { width: 1280, height: 800 });
+  const parkToken = new URL(parkLink).pathname.split("/").at(-1)!;
+  await reopen.page.goto(parkLink);
+  await expect(reopen.page.locator('main button[aria-pressed="true"]')).toHaveCount(34);
+  await expect(reopen.page.getByRole("button", { name: "11월 3일 12:00~12:30" })).toHaveAttribute("aria-pressed", "true");
+  await expect(reopen.page.getByRole("button", { name: "11월 5일 17:30~18:00" })).toHaveAttribute("aria-pressed", "true");
+  await expect(reopen.page.getByRole("button", { name: "11월 5일 11:30~12:00" })).toHaveAttribute("aria-pressed", "false");
+  const others = ROSTER.map(([n]) => n).filter((n) => n !== "박민수");
+  const body = await reopen.page.locator("body").innerText();
+  const { data: rpc } = await getAvailability(parkToken);
+  for (const name of others) {
+    expect(body.includes(name), `화면에 ${name} 없음`).toBe(false);
+    expect(JSON.stringify(rpc).includes(name), `응답에 ${name} 없음`).toBe(false);
+  }
+  await expectNoProblems(reopen.page, reopen.problems);
+  await reopen.context.close();
+
+  // 틀린 토큰
+  await p.goto(`/a/${crypto.randomUUID()}`);
+  await expect(p.getByText("링크를 확인해 주세요")).toBeVisible();
+  await expect(p.getByRole("button", { name: "제출" })).toHaveCount(0);
+  await expect(p.getByRole("button", { name: /^\d+월 \d+일 \d{2}:/ })).toHaveCount(0);
+  await expectNoDevTerms(p, "직원 화면(틀린 토큰)");
+  await expectNoProblems(p, staff.problems);
+  await staff.context.close();
+
+  // 박민수 말고 11명은 제출 도우미로 전일을 넣는다
+  await submitFullDay(WEEK, EMPLOYEE_COUNT, ["박민수"]);
+  const rows = await linkRows(WEEK.start_date);
+  expect(rows.every((r) => r.submitted_at), "12행 모두 제출").toBe(true);
+  const park = rows.find((r) => r.employee_name === "박민수")!;
+  expect(park.slots).toEqual({ "2026-11-03": [["12:00", "23:00"]], "2026-11-05": [["12:00", "18:00"]] });
+});
+
+test("S8. ② 매장 조건", async () => {
+  await page.getByRole("button", { name: "다음", exact: true }).click();
+
+  // S8-a. 요약표와 필요 인원 폼
+  await expect(currentStep()).toContainText("매장 조건");
+  await expect(page.getByRole("heading", { name: "매장 조건", exact: true }).first()).toBeFocused();
+  await expect(page.getByText("근무 형태, 필요 인원, 지켜야 할 규칙을 말로 적어 주세요")).toBeVisible();
+  const summaryRow = (name: string) => page.getByRole("row").filter({ hasText: name }).first();
+  await expect(summaryRow("오픈")).toContainText("09:00~15:00");
+  await expect(summaryRow("미들")).toContainText("12:00~18:00");
+  await expect(summaryRow("마감")).toContainText("17:00~23:00");
+  await expect(page.getByRole("button", { name: "바꾸기" })).toHaveAttribute("aria-expanded", "false");
+  for (const ex of ["평일 오픈 2명, 주말은 3명", "12시부터 15시까지는 최소 3명", "마감 다음 날 오픈은 안 되게"]) {
+    await expect(page.getByRole("button", { name: ex })).toBeVisible();
+  }
+  const next = page.getByRole("button", { name: "다음", exact: true });
   await expect(next).toBeEnabled();
   await expect(page.getByText("필요 인원 없이 만들면 인원을 맞추지 않아요")).toBeVisible();
   const numbers = page.getByRole("button", { name: "숫자로 입력하기" });
@@ -201,29 +331,29 @@ test("S5. 처음 설정 ① 병동·명단 → ② 병동 소개(필요 인원 �
     await page.getByRole("textbox", { name: `${kind} ${shift} 최대 인원` }).fill(String(max));
   }
   await expect(page.getByText("필요 인원 없이 만들면 인원을 맞추지 않아요")).toHaveCount(0);
-  const weekdayDay = page.getByRole("textbox", { name: "평일 데이 최소 인원" });
-  await weekdayDay.fill("abc");
-  await expect(weekdayDay).toHaveAttribute("aria-invalid", "true");
+  await expect(page.getByText(/명 근무 · \d+명 쉼/)).toHaveCount(0);
+  const weekdayMin = page.getByRole("textbox", { name: "평일 오픈 최소 인원" });
+  const weekdayMax = page.getByRole("textbox", { name: "평일 오픈 최대 인원" });
+  await weekdayMin.fill("abc");
+  await expect(weekdayMin).toHaveAttribute("aria-invalid", "true");
   await expect(page.getByText("인원은 숫자로 적어 주세요.")).toBeVisible();
-  await weekdayDay.fill("5");
+  await weekdayMin.fill("5");
   await expect(page.getByText("최소가 최대보다 커요.")).toBeVisible();
-  // 근무조 합계로 막지 않는다(사람이 모자라면 근무표를 만들 때 알려 준다)
-  await weekdayDay.fill("10");
-  await page.getByRole("textbox", { name: "평일 데이 최대 인원" }).fill("10");
+  // 근무조 합계로 막지 않는다
+  await weekdayMin.fill("10");
+  await weekdayMax.fill("10");
   await expect(page.getByText("쉴 사람이 없어요", { exact: false })).toHaveCount(0);
   await expect(page.getByText(/인원은 숫자로|최소가 최대보다/)).toHaveCount(0);
-  await weekdayDay.fill("3");
-  await page.getByRole("textbox", { name: "평일 데이 최대 인원" }).fill("4");
+  await weekdayMin.fill("1");
+  await weekdayMax.fill("2");
   await expect(page.getByText(/인원은 숫자로|최소가 최대보다/)).toHaveCount(0);
-  await expect(page.getByText(/명 근무 · \d+명 쉼/)).toHaveCount(0);
 
-  const { shop } = await readState(page);
-  expect(shop.name).toBe("내과 병동");
-  expect(shop.unit).toBe("month");
-  expect(shop.employees.map((n) => n.id), "간호사 id 유지").toEqual(idsBefore);
-  expect(shop.employees.filter((n) => n.active)).toHaveLength(EMPLOYEE_COUNT);
-  expect(shop.employees.filter((n) => n.tags.includes("나이트전담")).map((n) => n.name)).toEqual(["문가람", "배수아"]);
-  const coverage = shop.rules.filter((c) => c.id.startsWith("cov-"));
+  await page.getByRole("button", { name: "이전" }).click();
+  await expect(page.getByRole("button", { name: "링크 복사" })).toHaveCount(EMPLOYEE_COUNT);
+  await next.click();
+  await expect(currentStep()).toContainText("매장 조건");
+
+  const coverage = (await readState(page)).shop.rules.filter((c) => c.id.startsWith("cov-"));
   expect(coverage).toHaveLength(6);
   expect(coverage.every((c) => c.type === "rule" && c.default === true), "필요 인원은 기본 규칙").toBe(true);
   const ranges = coverage.map((c) => {
@@ -233,68 +363,44 @@ test("S5. 처음 설정 ① 병동·명단 → ② 병동 소개(필요 인원 �
   expect(ranges.sort(), "칸마다 최소~최대").toEqual(
     COVERAGE.map(([kind, shift, min, max]) => `${kind === "평일" ? "weekday" : "weekend"}-${SHIFT_CODE[shift]}:${min}~${max}`).sort(),
   );
-  await expectNoDevTerms(page, "처음 설정 ②");
-  // [이전]으로 ①에 돌아가도 입력은 그대로다
-  await page.getByRole("button", { name: "이전" }).click();
-  await expect(page.getByRole("textbox", { name: "1행 이름", exact: true })).toHaveValue("이영희");
-  await next.click();
-  await next.click();
-});
 
-test("S6. 처음 설정 ③ 병동 규칙 → 첫 근무표 만들기", async () => {
-  await expect(setupStepper().locator('[aria-current="step"]')).toContainText("병동 규칙");
-  const createFirst = page.getByRole("button", { name: "첫 근무표 만들기" });
-  await expect(createFirst).toBeEnabled();
-  // 기본 규칙 카드(필요 인원 6장 + 나이트 전담)가 맨 위에 `기본` 배지로 적용돼 있고, [삭제] 대신 [끄기]다
-  await expect(appliedCards(page)).toHaveCount(DEFAULT_CARDS);
-  const defaults = appliedCards(page).filter({ has: page.getByText("기본", { exact: true }) });
-  await expect(defaults).toHaveCount(DEFAULT_CARDS);
-  await expect(defaults.filter({ hasText: "나이트전담" })).toHaveCount(1);
-  await expect(defaults.first().getByRole("button", { name: "끄기" })).toBeVisible();
-  await expect(defaults.first().getByRole("button", { name: "삭제" })).toHaveCount(0);
-  await expect(page.getByText("규칙 없이 만들면 기본 규칙만 지켜요")).toHaveCount(0);
-  const examples = page.getByRole("button", { name: "나이트는 3일 넘게 연속으로 하지 않게" });
-  await examples.click();
-  await expect(page.getByRole("textbox", { name: RULE_INPUT })).toHaveValue("나이트는 3일 넘게 연속으로 하지 않게");
+  // S8-b. 규칙 만들기와 적용
+  await expect(page.locator("article")).toHaveCount(0);
+  await page.getByRole("button", { name: "마감 다음 날 오픈은 안 되게" }).click();
+  await expect(page.getByRole("textbox", { name: RULE_INPUT })).toHaveValue("마감 다음 날 오픈은 안 되게");
 
-  // S6-a. 규칙 3개(데모 저니 2)
-  const r1 = await interpretOk(page, RULE_INPUT, "규칙 만들기", "나이트 다음 날은 무조건 쉬게");
+  const r1 = await interpretOk(page, RULE_INPUT, "규칙 만들기", "마감 다음 날 오픈은 안 되게");
   expect(r1.length).toBeGreaterThan(0);
-  for (const c of r1) {
-    const s = ruleShape(c);
-    expect(["forbid", "off_after"], "나이트 다음 휴무 또는 금지 순서").toContain(s?.kind);
-    if (s?.kind === "forbid") expect(s.pattern[0].in?.join()).toBe("N");
-    if (s?.kind === "off_after") expect(s).toMatchObject({ after: { in: ["N"] } });
-  }
-  const r2 = await interpretOk(page, RULE_INPUT, "규칙 만들기", "나이트는 3일 넘게 연속으로 하지 않게");
-  expect(r2.map((c) => ruleShape(c)?.kind)).toEqual(["max_run"]);
-  expect(ruleShape(r2[0])).toMatchObject({ run: { in: ["N"] }, max_len: { n: 3 } });
-  const r3 = await interpretOk(page, RULE_INPUT, "규칙 만들기", "근무조마다 3년차 이상 한 명은 꼭 있어야 해");
+  await expect(pendingCards(page).first()).toContainText("마감 다음 날 오픈 금지");
+  const r2 = await interpretOk(page, RULE_INPUT, "규칙 만들기", "5일 넘게 연속으로 일하지 않게");
+  expect(r2.length).toBeGreaterThan(0);
+  const r2Card = page.locator("article").filter({ hasText: "연속 근무" });
+  await expect(r2Card).toContainText("연속 근무 5일까지");
+  const r3 = await interpretOk(page, RULE_INPUT, "규칙 만들기", "오픈에는 리더가 꼭 1명 있어야 해");
   expect(r3.length).toBeGreaterThan(0);
-  for (const c of r3) {
+  const r3Card = pendingCards(page).filter({ hasText: "리더" }).first();
+  await expect(r3Card).toContainText("오픈");
+  await expect(r3Card).toContainText("1명 이상");
+  const r4 = await interpretOk(page, RULE_INPUT, "규칙 만들기", "12시부터 15시까지는 최소 3명");
+  // 시간대 필요 인원: 12~15시를 덮는 코드는 정확히 {A, M}이다(ADR-020)
+  const peakCodes = r4.flatMap((c) => {
     const s = ruleShape(c);
-    expect(s?.kind).toBe("count");
-    if (s?.kind === "count") expect(s.min?.n).toBe(1);
-  }
-  const shifts = r3.flatMap((c) => {
-    const s = ruleShape(c);
-    return s?.kind === "count" ? (s.shifts.in ?? []) : [];
+    return s?.kind === "count" && s.per === "day" ? [{ codes: [...(s.shifts.in ?? [])].sort().join(), min: s.min?.n }] : [];
   });
-  expect([...shifts].sort(), "연차별 배치가 D/E/N을 모두 덮는다").toEqual(["D", "E", "N"]);
+  expect(peakCodes.length, `시간대 필요 인원 규칙: ${JSON.stringify(r4)}`).toBeGreaterThan(0);
+  for (const p of peakCodes) expect(p).toEqual({ codes: "A,M", min: 3 });
+  test.info().annotations.push({ type: "시간대 필요 인원 코드", description: JSON.stringify(peakCodes) });
+  const r4Card = pendingCards(page).filter({ hasText: "3명 이상" }).first();
+  await expect(r4Card).toContainText("오픈");
+  await expect(r4Card).toContainText("미들");
+  await expect(r4Card).not.toContainText("마감");
 
-  const total = r1.length + r2.length + r3.length;
+  const total = r1.length + r2.length + r3.length + r4.length;
   await expect(pendingCards(page)).toHaveCount(total);
   for (const card of await pendingCards(page).all()) await expectCardChrome(card, "반드시");
-  await expect(pendingCards(page).filter({ hasText: "최대 연속 나이트" })).toContainText("나이트 연속 3일까지");
-  // 문장 틀 "[날짜·묶음] [사람] [근무] [수]"(예: "매일 3년차 이상 데이 1명 이상")에서 핵심 낱말만 본다
-  const skillCard = pendingCards(page).filter({ hasText: "연차별 배치" }).first();
-  await expect(skillCard).toContainText("3년차 이상");
-  await expect(skillCard).toContainText("1명 이상");
   await expect(page.getByText(`적용하지 않은 규칙 ${total}개는 빠져요`)).toBeVisible();
-  await expect(createFirst).toBeEnabled();
-  await expectNoDevTerms(page, "처음 설정 ③(적용 대기)");
+  await expectNoDevTerms(page, "② 매장 조건(적용 대기)");
 
-  const r2Card = page.locator("article").filter({ hasText: "최대 연속 나이트" });
   const toggle = r2Card.getByRole("group", { name: "반드시/가능하면" });
   await toggle.getByRole("button", { name: "가능하면" }).click();
   await expect(toggle.getByRole("button", { name: "가능하면" })).toHaveAttribute("aria-pressed", "true");
@@ -302,150 +408,85 @@ test("S6. 처음 설정 ③ 병동 규칙 → 첫 근무표 만들기", async ()
   await expect(toggle.getByRole("button", { name: "반드시" })).toHaveAttribute("aria-pressed", "true");
 
   await applyAllPending(page);
-  await expect(appliedCards(page)).toHaveCount(total + DEFAULT_CARDS);
+  await expect(appliedCards(page)).toHaveCount(total);
   await expect(page.getByText(/적용하지 않은 규칙/)).toHaveCount(0);
-  // 기본 규칙 [끄기] → 꺼짐 → [다시 켜기]
-  const nightOnly = page.locator("article").filter({ hasText: "나이트전담" }).filter({ has: page.getByText("기본", { exact: true }) });
-  await nightOnly.getByRole("button", { name: "끄기" }).click();
-  await expect(nightOnly.getByText("꺼짐", { exact: true })).toBeVisible();
-  await nightOnly.getByRole("button", { name: "다시 켜기" }).click();
-  await expect(nightOnly.getByText("적용됨", { exact: true })).toBeVisible();
 
-  // S6-b. 적용된 카드 수정: 조정 가능한 값(밑줄)만 고친다. 값 이름은 LLM이 붙여 입력칸은 카드 안의 하나로 찾는다
-  await expect(r2Card.locator(".decoration-dotted")).toHaveText("3");
-  for (const days of ["4", "3"]) {
+  // S8-c. 적용된 카드 수정: 조정 가능한 값(밑줄)만 고친다. 값 이름은 LLM이 붙여 입력칸은 카드 안의 하나로 찾는다
+  await expect(r2Card.locator(".decoration-dotted")).toHaveText("5");
+  for (const days of ["6", "5"]) {
     await r2Card.getByRole("button", { name: "수정" }).click();
     await expect(r2Card.getByText("바꾸려면 말로 다시 적어 주세요")).toBeVisible();
     await r2Card.getByRole("textbox").fill(days);
     await r2Card.getByRole("button", { name: "저장" }).click();
-    await expect(r2Card).toContainText(`나이트 연속 ${days}일까지`);
+    await expect(r2Card).toContainText(`연속 근무 ${days}일까지`);
   }
 
-  // S6-c. 되묻기와 미지원. LLM 판단이 달라도 실패로 보지 않고 기록한 뒤 생긴 카드를 지운다.
-  const cases = [
-    { text: "주말은 적당히", expected: "clarify" },
-    // 짝 규칙은 지원하지만(ADR-019) 누구인지 없어 되묻는다
-    { text: "사이 안 좋은 간호사끼리는 같은 날 근무 안 넣게", expected: "clarify" },
-  ] as const;
-  for (const { text, expected } of cases) {
+  // S8-d. 되묻기와 미지원. LLM 판단이 달라도 실패로 보지 않고 기록한 뒤 생긴 카드를 지운다
+  for (const text of ["주말은 적당히", "사이 안 좋은 직원끼리는 같은 날 근무 안 넣게"]) {
     const body = await interpret(page, RULE_INPUT, "규칙 만들기", text);
-    if (body.status === "clarify") {
-      await expect(page.getByText("내용을 보완해서 다시 입력해 주세요.")).toBeVisible();
-    } else if (body.status === "unsupported") {
-      await expect(page.getByText(/^아직 지원하지 않는 규칙이에요:/)).toBeVisible();
-    }
-    if (body.status !== expected) {
-      test.info().annotations.push({ type: "확인 필요", description: `"${text}" 기대 ${expected}, 실제 ${body.status}` });
-    }
+    if (body.status === "clarify") await expect(page.getByText("내용을 보완해서 다시 입력해 주세요.")).toBeVisible();
+    else if (body.status === "unsupported") await expect(page.getByText(/^아직 지원하지 않는 규칙이에요:/)).toBeVisible();
+    if (body.status !== "clarify") test.info().annotations.push({ type: "확인 필요", description: `"${text}" 기대 clarify, 실제 ${body.status}` });
     await deleteAllPending(page);
   }
-  await expect(page.locator("article")).toHaveCount(total + DEFAULT_CARDS);
-  ruleCount = total + 1; // 매장 규칙 수: 나이트 전담 기본 규칙 포함, 필요 인원 제외
-
-  // S6-d. [첫 근무표 만들기] → 근무표 작성 ① 요청. 처음 설정은 다시 보이지 않는다
-  await createFirst.click();
-  await expect(page.getByRole("heading", { level: 1 })).toHaveText("11월 근무표");
-  await page.reload();
-  await expect(page.getByRole("heading", { level: 1 })).toHaveText("11월 근무표");
-  await expect(page.getByRole("button", { name: "병동 설정", exact: true })).toBeVisible();
+  await expect(page.locator("article")).toHaveCount(total);
+  ruleCount = total;
 });
 
-test("S7. 첫 근무표 ① 요청: 준비 요약", async () => {
-  const titleRow = page.getByRole("heading", { level: 1 }).locator("..");
-  await expect(titleRow).toContainText(NOV_RANGE);
-  await expect(titleRow.getByText("작성 중", { exact: true })).toBeVisible();
-  const stepper = workStepper();
-  await expect(stepper.locator('[aria-current="step"]')).toContainText("요청");
-  await expect(stepper.getByRole("button", { name: /근무표/ })).toBeDisabled();
-  await expect(page.getByRole("heading", { name: "요청", exact: true })).toBeVisible();
+test("S9. ③ 근무표: 예외 입력과 근무표 만들기", async () => {
+  await page.getByRole("button", { name: "다음", exact: true }).click();
 
-  // 첫 근무표: 요약 한 줄은 접혀 있고 [바꾸기]로 펼친다
-  await expect(page.getByRole("main")).toContainText(`${NOV_RANGE} · 공휴일 없음 · 간호사 ${EMPLOYEE_COUNT}명 · 지난 근무 없음`);
-  const prepare = page.getByRole("button", { name: "바꾸기" });
-  await expect(prepare).toHaveAttribute("aria-expanded", "false");
-  await prepare.click();
-  await expect(page.getByRole("button", { name: "접기" }).first()).toHaveAttribute("aria-expanded", "true");
-  // 첫 근무표는 시작일을 고른다(기본값: 달력 월 단위라 다음 달 1일)
-  await expect(page.getByLabel("시작일")).toHaveValue(NOV.start_date);
-  await expect(page.getByRole("main")).toContainText("2026.11.30 · 30일");
-  await expect(page.getByText("2026년 11월")).toBeVisible();
-  await expect(page.getByRole("button", { name: /^\d+월 \d+일 공휴일 (지정|해제)$/ })).toHaveCount(30);
-  await page.getByRole("button", { name: `11월 ${HOLIDAY}일 공휴일 지정` }).click();
-  await expect(page.getByRole("button", { name: `11월 ${HOLIDAY}일 공휴일 해제` })).toHaveAttribute("aria-pressed", "true");
+  // S9-a. 이번 근무표 예외 입력
+  await expect(currentStep()).toContainText("근무표");
+  await expect(scheduleTitle(page)).toBeVisible();
+  await expect(workStepper().getByRole("button", { name: /가능 시간/ })).toBeEnabled();
+  await expect(workStepper().getByRole("button", { name: /매장 조건/ })).toBeEnabled();
+  const exception = page.getByRole("button", { name: "이번 근무표 예외 입력" });
+  await expect(exception).toHaveAttribute("aria-expanded", "false");
+  await exception.click();
+  await expect(page.getByRole("textbox", { name: REQUEST_INPUT })).toBeVisible();
 
-  await expect(sectionWith("명단 확인")).toContainText(`간호사 ${EMPLOYEE_COUNT}명`);
-  await expect(page.getByText("지난 근무표와 명단이 같아요")).toHaveCount(0);
-  const carryToggle = page.getByRole("button", { name: "지난 근무 입력하기 (선택)" });
-  await expect(carryToggle).toHaveAttribute("aria-expanded", "false");
-  await carryToggle.click();
-  await expect(page.getByRole("heading", { name: "지난 근무 마지막 며칠 (선택)" })).toBeVisible();
-  await expect(page.getByText(/지금 반영된 간호사:\s*0명/)).toBeVisible();
-  await expectNoDevTerms(page, "① 요청(준비 펼침, 첫 근무표)");
-  await expect(page.getByRole("main")).toContainText(`${NOV_RANGE} · 공휴일 1일 · 간호사 ${EMPLOYEE_COUNT}명`);
-
-  const p = await periodByStart(page, NOV.start_date);
-  expect({ start_date: p.start_date, length: p.length }).toEqual(NOV);
-  expect(p.holidays).toEqual([HOLIDAY]);
-  await page.getByRole("button", { name: "접기" }).first().click();
-  await expect(page.getByRole("heading", { name: "명단 확인" })).toHaveCount(0);
-});
-
-test("S8. ① 요청: 요청 카드", async () => {
   const lee = await employeeId(page, "이영희");
-  const park = await employeeId(page, "박민수");
-
-  const q1 = await interpretOk(page, REQUEST_INPUT, "요청 만들기", "이영희 11월 15~17일 휴가");
-  expect(q1.map(leaveOf)).toEqual([{ employee_id: lee, days: [15, 16, 17] }]);
+  const kim = await employeeId(page, "김철수");
+  const q1 = await interpretOk(page, REQUEST_INPUT, "요청 만들기", "이영희 11월 3~5일 휴가");
+  expect(q1.map(leaveOf)).toEqual([{ employee_id: lee, days: [2, 3, 4] }]);
   expect(q1[0].hardness ?? "hard").toBe("hard");
-  const leaveCard = pendingCards(page).filter({ hasText: "이영희 · 11/15~11/17 · 휴무" });
+  const leaveCard = pendingCards(page).filter({ hasText: "이영희 · 11/3~11/5 · 휴무" });
   await expect(leaveCard.getByRole("heading", { name: "휴가" })).toBeVisible();
-  // 휴가는 항상 반드시라 토글을 보이지 않는다
   await expectCardChrome(leaveCard, null);
 
-  const q2 = await interpretOk(page, REQUEST_INPUT, "요청 만들기", "박민수는 주말에 쉬고 싶대요");
+  const q2 = await interpretOk(page, REQUEST_INPUT, "요청 만들기", "김철수는 주말에 쉬고 싶대요");
   expect(q2.map((c) => ruleShape(c)?.kind)).toEqual(["count"]);
-  const pref = q2[0];
-  const p = ruleShape(pref);
+  const p = ruleShape(q2[0]);
   if (p?.kind === "count") {
-    expect({ ids: p.people.ids, hardness: pref.hardness }).toEqual({ ids: [park], hardness: "soft" });
+    expect({ ids: p.people.ids, hardness: q2[0].hardness }).toEqual({ ids: [kim], hardness: "soft" });
     // 같은 뜻의 두 모양: 휴무를 대상 날짜 수만큼(in O, min) 또는 근무를 0번(not_in O, max 0)
     const offWish = (p.shifts.in?.join() === "O" && !!p.min) || (p.shifts.not_in?.join() === "O" && p.max?.n === 0);
-    expect(offWish, `휴무 희망 모양: ${JSON.stringify(pref)}`).toBe(true);
-    const weekendOnly = p.days.kind === "weekend" || (p.days.days ?? []).every((d) => NOV_WEEKEND_DAYS.includes(d));
-    expect(weekendOnly, "주말·공휴일만 대상").toBe(true);
+    expect(offWish, `휴무 희망 모양: ${JSON.stringify(q2[0])}`).toBe(true);
   }
   const prefCard = pendingCards(page).filter({ hasText: "희망·기피 근무" });
-  await expect(prefCard).toContainText("박민수 ·");
+  await expect(prefCard).toContainText("김철수 ·");
   await expect(prefCard).toContainText("휴무 희망");
   await expectCardChrome(prefCard, "가능하면");
-  await expectNoDevTerms(page, "② 요청(적용 대기)");
+  await expectNoDevTerms(page, "③ 예외 입력(적용 대기)");
 
   await applyAllPending(page);
 
-  const q3 = await interpret(page, REQUEST_INPUT, "요청 만들기", "홍길동 20일 휴가");
+  const q3 = await interpret(page, REQUEST_INPUT, "요청 만들기", "홍길동 5일 휴가");
   if (q3.status === "ok" && q3.constraints.length > 0) {
-    const orphan = pendingCards(page).filter({ hasText: "(명단에 없는 간호사)" });
-    await expect(orphan.first().getByText("명단에 없는 간호사를 가리켜요.")).toBeVisible();
+    const orphan = pendingCards(page).filter({ hasText: "(명단에 없는 직원)" });
+    await expect(orphan.first().getByText("명단에 없는 직원을 가리켜요.")).toBeVisible();
   } else {
-    test.info().annotations.push({ type: "확인 필요", description: `"홍길동 20일 휴가" → ${q3.status}` });
+    test.info().annotations.push({ type: "확인 필요", description: `"홍길동 5일 휴가" → ${q3.status}` });
   }
   await deleteAllPending(page);
+  // 되묻기면 입력이 남아 [요청 만들기]가 눌리는 상태로 있다
+  await page.getByRole("textbox", { name: REQUEST_INPUT }).fill("");
 
-  await expect(page.getByRole("heading", { name: "이 근무표에 적용되는 병동 규칙" })).toBeVisible();
-  await page.getByRole("button", { name: "병동 규칙 보기" }).click();
-  await expect(page.getByRole("button", { name: "이번 근무표에서만 끄기" }).first()).toBeVisible();
-  await page.getByRole("button", { name: "접기" }).click();
-
-  await page.getByRole("button", { name: "다음" }).click();
-  await expect(scheduleTitle(page)).toBeVisible();
-  await expect(workStepper().getByRole("button", { name: "요청", exact: true })).toBeEnabled();
-});
-
-test("S9. ② 근무표 만들기", async () => {
-  await expect(page.getByText("적용한 규칙과 요청으로 근무표를 만들어요.")).toBeVisible();
+  // S9-b. 근무표 만들기
+  await expect(page.getByText("가능 시간과 매장 조건으로 근무표를 만들어요")).toBeVisible();
   await expect(primaryButtons(page)).toHaveText("근무표 만들기");
   expect(await solve(() => page.getByRole("button", { name: "근무표 만들기" }).click())).toBe("ok");
-
   await expect(page.getByText("규칙을 모두 지켰어요", { exact: true })).toBeVisible();
   await expect(page.getByText("희망 반영", { exact: true })).toBeVisible();
   await expect(page.getByText("못 지킨 규칙", { exact: true })).toBeVisible();
@@ -457,158 +498,242 @@ test("S9. ② 근무표 만들기", async () => {
 
   const stats = sectionWith("개인별 통계");
   await expect(stats.locator("tbody tr")).toHaveCount(EMPLOYEE_COUNT);
-  for (const h of ["D", "E", "N", "O", "근무 시간", "주말·공휴일 근무", "최대 연속 근무", "희망 반영률", "평균보다 많은 근무일"]) {
+  for (const h of ["A", "M", "C", "O", "근무 시간", "주말·공휴일 근무", "최대 연속 근무", "희망 반영률", "평균보다 많은 근무일"]) {
     await expect(stats.getByRole("columnheader", { name: h, exact: true })).toBeVisible();
   }
   // 첫 근무표: 최근 4주 기록이 없어 열과 근거 한 줄을 그리지 않는다
   expect(lastSolve!.history ?? null).toBeNull();
   await expect(page.getByText(/최근 4주/)).toHaveCount(0);
 
-  await expectHardRulesHold(page, NOV, lastSolve);
-  const grid = await readGrid(page, NOV);
-  expect(grid["이영희"].slice(14, 17)).toEqual(["O", "O", "O"]);
-  // 평일 데이는 범위(3~4명)
-  const weekdayDayCounts = Array.from({ length: NOV.length }, (_, i) => i + 1)
-    .filter((d) => !NOV_WEEKEND_DAYS.includes(d))
-    .map((d) => Object.values(grid).filter((row) => row[d - 1] === "D").length);
-  expect(weekdayDayCounts.every((n) => n >= 3 && n <= 4), `평일 데이 3~4명: ${weekdayDayCounts}`).toBe(true);
-  await expectNoDevTerms(page, "② 근무표(첫 근무표)");
+  await expectHardRulesHold(page, WEEK, lastSolve);
+  await expectParkAvailability();
+  const stored = (await readState(page)).shop.rules;
+  expect((lastSolve!.constraints ?? []).some((c) => c.id.startsWith("avail-")), "요청에 가능 시간 규칙").toBe(true);
+  expect(stored.some((r) => r.id.startsWith("avail-")), "저장된 매장 조건에는 없음").toBe(false);
+  expect((await readGrid(page, WEEK))["이영희"].slice(1, 4)).toEqual(["O", "O", "O"]);
+  await expectNoDevTerms(page, "③ 근무표");
+
+  // 가능 시간이 바뀌면 다시 들어왔을 때 배너가 뜬다
+  const oh = (await linkRows(WEEK.start_date)).find((r) => r.employee_name === "오민준")!;
+  const slots = fullDaySlots(WEEK);
+  slots["2026-11-02"] = [["09:00", "23:30"]];
+  expect((await submitAvailability(oh.token, slots)).error).toBeNull();
+  await expectSaved(page);
+  await page.reload();
+  await expect(scheduleTitle(page)).toBeVisible();
+  const changed = page.getByRole("status").filter({ hasText: "가능 시간이 바뀌었어요. 다시 만들어 주세요" });
+  await expect(changed).toBeVisible();
+  await expect(page.getByText("입력이 바뀌었어요. 다시 만들어 주세요"), "새로고침만으로 입력 변경 배너가 뜨지 않는다").toHaveCount(0);
+  expect(await solve(() => changed.getByRole("button", { name: "다시 만들기" }).click())).toBe("ok");
+  await expect(changed).toHaveCount(0);
+  await expect(page.getByText("규칙을 모두 지켰어요", { exact: true })).toBeVisible();
+  // 새로고침으로 접힌 예외 입력을 다시 펼쳐 둔다(S10)
+  await exception.click();
 });
 
+/** 박민수는 칠한 칸이 근무조를 완전히 덮는 칸에만 배정된다. 칸 고정한 날은 뺀다. */
+async function expectParkAvailability(fixedDays: number[] = []) {
+  const row = (await readGrid(page, WEEK))["박민수"];
+  [1, 3, 5, 6, 7].forEach((d) => {
+    if (!fixedDays.includes(d)) expect(row[d - 1], `박민수 ${d}번째 날`).toBe("O");
+  });
+  expect(["M", "C", "O"]).toContain(row[1]); // 11/3
+  expect(["M", "O"]).toContain(row[3]); // 11/5
+}
+
 test("S10. 근무표 없음 → 설명과 검증된 제안", async () => {
-  await page.getByRole("button", { name: "이전" }).click();
-  await expect(page.getByRole("heading", { name: "요청", exact: true })).toBeVisible();
-  for (const text of ["이영희, 박민수, 김철수, 정유진 20일 휴가", "최지훈, 강서연, 윤지민, 임하늘 20일 휴가"]) {
+  const explains: { proposals?: { changes: { constraint_id: string }[] }[] }[] = [];
+  const onResponse = async (r: { url: () => string; json: () => Promise<unknown> }) => {
+    if (r.url().includes("/api/py/explain")) explains.push((await r.json()) as (typeof explains)[number]);
+  };
+  page.on("response", onResponse);
+
+  for (const text of ["이영희, 김철수, 정유진, 최지훈 11월 6일 휴가", "강서연, 임하늘, 한소율 11월 6일 휴가"]) {
     const cards = await interpretOk(page, REQUEST_INPUT, "요청 만들기", text);
     // 사람마다 한 장이어도, 여러 사람을 한 장에 묶어도 휴가 모양이면 된다
     expect(cards.every((c) => leavesOf(c).length > 0), `${text} → 휴가 카드`).toBe(true);
     await applyAllPending(page);
   }
-  const requests = (await periodByStart(page, NOV.start_date)).requests;
-  const offOn20 = new Set(requests.flatMap((c) => leavesOf(c).flatMap((l) => (l.days.includes(20) ? [l.employee_id] : []))));
-  expect(offOn20.size, "11/20 휴가 인원").toBe(8);
+  const requests = (await periodByStart(page, WEEK.start_date)).requests;
+  const off = new Set(requests.flatMap((c) => leavesOf(c).flatMap((l) => (l.days.includes(5) ? [l.employee_id] : []))));
+  expect(off.size, "11/6 휴가 인원").toBe(7);
   const lee = await employeeId(page, "이영희");
-  const leeLeave15 = (list: ConstraintSpec[]) =>
-    list.find((c) => leaveOf(c)?.employee_id === lee && leaveOf(c)!.days.includes(15));
-  expect(leaveOf(leeLeave15(requests)!), "S8의 이영희 15~17일 휴가가 남아 있음").toEqual({ employee_id: lee, days: [15, 16, 17] });
+  const leeLeave = (list: ConstraintSpec[]) => list.find((c) => leaveOf(c)?.employee_id === lee && leaveOf(c)!.days.includes(2));
+  expect(leaveOf(leeLeave(requests)!), "S9의 이영희 11/3~11/5 휴가").toEqual({ employee_id: lee, days: [2, 3, 4] });
 
-  await page.getByRole("button", { name: "다음" }).click();
   const stale = page.getByRole("status").filter({ hasText: "입력이 바뀌었어요. 다시 만들어 주세요" });
   await expect(stale).toBeVisible();
-
   expect(await solve(() => stale.getByRole("button", { name: "다시 만들기" }).click())).toBe("infeasible");
   const panel = page.locator("section").filter({ hasText: "규칙을 모두 지키는 근무표가 없어요" });
   await expect(panel.getByText("근무표 없음", { exact: true })).toBeVisible();
   await expect(panel.getByRole("heading", { name: "함께 지킬 수 없는 규칙" })).toBeVisible();
-  await expect(panel.getByRole("button", { name: "이번 근무표에서만 끄기" }).first()).toBeVisible();
   const explanation = panel.locator("p.whitespace-pre-line");
   await expect(explanation).not.toBeEmpty();
   test.info().annotations.push({ type: "충돌 설명", description: await explanation.innerText() });
+
+  // 가능 시간 행은 있을 수도 없을 수도 있고, 있으면 끄는 버튼이 없다
+  const availRows = panel.locator("li").filter({ hasText: /가능 시간$/ });
+  test.info().annotations.push({ type: "가능 시간 행", description: (await availRows.allInnerTexts()).join(" | ") || "없음" });
+  await expect(availRows.getByRole("button")).toHaveCount(0);
+  await expect(panel.getByRole("button", { name: "이번 근무표에서만 끄기" }).first()).toBeVisible();
+
+  // 제안은 가능 시간을 바꾸지 않는다
+  await expect.poll(() => explains.length, { message: "/explain 응답" }).toBeGreaterThan(0);
+  const touched = (explains.at(-1)?.proposals ?? []).flatMap((p) => p.changes.map((c) => c.constraint_id));
+  expect(touched.filter((id) => id.startsWith("avail-")), "가능 시간을 바꾸는 제안 없음").toEqual([]);
 
   const proposals = panel.locator("article").filter({ hasText: "검증됨" });
   if ((await proposals.count()) > 0) {
     const first = proposals.first();
     await expect(first).toContainText(/이렇게 바꾸면 근무표를 만들 수 있어요 · 희망 반영 \d+\/\d+/);
-    // 바꾸는 것은 식에서 만든 한 줄: 값 바꾸기("인원 3 → 2"), 반드시 → 가능하면, 이번 근무표에서만 끄기
     await expect(first).toContainText(/\S+ → \S+|이번 근무표에서만 끄기/);
-    test.info().annotations.push({ type: "S10 분기", description: `10-a 제안 수락: ${await first.innerText()}` });
+    await expect(first).not.toContainText("가능 시간");
+    test.info().annotations.push({ type: "S10 분기", description: `8-a 제안 수락: ${await first.innerText()}` });
     expect(await solve(() => first.getByRole("button", { name: "수락" }).click())).toBe("ok");
   } else {
-    test.info().annotations.push({ type: "S10 분기", description: "10-b 이번 근무표에서만 끄기" });
+    test.info().annotations.push({ type: "S10 분기", description: "8-b 이번 근무표에서만 끄기" });
     for (let tries = 0; ; tries++) {
       expect(tries, "이번 근무표에서만 끄기 반복").toBeLessThan(8);
       const rows = panel.locator("li").filter({ has: page.getByRole("button", { name: "이번 근무표에서만 끄기" }) });
-      const leaveRow = rows.filter({ hasText: "11/20" });
+      const leaveRow = rows.filter({ hasText: "11/6" });
       const row = (await leaveRow.count()) > 0 ? leaveRow.first() : rows.first();
       if ((await solve(() => row.getByRole("button", { name: "이번 근무표에서만 끄기" }).click())) === "ok") break;
     }
   }
+  page.off("response", onResponse);
 
   await expect(page.getByText("규칙을 모두 지키는 근무표가 없어요")).toHaveCount(0);
   await expect(page.getByText("규칙을 모두 지켰어요", { exact: true })).toBeVisible();
-  await expectHardRulesHold(page, NOV, lastSolve);
-  expect(leeLeave15(lastSolve!.constraints ?? [])?.enabled, "이영희 15~17일 휴가가 켜져 있음").not.toBe(false);
-  expect((await readGrid(page, NOV))["이영희"].slice(14, 17)).toEqual(["O", "O", "O"]);
+  await expectHardRulesHold(page, WEEK, lastSolve);
+  expect(leeLeave(lastSolve!.constraints ?? [])?.enabled, "이영희 휴가가 켜져 있음").not.toBe(false);
+  expect((await readGrid(page, WEEK))["이영희"].slice(1, 4)).toEqual(["O", "O", "O"]);
 });
 
 test("S11. 칸 고정 후 다시 만들기", async () => {
-  const grid = await readGrid(page, NOV);
+  const grid = await readGrid(page, WEEK);
   const row = grid["김철수"];
-  // 11/10부터, 근무가 있고 전날이 N이 아닌 날을 O로 고정한다(나이트 규칙과 부딪히지 않게)
-  const day = Array.from({ length: NOV.length - 9 }, (_, i) => i + 10).find((d) => row[d - 1] !== "O" && row[d - 2] !== "N");
+  // 11/2부터, 인원이 빠듯한 11/6(5번째 날)을 빼고 근무가 있는 첫 날을 O로 고정한다
+  const day = [1, 2, 3, 4, 6, 7].find((d) => row[d - 1] !== "O");
   expect(day, "고정할 날").toBeDefined();
+  const dom = day! + 1;
   fixedCell = { day: day!, code: "O" };
-  const before = row[day! - 1];
 
-  await page.getByRole("button", { name: `김철수 11월 ${day}일 ${before}` }).click();
-  await expect(page.getByText(`김철수 11/${day}`)).toBeVisible();
-  for (const code of ["D", "E", "N", "O"]) await expect(page.getByRole("button", { name: `${code}로 고정` })).toBeVisible();
+  await page.getByRole("button", { name: `김철수 11월 ${dom}일 ${row[day! - 1]}` }).click();
+  await expect(page.getByText(`김철수 11/${dom}`)).toBeVisible();
+  for (const code of ["A", "M", "C", "O"]) await expect(page.getByRole("button", { name: `${code}로 고정` })).toBeVisible();
+  await expect(page.getByRole("button", { name: "취소" })).toBeVisible();
 
   expect(await solve(() => page.getByRole("button", { name: "O로 고정" }).click())).toBe("ok");
-  const cell = page.getByRole("button", { name: `김철수 11월 ${day}일 O` });
+  const cell = page.getByRole("button", { name: `김철수 11월 ${dom}일 O` });
   await expect(cell.locator("svg")).toHaveCount(1);
   await expect(page.getByText("규칙을 모두 지켰어요", { exact: true })).toBeVisible();
-  await expectHardRulesHold(page, NOV, lastSolve);
+  await expectHardRulesHold(page, WEEK, lastSolve);
 
-  const afterFix = await readGrid(page, NOV);
-  const other = afterFix["한소율"][4];
-  await page.getByRole("button", { name: `한소율 11월 5일 ${other}` }).click();
-  await expect(page.getByRole("button", { name: "D로 고정" })).toBeVisible();
+  const afterFix = await readGrid(page, WEEK);
+  await page.getByRole("button", { name: `한소율 11월 5일 ${afterFix["한소율"][3]}` }).click();
+  await expect(page.getByRole("button", { name: "A로 고정" })).toBeVisible();
   await page.getByRole("button", { name: "취소" }).click();
-  await expect(page.getByRole("button", { name: "D로 고정" })).toHaveCount(0);
-  expect(await readGrid(page, NOV)).toEqual(afterFix);
+  await expect(page.getByRole("button", { name: "A로 고정" })).toHaveCount(0);
+  expect(await readGrid(page, WEEK)).toEqual(afterFix);
+
+  // 칸 고정이 가능 시간보다 우선한다: 박민수는 11/4에 칠한 칸이 없다
+  await page.getByRole("button", { name: `박민수 11월 4일 ${afterFix["박민수"][2]}` }).click();
+  expect(await solve(() => page.getByRole("button", { name: "A로 고정" }).click())).toBe("ok");
+  await expect(page.getByRole("button", { name: "박민수 11월 4일 A" }).locator("svg")).toHaveCount(1);
+  await expect(page.getByText("규칙을 모두 지켰어요", { exact: true })).toBeVisible();
+  const park = await employeeId(page, "박민수");
+  const parkA = (lastSolve!.constraints ?? []).find((c) => c.id === `avail-${park}-A`);
+  const forbidden = parkA?.type === "rule" && parkA.body.kind === "require" ? parkA.body.for_each.days?.days : null;
+  expect(forbidden, "박민수 A 금지 규칙").toBeTruthy();
+  expect(forbidden, "고정한 11/4는 금지하지 않음").not.toContain(3);
+  await expectHardRulesHold(page, WEEK, lastSolve);
+  await expectParkAvailability([3]);
+  expect((await readGrid(page, WEEK))["김철수"][day! - 1]).toBe("O");
 });
 
-test("S12. 확정(게스트) → 확정 근무표", async () => {
+test("S12. 확정 → 확정 근무표 → 직원 링크 잠김", async ({ browser }) => {
   await page.getByRole("button", { name: "확정", exact: true }).click();
-  await expect(page.getByRole("status").filter({ hasText: "확정했어요. 이 브라우저에만 저장돼 있어요" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "CSV 받기" })).toBeVisible();
   await expect(page.getByRole("button", { name: "확정", exact: true })).toHaveCount(0);
   await expect(workStepper()).toHaveCount(0);
   await expect(page.getByRole("button", { name: "이전" })).toHaveCount(0);
-  await expect(page.getByRole("button", { name: "CSV 받기" })).toBeVisible();
   await expect(page.getByRole("heading", { level: 1 }).locator("..").getByText("확정", { exact: true })).toBeVisible();
   await expect(page.getByText(/마지막 확정/)).toBeVisible();
   await expect(page.getByRole("heading", { name: "변경 입력" })).toBeVisible();
   await expect(page.getByRole("textbox", { name: "변경 입력" })).toBeVisible();
   await expect(page.getByRole("button", { name: "다시 확정" })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "변경 취소" })).toHaveCount(0);
-  const cell = page.getByRole("button", { name: `김철수 11월 ${fixedCell.day}일 ${fixedCell.code}` });
+  const cell = page.getByRole("button", { name: `김철수 11월 ${fixedCell.day + 1}일 ${fixedCell.code}` });
   await expect(cell.locator("svg")).toHaveCount(1);
-  finalGrid = await readGrid(page, NOV);
-  expect((await periodByStart(page, NOV.start_date)).versions).toHaveLength(1);
+  finalGrid = await readGrid(page, WEEK);
+  expect((await periodByStart(page, WEEK.start_date)).versions).toHaveLength(1);
   await expectNoDevTerms(page, "확정 근무표");
 
   await page.getByRole("button", { name: "← 근무표 목록" }).click();
-  await expect(page.getByText("운영 중", { exact: true })).toHaveCount(0); // 11월은 아직 시작 전
-  await expect(page.getByRole("main")).toContainText(`간호사 15명 · 병동 규칙 ${ruleCount}개 · 한 달 단위`);
-  const task = sectionWith("11월 근무표");
+  await expect(page.getByText("운영 중", { exact: true })).toHaveCount(0);
+  // 필요 인원은 세지 않는다. 시간대 필요 인원(R4)도 LLM이 필요 인원 모양으로 세우면 빠진다
+  const conditions = (await readState(page)).shop.rules.filter((r) => presetName(r) !== "필요 인원").length;
+  await expect(page.getByRole("main")).toContainText(`직원 12명 · 매장 조건 ${conditions}개 · 1주 단위`);
+  const task = sectionWith(WEEK_NAME);
   await expect(task).toContainText("확정했어요 · 10/28 09:00");
-  await expect(task.getByRole("button", { name: "열기" })).toBeVisible();
+  await expect(task.getByRole("button", { name: "열기" })).toHaveClass(/bg-white/);
   await expect(primaryButtons(page)).toHaveCount(1);
-  await expect(primaryButtons(page)).toHaveText("12월 근무표 만들기");
+  await expect(primaryButtons(page)).toHaveText("11/9~11/15 근무표 만들기");
   await expect(page.getByText("확정한 근무표가 여기에 쌓여요.")).toBeVisible();
-  await expectNoDevTerms(page, "병동 홈(11월 확정 후)");
+  await expectNoDevTerms(page, "매장 홈(확정 후)");
+
+  const rows = await linkRows(WEEK.start_date);
+  expect(rows.every((r) => r.locked_at), "링크 12행 잠김").toBe(true);
+
+  // 잠긴 직원 화면
+  const staff = await openFlow(browser, { width: 1280, height: 800 });
+  await staff.page.goto(parkLink);
+  await expect(staff.page.getByText("이미 확정된 근무표예요")).toBeVisible();
+  await expect(staff.page.locator('main button[aria-pressed="true"]')).toHaveCount(34);
+  await expect(staff.page.getByRole("button", { name: "제출" })).toHaveCount(0);
+  const empty = staff.page.getByRole("button", { name: "11월 2일 09:00~09:30" });
+  await empty.click({ force: true });
+  await expect(empty).toHaveAttribute("aria-pressed", "false");
+  await expectNoDevTerms(staff.page, "잠긴 직원 화면");
+  await expectNoProblems(staff.page, staff.problems);
+  await staff.context.close();
+
+  const park = rows.find((r) => r.employee_name === "박민수")!;
+  const { error } = await submitAvailability(park.token, fullDaySlots(WEEK));
+  expect(error?.code, "잠긴 링크 제출 거부").toBe("P0001");
+  expect((await linkRows(WEEK.start_date)).find((r) => r.employee_name === "박민수")!.slots).toEqual(park.slots);
 });
 
 test("S13. 저장과 다시 들어오기", async () => {
-  // 확정한 근무표는 확정 근무표 화면으로 열린다
-  await sectionWith("11월 근무표").getByRole("button", { name: "열기" }).click();
+  await sectionWith(WEEK_NAME).getByRole("button", { name: "열기" }).click();
   await expect(page.getByRole("heading", { name: "변경 입력" })).toBeVisible();
   await expect(page.getByRole("heading", { level: 1 })).toBeFocused();
-  // 시작 화면 없이 마지막 화면으로 바로 들어간다
+  await expectSaved(page);
   await page.reload();
-  await expect(page.getByRole("heading", { level: 1 })).toHaveText("11월 근무표");
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText(WEEK_NAME);
   await expect(page.getByRole("heading", { name: "변경 입력" })).toBeVisible();
-  await expect(scheduleTitle(page)).toBeVisible();
-  expect(await readGrid(page, NOV)).toEqual(finalGrid);
-  const p = await periodByStart(page, NOV.start_date);
-  expect(p.holidays).toEqual([HOLIDAY]);
+  await expect(page.getByRole("button", { name: "Google로 로그인" })).toHaveCount(0);
+  await expect(page.getByText("입력이 바뀌었어요. 다시 만들어 주세요")).toHaveCount(0);
+  expect(await readGrid(page, WEEK)).toEqual(finalGrid);
+  const saved = (await savedDoc())!.state.periods.find((p) => p.start_date === WEEK.start_date)!;
+  expect(saved.holidays).toEqual([HOLIDAY]);
   const lee = await employeeId(page, "이영희");
-  expect(p.requests.some((c) => leaveOf(c)?.employee_id === lee && leaveOf(c)!.days.join() === "15,16,17")).toBe(true);
+  expect(saved.requests.some((c) => leaveOf(c)?.employee_id === lee && leaveOf(c)!.days.join() === "2,3,4")).toBe(true);
 
-  // 매장 설정은 고칠 때만 쓴다([첫 근무표 만들기] 없음)
-  await page.getByRole("button", { name: "병동 설정", exact: true }).click();
-  await expect(page.getByRole("button", { name: "첫 근무표 만들기" })).toHaveCount(0);
-  await page.getByRole("tab", { name: "병동 규칙" }).click();
+  await page.getByRole("button", { name: "매장 설정", exact: true }).click();
+  await expect(page.getByRole("button", { name: "첫 근무표 시작하기" })).toHaveCount(0);
+  await page.getByRole("tab", { name: "매장 조건" }).click();
   await expect(appliedCards(page)).toHaveCount(ruleCount + COVERAGE.length);
+  const first = page.locator("article").first();
+  await expect(first.getByText("기본", { exact: true })).toBeVisible();
+  await expect(first.getByRole("button", { name: "삭제" })).toHaveCount(0);
+  const weekdayOpen = page
+    .locator("article")
+    .filter({ has: page.getByText("기본", { exact: true }) })
+    .filter({ hasText: /평일.*오픈/ })
+    .first();
+  await weekdayOpen.getByRole("button", { name: "끄기" }).click();
+  await expect(weekdayOpen.getByText("꺼짐", { exact: true })).toBeVisible();
+  await weekdayOpen.getByRole("button", { name: "다시 켜기" }).click();
+  await expect(weekdayOpen.getByText("적용됨", { exact: true })).toBeVisible();
 });

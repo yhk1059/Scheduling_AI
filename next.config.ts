@@ -3,6 +3,8 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   cacheComponents: true,
   partialPrefetching: true,
+  // 값이 없어도 항상 치환해 e2e 전용 로그인 코드가 프로덕션 번들에서 빠지게 한다(lib/supabase.ts, ADR-020)
+  env: { NEXT_PUBLIC_E2E_LOGIN: process.env.NEXT_PUBLIC_E2E_LOGIN ?? "" },
   turbopack: {
     rules: {
       "*.css": {

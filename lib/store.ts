@@ -895,9 +895,13 @@ export function createAppStore(getStorage: () => Storage, now: () => Date = () =
           }
           if (dirty) await save();
         };
-        /** 상태를 통째로 바꾼다. 진행 중 요청의 응답을 버리도록 inputVersion은 지금보다 크게 한다. */
+        /** 상태를 통째로 바꾼다. 진행 중 요청의 응답을 버리도록 inputVersion은 지금보다 크게 하고, 문서에서 최신이던 결과는 최신으로 둔다. */
         const replace = (data: Data, extra: Partial<AppState> = {}) =>
-          set((s) => ({ ...data, inputVersion: Math.max(s.inputVersion, data.inputVersion) + 1, ...extra }));
+          set((s) => {
+            const inputVersion = Math.max(s.inputVersion, data.inputVersion) + 1;
+            const periods = data.periods.map((p) => (p.resultVersion === data.inputVersion ? { ...p, resultVersion: inputVersion } : p));
+            return { ...data, periods, inputVersion, ...extra };
+          });
         const emptyShopData = (): Data => ({ ...initialData(), shop: emptyShop(), view: { screen: "setup" } });
 
         return {
