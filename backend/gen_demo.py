@@ -14,7 +14,7 @@ from backend.solver.model import solve
 ROOT = Path(__file__).resolve().parent.parent
 SHOP = ROOT / "lib" / "samples" / "shop-12.json"
 OUT = ROOT / "lib" / "samples" / "demo-schedule.json"
-DEMO_PERIOD = {"start_date": "2026-11-01", "length": 30}  # 공휴일 없는 달
+DEMO_PERIOD = {"start_date": "2026-11-02", "length": 28}  # 월요일에 시작하는 4주. 주마다 세는 규칙에 잘린 주가 없다
 
 
 def demo_request() -> ScheduleRequest:

@@ -1,10 +1,20 @@
 // 테스트용 식 규칙(backend/tests/rules.py와 같은 모양). 앱 코드에서 쓰지 않는다.
 import { normalizeRule } from "./rules";
-import type { Cmp, ConstraintSpec, Count, Days, People, Rule, Shifts, Value } from "./types.gen";
+import type { Cmp, ConstraintSpec, Count, Days, People, Rule, Shifts, ShopConfig, Value } from "./types.gen";
 
 type Over = Partial<Omit<Rule, "type" | "body" | "values">> & { type?: never };
 type Body = Rule["body"];
 type Cond = Cmp | { all: Cmp[] } | { any: Cmp[] };
+/** 코드 이름이 뜻을 갖지 않는 테스트용 근무 형태. N이 가장 늦게 끝난다. */
+export const DEN_CONFIG: ShopConfig = {
+  shifts: [
+    { code: "D", name: "데이", hours: 8, start: "07:00", end: "15:00" },
+    { code: "E", name: "이브닝", hours: 8, start: "15:00", end: "23:00" },
+    { code: "N", name: "나이트", hours: 8, start: "16:00", end: "24:00" },
+    { code: "O", name: "휴무", hours: 0 },
+  ],
+};
+
 export const OFF: Shifts = { in: ["O"] };
 export const WORK: Shifts = { not_in: ["O"] };
 

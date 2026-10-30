@@ -5,7 +5,7 @@ import { useState, type ReactNode } from "react";
 import { ApiError, errorMessage, explain, solve } from "@/lib/api";
 import { toScheduleCsv } from "@/lib/csv";
 import { historyLoadFor, isOperating } from "@/lib/continuity";
-import { DEFAULT_CONFIG } from "@/lib/rules";
+import { closingShift, DEFAULT_CONFIG } from "@/lib/rules";
 import { dayHeader, dayOfDate, isWeekendDay, monthDay, periodDays, periodEnd } from "@/lib/period";
 import {
   carryOverChanged,
@@ -28,7 +28,7 @@ import type {
   ShopConfig,
 } from "@/lib/types.gen";
 import { statsFromAssignments } from "@/lib/stats";
-import { describeRule, formatDeviation, hardnessLabel, presetName } from "@/lib/wording";
+import { describeRule, formatDeviation, hardnessLabel, josa, presetName } from "@/lib/wording";
 
 import { markConfirmedEntry } from "./confirmedEntry";
 import { Spinner, today } from "./RulesStep";
@@ -79,23 +79,24 @@ type Outcome =
   | null;
 type Cell = { employeeId: string; day: number };
 export type Toast = { message: string; retry: () => void } | null;
-type Load = { nights: number; weekends: number };
+type Load = { closings: number; weekends: number };
 
 /**
- * 누적 부담 근거 한 줄. 최근 4주 나이트가 평균보다 많았던 직원 중 이번 근무표 N이 평균 이하인 사람.
+ * 누적 부담 근거 한 줄. 최근 4주 마감이 평균보다 많았던 직원 중 이번 근무표 마감이 평균 이하인 사람.
  * 해당자가 없거나 history가 비면 null.
  */
-function historyEvidence(rows: Employee[], result: ScheduleResult, history: Map<string, Load>): string | null {
-  if (history.size === 0 || rows.length === 0) return null;
-  const past = (n: Employee) => history.get(n.id)?.nights ?? 0;
-  const now = (n: Employee) => result.stats[n.id]?.counts?.N ?? result.assignments[n.id].filter((c) => c === "N").length;
+function historyEvidence(rows: Employee[], result: ScheduleResult, history: Map<string, Load>, config: ShopConfig): string | null {
+  const closing = closingShift(config);
+  if (history.size === 0 || rows.length === 0 || !closing) return null;
+  const past = (n: Employee) => history.get(n.id)?.closings ?? 0;
+  const now = (n: Employee) => result.stats[n.id]?.counts?.[closing.code] ?? result.assignments[n.id].filter((c) => c === closing.code).length;
   const avg = (f: (n: Employee) => number) => rows.reduce((sum, n) => sum + f(n), 0) / rows.length;
   const pastAvg = avg(past);
   const nowAvg = avg(now);
   const eased = rows.filter((n) => past(n) > pastAvg && now(n) <= nowAvg);
   if (eased.length === 0) return null;
-  if (eased.length === 1) return `${eased[0].name} 최근 4주 나이트 ${past(eased[0])}회 → 이번 근무표 ${now(eased[0])}회`;
-  return `최근 4주 나이트가 많았던 ${eased.length}명은 이번 근무표에서 나이트를 줄였어요`;
+  if (eased.length === 1) return `${eased[0].name} 최근 4주 ${closing.name} ${past(eased[0])}회 → 이번 근무표 ${now(eased[0])}회`;
+  return `최근 4주 ${closing.name}${josa(closing.name, "이", "가")} 많았던 ${eased.length}명은 이번 근무표에서 ${closing.name}${josa(closing.name, "을", "를")} 줄였어요`;
 }
 
 export function toMessage(e: unknown): string {
@@ -240,7 +241,7 @@ export function ScheduleBody({
   const result = period.result && withStats(period.result, shop.config, period, holidays);
   const { outcome } = sv;
   const confirmed = period.versions.at(-1)?.assignments ?? null;
-  const history = new Map(historyLoadFor(raw, shop.config).map((h) => [h.employee_id, { nights: h.nights, weekends: h.weekends }]));
+  const history = new Map(historyLoadFor(raw, shop.config).map((h) => [h.employee_id, { closings: h.closings, weekends: h.weekends }]));
   // 운영 중인 기간에서 오늘 이전 날짜는 잠긴다(toScheduleRequest의 pastDayLocks와 같은 범위)
   const todayDay = dayOfDate(period, now);
   const pastDays = isOperating(period, now) && todayDay !== null ? todayDay - 1 : 0;
@@ -267,7 +268,7 @@ export function ScheduleBody({
   const rows = result ? employees.filter((n) => result.assignments[n.id]) : [];
   const shownVersion = outcome ? outcome.version : resultVersion;
   const stale = !busy && shownVersion !== null && shownVersion !== inputVersion;
-  const evidence = result ? historyEvidence(rows, result, history) : null;
+  const evidence = result ? historyEvidence(rows, result, history, shop.config) : null;
 
   return (
     <>
@@ -772,7 +773,7 @@ export function ScheduleGrid({
   /** 끝난 근무표: 칸을 편집하지 않는다 */
   readOnly?: boolean;
   onSelect: (cell: Cell) => void;
-  /** 직원별 최근 4주 나이트·주말. 없으면 0 */
+  /** 직원별 최근 4주 마감·주말. 없으면 0 */
   history?: Map<string, Load>;
   /** 운영 중 기간의 잠긴 지난 날짜 수(1..pastDays) */
   pastDays?: number;
@@ -788,7 +789,7 @@ export function ScheduleGrid({
   const covers = (code: Code, team: Code) =>
     code === team || (config.shifts.find((s) => s.code === code)?.parts ?? []).includes(team);
   // 최근 4주 기록이 하나도 없으면(첫 근무표) 누적 부담 열을 그리지 않는다
-  const showHistory = [...(history?.values() ?? [])].some((h) => h.nights > 0 || h.weekends > 0);
+  const showHistory = [...(history?.values() ?? [])].some((h) => h.closings > 0 || h.weekends > 0);
   const dayList = pdays.map((p) => p.day);
   // grid-cols-[150px_repeat(N,30px)_repeat(K,34px)_repeat(2,44px)], N = 기간 길이, K = 근무 코드 수
   const grid = {
@@ -832,7 +833,7 @@ export function ScheduleGrid({
             </span>
           ))}
           {/* 누적 부담(최근 4주) */}
-          {showHistory && ["최근 4주 나이트", "최근 4주 주말"].map((label) => (
+          {showHistory && [`최근 4주 ${closingShift(config)?.name ?? "마감"}`, "최근 4주 주말"].map((label) => (
             <span key={label} className="flex items-end justify-center text-center text-[11px] leading-tight font-medium text-[#66665E]">
               {label}
             </span>
@@ -896,7 +897,7 @@ export function ScheduleGrid({
               ))}
               {showHistory && (
                 <>
-                  <span className={total}>{history?.get(n.id)?.nights ?? 0}</span>
+                  <span className={total}>{history?.get(n.id)?.closings ?? 0}</span>
                   <span className={total}>{history?.get(n.id)?.weekends ?? 0}</span>
                 </>
               )}
@@ -938,7 +939,7 @@ export function StatsTable({
   const thBase = "px-3 py-2 text-xs font-medium whitespace-nowrap text-[#66665E]";
   const th = `${thBase} text-right`;
   const td = "px-3 py-1.5 text-right font-mono text-[13px] font-medium text-[#1B1B18]";
-  const showHistory = [...history.values()].some((h) => h.nights > 0 || h.weekends > 0);
+  const showHistory = [...history.values()].some((h) => h.closings > 0 || h.weekends > 0);
   return (
     <section className={`${ui.card} flex flex-col gap-3`}>
       <h2 className={ui.cardTitle}>개인별 통계</h2>
@@ -959,7 +960,7 @@ export function StatsTable({
               <th className={th}>평균보다 많은 근무일</th>
               {showHistory && (
                 <>
-                  <th className={th}>최근 4주 나이트</th>
+                  <th className={th}>최근 4주 {closingShift(config)?.name ?? "마감"}</th>
                   <th className={th}>최근 4주 주말</th>
                 </>
               )}
@@ -986,7 +987,7 @@ export function StatsTable({
                   <td className={td}>{formatDeviation(s.deviation)}</td>
                   {showHistory && (
                     <>
-                      <td className={td}>{history.get(n.id)?.nights ?? 0}</td>
+                      <td className={td}>{history.get(n.id)?.closings ?? 0}</td>
                       <td className={td}>{history.get(n.id)?.weekends ?? 0}</td>
                     </>
                   )}

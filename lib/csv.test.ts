@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
 
 import { toScheduleCsv } from "./csv";
-import { DEFAULT_CONFIG } from "./rules";
+import { DEN_CONFIG } from "./test-rules";
 import type { Employee, ShopConfig } from "./types.gen";
 
 type Code = string;
-const config = DEFAULT_CONFIG;
+const config = DEN_CONFIG;
 
 const employees: Employee[] = [
   { id: "e01", name: "이영희" },
@@ -91,7 +91,7 @@ describe("toScheduleCsv", () => {
   it("합계 열은 활성 코드, 하단 합계는 근무조별이고 복합 코드는 세는 근무조마다 더한다", () => {
     const withDouble = {
       shifts: [
-        ...DEFAULT_CONFIG.shifts,
+        ...DEN_CONFIG.shifts,
         { code: "M", name: "미드", hours: 8, active: false },
         { code: "DE", name: "더블", hours: 16, parts: ["D", "E"] },
       ],

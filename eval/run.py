@@ -33,7 +33,6 @@ from pydantic import BaseModel, TypeAdapter, ValidationError  # noqa: E402
 
 from backend.domain.constants import CARRY_OVER_DAYS, OFF_CODE  # noqa: E402
 from backend.domain.models import (  # noqa: E402
-    DEFAULT_CONFIG,
     Balance,
     ConstraintSpec,
     Count,
@@ -61,7 +60,8 @@ from backend.solver import evaluate, select  # noqa: E402
 
 DATASET = ROOT / "eval" / "dataset.jsonl"
 RESULTS = ROOT / "eval" / "results.md"
-SAMPLE = ROOT / "lib" / "samples" / "shop-12.json"
+# 데이터셋이 아직 D/E/N 말투라 같은 근무 형태의 매장으로 판정한다
+SAMPLE = ROOT / "backend" / "tests" / "golden" / "den-shop.json"
 STATUSES = ("ok", "clarify", "unsupported")
 SCOPES = ("shop", "period")
 SETS = ("basic", "new", "expr")
@@ -106,6 +106,10 @@ def load_dataset(path: Path) -> list[dict]:
 # --- 근무 형태 ---
 
 
+def _base_config() -> ShopConfig:
+    return ShopConfig.model_validate(_shop()["config"])
+
+
 def _apply_changes(config: ShopConfig, changes: list, only_new: bool = False) -> tuple[ShopConfig, list[str]]:
     """설정 변경을 적용한다. only_new면 아직 없는 코드의 add만(실제 출력의 코드를 판정 근무표에 넣을 때)."""
     shifts = {s.code: s for s in config.shifts}
@@ -128,7 +132,7 @@ def _apply_changes(config: ShopConfig, changes: list, only_new: bool = False) ->
 
 def judge_config(expected_changes: list, actual_changes: list = ()) -> ShopConfig:
     """판정 근무표의 근무 형태: 기본 + 기대 설정 변경 + 실제 출력이 새로 더한 코드."""
-    config, _ = _apply_changes(DEFAULT_CONFIG, expected_changes)
+    config, _ = _apply_changes(_base_config(), expected_changes)
     try:
         config, _ = _apply_changes(config, list(actual_changes), only_new=True)
     except ValidationError:  # 실제 출력이 근무 형태를 깨면 기대 근무 형태로만 판정한다(블록은 불일치가 된다)
@@ -334,7 +338,7 @@ def validate_dataset(cases: list[dict]) -> list[str]:
             continue
 
         try:
-            config, change_errors = _apply_changes(DEFAULT_CONFIG, changes)
+            config, change_errors = _apply_changes(_base_config(), changes)
             errors += [f"{cid}: {e}" for e in change_errors]
             specs = [{**_FILLER, **x, "id": f"{cid}-{i}", "scope": c.get("scope")} for i, x in enumerate(constraints)]
             req = ScheduleRequest.model_validate(
@@ -402,6 +406,7 @@ def _request(case: dict, shop: dict) -> TranslateRequest:
         text=case["text"],
         scope=case["scope"],
         context=TranslateContext(
+            config=shop["config"],
             employees=[Employee(**n) for n in shop["employees"]],
             period=Period(**case.get("period", shop["period"])),
             holidays=case.get("holidays", shop["holidays"]),

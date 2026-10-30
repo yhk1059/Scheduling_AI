@@ -25,6 +25,7 @@ FIXED = rules.fixed("fx1", "e02", 14, "N", source_text="박민수 14일 N 고정
 UNRELATED = rules.forbid("seq", "N", "D", source_text="나이트 다음 날 데이 금지")
 
 REQUEST = ScheduleRequest(
+    config=rules.DEN_CONFIG,
     employees=EMPLOYEES,
     period=Period(start_date=date(2026, 11, 1), length=30),
     holidays=[5],
@@ -285,6 +286,7 @@ MAX_NIGHTS = {
     "source_text": "나이트 3연속까지",
 }
 RULE_REQUEST = ScheduleRequest(
+    config=rules.DEN_CONFIG,
     employees=EMPLOYEES,
     period=Period(start_date=date(2026, 11, 1), length=30),
     holidays=[5],

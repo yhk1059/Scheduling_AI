@@ -26,7 +26,7 @@ import {
   type ShopRemote,
 } from "./store";
 import { DEFAULT_CONFIG, STORAGE_VERSION } from "./rules";
-import { balance, count, fixedCell, forbid as forbidRule, maxRun, OFF, WORK } from "./test-rules";
+import { balance, count, DEN_CONFIG, fixedCell, forbid as forbidRule, maxRun, OFF, WORK } from "./test-rules";
 import type { ConstraintSpec, Rule, RuleExample, ScheduleResult } from "./types.gen";
 
 class MemoryStorage implements Storage {
@@ -97,9 +97,15 @@ function fresh(storage: Storage = new MemoryStorage()) {
   return createAppStore(() => storage, () => CONFIRMED_AT);
 }
 
+/** 코드 이름과 주기가 뜻을 갖지 않는 테스트의 매장: 한 달 단위, D/E/N. */
+function startDenShop(store: ReturnType<typeof fresh>) {
+  store.getState().startShop();
+  store.setState((s) => ({ shop: { ...s.shop!, unit: "month", config: DEN_CONFIG } }));
+}
+
 /** 게스트 입력: 매장(이영희 e01, 박민수 e02, 월 단위) + 첫 기간. */
 function addInput(store: ReturnType<typeof createAppStore>) {
-  store.getState().startShop();
+  startDenShop(store);
   store.getState().addEmployees(rows);
   store.getState().createPeriod(TODAY);
 }
@@ -107,7 +113,7 @@ function addInput(store: ReturnType<typeof createAppStore>) {
 /** 매장(이영희 e01, 박민수 e02, 월 단위) + 첫 기간. */
 function withPeriod() {
   const store = fresh();
-  store.getState().startShop();
+  startDenShop(store);
   store.getState().addEmployees(rows);
   const id = store.getState().createPeriod(TODAY)!;
   const period = () => store.getState().periods.find((p) => p.id === id)!;
@@ -132,7 +138,7 @@ describe("병동", () => {
     const store = fresh();
     store.getState().startShop();
     const s = store.getState();
-    expect(s.shop).toMatchObject({ name: "", unit: "month", employees: [], nextEmployeeNo: 1, pendingConfig: [], unconverted: [] });
+    expect(s.shop).toMatchObject({ name: "", unit: "1w", employees: [], nextEmployeeNo: 1, pendingConfig: [], unconverted: [] });
     // 기본 근무 형태, 기본 규칙 없음
     expect(s.shop!.config).toEqual(DEFAULT_CONFIG);
     expect(s.shop!.rules).toEqual([]);
@@ -143,7 +149,7 @@ describe("병동", () => {
 
   it("setShopName·setUnit·setCoverage는 inputVersion을 올리고 필요 인원은 shop.rules의 기본 규칙이다", () => {
     const store = fresh();
-    store.getState().startShop();
+    startDenShop(store);
     store.getState().setShopName("내과 5병동");
     store.getState().setUnit("2w");
     store.getState().setCoverage("D", "weekday", 3, 4);
@@ -170,7 +176,7 @@ describe("병동", () => {
 
   it("setCoverage: 최대가 없으면 이상, 같으면 정확히, 범위면 최소·최대. 같은 칸은 제자리에서 바꾼다", () => {
     const store = fresh();
-    store.getState().startShop();
+    startDenShop(store);
     store.getState().setCoverage("N", "weekday", 2, null);
     const w = () => store.getState().shop!;
     const cov = () => coverageRule(w().rules, "N", "weekday") as Rule;
@@ -201,7 +207,7 @@ describe("병동", () => {
 describe("병동 규칙 카드", () => {
   it("대기 카드는 inputVersion 없이 쌓이고, 적용하면 rules로 옮긴다", () => {
     const store = fresh();
-    store.getState().startShop();
+    startDenShop(store);
     const v = store.getState().inputVersion;
     store.getState().addPendingRules([maxWork("c1", 5)]);
     expect(store.getState().inputVersion).toBe(v);
@@ -213,7 +219,7 @@ describe("병동 규칙 카드", () => {
 
   it("말로 만든 필요 인원 카드(날마다 모든 사람의 개수)는 기본 규칙이 된다", () => {
     const store = fresh();
-    store.getState().startShop();
+    startDenShop(store);
     const sat = countCard("sat-D", { days: { kind: "all", weekdays: [5] }, shifts: { in: ["D"] }, per: "day", min: 2 });
     store.getState().addPendingRules([sat, skillMix("s", "D"), minOff("m", 8)]);
     expect(store.getState().shop!.pendingRules.map((c) => [c.id, (c as Rule).default])).toEqual([
@@ -225,7 +231,7 @@ describe("병동 규칙 카드", () => {
 
   it("같은 type·scope·대상이면 교체하고, 대상이 다르면 추가한다", () => {
     const store = fresh();
-    store.getState().startShop();
+    startDenShop(store);
     store.getState().addPendingRules([
       maxWork("d", 5),
       maxWork("e", 6),
@@ -240,7 +246,7 @@ describe("병동 규칙 카드", () => {
 
   it("updateRule: 대기 카드는 inputVersion 없이, 적용된 규칙은 올리며 바꾸고 weight는 중요도를 따른다", () => {
     const store = fresh();
-    store.getState().startShop();
+    startDenShop(store);
     store.getState().addPendingRules([maxWork("p", 5), nightFair("q")]);
     store.getState().applyRule("q");
     const v = store.getState().inputVersion;
@@ -264,7 +270,7 @@ describe("병동 규칙 카드", () => {
 
   it("setRuleValue: 값만 바꾸고, 최대 연속은 창 길이도 함께 바꾸며, 이름이 없거나 음수면 무시한다", () => {
     const store = fresh();
-    store.getState().startShop();
+    startDenShop(store);
     store.getState().addPendingRules([maxNights("p", 3), minOff("q", 8)]);
     store.getState().applyRule("q");
     const v = store.getState().inputVersion;
@@ -286,7 +292,7 @@ describe("병동 규칙 카드", () => {
 
   it("removeRule: 기본 규칙은 지우지 않고 끈다", () => {
     const store = fresh();
-    store.getState().startShop();
+    startDenShop(store);
     store.getState().setCoverage("D", "weekday", 3, 3);
     store.getState().removeRule("cov-weekday-D");
     expect(store.getState().shop!.rules.map((c) => [c.id, c.enabled])).toEqual([
@@ -296,7 +302,7 @@ describe("병동 규칙 카드", () => {
 
   it("enableRule: 끈 기본 규칙을 다시 켜고 inputVersion을 올린다", () => {
     const store = fresh();
-    store.getState().startShop();
+    startDenShop(store);
     store.getState().setCoverage("D", "weekday", 3, null);
     store.getState().removeRule("cov-weekday-D");
     const v = store.getState().inputVersion;
@@ -310,7 +316,7 @@ describe("병동 규칙 카드", () => {
 
   it("removeRule: 대기 카드는 inputVersion 없이, 적용된 규칙은 올리며 지운다", () => {
     const store = fresh();
-    store.getState().startShop();
+    startDenShop(store);
     store.getState().addPendingRules([maxWork("p", 5), minOff("q", 8)]);
     store.getState().applyRule("q");
     const v = store.getState().inputVersion;
@@ -327,7 +333,7 @@ describe("카드 예시", () => {
 
   it("병동 규칙: 카드별로 한 번 저장하고, 적용해도 남고, 지우거나 교체되면 지운다", () => {
     const store = fresh();
-    store.getState().startShop();
+    startDenShop(store);
     store.getState().addPendingRules([forbid("a", "N", "D"), maxWork("b", 5)], [], { a: [example("가")], b: [], x: [example("없는 카드")] });
     const w = () => store.getState().shop!;
     expect(w().examples).toEqual({ a: [example("가")] });
@@ -354,7 +360,7 @@ describe("카드 예시", () => {
 
   it("값을 바꾸면 그 카드의 예시를 지운다(예시는 옛 값으로 판정한 것)", () => {
     const store = fresh();
-    store.getState().startShop();
+    startDenShop(store);
     store.getState().addPendingRules([maxNights("p", 3), minOff("q", 8)], [], { p: [example("가")], q: [example("나")] });
     store.getState().applyRule("q");
     store.getState().setRuleValue("p", "없는값", 4);
@@ -376,7 +382,7 @@ describe("카드 순서", () => {
 
   it("병동 규칙: 새 카드는 맨 위에 붙고, 적용해도 제자리에 남는다", () => {
     const store = fresh();
-    store.getState().startShop();
+    startDenShop(store);
     store.getState().addPendingRules([maxWork("a", 5)]);
     store.getState().addPendingRules([minOff("b", 8), maxNights("c", 3)]);
     const w = () => store.getState().shop!;
@@ -426,7 +432,7 @@ describe("findReplaced", () => {
 describe("간호사 id", () => {
   it("addEmployees는 e{번호}를 부여하고 nextEmployeeNo를 올린다", () => {
     const store = fresh();
-    store.getState().startShop();
+    startDenShop(store);
     store.getState().addEmployees(rows);
     const w = store.getState().shop!;
     expect(w.employees).toEqual([
@@ -438,7 +444,7 @@ describe("간호사 id", () => {
 
   it("nextEmployeeNo는 삭제 후에도 줄어들지 않고 지운 번호를 다시 쓰지 않는다", () => {
     const store = fresh();
-    store.getState().startShop();
+    startDenShop(store);
     store.getState().addEmployees(rows);
     store.getState().removeEmployee("e02");
     store.getState().addEmployees([{ name: "김철수" }]);
@@ -448,7 +454,7 @@ describe("간호사 id", () => {
 
   it("updateEmployee·setEmployeeActive는 id를 바꾸지 않는다", () => {
     const store = fresh();
-    store.getState().startShop();
+    startDenShop(store);
     store.getState().addEmployees(rows);
     store.getState().updateEmployee("e01", { name: "이영희A" });
     store.getState().setEmployeeActive("e02", false);
@@ -492,7 +498,7 @@ describe("createPeriod", () => {
     ];
     for (const [unit, range] of cases) {
       const store = fresh();
-      store.getState().startShop();
+      startDenShop(store);
       store.getState().setUnit(unit as "month");
       const id = store.getState().createPeriod(TODAY);
       const p = store.getState().periods[0];
@@ -653,7 +659,7 @@ describe("toScheduleRequest", () => {
     store.getState().addTag("e02", "책임");
 
     const req = toScheduleRequest(store.getState().shop!, period(), store.getState().periods, TODAY);
-    expect(req.config).toEqual(DEFAULT_CONFIG);
+    expect(req.config).toEqual(DEN_CONFIG);
     expect(req.employees).toEqual([
       { id: "e01", name: "이영희", tags: [] },
       { id: "e02", name: "박민수", tags: ["책임"] },
@@ -1105,7 +1111,7 @@ describe("persist", () => {
     expect(s.shop).toBeNull();
     expect(s.resetNotice).toBe(true);
     // 근무 형태가 없는 매장도 손상으로 본다
-    const shop = { name: "", unit: "month", employees: [], nextEmployeeNo: 1, rules: [], pendingRules: [], pendingConfig: [], unconverted: [] };
+    const shop = { name: "", unit: "1w", employees: [], nextEmployeeNo: 1, rules: [], pendingRules: [], pendingConfig: [], unconverted: [] };
     storage.setItem(STORAGE_KEY, JSON.stringify({ version: STORAGE_VERSION, state: { shop, periods: [], view: { screen: "home" }, inputVersion: 1 } }));
     expect(fresh(storage).getState().resetNotice).toBe(true);
   });
@@ -1125,7 +1131,7 @@ describe("localStorage 예외", () => {
       throw new Error("SecurityError");
     });
     expect(store.getState().storageAvailable).toBe(false);
-    store.getState().startShop();
+    startDenShop(store);
     store.getState().addEmployees(rows);
     expect(store.getState().shop!.employees).toHaveLength(2);
   });
@@ -1137,7 +1143,7 @@ describe("localStorage 예외", () => {
     };
     const store = fresh(storage);
     expect(store.getState().storageAvailable).toBe(false);
-    store.getState().startShop();
+    startDenShop(store);
     expect(store.getState().shop).not.toBeNull();
   });
 });
@@ -1186,7 +1192,7 @@ function synced(remote: ShopRemote, storage: Storage = new MemoryStorage()) {
 /** 서버 문서: 매장 "서버 매장"(직원 1명) + 기간 없음. */
 function serverDoc() {
   const s = fresh();
-  s.getState().startShop();
+  startDenShop(s);
   s.getState().setShopName("서버 병동");
   s.getState().addEmployees([rows[0]]);
   const { shop, periods, view, inputVersion } = s.getState();
@@ -1264,7 +1270,7 @@ describe("로그인 분기", () => {
     await vi.advanceTimersByTimeAsync(SAVE_DEBOUNCE_MS * 2);
     expect(f.calls.save).toHaveLength(0);
 
-    store.getState().startShop();
+    startDenShop(store);
     await vi.advanceTimersByTimeAsync(SAVE_DEBOUNCE_MS);
     expect(f.calls.save).toHaveLength(1);
   });
@@ -1291,7 +1297,7 @@ describe("로그인 분기", () => {
 /** withPeriod와 같지만 remote를 주입한다. */
 function withPeriodSynced(remote: ShopRemote, storage: Storage = new MemoryStorage()) {
   const store = synced(remote, storage);
-  store.getState().startShop();
+  startDenShop(store);
   store.getState().addEmployees(rows);
   const id = store.getState().createPeriod(TODAY)!;
   return { store, id };
@@ -1499,7 +1505,7 @@ describe("병동 준비와 처음 설정 단계", () => {
 
   it("명단이 없으면 ①, 병동 소개에서 [다음]을 누르지 않았으면 ②, 그 밖은 ③. 필요 인원은 필수가 아니다", () => {
     const store = fresh();
-    store.getState().startShop();
+    startDenShop(store);
     const shop = () => store.getState().shop!;
     expect([setupStep(shop()), hasCoverage(shop()), isShopReady(shop())]).toEqual([1, false, false]);
     store.getState().addEmployees(rows);
@@ -1590,7 +1596,7 @@ describe("옛 화면 상태 불러오기", () => {
 
   it("근무표가 없는 병동은 설정·홈 화면을 처음 설정의 못 끝낸 첫 단계로 바꾼다", () => {
     const store = fresh();
-    store.getState().startShop();
+    startDenShop(store);
     expect(reload(store, { screen: "settings", tab: "roster" }).view).toEqual({ screen: "setup", step: 1 });
     store.getState().addEmployees(rows);
     expect(reload(store, { screen: "settings", tab: "rules" }).view).toEqual({ screen: "setup", step: 2 });
@@ -1625,7 +1631,7 @@ describe("근무 형태", () => {
 
   it("addShift는 O 앞에 더하고 중복·8개 초과는 무시한다, setShift는 O를 바꾸지 않는다", () => {
     const store = fresh();
-    store.getState().startShop();
+    startDenShop(store);
     const v = store.getState().inputVersion;
     store.getState().addShift({ code: "M", name: "미드", hours: 8, start: "11:00" });
     store.getState().addShift({ code: "M", name: "다른 미드", hours: 4 });
@@ -1643,7 +1649,7 @@ describe("근무 형태", () => {
 
   it("setShiftActive: 끄면 그 코드를 세는 복합 코드도 끄고, 근무조가 꺼진 복합 코드는 켜지 않는다", () => {
     const store = fresh();
-    store.getState().startShop();
+    startDenShop(store);
     store.getState().addShift({ code: "DE", name: "더블", hours: 16, parts: ["D", "E"] });
     store.getState().setShiftActive("E", false);
     expect(codes(store)).toEqual(["D", "E-", "N", "DE-", "O"]);
@@ -1674,7 +1680,7 @@ describe("근무 형태", () => {
 
   it("dismissUnconverted는 옮기지 못한 옛 규칙 원문 하나를 지우고 입력 버전은 그대로 둔다", () => {
     const store = fresh();
-    store.getState().startShop();
+    startDenShop(store);
     store.setState((s) => ({ shop: { ...s.shop!, unconverted: [{ source_text: "가" }, { source_text: "나" }] } }));
     const v = store.getState().inputVersion;
     store.getState().dismissUnconverted(0);
@@ -1684,7 +1690,7 @@ describe("근무 형태", () => {
 
   it("필요 인원 행은 활성 기본 코드를 따른다(복합·휴무 제외)", () => {
     const store = fresh();
-    store.getState().startShop();
+    startDenShop(store);
     store.getState().addEmployees(rows);
     for (const code of ["D", "E", "N"]) {
       store.getState().setCoverage(code, "weekday", 1, 1);
@@ -1720,7 +1726,7 @@ describe("근무 형태", () => {
 describe("태그", () => {
   it("addTag는 공백을 지우고 중복·빈 값·10자 초과·5개 초과를 무시한다, removeTag는 지운다", () => {
     const store = fresh();
-    store.getState().startShop();
+    startDenShop(store);
     store.getState().addEmployees([{ name: "이영희", tags: ["책임"] }]);
     const tags = () => store.getState().shop!.employees[0].tags;
     expect(tags()).toEqual(["책임"]);
@@ -1748,7 +1754,7 @@ describe("설정 변경 카드", () => {
 
   function withConfigCard() {
     const store = fresh();
-    store.getState().startShop();
+    startDenShop(store);
     store.getState().addPendingRules([deLimit, other], [double]);
     return store;
   }
@@ -1787,13 +1793,13 @@ describe("설정 변경 카드", () => {
     const w = other.getState().shop!;
     expect(w.pendingConfig).toEqual([]);
     expect(w.pendingRules.map((c) => c.id)).toEqual(["w5"]);
-    expect(w.config).toEqual(DEFAULT_CONFIG);
+    expect(w.config).toEqual(DEN_CONFIG);
     expect(other.getState().inputVersion).toBe(v);
   });
 
   it("update 설정 카드는 같은 코드를 바꾸고 딸린 카드가 없다", () => {
     const store = fresh();
-    store.getState().startShop();
+    startDenShop(store);
     store.getState().addPendingRules([], [{ action: "update", shift: { code: "E", name: "이브닝", hours: 9 } }]);
     expect(store.getState().shop!.pendingConfig[0].ruleIds).toEqual([]);
     store.getState().applyRule("cfg-E");
@@ -1804,14 +1810,14 @@ describe("설정 변경 카드", () => {
 describe("시작일", () => {
   it("첫 근무표는 고른 시작일에서 시작하고, 달력 월인데 29~31일이면 만들지 않는다", () => {
     const store = fresh();
-    store.getState().startShop();
+    startDenShop(store);
     expect(store.getState().createPeriod(TODAY, "2026-11-29")).toBeNull();
     expect(store.getState().periods).toEqual([]);
     store.getState().createPeriod(TODAY, "2026-11-15");
     expect(store.getState().periods.map((p) => [p.start_date, p.length])).toEqual([["2026-11-15", 30]]);
 
     const weekly = fresh();
-    weekly.getState().startShop();
+    startDenShop(weekly);
     weekly.getState().setUnit("2w");
     weekly.getState().createPeriod(TODAY, "2026-11-04");
     expect(weekly.getState().periods.map((p) => [p.start_date, p.length])).toEqual([["2026-11-04", 14]]);

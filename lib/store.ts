@@ -198,7 +198,7 @@ export interface AppState extends Data {
   /** 처음 설정 ② 매장 소개에서 [다음]을 눌렀다. */
   markIntroSeen: () => void;
   // 근무 형태
-  /** 코드의 이름·시간·시작 시각·세는 근무조를 바꾼다. O는 바꾸지 않는다. */
+  /** 코드의 이름·실근무 시간·시작·끝 시각·세는 근무조를 바꾼다. O는 바꾸지 않는다. */
   setShift: (code: Code, patch: Partial<Omit<ShiftDef, "code" | "active">>) => void;
   /** 새 코드를 O 앞에 더한다. 이미 있거나 코드가 MAX_SHIFT_CODES개면 아무것도 하지 않는다. */
   addShift: (def: ShiftDef) => void;
@@ -273,7 +273,7 @@ function initialData(): Data {
 function emptyShop(): Shop {
   return {
     name: "",
-    unit: "month",
+    unit: "1w",
     config: DEFAULT_CONFIG,
     employees: [],
     nextEmployeeNo: 1,

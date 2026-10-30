@@ -6,8 +6,18 @@ from pathlib import Path
 
 from backend.domain.constants import HISTORY_DAYS
 
-SAMPLE_PATH = Path(__file__).resolve().parents[2] / "lib" / "samples" / "shop-12.json"
+# 솔버·라우트 테스트의 큰 매장: D/E/N 15명. 실제 샘플 매장(lib/samples)은 test_demo_schedule·test_domain이 본다
+DEN_SHOP_PATH = Path(__file__).resolve().parent / "golden" / "den-shop.json"
 
+
+# 코드 이름이 뜻을 갖지 않는 솔버 테스트용 근무 형태. 시각은 형식만 맞춘다(솔버는 쓰지 않는다).
+DEN_SHIFTS = [
+    {"code": "D", "name": "데이", "hours": 8, "start": "07:00", "end": "15:00"},
+    {"code": "E", "name": "이브닝", "hours": 8, "start": "15:00", "end": "23:00"},
+    {"code": "N", "name": "나이트", "hours": 8, "start": "00:00", "end": "08:00"},
+    {"code": "O", "name": "휴무", "hours": 0},
+]
+DEN_CONFIG = {"shifts": DEN_SHIFTS}
 
 N, O = {"in": ["N"]}, {"in": ["O"]}
 WORK = {"not_in": ["O"]}
@@ -185,7 +195,5 @@ def history(start: str, rows: dict[str, list[str]], holidays: list[str] = ()) ->
 
 
 def sample_data() -> dict:
-    """샘플 매장(식 규칙) 요청 dict. next_requests(다음 근무표 요청)는 뺀다."""
-    data = json.loads(SAMPLE_PATH.read_text(encoding="utf-8"))
-    del data["next_requests"]
-    return data
+    """D/E/N 15명 매장(식 규칙) 요청 dict."""
+    return json.loads(DEN_SHOP_PATH.read_text(encoding="utf-8"))

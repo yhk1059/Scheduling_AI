@@ -19,6 +19,7 @@ from backend.domain.models import (
     TranslateRequest,
     TranslateUnsupported,
 )
+from backend.tests.rules import DEN_CONFIG
 from backend.llm.client import (
     AnthropicClient,
     LLMConfigError,
@@ -46,7 +47,7 @@ def request(text: str, scope: str = "period", period: Period = NOV, holidays: li
     return TranslateRequest(
         text=text,
         scope=scope,
-        context=TranslateContext(employees=EMPLOYEES, period=period, holidays=[5] if holidays is None else holidays, today=today),
+        context=TranslateContext(config=DEN_CONFIG, employees=EMPLOYEES, period=period, holidays=[5] if holidays is None else holidays, today=today),
         input_version=7,
     )
 
@@ -122,7 +123,7 @@ def staffing(shifts: dict, at_least: float, who: dict | None = None, days: dict 
 
 
 NIGHT_FAIR = balance(shifts=N)
-MID = {"code": "M", "name": "미드", "hours": 8, "start": "11:00"}
+MID = {"code": "M", "name": "미드", "hours": 8, "start": "11:00", "end": "19:00"}
 AFTER_NIGHT = rule(
     {"per": "person_day"},
     cmp(n(NOT_OFF, offset=[1, 1]), "eq", 0),
@@ -297,7 +298,7 @@ def test_config_change_only_is_ok():
 
 
 def test_config_change_update_existing():
-    client = FakeClient(ok({"config_changes": [{"action": "update", "shift": {"code": "N", "name": "나이트", "hours": 10}}]}))
+    client = FakeClient(ok({"config_changes": [{"action": "update", "shift": {"code": "N", "name": "나이트", "hours": 10, "start": "00:00", "end": "10:00"}}]}))
     res = translate(request("나이트는 10시간", "shop"), client)
     assert res.config_changes[0].shift.hours == 10
 
@@ -305,8 +306,8 @@ def test_config_change_update_existing():
 @pytest.mark.parametrize(
     "change",
     [
-        {"action": "add", "shift": {"code": "D", "name": "데이", "hours": 8}},  # 이미 있음
-        {"action": "update", "shift": {"code": "M", "name": "미드", "hours": 8}},  # 없는 코드
+        {"action": "add", "shift": {"code": "D", "name": "데이", "hours": 8, "start": "07:00", "end": "15:00"}},  # 이미 있음
+        {"action": "update", "shift": {**MID}},  # 없는 코드
         {"action": "update", "shift": {"code": "O", "name": "쉼", "hours": 0}},  # 휴무는 바꿀 수 없음
         {"action": "add", "shift": {"code": "DM", "name": "더블", "hours": 16, "parts": ["D", "M"]}},  # 없는 parts
     ],
@@ -318,7 +319,7 @@ def test_invalid_config_change_retry_then_clarify(change):
 
 
 def test_config_change_over_code_limit_clarify():
-    extra = [{"action": "add", "shift": {"code": f"X{i}", "name": f"근무{i}", "hours": 8}} for i in range(constants.MAX_SHIFT_CODES - 3)]
+    extra = [{"action": "add", "shift": {"code": f"X{i}", "name": f"근무{i}", "hours": 8, "start": "09:00", "end": "17:00"}} for i in range(constants.MAX_SHIFT_CODES - 3)]
     _, retry = retry_then_clarify({"config_changes": extra}, request("근무 많이 추가", "shop"))
     assert str(constants.MAX_SHIFT_CODES) in retry
 

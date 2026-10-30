@@ -5,6 +5,7 @@ from datetime import date, timedelta
 from backend.domain.constants import HISTORY_DAYS
 from backend.domain.models import Rule, ScheduleRequest
 from backend.solver import stats
+from backend.tests.rules import DEN_CONFIG
 from backend.solver.evaluate import Instance, RuleViolation, evaluate_rule, instances
 
 START = date(2026, 11, 5)  # 목요일. 1=목 2=금 3=토 4=일 5=월 … 14=수
@@ -20,6 +21,7 @@ EMPLOYEES = [
 
 def req(length: int = 14, carry: dict | None = None, history: dict | None = None, **extra) -> ScheduleRequest:
     raw = {
+        "config": DEN_CONFIG,
         "employees": EMPLOYEES,
         "period": {"start_date": START.isoformat(), "length": length},
         "holidays": [6],

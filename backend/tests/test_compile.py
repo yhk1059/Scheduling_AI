@@ -157,6 +157,7 @@ ALL_RULES = _shape_rules() + FEATURE_RULES
 
 def _request(rng: random.Random, constraints: list[dict], carry: bool) -> ScheduleRequest:
     raw = {
+        "config": R.DEN_CONFIG,
         "employees": EMPLOYEES,
         "period": {"start_date": START.isoformat(), "length": LENGTH},
         "holidays": [6],
@@ -253,6 +254,7 @@ def _fix(nid: str, d: int, code: str) -> dict:
 
 def _plain(constraints: list[dict]) -> ScheduleRequest:
     raw = {
+        "config": R.DEN_CONFIG,
         "employees": EMPLOYEES,
         "period": {"start_date": START.isoformat(), "length": LENGTH},
         "constraints": constraints,

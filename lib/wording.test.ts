@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { DEFAULT_CONFIG } from "./rules";
+import { DEN_CONFIG } from "./test-rules";
 import { balance, count, fixedCell, forbid, maxRun, minRun, OFF, offAfter, WORK } from "./test-rules";
 import { isLeaveRule, type Shop, type WorkPeriod } from "./store";
 import type { ConstraintSpec, Employee, Rule, Shifts, ShopConfig } from "./types.gen";
@@ -29,14 +29,14 @@ const EMPLOYEES: Employee[] = [
 ];
 const CONFIG: ShopConfig = {
   shifts: [
-    ...DEFAULT_CONFIG.shifts.slice(0, 3),
+    ...DEN_CONFIG.shifts.slice(0, 3),
     { code: "M", name: "미드", hours: 8 },
     { code: "DE", name: "더블", hours: 16, parts: ["D", "E"] },
-    DEFAULT_CONFIG.shifts[3],
+    DEN_CONFIG.shifts[3],
   ],
 } as unknown as ShopConfig;
 
-const text = (c: ConstraintSpec, config: ShopConfig = DEFAULT_CONFIG) => describeRule(c, config, EMPLOYEES, NOV).text;
+const text = (c: ConstraintSpec, config: ShopConfig = DEN_CONFIG) => describeRule(c, config, EMPLOYEES, NOV).text;
 
 const D: Shifts = { in: ["D"] };
 const E: Shifts = { in: ["E"] };
@@ -65,22 +65,22 @@ describe("scheduleName", () => {
 
 describe("describeShiftChange", () => {
   it("추가: 코드 · 이름 · 시간", () => {
-    expect(describeShiftChange({ action: "add", shift: { code: "M", name: "미드", hours: 8 } }, DEFAULT_CONFIG)).toBe(
+    expect(describeShiftChange({ action: "add", shift: { code: "M", name: "미드", hours: 8 } }, DEN_CONFIG)).toBe(
       "근무 코드 추가 · M 미드 · 8시간",
     );
   });
-  it("시작 시각이 있으면 함께 쓴다", () => {
+  it("시각이 있으면 함께 쓴다", () => {
     expect(
-      describeShiftChange({ action: "add", shift: { code: "M", name: "미드", hours: 8, start: "11:00" } }, DEFAULT_CONFIG),
-    ).toBe("근무 코드 추가 · M 미드 · 11:00부터 8시간");
+      describeShiftChange({ action: "add", shift: { code: "P", name: "피크", hours: 3, start: "11:00", end: "14:00" } }, DEN_CONFIG),
+    ).toBe("근무 코드 추가 · P 피크 · 11:00~14:00 · 3시간");
   });
   it("더블은 세는 근무조 이름을 붙인다", () => {
     expect(
-      describeShiftChange({ action: "add", shift: { code: "DE", name: "더블", hours: 16, parts: ["D", "E"] } }, DEFAULT_CONFIG),
+      describeShiftChange({ action: "add", shift: { code: "DE", name: "더블", hours: 16, parts: ["D", "E"] } }, DEN_CONFIG),
     ).toBe("근무 코드 추가 · DE 더블 · 16시간 · 데이와 이브닝으로 세요");
   });
   it("수정", () => {
-    expect(describeShiftChange({ action: "update", shift: { code: "E", name: "이브닝", hours: 9 } }, DEFAULT_CONFIG)).toBe(
+    expect(describeShiftChange({ action: "update", shift: { code: "E", name: "이브닝", hours: 9 } }, DEN_CONFIG)).toBe(
       "근무 코드 수정 · E 이브닝 · 9시간",
     );
   });
@@ -264,14 +264,14 @@ describe("presetName / describeRule: 새 모양", () => {
 describe("describeRule: 조정 가능한 값의 위치(parts)", () => {
   it("값은 이름과 함께 따로 나오고, 이어 붙이면 text다", () => {
     const r = count({ days: { kind: "weekday" }, shifts: D, per: "day", min: 3, max: 4 });
-    const s = describeRule(r, DEFAULT_CONFIG, EMPLOYEES, NOV);
+    const s = describeRule(r, DEN_CONFIG, EMPLOYEES, NOV);
     expect(s.text).toBe("평일마다 데이 3~4명");
     expect(s.parts).toEqual([{ text: "평일마다 데이 " }, { value: "min", text: "3" }, { text: "~" }, { value: "max", text: "4" }, { text: "명" }]);
     expect(s.parts.map((p) => p.text).join("")).toBe(s.text);
   });
 
   it("최대 연속·고르게 차이도 값, 구조 숫자(휴무 일수 offset)는 값이 아니다", () => {
-    const values = (r: ConstraintSpec) => describeRule(r, DEFAULT_CONFIG, EMPLOYEES, NOV).parts.filter((p) => "value" in p);
+    const values = (r: ConstraintSpec) => describeRule(r, DEN_CONFIG, EMPLOYEES, NOV).parts.filter((p) => "value" in p);
     expect(values(maxRun(N, 3))).toEqual([{ value: "max_len", text: "3" }]);
     expect(values(balance({ shifts: N, max_gap: 0 }, hard))).toEqual([{ value: "max_gap", text: "0" }]);
     expect(values(offAfter(N, 2))).toEqual([]);
@@ -392,7 +392,7 @@ describe("nextTask", () => {
   const shop: Shop = {
     name: "내과 병동",
     unit: "month",
-    config: DEFAULT_CONFIG,
+    config: DEN_CONFIG,
     employees: EMPLOYEES.map((n) => ({ ...n, tags: [], active: true })),
     nextEmployeeNo: 5,
     rules: [],
@@ -498,7 +498,7 @@ describe("configSummary", () => {
     ({ shifts: [...shifts, shift("O", "휴무", 0)] }) as unknown as ShopConfig;
 
   it("기본 근무 형태는 UI_GUIDE 문구와 같다", () => {
-    expect(configSummary(DEFAULT_CONFIG)).toBe("데이·이브닝·나이트 3교대, 각 8시간");
+    expect(configSummary(DEN_CONFIG)).toBe("데이·이브닝·나이트 3교대, 각 8시간");
   });
 
   it("시간이 다르면 근무조마다 적고, 더블과 꺼진 코드를 구분한다", () => {

@@ -5,6 +5,7 @@ from backend.domain.models import ScheduleRequest, SolveInfeasible, SolveOk
 from backend.solver import select
 from backend.solver.model import build_model, solve
 from backend.tests.rules import (
+    DEN_CONFIG,
     coverage,
     fixed,
     forbid,
@@ -27,6 +28,7 @@ def employee(nid: str, tags: list[str] | None = None) -> dict:
 
 def request(employees: list[dict] | None = None, constraints: list[dict] | None = None, **extra) -> ScheduleRequest:
     return ScheduleRequest.model_validate({
+        "config": DEN_CONFIG,
         "employees": employees if employees is not None else [employee(f"n{i}") for i in range(1, 7)],
         "period": {"start_date": START, "length": DAYS},
         "constraints": constraints or [],

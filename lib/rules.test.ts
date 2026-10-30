@@ -1,20 +1,55 @@
 import { describe, expect, it } from "vitest";
 
 import { balance, count, fixedCell, forbid, maxRun, minRun, OFF, offAfter, WORK } from "./test-rules";
-import { DEFAULT_CONFIG, normalizeRule, ruleShape } from "./rules";
-import type { ConstraintSpec, Rule, Shifts } from "./types.gen";
+import { closingShift, DEFAULT_CONFIG, normalizeRule, ruleShape, shiftTimesError } from "./rules";
+import type { ConstraintSpec, Rule, Shifts, ShopConfig } from "./types.gen";
 
 const N: Shifts = { in: ["N"] };
 const D: Shifts = { in: ["D"] };
 
 describe("DEFAULT_CONFIG", () => {
-  it("D/E/N 8시간 + O", () => {
-    expect(DEFAULT_CONFIG.shifts.map((s) => [s.code, s.name, s.hours])).toEqual([
-      ["D", "데이", 8],
-      ["E", "이브닝", 8],
-      ["N", "나이트", 8],
-      ["O", "휴무", 0],
+  it("오픈·미들·마감 + 휴무", () => {
+    expect(DEFAULT_CONFIG.shifts.map((s) => [s.code, s.name, s.start, s.end, s.hours])).toEqual([
+      ["A", "오픈", "09:00", "15:00", 6],
+      ["M", "미들", "12:00", "18:00", 6],
+      ["C", "마감", "17:00", "23:00", 6],
+      ["O", "휴무", undefined, undefined, 0],
     ]);
+  });
+});
+
+describe("shiftTimesError", () => {
+  it("30분 단위, 24:00까지 받는다", () => {
+    expect(shiftTimesError("09:00", "15:30")).toBeNull();
+    expect(shiftTimesError("17:30", "24:00")).toBeNull();
+  });
+  it("형식이 틀리면 형식 오류", () => {
+    for (const [s, e] of [["9:00", "15:00"], ["09:15", "15:00"], ["09:00", "24:30"], ["", "15:00"]]) {
+      expect(shiftTimesError(s, e)).toContain("30분 단위");
+    }
+  });
+  it("끝이 시작보다 빠르거나 같으면(자정을 넘기면) 오류", () => {
+    expect(shiftTimesError("22:00", "02:00")).toContain("자정");
+    expect(shiftTimesError("09:00", "09:00")).toContain("자정");
+  });
+});
+
+describe("closingShift", () => {
+  it("기본 근무 형태는 마감", () => {
+    expect(closingShift(DEFAULT_CONFIG)?.code).toBe("C");
+  });
+  it("코드와 이름이 달라도 가장 늦게 끝나는 활성 기본 코드", () => {
+    const shifts: ShopConfig["shifts"] = [
+      { code: "X", name: "저녁", hours: 6, start: "16:00", end: "22:00" },
+      { code: "Y", name: "야간", hours: 6, start: "18:00", end: "24:00", active: false },
+      { code: "Z", name: "늦은 저녁", hours: 4, start: "18:00", end: "22:00" },
+      { code: "XZ", name: "더블", hours: 10, parts: ["X", "Z"] },
+      { code: "O", name: "휴무", hours: 0 },
+    ];
+    expect(closingShift({ shifts })?.code).toBe("Z");
+  });
+  it("세는 근무조가 없으면 null", () => {
+    expect(closingShift({ shifts: [{ code: "O", name: "휴무", hours: 0 }] })).toBeNull();
   });
 });
 

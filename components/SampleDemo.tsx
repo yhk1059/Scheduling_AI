@@ -40,9 +40,9 @@ export default function SampleDemo() {
         <div className="flex items-end justify-between gap-6">
           <div className="flex flex-col gap-2">
             <p className="font-mono text-xs font-semibold text-[#155E75]">샘플 데모</p>
-            <h1 className="text-[22px] font-semibold text-[#1B1B18]">샘플 병동</h1>
+            <h1 className="text-[22px] font-semibold text-[#1B1B18]">{shop.name}</h1>
             <p className="text-sm leading-relaxed text-[#3D3D38]">
-              간호사 {EMPLOYEES.length}명과 병동 규칙 {SHOP_RULES.length}개로 만든 한 달 근무표예요. 모두에게 같은 화면이고, 바꾸거나 저장할
+              간호사 {EMPLOYEES.length}명과 병동 규칙 {SHOP_RULES.length}개로 만든 4주 근무표예요. 모두에게 같은 화면이고, 바꾸거나 저장할
               수 없어요.
             </p>
           </div>

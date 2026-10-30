@@ -32,6 +32,8 @@ from backend.domain.constants import (
 
 # 근무 코드는 매장 구조(config)가 정한다. 형식만 여기서 보고, 있는 코드인지는 요청 단위로 검사한다.
 ShiftCode = Annotated[str, Field(pattern=r"^[A-Z0-9]{1,3}$")]
+# "HH:MM" 30분 단위. 24:00은 끝 시각으로 쓴다. 0을 채운 형식이라 문자열 비교가 시각 비교다.
+ShiftTime = Annotated[str, Field(pattern=r"^(([01][0-9]|2[0-3]):(00|30)|24:00)$")]
 Scope = Literal["shop", "period"]
 Hardness = Literal["hard", "soft"]
 Priority = Literal["high", "normal", "low"]
@@ -48,10 +50,23 @@ class _Strict(BaseModel):
 class ShiftDef(_Strict):
     code: ShiftCode  # "O"는 휴무(필수)
     name: str = Field(min_length=1)
-    hours: float = Field(ge=0, le=24, multiple_of=0.5)
-    parts: list[ShiftCode] = []  # 복합 코드면 세는 근무조. 예: DE → ["D", "E"]
-    start: str | None = None  # "07:00" 표시용
+    hours: float = Field(ge=0, le=24, multiple_of=0.5)  # 실근무 시간. 쉬는 시간 때문에 시각 차이와 다를 수 있다
+    parts: list[ShiftCode] = []  # 복합 코드면 세는 근무조. 예: AC → ["A", "C"]
+    # 판정·문맥·화면에만 쓰고 솔버는 쓰지 않는다. 휴무와 복합 코드는 없고, 그 밖의 코드는 필수다
+    start: ShiftTime | None = None
+    end: ShiftTime | None = None
     active: bool = True  # 한 번이라도 쓰인 코드는 지우지 않고 끈다
+
+    @model_validator(mode="after")
+    def _check_times(self):
+        if self.code == OFF_CODE or self.parts:
+            if self.start is not None or self.end is not None:
+                raise ValueError(f"{self.code}: 휴무와 복합 코드에는 시각을 적지 않습니다")
+        elif self.start is None or self.end is None:
+            raise ValueError(f"{self.code}: 시작·끝 시각이 필요합니다")
+        elif self.start >= self.end:
+            raise ValueError(f"{self.code}: 끝 시각은 시작 시각보다 늦어야 합니다(자정을 넘길 수 없습니다)")
+        return self
 
 
 class ShopConfig(_Strict):
@@ -85,7 +100,9 @@ class ShopConfig(_Strict):
         return {s.code for s in self.shifts}
 
 
-DEFAULT_CONFIG = ShopConfig(shifts=[ShiftDef(code=c, name=name, hours=h) for c, name, h in DEFAULT_SHIFTS])
+DEFAULT_CONFIG = ShopConfig(
+    shifts=[ShiftDef(code=c, name=name, hours=h, start=start, end=end) for c, name, h, start, end in DEFAULT_SHIFTS]
+)
 
 
 def covers(config: ShopConfig, code: str) -> set[str]:

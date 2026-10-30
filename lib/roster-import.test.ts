@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { DEFAULT_CONFIG } from "./rules";
+import { DEN_CONFIG } from "./test-rules";
 import type { Employee, ShopConfig } from "./types.gen";
 import { parseCarryOver, parseDelimited } from "./roster-import";
 
@@ -41,7 +41,7 @@ describe("parseCarryOver", () => {
     { id: "e01", name: "이영희" },
     { id: "e02", name: "박민수" },
   ];
-  const parse = (text: string, config: ShopConfig = DEFAULT_CONFIG) => parseCarryOver(text, employees, config);
+  const parse = (text: string, config: ShopConfig = DEN_CONFIG) => parseCarryOver(text, employees, config);
 
   it("이름으로 employee_id를 찾고 근무 코드 동의어를 정규화한다", () => {
     const text = "이영희\tD\t데이\tE\t이브\t이브닝\tN\t나\n박민수\t나이트\tOFF\t휴\t오프\to\td";
@@ -74,7 +74,7 @@ describe("parseCarryOver", () => {
 
   it("근무 형태의 코드·이름을 받고, 근무 형태에 없는 코드는 오류다", () => {
     const config = {
-      shifts: [...DEFAULT_CONFIG.shifts, { code: "M", name: "미드", hours: 8 }, { code: "DE", name: "더블", hours: 16, parts: ["D", "E"] }],
+      shifts: [...DEN_CONFIG.shifts, { code: "M", name: "미드", hours: 8 }, { code: "DE", name: "더블", hours: 16, parts: ["D", "E"] }],
     } as ShopConfig;
     expect(parse("이영희\tM\t미드\tde\t더블", config).rows).toEqual([{ employee_id: "e01", shifts: ["M", "M", "DE", "DE"] }]);
     expect(parse("이영희\tM").errors).toEqual([{ row: 0, col: 1, message: expect.any(String) }]);

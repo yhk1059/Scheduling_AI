@@ -174,7 +174,7 @@ test("S3. 운영 중인 병동: 다음 근무표 만들기와 게스트 확정",
     byId(
       Object.entries(expected)
         .filter(([, v]) => v.nights > 0 || v.weekends > 0)
-        .map(([name, v]) => ({ employee_id: idOf(name), ...v })),
+        .map(([name, v]) => ({ employee_id: idOf(name), closings: v.nights, weekends: v.weekends })),
     ),
   );
   expect(Object.fromEntries((lastSolve!.carry_over ?? []).map((r) => [r.employee_id, r.shifts])), "요청의 carry_over").toEqual(

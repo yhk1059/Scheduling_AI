@@ -286,12 +286,12 @@ def test_schedules_deterministic():
 
 # --- 근무 형태 변경 채점 ---
 
-M = {"action": "add", "shift": {"code": "M", "name": "미드", "hours": 8, "start": "11:00"}}
+M = {"action": "add", "shift": {"code": "M", "name": "미드", "hours": 8, "start": "11:00", "end": "19:00"}}
 DE = {"action": "add", "shift": {"code": "DE", "name": "더블", "hours": 16, "parts": ["D", "E"]}}
 
 
 def test_score_config_changes():
-    renamed = {"action": "add", "shift": {"code": "M", "name": "미드 근무", "hours": 8}}
+    renamed = {"action": "add", "shift": {"code": "M", "name": "미드 근무", "hours": 8, "start": "11:00", "end": "19:00"}}
     assert run.score_config_changes([M], [renamed]) == (1, 1, 1)
     assert run.score_config_changes([M], [{"action": "add", "shift": {**M["shift"], "hours": 9}}]) == (0, 1, 1)
     assert run.score_config_changes([DE], [{"action": "add", "shift": {**DE["shift"], "parts": ["E", "D"]}}]) == (1, 1, 1)
@@ -352,7 +352,7 @@ def test_validate_dataset_ok():
         [case("a", {"status": "clarify"}, set="other")],  # set 값
         [{k: v for k, v in case("a", {"status": "clarify"}).items() if k != "set"}],  # set 없음
         [case("a", {"status": "ok", "constraints": [R.count("x", {"in": ["M"]}, "day", lo=1)]})],  # 없는 코드
-        [case("a", {"status": "ok", "config_changes": [{"action": "add", "shift": {"code": "D", "name": "데이", "hours": 8}}]})],  # 있는 코드 add
+        [case("a", {"status": "ok", "config_changes": [{"action": "add", "shift": {"code": "D", "name": "데이", "hours": 8, "start": "07:00", "end": "15:00"}}]})],  # 있는 코드 add
         [case("a", {"status": "ok", "constraints": [R.count("x", {"in": ["D"]}, "day", lo=1, people={"tags": ["프리셉터"]})]})],  # 없는 태그
     ],
 )
@@ -524,7 +524,7 @@ def test_run_case_config_changes():
     client = FakeClient(ok({"config_changes": [DE], "rules": [draft(de_rule)]}))
     (r,) = run.run_cases(cases, client)
     assert (r.tp, r.n_expected, r.n_actual, r.exact, r.set) == (2, 2, 2, True, "new")
-    assert r.actual_changes == [DE["shift"] | {"start": None, "active": True}]
+    assert r.actual_changes == [DE["shift"] | {"start": None, "end": None, "active": True}]
 
     client = FakeClient(ok({"config_changes": [DE], "rules": [draft(R.count("x", {"in": ["DE"]}, "person", hi=3))]}))
     (r,) = run.run_cases(cases, client)

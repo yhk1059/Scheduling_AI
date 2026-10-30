@@ -25,13 +25,13 @@ MIN_OFFSET = -7  # 세기의 날짜 이동(d+a..d+b)
 MAX_OFFSET = 14
 MAX_OFFSET_SPAN = 14  # 이동 구간의 날 수(b − a + 1)
 
-# 매장 구조 기본값: (코드, 이름, 시간). O는 휴무이고 필수다.
+# 매장 구조 기본값: (코드, 이름, 실근무 시간, 시작, 끝). O는 휴무이고 필수다.
 OFF_CODE = "O"
-DEFAULT_SHIFTS: list[tuple[str, str, float]] = [
-    ("D", "데이", 8),
-    ("E", "이브닝", 8),
-    ("N", "나이트", 8),
-    (OFF_CODE, "휴무", 0),
+DEFAULT_SHIFTS: list[tuple[str, str, float, str | None, str | None]] = [
+    ("A", "오픈", 6, "09:00", "15:00"),
+    ("M", "미들", 6, "12:00", "18:00"),
+    ("C", "마감", 6, "17:00", "23:00"),
+    (OFF_CODE, "휴무", 0, None, None),
 ]
 
 # LLM

@@ -35,11 +35,11 @@ LEAVE_DAY = 10  # 충돌 변형: 이날 휴가가 몰려 필요 인원을 채울
 # 근무 코드 8개(O 포함): 기본 D/E/N + 미드 M + 짧은 S + 더블 DE·ME
 CONFIG = {
     "shifts": [
-        {"code": "D", "name": "데이", "hours": 8},
-        {"code": "E", "name": "이브닝", "hours": 8},
-        {"code": "N", "name": "나이트", "hours": 8},
-        {"code": "M", "name": "미드", "hours": 8},
-        {"code": "S", "name": "단축", "hours": 4},
+        {"code": "D", "name": "데이", "hours": 8, "start": "07:00", "end": "15:00"},
+        {"code": "E", "name": "이브닝", "hours": 8, "start": "15:00", "end": "23:00"},
+        {"code": "N", "name": "나이트", "hours": 8, "start": "00:00", "end": "08:00"},
+        {"code": "M", "name": "미드", "hours": 8, "start": "11:00", "end": "19:00"},
+        {"code": "S", "name": "단축", "hours": 4, "start": "09:00", "end": "13:00"},
         {"code": "DE", "name": "더블", "hours": 16, "parts": ["D", "E"]},
         {"code": "ME", "name": "미드 더블", "hours": 16, "parts": ["M", "E"]},
         {"code": "O", "name": "휴무", "hours": 0},

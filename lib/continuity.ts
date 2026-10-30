@@ -1,16 +1,17 @@
 // 기간 연속성(ADR-015): 이월, 최근 4주 원본(history), 지난 날짜 잠금. 모두 순수 함수이고 날짜는 lib/period.ts로만 다룬다.
 import { CARRY_OVER_DAYS } from "./roster-import";
 import { dateOfDay, dayOfDate, isWeekendDay, monthDay, periodDays, periodEnd, type PeriodRange } from "./period";
+import { closingShift } from "./rules";
 import type { Assignments, ShopEmployee, WorkPeriod } from "./store";
 import type { CarryOverRow, DiffCell, FixedAssignment, History, Employee, ShopConfig } from "./types.gen";
 
 export const HISTORY_DAYS = 28; // backend/domain/constants.py HISTORY_DAYS
 const OFF = "O";
 
-/** 직원별 최근 4주 나이트·주말·공휴일 근무 수(화면 표시용). */
+/** 직원별 최근 4주 마감(closingShift)·주말·공휴일 근무 수(화면 표시용). */
 export interface HistoryLoad {
   employee_id: string;
-  nights: number;
+  closings: number;
   weekends: number;
 }
 
@@ -73,9 +74,10 @@ export function historyFor(periods: WorkPeriod[], target: PeriodRange, employeeI
   return { start_date: dateOfDay(window, first), rows, holidays: holidays.sort() };
 }
 
-/** 화면의 "최근 4주 나이트·주말" 숫자: history 원본에서 나이트(세는 근무조 N)와 주말·공휴일 근무를 센다. 둘 다 0이면 뺀다. */
+/** 화면의 "최근 4주 마감·주말" 숫자: history 원본에서 마감(closingShift, 복합 코드는 세는 근무조로)과 주말·공휴일 근무를 센다. 둘 다 0이면 뺀다. */
 export function historyLoadFor(history: History | null, config: ShopConfig): HistoryLoad[] {
   if (!history) return [];
+  const closing = closingShift(config)?.code;
   const covers = (code: string) => [code, ...(config.shifts.find((s) => s.code === code)?.parts ?? [])];
   return Object.entries(history.rows)
     .map(([employee_id, row]) => {
@@ -83,11 +85,11 @@ export function historyLoadFor(history: History | null, config: ShopConfig): His
       const holidays = (history.holidays ?? []).map((d) => dayOfDate(range, d)).filter((d): d is number => d !== null);
       return {
         employee_id,
-        nights: row.filter((code) => covers(code).includes("N")).length,
+        closings: row.filter((code) => closing !== undefined && covers(code).includes(closing)).length,
         weekends: row.filter((code, i) => code !== OFF && isWeekendDay(range, i + 1, holidays)).length,
       };
     })
-    .filter((l) => l.nights > 0 || l.weekends > 0);
+    .filter((l) => l.closings > 0 || l.weekends > 0);
 }
 
 /** 기간이 운영 중인지: 확정됨 && start_date <= today <= end. */

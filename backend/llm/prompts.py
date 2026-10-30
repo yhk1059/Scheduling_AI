@@ -270,7 +270,7 @@ TRANSLATE_EXAMPLES: list[tuple[str, dict]] = [
     (
         "데이 평일 3명 이상, 주말 2명, 미드 M 11시부터 8시간도 있어",
         {
-            "config_changes": [{"action": "add", "shift": {"code": "M", "name": "미드", "hours": 8, "start": "11:00"}}],
+            "config_changes": [{"action": "add", "shift": {"code": "M", "name": "미드", "hours": 8, "start": "11:00", "end": "19:00"}}],
             "rules": [
                 _rule({"per": "day", "days": {"kind": "weekday"}}, _cmp(_n(D), "ge", _ref("min")), values={"min": _val(3, "최소 인원")}),
                 _rule({"per": "day", "days": {"kind": "weekend"}}, _cmp(_n(D), "eq", _ref("min")), values={"min": _val(2, "인원")}),
@@ -355,7 +355,7 @@ TRANSLATE_SYSTEM = f"""\
   (기본값: require는 normal, balance는 low).
 
 ## 근무 형태 변경 (config_changes)
-- "미드 근무 M 11시~19시 추가" → {{action add, shift {{code M, name 미드, hours 8, start "11:00"}}}}
+- "미드 근무 M 11시~19시 추가" → {{action add, shift {{code M, name 미드, hours 8, start "11:00", end "19:00"}}}}
 - "D+E 더블 허용" → {{action add, shift {{code DE, name 더블, hours 16, parts [D, E]}}}}. 코드는 영문 대문자·숫자 1~3자.
 - 있는 근무의 이름·시간을 바꾸면 action update에 바뀐 뒤의 전체 shift를 쓴다. O(휴무)는 바꾸지 않는다.
 - 새 코드를 쓰는 규칙("사람마다 더블은 2번까지")은 같은 응답의 rules에 함께 낸다.
