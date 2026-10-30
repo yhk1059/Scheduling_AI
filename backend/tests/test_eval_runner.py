@@ -316,7 +316,7 @@ def test_score_constraints_with_new_code():
 
 
 def case(id_: str, expected: dict, **extra) -> dict:
-    return {"id": id_, "set": "legacy", "today": "2026-10-26", "scope": "period", "text": "t", "expected": expected, **extra}
+    return {"id": id_, "set": "basic", "today": "2026-10-26", "scope": "period", "text": "t", "expected": expected, **extra}
 
 
 def test_validate_dataset_ok():
@@ -402,13 +402,13 @@ def test_real_dataset_valid():
     cases = run.load_dataset(run.DATASET)
     assert run.validate_dataset(cases) == []
     sets = [c["set"] for c in cases]
-    assert sets.count("legacy") == 49  # 기존 케이스 전부(w·h·m·c·u 44건 + 기간 경계 p 5건)
+    assert sets.count("basic") == 49  # 기존 케이스 전부(w·h·m·c·u 44건 + 기간 경계 p 5건)
     assert sets.count("new") == 30
     assert sets.count("expr") >= 20
 
 
 def test_real_dataset_is_rules():
-    # 기존 케이스는 convert_dataset.py로 기계 변환한 식 규칙(블록·템플릿 type이 남지 않는다)
+    # 기대값은 모두 식 규칙이다(블록·템플릿 type이 남지 않는다)
     types = {c["type"] for case_ in run.load_dataset(run.DATASET) for c in case_["expected"].get("constraints", [])}
     assert types <= {"rule", "fixed_assignment"}
 
@@ -419,18 +419,6 @@ def test_real_dataset_pair_rules_supported():
     assert by_id["u01"]["expected"]["status"] == "ok"
     assert by_id["b29"]["expected"]["status"] == "ok"
     assert {c["expected"]["status"] for c in by_id.values() if c["set"] == "expr"} == {"ok", "clarify", "unsupported"}
-
-
-def test_convert_dataset_blocks_to_rules():
-    spec = importlib.util.spec_from_file_location("convert_dataset", ROOT / "eval" / "convert_dataset.py")
-    conv = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(conv)
-    run_block = {"type": "sequence", "hardness": "hard", "params": {"run": {"in": ["N"]}, "min_len": 2, "max_len": 3}}
-    block_case = case("a", {"status": "ok", "constraints": [run_block]})
-    out = conv.convert_case(block_case, run._ward())
-    assert [c["type"] for c in out["expected"]["constraints"]] == ["rule", "rule"]
-    assert out["set"] == "legacy"
-    assert conv.convert_case(out, run._ward()) == out  # 여러 번 실행해도 같다
 
 
 # --- mock 실행 ---
@@ -559,10 +547,10 @@ def test_aggregate_by_set_and_gate():
     )
     results = run.run_cases(cases, client)
     by_set = run.aggregate_by_set(results)
-    assert by_set["legacy"]["exact_match_rate"] == 1.0 and by_set["legacy"]["cases"] == 2
+    assert by_set["basic"]["exact_match_rate"] == 1.0 and by_set["basic"]["cases"] == 2
     assert by_set["new"]["exact_match_rate"] == 0.0
     failures = run.gate_failures(run.aggregate(results), by_set)
-    assert any(f.startswith("new") for f in failures) and not any(f.startswith("legacy") for f in failures)
+    assert any(f.startswith("new") for f in failures) and not any(f.startswith("basic") for f in failures)
 
 
 def by_set(**rates) -> dict:
@@ -570,20 +558,20 @@ def by_set(**rates) -> dict:
 
 
 def test_gate_targets():
-    assert run.GATE_EXACT == {"legacy": 0.95, "new": 0.95, "expr": 0.85}
-    assert run.GATE_PRIOR_EXACT == 0.95 and run.PRIOR_SETS == ("legacy", "new")
+    assert run.GATE_EXACT == {"basic": 0.95, "new": 0.95, "expr": 0.85}
+    assert run.GATE_PRIOR_EXACT == 0.95 and run.PRIOR_SETS == ("basic", "new")
     assert run.GATE_SCHEMA_VALID == 1.0
     ok_metrics = {"schema_valid_rate": 1.0}
-    assert run.gate_failures(ok_metrics, by_set(legacy=(0.96, 49), new=(0.96, 30), expr=(0.85, 20))) == []
-    assert run.gate_failures({"schema_valid_rate": 0.99}, by_set(legacy=(1.0, 49), new=(1.0, 30), expr=(1.0, 20)))
-    assert any("expr" in f for f in run.gate_failures(ok_metrics, by_set(legacy=(1.0, 49), new=(1.0, 30), expr=(0.8, 20))))
-    assert any("new" in f for f in run.gate_failures(ok_metrics, by_set(legacy=(1.0, 49), new=(0.9, 30), expr=(1.0, 20))))
-    assert any("expr" in f for f in run.gate_failures(ok_metrics, by_set(legacy=(1.0, 49), new=(1.0, 30))))  # set이 없으면 미달
+    assert run.gate_failures(ok_metrics, by_set(basic=(0.96, 49), new=(0.96, 30), expr=(0.85, 20))) == []
+    assert run.gate_failures({"schema_valid_rate": 0.99}, by_set(basic=(1.0, 49), new=(1.0, 30), expr=(1.0, 20)))
+    assert any("expr" in f for f in run.gate_failures(ok_metrics, by_set(basic=(1.0, 49), new=(1.0, 30), expr=(0.8, 20))))
+    assert any("new" in f for f in run.gate_failures(ok_metrics, by_set(basic=(1.0, 49), new=(0.9, 30), expr=(1.0, 20))))
+    assert any("expr" in f for f in run.gate_failures(ok_metrics, by_set(basic=(1.0, 49), new=(1.0, 30))))  # set이 없으면 미달
 
 
 def test_gate_prior_total():
-    # 기존 79건 합산: legacy 47/49 + new 28/30 = 75/79 = 94.9% < 95%
-    rates = by_set(legacy=(47 / 49, 49), new=(28 / 30, 30), expr=(1.0, 20))
+    # 기존 79건 합산: basic 47/49 + new 28/30 = 75/79 = 94.9% < 95%
+    rates = by_set(basic=(47 / 49, 49), new=(28 / 30, 30), expr=(1.0, 20))
     failures = run.gate_failures({"schema_valid_rate": 1.0}, rates)
     assert any("기존" in f for f in failures)
 
@@ -594,7 +582,7 @@ def test_write_results_set_table(tmp_path):
     out = tmp_path / "results.md"
     run.write_results(out, run.aggregate(results), results, model="fake-model", by_set=run.aggregate_by_set(results))
     text = out.read_text(encoding="utf-8")
-    assert "## set별 지표" in text and "| legacy |" in text and "| new |" in text
+    assert "## set별 지표" in text and "| basic |" in text and "| new |" in text
 
 
 def test_write_results_history(tmp_path):

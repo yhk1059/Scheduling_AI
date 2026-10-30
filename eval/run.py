@@ -64,12 +64,12 @@ RESULTS = ROOT / "eval" / "results.md"
 SAMPLE = ROOT / "lib" / "samples" / "ward-15.json"
 STATUSES = ("ok", "clarify", "unsupported")
 SCOPES = ("ward", "period")
-SETS = ("legacy", "new", "expr")
-PRIOR_SETS = ("legacy", "new")  # 식 이전의 기존 79건
+SETS = ("basic", "new", "expr")
+PRIOR_SETS = ("basic", "new")  # 식 이전의 기존 79건
 EXPECTED_TYPES = ("rule", "fixed_assignment")
 
 # 게이트 목표(사용자 결정 ★8). 낮추지 않는다
-GATE_EXACT = {"legacy": 0.95, "new": 0.95, "expr": 0.85}
+GATE_EXACT = {"basic": 0.95, "new": 0.95, "expr": 0.85}
 GATE_PRIOR_EXACT = 0.95  # 기존 79건 합산
 GATE_SCHEMA_VALID = 1.0
 
@@ -393,7 +393,7 @@ class CaseResult:
     n_expected: int
     n_actual: int
     exact: bool
-    set: str = "legacy"
+    set: str = "basic"
     actual_changes: list[dict] = field(default_factory=list)  # 실제 근무 형태 변경(ShiftDef)
 
 
@@ -452,7 +452,7 @@ def run_case(case: dict, client: LLMClient, ward: dict) -> CaseResult:
         n_expected=n_exp,
         n_actual=n_act,
         exact=exact,
-        set=case.get("set", "legacy"),
+        set=case.get("set", "basic"),
         actual_changes=[ch.shift.model_dump(mode="json") for ch in changes],
     )
 

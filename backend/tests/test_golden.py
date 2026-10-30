@@ -1,7 +1,6 @@
 """솔버 회귀 기준(solver-cases.json): 식 규칙 요청과 지금 솔버의 기대값(status, 목적값·배정 또는 충돌 규칙 id).
 
-요청은 블록화 전(cases.json)·식 언어 전(blocks-cases.json) 솔버의 골든을 식 규칙으로 옮긴 것이다.
-옮길 때 옛 기록과 목적값·충돌이 같음을 확인했다. 다시 쓰기: npm run gen:golden
+다시 쓰기: npm run gen:golden
 """
 
 import json
