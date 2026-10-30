@@ -116,7 +116,8 @@ def count_scope(request: ScheduleRequest, rule: Rule, inst: Instance, count: Cou
         span = inst.days if fe.per in ("person_week", "person_window") else range(1, request.period.days + 1)
         days = [d for d in span if select.day_matches(request, fe.days, d)]
     length = request.period.days
-    first = {nid: select.first_day(request, nid) for nid in ids}
+    carry = select.carry(request)
+    first = {nid: 1 - len(carry.get(nid, [])) for nid in ids}  # select.first_day를 사람마다 다시 만들지 않는다
     return [
         (nid, d)
         for d in days

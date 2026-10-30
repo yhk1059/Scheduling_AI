@@ -29,6 +29,7 @@ class ModelContext:
     hard_literals: dict[str, cp_model.IntVar] = field(default_factory=dict)
     objective_terms: list = field(default_factory=list)
     _literals: dict[tuple[str, int, tuple[str, ...]], cp_model.IntVar] = field(default_factory=dict)
+    _weight_cache: dict[tuple, object] = field(default_factory=dict)
 
     @property
     def days(self) -> int:
@@ -65,13 +66,26 @@ class ModelContext:
         """칸 하나의 값(개수 또는 분): 변수 합, 이월이면 상수, 이월이 없는 날이면 None."""
         config = self.request.config
         if day >= 1:
-            return sum(
-                select.value(config, c, sel, measure) * self.x[nurse_id, day, c]
-                for c in self.codes
-                if select.matches(config, c, sel)
-            )
+            return sum(k * self.x[nurse_id, day, c] for c, k in self._weights(sel, measure))
         code = self._carry_code(nurse_id, day)
         return None if code is None else select.value(config, code, sel, measure)
+
+    def _weights(self, sel: Shifts, measure: str) -> list[tuple[str, int]]:
+        """셀렉터에 맞는 활성 코드와 칸 하나의 값. 칸마다 다시 세지 않게 셀렉터별로 캐시한다."""
+        key = (sel.in_ is not None, tuple(sel.in_ or sel.not_in or ()), measure)
+        if key not in self._weight_cache:
+            config = self.request.config
+            self._weight_cache[key] = [
+                (c, select.value(config, c, sel, measure)) for c in self.codes if select.matches(config, c, sel)
+            ]
+        return self._weight_cache[key]
+
+    def max_value(self, sel: Shifts, measure: str) -> int:
+        """select.max_cell_value를 셀렉터별로 캐시한 것."""
+        key = ("max", sel.in_ is not None, tuple(sel.in_ or sel.not_in or ()), measure)
+        if key not in self._weight_cache:
+            self._weight_cache[key] = select.max_cell_value(self.request.config, sel, measure)
+        return self._weight_cache[key]
 
     def match(self, nurse_id: str, day: int, sel: Shifts):
         """칸이 셀렉터에 맞으면 1: 맞는 코드 변수의 합(하루 하나라 0/1), 이월이면 상수."""

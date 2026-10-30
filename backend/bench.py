@@ -1,8 +1,9 @@
-"""최악 병동 성능 확인(ADR-008, 설계 §10 6단계). 실행: npm run bench
+"""최악 병동 성능 확인(ADR-008, ADR-019). 실행: npm run bench
 
 입력 상한(constants.py)을 꽉 채운 병동이 시간 예산 안에 해를 내는지, 휴가 충돌을 더한 변형에서
-충돌 분석이 예산 안에 끝나는지 확인한다. 하나라도 넘으면 exit 1. 넘으면 시간 예산을 늘리지 말고 상한을 낮춘다.
-시간이 걸려서 npm run test에는 넣지 않는다.
+충돌 분석이 예산 안에 끝나는지 확인한다. 블록 병동과, 같은 블록을 식 규칙으로 바꾸고 식 고유 규칙
+(조건부·짝·세기끼리 비교·offset 폭 상한)을 더한 병동을 나란히 잰다.
+하나라도 넘으면 exit 1. 넘으면 시간 예산을 늘리지 말고 상한을 낮춘다. 시간이 걸려서 npm run test에는 넣지 않는다.
 """
 
 import sys
@@ -15,6 +16,7 @@ from backend.domain.constants import (
     CONFLICT_TIME_LIMIT_S,
     HISTORY_DAYS,
     MAX_NURSES,
+    MAX_OFFSET_SPAN,
     MAX_PATTERN_LEN,
     MAX_PATTERNS,
     MAX_PERIOD_DAYS,
@@ -23,7 +25,7 @@ from backend.domain.constants import (
     NIGHT_ONLY_TAG,
     SOLVE_TIME_LIMIT_S,
 )
-from backend.domain.convert import night_dedicated_rule
+from backend.domain.convert import night_dedicated_rule, rules_request
 from backend.domain.models import ScheduleRequest, SolveInfeasible, SolveOk
 from backend.solver.conflicts import find_conflicts
 from backend.solver.model import solve
@@ -68,13 +70,17 @@ def nurses() -> list[dict]:
 
 
 def past_rows(people: list[dict]) -> dict[str, list[str]]:
-    """기간 직전 28일 확정 배정. 규칙을 지키는 순환 패턴을 사람마다 어긋나게 둔다."""
+    """기간 직전 28일 확정 배정. 규칙을 지키는 순환 패턴을 사람마다 어긋나게 둔다.
+
+    책임 태그(i % 5 == 0)가 같은 위상에 몰리지 않게 i // 5만큼 더 민다. 몰리면 1일에 책임 데이를 둘 수 없다
+    (식 규칙은 이월 마지막 날 직전에 끝난 나이트 뒤 휴무 2일을 1일까지 이어서 본다).
+    """
     general = "DDEEONNOOO"
     night = "NNOONNNOOO"
     rows = {}
     for i, n in enumerate(people):
         cycle = night if NIGHT_ONLY_TAG in n["tags"] else general
-        rows[n["id"]] = [cycle[(i + d) % len(cycle)] for d in range(HISTORY_DAYS)]
+        rows[n["id"]] = [cycle[(i + i // 5 + d) % len(cycle)] for d in range(HISTORY_DAYS)]
     return rows
 
 
@@ -151,6 +157,64 @@ def rules(people: list[dict]) -> list[dict]:
     return rows
 
 
+# --- 식 고유 규칙(ADR-019): 블록으로는 쓸 수 없는 모양 ---
+
+
+def cnt(shifts: dict, who: dict | None = None, offset: tuple[int, int] | None = None, **extra: Any) -> dict:
+    c: dict = {"shifts": shifts, **extra}
+    if who is not None:
+        c["who"] = who
+    if offset is not None:
+        c["offset"] = list(offset)
+    return c
+
+
+def cmp(left: dict, op: str, right: Any) -> dict:
+    return {"left": left, "op": op, "right": right}
+
+
+def expr_rule(cid: str, for_each: dict, then: dict, when: dict | None = None, values: dict | None = None) -> dict:
+    body: dict = {"kind": "require", "for_each": for_each, "then": then}
+    if when is not None:
+        body["when"] = when
+    return {"id": cid, "type": "rule", "scope": "ward", "hardness": "hard", "source_text": cid, "values": values or {}, "body": body}
+
+
+def expr_rules() -> list[dict]:
+    """조건부 5개(when + 그리고), 짝 3개, 세기끼리 비교 2개, offset 폭 상한 2개."""
+    charge, new = {"tags": ["책임"]}, {"tags": ["신규"]}
+    ids = lambda *ns: {"ids": [f"n{i:02d}" for i in ns]}  # noqa: E731
+    day, person_day = {"per": "day"}, {"per": "person_day"}
+    return [
+        # 조건부: 신규가 나이트면 책임과 5년차 이상도 나이트에
+        expr_rule("if-new-night", day, {"all": [cmp(cnt(ALL_N, charge), "ge", 1), cmp(cnt(ALL_N, {"min_years": 5}), "ge", 1)]},
+                  when=cmp(cnt(ALL_N, new), "ge", 1)),
+        expr_rule("if-new-day", day, {"all": [cmp(cnt(IN("D"), charge), "ge", 1), cmp(cnt(IN("D"), {"min_years": 3}), "ge", 3)]},
+                  when=cmp(cnt(IN("D"), new), "ge", 1)),
+        expr_rule("if-night-next", person_day, {"all": [cmp(cnt(IN("D"), offset=(1, 1)), "eq", 0), cmp(cnt(IN("M"), offset=(1, 1)), "eq", 0)]},
+                  when=cmp(cnt(ALL_N, offset=(0, 0)), "ge", 1)),
+        expr_rule("if-weekend-work", {"per": "person_week"},
+                  {"all": [cmp(cnt(IN("O")), "ge", 2), cmp(cnt(WORK, measure="hours"), "le", {"value": "hours"})]},
+                  when=cmp(cnt(WORK, days={"kind": "weekend"}), "ge", 2), values={"hours": {"value": 48, "label": "최대 근무 시간"}}),
+        expr_rule("if-new-many-nights", {"per": "person", "people": new},
+                  {"all": [cmp(cnt(IN("O")), "ge", 10), cmp(cnt(IN("DE", "ME")), "eq", 0)]},
+                  when={"all": [cmp(cnt(ALL_N), "ge", 3), cmp(cnt(WORK, days={"kind": "weekend"}), "ge", 2)]}),
+        # 짝: 따로 2개, 같이 1개(이력 위상이 같은 두 사람)
+        expr_rule("pair-apart-1", day, cmp(cnt(ALL_N, ids(3, 4)), "le", 1)),
+        expr_rule("pair-apart-2", day, cmp(cnt(IN("D"), ids(6, 8)), "le", 1)),
+        expr_rule("pair-together", day, cmp(cnt(ALL_N, ids(27)), "ge", 1), when=cmp(cnt(ALL_N, ids(2)), "ge", 1)),
+        # 세기끼리 비교
+        expr_rule("charge-ge-new-night", day, cmp(cnt(ALL_N, charge), "ge", cnt(ALL_N, new))),
+        expr_rule("senior-ge-junior-day", {"per": "day", "days": {"kind": "weekday"}},
+                  cmp(cnt(IN("D"), {"min_years": 5}), "ge", cnt(IN("D"), {"max_years": 4}))),
+        # offset 폭 상한: 더블 뒤 14일 안에 더블 없음, 앞뒤 14일 나이트 7번 이하
+        expr_rule("double-gap", person_day, cmp(cnt(IN("DE", "ME"), offset=(1, MAX_OFFSET_SPAN)), "eq", 0),
+                  when=cmp(cnt(IN("DE", "ME"), offset=(0, 0)), "ge", 1)),
+        expr_rule("night-14", person_day, cmp(cnt(ALL_N, offset=(-7, MAX_OFFSET_SPAN - 8)), "le", {"value": "max"}),
+                  values={"max": {"value": 7, "label": "최대 나이트"}}),
+    ]
+
+
 def worst_ward() -> dict:
     people = nurses()
     past = past_rows(people)
@@ -183,35 +247,47 @@ def timed(fn, *args, **kwargs):
     return out, time.monotonic() - t
 
 
-def main() -> int:
-    data = worst_ward()
-    req = ScheduleRequest.model_validate(data)
-    blocks = sum(1 for c in req.constraints if c.type in ("count", "sequence", "balance"))
-    print(f"병동: 간호사 {len(req.nurses)}명 × {req.period.length}일, 근무 코드 {len(req.config.shifts)}개, 블록 {blocks}개")
-    failed = False
+def with_expr_rules(req: ScheduleRequest) -> ScheduleRequest:
+    """블록을 식 규칙으로 바꾸고(휴가 블록도) 식 고유 규칙을 더한 요청."""
+    data = rules_request(req).model_dump(mode="json")
+    data["constraints"] += expr_rules()
+    return ScheduleRequest.model_validate(data)
+
+
+def measure(label: str, req: ScheduleRequest, bad: ScheduleRequest) -> bool:
+    """풀이·충돌 변형 풀이·충돌 분석을 재고 통과 여부를 낸다."""
+    rules = sum(1 for c in req.constraints if c.type != "fixed_assignment")
+    print(f"[{label}] 간호사 {len(req.nurses)}명 × {req.period.length}일, 근무 코드 {len(req.config.shifts)}개, 규칙 {rules}개")
+    ok = True
 
     res, elapsed = timed(solve, req)
     optimal = res.result.optimal if isinstance(res, SolveOk) else None
-    print(f"풀이: {res.status} (optimal={optimal}) {elapsed:.2f}s / 예산 {SOLVE_TIME_LIMIT_S}s")
+    print(f"  풀이: {res.status} (optimal={optimal}) {elapsed:.2f}s / 예산 {SOLVE_TIME_LIMIT_S}s")
     if not isinstance(res, SolveOk) or elapsed > SOLVE_TIME_LIMIT_S + OVERHEAD_S:
-        print("실패: 시간 예산 안에 해를 내지 못했다")
-        failed = True
+        print("  실패: 시간 예산 안에 해를 내지 못했다")
+        ok = False
 
-    bad = ScheduleRequest.model_validate(with_leave_conflict(data))
     res, elapsed = timed(solve, bad, analyze_conflicts=False)
-    print(f"충돌 변형 풀이: {res.status} {elapsed:.2f}s / 예산 {SOLVE_TIME_LIMIT_S}s")
+    print(f"  충돌 변형 풀이: {res.status} {elapsed:.2f}s / 예산 {SOLVE_TIME_LIMIT_S}s")
     if not isinstance(res, SolveInfeasible):
-        print("실패: 충돌 변형이 시간 예산 안에 해 없음으로 판정되지 않았다")
-        failed = True
+        print("  실패: 충돌 변형이 시간 예산 안에 해 없음으로 판정되지 않았다")
+        ok = False
 
     conflicts, elapsed = timed(find_conflicts, bad, CONFLICT_TIME_LIMIT_S)
     ids = [c.constraint_id for c in conflicts or []]
-    print(f"충돌 분석: {len(ids)}개 {ids} {elapsed:.2f}s / 예산 {CONFLICT_TIME_LIMIT_S}s")
+    print(f"  충돌 분석: {len(ids)}개 {ids} {elapsed:.2f}s / 예산 {CONFLICT_TIME_LIMIT_S}s")
     if conflicts is None or "leave-crowd" not in ids or elapsed > CONFLICT_TIME_LIMIT_S + OVERHEAD_S:
-        print("실패: 충돌 분석이 시간 예산 안에 휴가 충돌을 찾지 못했다")
-        failed = True
+        print("  실패: 충돌 분석이 시간 예산 안에 휴가 충돌을 찾지 못했다")
+        ok = False
+    return ok
 
-    return 1 if failed else 0
+
+def main() -> int:
+    data = worst_ward()
+    blocks = ScheduleRequest.model_validate(data)
+    blocks_bad = ScheduleRequest.model_validate(with_leave_conflict(data))
+    passed = [measure("블록", blocks, blocks_bad), measure("식", with_expr_rules(blocks), with_expr_rules(blocks_bad))]
+    return 0 if all(passed) else 1
 
 
 if __name__ == "__main__":

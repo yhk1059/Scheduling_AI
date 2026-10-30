@@ -11,13 +11,18 @@ from backend.domain.constants import (
     MAX_CONSTRAINTS,
     MAX_FIXED_ASSIGNMENTS,
     MAX_NURSES,
+    MAX_OFFSET,
+    MAX_OFFSET_SPAN,
     MAX_PATTERN_LEN,
     MAX_PATTERNS,
     MAX_PROPOSALS,
+    MAX_RULE_CMPS,
+    MAX_RULE_VALUES,
     MAX_SHIFT_CODES,
     MAX_TAGS_PER_NURSE,
     MAX_TEXT_CHARS,
     MAX_WINDOW_DAYS,
+    MIN_OFFSET,
     PROPOSAL_VERIFY_TIME_LIMIT_S,
 )
 from backend.llm.client import LLMConfigError, LLMUnavailableError, ToolCallResult
@@ -490,6 +495,102 @@ def test_block_format_limits_are_422(spec, accepted):
         assert r.status_code == 200, r.text
     else:
         assert_error(r, 422, "VALIDATION_ERROR")
+
+
+# --- 규칙 식 상한(ADR-019): 모델 검증이라 422 ---
+
+
+def rule(body: dict, values: dict | None = None, rid: str = "r1") -> dict:
+    return {"id": rid, "type": "rule", "scope": "ward", "hardness": "hard", "source_text": "원문", "values": values or {}, "body": body}
+
+
+def off_count(offset: tuple[int, int] | None = None) -> dict:
+    c: dict = {"shifts": {"in": ["O"]}}
+    if offset is not None:
+        c["offset"] = list(offset)
+    return c
+
+
+def true_cmp(right=0, offset=None) -> dict:
+    """늘 참인 비교: 휴무 수 ≥ 0, 또는 ≤ 큰 값."""
+    return {"left": off_count(offset), "op": "ge" if right == 0 else "le", "right": right}
+
+
+def cond(cmps: list[dict]) -> dict:
+    return cmps[0] if len(cmps) == 1 else {"all": cmps}
+
+
+def rule_with_cmps(n: int) -> dict:
+    """비교 n개: then 그리고 4개까지, 나머지는 when."""
+    then, when = [true_cmp()] * min(n, 4), [true_cmp()] * (n - min(n, 4))
+    body = {"kind": "require", "for_each": {"per": "day"}, "then": cond(then)}
+    if when:
+        body["when"] = cond(when)
+    return rule(body)
+
+
+def rule_with_values(n: int) -> dict:
+    """값 n개를 비교 n개가 하나씩 쓴다."""
+    names = [f"v{i}" for i in range(n)]
+    cmps = [true_cmp({"value": v}) for v in names]
+    then, when = cmps[:4], cmps[4:]
+    body = {"kind": "require", "for_each": {"per": "day"}, "then": cond(then)}
+    if when:
+        body["when"] = cond(when)
+    return rule(body, {v: {"value": 40, "label": f"최대 인원 {v}"} for v in names})
+
+
+def rule_with_offset(offset: tuple[int, int]) -> dict:
+    return rule({"kind": "require", "for_each": {"per": "person_day"}, "then": true_cmp(offset=offset)})
+
+
+def rule_with_window(window: int) -> dict:
+    return rule({"kind": "require", "for_each": {"per": "person_window", "window": window}, "then": true_cmp()})
+
+
+@pytest.mark.parametrize(
+    "spec, accepted",
+    [
+        (rule_with_values(MAX_RULE_VALUES), True),
+        (rule_with_values(MAX_RULE_VALUES + 1), False),
+        (rule_with_cmps(MAX_RULE_CMPS), True),
+        (rule_with_cmps(MAX_RULE_CMPS + 1), False),
+        (rule_with_offset((MIN_OFFSET, MIN_OFFSET)), True),
+        (rule_with_offset((MIN_OFFSET - 1, MIN_OFFSET - 1)), False),
+        (rule_with_offset((MAX_OFFSET, MAX_OFFSET)), True),
+        (rule_with_offset((MAX_OFFSET + 1, MAX_OFFSET + 1)), False),
+        (rule_with_offset((0, MAX_OFFSET_SPAN - 1)), True),
+        (rule_with_offset((0, MAX_OFFSET_SPAN)), False),
+        (rule_with_window(MAX_WINDOW_DAYS), True),
+        (rule_with_window(MAX_WINDOW_DAYS + 1), False),
+    ],
+    ids=[
+        "values-at-limit", "values-over", "cmps-at-limit", "cmps-over",
+        "offset-min-at-limit", "offset-min-over", "offset-max-at-limit", "offset-max-over",
+        "offset-span-at-limit", "offset-span-over", "window-at-limit", "window-over",
+    ],
+)
+def test_rule_expr_limits_are_422(spec, accepted):
+    data = sample()
+    data["constraints"] = data["constraints"] + [spec]
+    r = client.post("/api/py/solve", json=data)
+    if accepted:
+        assert r.status_code == 200, r.text
+    else:
+        assert_error(r, 422, "VALIDATION_ERROR")
+
+
+def test_constraint_cap_counts_rules():
+    # 금지 패턴을 나눠 늘어난 규칙도 하나씩 센다. 칸 고정은 따로 센다
+    data = sample()
+    first = client.post("/api/py/solve", json=data).json()["result"]["assignments"]
+    nid, row = next(iter(first.items()))
+    rules = [rule({"kind": "require", "for_each": {"per": "day"}, "then": true_cmp()}, rid=f"r{i}") for i in range(MAX_CONSTRAINTS)]
+    data["constraints"] = rules + [fixed("lock-1", nid, 1, row[0])]
+    r = client.post("/api/py/solve", json=data)
+    assert r.status_code == 200, r.text
+    data["constraints"] = data["constraints"] + [rule(rules[0]["body"], rid="r-extra")]
+    assert_error(client.post("/api/py/solve", json=data), 413, "PAYLOAD_TOO_LARGE")
 
 
 def test_422_pydantic_error_has_field_path():
