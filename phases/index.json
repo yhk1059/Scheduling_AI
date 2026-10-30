@@ -19,6 +19,10 @@
       "dir": "4-blocks",
       "status": "completed",
       "completed_at": "2026-10-30T01:40:17+0900"
+    },
+    {
+      "dir": "5-expressions",
+      "status": "pending"
     }
   ]
 }

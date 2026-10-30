@@ -1,0 +1,71 @@
+{
+  "project": "nurse-scheduler",
+  "phase": "5-expressions",
+  "steps": [
+    {
+      "step": 0,
+      "name": "golden-blocks",
+      "status": "pending"
+    },
+    {
+      "step": 1,
+      "name": "domain-expr",
+      "status": "pending"
+    },
+    {
+      "step": 2,
+      "name": "evaluate-expr",
+      "status": "pending"
+    },
+    {
+      "step": 3,
+      "name": "compile-expr",
+      "status": "pending"
+    },
+    {
+      "step": 4,
+      "name": "perf-expr",
+      "status": "pending"
+    },
+    {
+      "step": 5,
+      "name": "llm-expr",
+      "status": "pending"
+    },
+    {
+      "step": 6,
+      "name": "examples-route",
+      "status": "pending"
+    },
+    {
+      "step": 7,
+      "name": "eval-expr",
+      "status": "pending"
+    },
+    {
+      "step": 8,
+      "name": "backend-cleanup",
+      "status": "pending"
+    },
+    {
+      "step": 9,
+      "name": "client-lib",
+      "status": "pending"
+    },
+    {
+      "step": 10,
+      "name": "ui-setup-coverage",
+      "status": "pending"
+    },
+    {
+      "step": 11,
+      "name": "ui-cards",
+      "status": "pending"
+    },
+    {
+      "step": 12,
+      "name": "samples-e2e",
+      "status": "pending"
+    }
+  ]
+}
