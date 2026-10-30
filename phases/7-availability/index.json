@@ -13,7 +13,10 @@
     {
       "step": 1,
       "name": "flow-steps",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-10-31T00:25:57+0900",
+      "summary": "근무표 작성을 ① 가능 시간(준비 요약 + 링크 표 자리) → ② 매장 조건(요약표, 입력창 하나, 예시 3개, 접힌 숫자 입력, 카드) → ③ 근무표(접힌 예외 입력)로 바꿈. PeriodWork·RulesStep(intro 삭제, step·summary·afterInput prop)·ScheduleStep·SetupFlow·ShopHome, lib/store(PeriodStep, liveShopRules, summarizedCoverageIds), lib/wording(coverageText, TASK_STEPS 4단계), lib/availability(isAvailabilityRule, mergeAvailabilityConflicts). 결정: 해 없음에서 가능 시간은 직원마다 한 줄로 묶고(step 0에서 step 3로 넘긴 일을 여기서 처리) 끄기 버튼 없이 보이며, 원인을 모를 때의 끄기 목록에서도 뺀다. PeriodRules 목록을 없애고 ② 카드에 이 근무표의 꺼짐·수정본을 보여 준다(꺼진 필요 인원은 요약표에서 빠져 카드로 다시 켠다, 이 근무표에서 바꾼 규칙은 끄고 켜기만). 명단에 없는 직원 차단은 ②의 [다음]에서 규칙만 보고, 요청은 ③의 예외 입력을 펼쳐 카드 경고로 보인다. SetupFlow는 step 2에서 지울 것이라 ①·② 두 단계로만 줄이고 store의 setupStep·introSeen·markIntroSeen은 그대로 두어 step 2에서 지운다.",
+      "completed_at": "2026-10-31T00:32:33+0900"
     },
     {
       "step": 2,
