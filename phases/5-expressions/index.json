@@ -37,7 +37,10 @@
     {
       "step": 4,
       "name": "perf-expr",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-10-30T13:44:30+0900",
+      "completed_at": "2026-10-30T13:55:50+0900",
+      "summary": "test_routes에 식 상한 경계 13개(values 5/6·Cmp 6/7·offset −7/−8·+14/+15·폭 14/15·window 14/15는 Pydantic 422, 규칙 200개+칸 고정은 통과·201개는 413 — rule도 제약 상한에 셈; step 1 구현으로 바로 통과). bench.py: 블록 병동과 식 병동(rules_request + 식 고유 12: 조건부 5(when + 그리고), 짝 3(따로 2·같이 1), 세기끼리 2, offset 폭 14 2 → 규칙 78개)을 나란히 잼. 결과(15코어, 다중 워커): 블록 solve ok(optimal=false) 10.37s·충돌 변형 infeasible 0.47s·find_conflicts 5.00s 4개(leave-crowd 포함); 식 solve ok(optimal=false) 10.85s·infeasible 0.98s·find_conflicts 5.00s 4개(leave-crowd 포함) — 모두 10s+OVERHEAD_S 1s·5s+1s 안, 상한 변경 없음(ARCHITECTURE·§11 그대로). 성능(의미 유지): 식 모델 만들기 1.48s → 0.75s(블록 0.49 → 0.32s) — ModelContext가 셀렉터별 (코드, 계수)와 max_cell_value를 캐시(_weights·max_value, compile._count가 사용), evaluate.count_scope가 carry를 한 번만 만듦. 발견: 처음 벤치 이력(위상 i%10)에서는 식 병동이 해 없음 — step 2에 기록한 then_off 이월 경계(이월 −1일 N·0일 O면 1일도 휴무)로 책임 8명이 1일에 데이를 못 함(core charge-D·forbid-misc·after-night); 벤치 이력 위상을 i + i//5로 흩어 해결(솔버 의미는 그대로, 블록 결과도 비슷). 위험: 단일 워커(deterministic)로는 블록 10.33s·식 10.76s 모두 timeout(4-blocks step 3과 같음) — Vercel vCPU 수에서 재확인 필요; 식 solve 여유는 0.15s 정도. pytest 1216·vitest 292, gen:golden --check·build·lint(기존 경고 1) 통과."
     },
     {
       "step": 5,
