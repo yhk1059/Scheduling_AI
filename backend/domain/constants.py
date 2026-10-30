@@ -2,7 +2,7 @@
 
 # 입력 상한 (초과 시 413)
 MAX_EMPLOYEES = 40
-MAX_CONSTRAINTS = 200  # 고정 근무(칸 고정, 지난 날짜 잠금)를 뺀 규칙·요청
+MAX_CONSTRAINTS = 200  # 고정 근무(칸 고정, 지난 날짜 잠금)와 가능 시간 규칙을 뺀 규칙·요청
 MAX_TEXT_CHARS = 1000
 CARRY_OVER_DAYS = 7
 MAX_PERIOD_DAYS = 31
@@ -36,6 +36,7 @@ DEFAULT_SHIFTS: list[tuple[str, str, float, str | None, str | None]] = [
 
 # 직원 가능 시간에서 만든 규칙의 id 접두사. 완화 제안 대상이 아니다
 AVAILABILITY_RULE_PREFIX = "avail-"
+MAX_AVAILABILITY_RULES = MAX_EMPLOYEES * (MAX_SHIFT_CODES - 1)  # 직원 × 휴무 뺀 코드. 규칙·요청 상한과 따로 센다
 
 # LLM
 LLM_MAX_RETRIES = 2

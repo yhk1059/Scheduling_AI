@@ -13,10 +13,12 @@ from pydantic import BaseModel, TypeAdapter, ValidationError
 from starlette.concurrency import run_in_threadpool
 
 from backend.domain.constants import (
+    AVAILABILITY_RULE_PREFIX,
     EXAMPLES_PER_RULE,
     EXAMPLES_SAMPLES,
     EXAMPLES_SEED,
     EXAMPLES_TIME_BUDGET_S,
+    MAX_AVAILABILITY_RULES,
     MAX_CONSTRAINTS,
     MAX_FIXED_ASSIGNMENTS,
     MAX_EMPLOYEES,
@@ -180,7 +182,10 @@ def _check_limits(data: Any) -> None:
             raise ApiError(413, "PAYLOAD_TOO_LARGE", f"근무 코드는 최대 {MAX_SHIFT_CODES}개입니다")
         if isinstance(constraints, list):
             fixed = sum(1 for c in constraints if isinstance(c, dict) and c.get("type") == "fixed_assignment")
-            if len(constraints) - fixed > MAX_CONSTRAINTS:
+            avail = sum(1 for c in constraints if isinstance(c, dict) and str(c.get("id", "")).startswith(AVAILABILITY_RULE_PREFIX))
+            if avail > MAX_AVAILABILITY_RULES:
+                raise ApiError(413, "PAYLOAD_TOO_LARGE", f"가능 시간 규칙은 최대 {MAX_AVAILABILITY_RULES}개입니다")
+            if len(constraints) - fixed - avail > MAX_CONSTRAINTS:
                 raise ApiError(413, "PAYLOAD_TOO_LARGE", f"제약은 최대 {MAX_CONSTRAINTS}개입니다")
             if fixed > MAX_FIXED_ASSIGNMENTS:
                 raise ApiError(413, "PAYLOAD_TOO_LARGE", f"고정 근무는 최대 {MAX_FIXED_ASSIGNMENTS}개입니다")

@@ -646,6 +646,45 @@ describe("이번 기간만 끄기와 제안 수락", () => {
 });
 
 describe("toScheduleRequest", () => {
+  it("가능 시간이 없는 기간은 가능 시간 규칙을 더하지 않는다", () => {
+    const { store, period } = withPeriod();
+    const req = toScheduleRequest(store.getState().shop!, period(), store.getState().periods, TODAY);
+    expect(req.constraints!.filter((c) => c.id.startsWith("avail-"))).toEqual([]);
+  });
+
+  it("가능 시간을 반드시 규칙으로 더하고 매장 조건에는 저장하지 않는다", () => {
+    const { store, id, period } = withPeriod();
+    const start = period().start_date;
+    store.setState((s) => ({
+      periods: s.periods.map((p) => (p.id === id ? { ...p, availability: { e01: { [start]: [["07:00", "15:00"]] } } } : p)),
+    }));
+    const req = toScheduleRequest(store.getState().shop!, period(), store.getState().periods, TODAY);
+    const rule = (rid: string) => req.constraints!.find((c) => c.id === rid) as Rule;
+    const days = (rid: string) => (rule(rid).body as Extract<Rule["body"], { kind: "require" }>).for_each.days?.days;
+    const all = Array.from({ length: period().length }, (_, i) => i + 1);
+    expect(days("avail-e01-D")).toEqual(all.slice(1)); // 첫날 D는 덮는다
+    expect(days("avail-e01-E")).toEqual(all);
+    expect(days("avail-e02-D")).toEqual(all); // 제출하지 않은 직원은 어느 칸에도 배정되지 않는다
+    expect(rule("avail-e02-D").source_text).toBe("박민수 가능 시간");
+    expect(store.getState().shop!.rules.some((r) => r.id.startsWith("avail-"))).toBe(false);
+  });
+
+  it("칸 고정은 가능 시간보다 우선한다. 꺼진 고정은 우선하지 않는다", () => {
+    const { store, id, period } = withPeriod();
+    store.setState((s) => ({
+      periods: s.periods.map((p) =>
+        p.id === id
+          ? { ...p, availability: {}, requests: [fixedCell("e01", 2, "D", { id: "on" }), fixedCell("e01", 3, "D", { id: "off" })], disabledIds: ["off"] }
+          : p,
+      ),
+    }));
+    const req = toScheduleRequest(store.getState().shop!, period(), store.getState().periods, TODAY);
+    const rule = req.constraints!.find((c) => c.id === "avail-e01-D") as Rule;
+    const forbidden = (rule.body as Extract<Rule["body"], { kind: "require" }>).for_each.days?.days;
+    expect(forbidden).not.toContain(2);
+    expect(forbidden).toContain(3);
+  });
+
   it("현재 매장과 기간으로 요청 본문을 만든다(근무 형태·태그, override 적용, 꺼진 제약 enabled=false)", () => {
     const { store, id, period } = withPeriod();
     store.getState().setCoverage("D", "weekday", 1, 1);

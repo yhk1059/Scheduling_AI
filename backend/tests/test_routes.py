@@ -8,7 +8,9 @@ from fastapi.testclient import TestClient
 
 from backend import routes
 from backend.domain.constants import (
+    AVAILABILITY_RULE_PREFIX,
     EXAMPLES_PER_RULE,
+    MAX_AVAILABILITY_RULES,
     MAX_CONSTRAINTS,
     MAX_FIXED_ASSIGNMENTS,
     MAX_EMPLOYEES,
@@ -27,7 +29,7 @@ from backend.domain.constants import (
 from backend.llm.client import LLMConfigError, LLMUnavailableError, ToolCallResult
 from backend.routes import app, get_llm_client
 from backend.solver.model import solve as real_solve
-from backend.tests.rules import DEN_CONFIG, DEN_SHIFTS, history, sample_data
+from backend.tests.rules import DEN_CONFIG, DEN_SHIFTS, count, history, sample_data
 
 client = TestClient(app)
 
@@ -528,6 +530,35 @@ def test_solve_accepts_past_day_locks_beyond_constraint_cap():
     r = client.post("/api/py/solve", json=data)
     assert r.status_code == 200
     assert r.json()["status"] == "ok"
+
+
+def _avail(cid: str, nid: str, day: int, shift: str) -> dict:
+    return count(cid, {"in": [shift]}, "person", hi=0, people={"ids": [nid]}, days={"days": [day]}, scope="period")
+
+
+def test_solve_accepts_availability_rules_beyond_constraint_cap():
+    # 가능 시간 규칙은 직원 × 코드마다 생겨 규칙·요청 200개 상한과 따로 센다
+    data = sample()
+    first = client.post("/api/py/solve", json=data).json()["result"]["assignments"]
+    free = [(nid, d + 1, s) for nid, row in first.items() for d, code in enumerate(row) for s in ("D", "E", "N") if s != code]
+    rules = [_avail(f"{AVAILABILITY_RULE_PREFIX}{i}", *cell) for i, cell in enumerate(free[: MAX_CONSTRAINTS + 1])]
+    assert len(rules) > MAX_CONSTRAINTS
+    data["constraints"] = data["constraints"] + rules
+    r = client.post("/api/py/solve", json=data)
+    assert r.status_code == 200
+    assert r.json()["status"] == "ok"
+
+
+def test_413_too_many_availability_rules():
+    data = sample()
+    data["constraints"] = [{"id": f"{AVAILABILITY_RULE_PREFIX}{i}"} for i in range(MAX_AVAILABILITY_RULES + 1)]
+    assert_error(client.post("/api/py/solve", json=data), 413, "PAYLOAD_TOO_LARGE")
+
+
+def test_constraint_cap_still_counts_other_rules_beside_availability():
+    data = sample()
+    data["constraints"] = [{"id": f"r{i}"} for i in range(MAX_CONSTRAINTS + 1)] + [{"id": f"{AVAILABILITY_RULE_PREFIX}0"}]
+    assert_error(client.post("/api/py/solve", json=data), 413, "PAYLOAD_TOO_LARGE")
 
 
 def test_413_too_many_fixed_assignments():
