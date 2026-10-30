@@ -689,6 +689,19 @@ def call(client: AnthropicClient):
     return client.call_tool(system="s", messages=[{"role": "user", "content": "x"}], tool=TRANSLATE_TOOL)
 
 
+def test_call_sends_effort(sdk_client, monkeypatch):
+    seen = {}
+
+    def create(**kwargs):
+        seen.update(kwargs)
+        raise status_error(anthropic.RateLimitError, 429)
+
+    monkeypatch.setattr(sdk_client._client.messages, "create", create)
+    with pytest.raises(LLMUnavailableError):
+        call(sdk_client)
+    assert seen["output_config"] == {"effort": "medium"}
+
+
 def test_missing_key_config_error(monkeypatch):
     monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
     with pytest.raises(LLMConfigError):

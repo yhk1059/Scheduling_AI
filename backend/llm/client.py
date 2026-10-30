@@ -6,7 +6,7 @@ from typing import Any, Protocol
 
 import anthropic
 
-from backend.domain.constants import DEFAULT_MODEL, LLM_MAX_TOKENS, LLM_TIMEOUT_S
+from backend.domain.constants import DEFAULT_MODEL, LLM_EFFORT, LLM_MAX_TOKENS, LLM_TIMEOUT_S
 
 
 class LLMConfigError(Exception):
@@ -46,6 +46,7 @@ class AnthropicClient:
             message = self._client.messages.create(
                 model=self.model,
                 max_tokens=LLM_MAX_TOKENS,
+                output_config={"effort": LLM_EFFORT},
                 system=system,
                 messages=messages,
                 tools=[tool],
