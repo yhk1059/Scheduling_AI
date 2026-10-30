@@ -37,7 +37,7 @@ from backend.domain.models import (  # noqa: E402
     Balance,
     ConstraintSpec,
     Count,
-    Nurse,
+    Employee,
     People,
     Period,
     ScheduleRequest,
@@ -45,7 +45,7 @@ from backend.domain.models import (  # noqa: E402
     Shifts,
     TranslateContext,
     TranslateRequest,
-    WardConfig,
+    ShopConfig,
     cond_cmps,
     rule_counts,
 )
@@ -61,9 +61,9 @@ from backend.solver import evaluate, select  # noqa: E402
 
 DATASET = ROOT / "eval" / "dataset.jsonl"
 RESULTS = ROOT / "eval" / "results.md"
-SAMPLE = ROOT / "lib" / "samples" / "ward-15.json"
+SAMPLE = ROOT / "lib" / "samples" / "shop-12.json"
 STATUSES = ("ok", "clarify", "unsupported")
-SCOPES = ("ward", "period")
+SCOPES = ("shop", "period")
 SETS = ("basic", "new", "expr")
 PRIOR_SETS = ("basic", "new")  # 식 이전의 기존 79건
 EXPECTED_TYPES = ("rule", "fixed_assignment")
@@ -79,23 +79,23 @@ FLIPS_PER_COUNT = 4
 SEED = 20261030
 
 # eval 병동 = 샘플 병동 + 태그(책임 2명, 신규 3명)
-EVAL_TAGS = {"n01": ["책임"], "n06": ["책임"], "n11": ["신규"], "n12": ["신규"], "n13": ["신규"]}
+EVAL_TAGS = {"e01": ["책임"], "e06": ["책임"], "e11": ["신규"], "e12": ["신규"], "e13": ["신규"]}
 
 _spec_adapter = TypeAdapter(ConstraintSpec)
-_FILLER = {"id": "eval", "scope": "ward", "source_text": "eval", "weight": 1}
+_FILLER = {"id": "eval", "scope": "shop", "source_text": "eval", "weight": 1}
 _DUMP_EXCLUDE = {"id", "scope", "source_text", "enabled", "weight"}
 
 
-def _ward() -> dict:
-    ward = json.loads(SAMPLE.read_text(encoding="utf-8"))
-    nurses = []
-    for n in ward["nurses"]:
-        nurses.append(n | {"tags": EVAL_TAGS.get(n["id"], []) + n["tags"]})
-    return {**ward, "nurses": nurses}
+def _shop() -> dict:
+    shop = json.loads(SAMPLE.read_text(encoding="utf-8"))
+    employees = []
+    for n in shop["employees"]:
+        employees.append(n | {"tags": EVAL_TAGS.get(n["id"], []) + n["tags"]})
+    return {**shop, "employees": employees}
 
 
-def _known_tags(ward: dict) -> set[str]:
-    return {t for n in ward["nurses"] for t in n["tags"]}
+def _known_tags(shop: dict) -> set[str]:
+    return {t for n in shop["employees"] for t in n["tags"]}
 
 
 def load_dataset(path: Path) -> list[dict]:
@@ -106,7 +106,7 @@ def load_dataset(path: Path) -> list[dict]:
 # --- 근무 형태 ---
 
 
-def _apply_changes(config: WardConfig, changes: list, only_new: bool = False) -> tuple[WardConfig, list[str]]:
+def _apply_changes(config: ShopConfig, changes: list, only_new: bool = False) -> tuple[ShopConfig, list[str]]:
     """설정 변경을 적용한다. only_new면 아직 없는 코드의 add만(실제 출력의 코드를 판정 근무표에 넣을 때)."""
     shifts = {s.code: s for s in config.shifts}
     errors = []
@@ -123,10 +123,10 @@ def _apply_changes(config: WardConfig, changes: list, only_new: bool = False) ->
             errors.append(f"config_changes.{i}: {ch.action} {code}")
         else:
             shifts[code] = ch.shift
-    return WardConfig(shifts=list(shifts.values())), errors
+    return ShopConfig(shifts=list(shifts.values())), errors
 
 
-def judge_config(expected_changes: list, actual_changes: list = ()) -> WardConfig:
+def judge_config(expected_changes: list, actual_changes: list = ()) -> ShopConfig:
     """판정 근무표의 근무 형태: 기본 + 기대 설정 변경 + 실제 출력이 새로 더한 코드."""
     config, _ = _apply_changes(DEFAULT_CONFIG, expected_changes)
     try:
@@ -139,9 +139,9 @@ def judge_config(expected_changes: list, actual_changes: list = ()) -> WardConfi
 # --- 채점 ---
 
 
-def _period(case: dict | None, ward: dict) -> tuple[Period, list[int]]:
+def _period(case: dict | None, shop: dict) -> tuple[Period, list[int]]:
     case = case or {}
-    return Period(**case.get("period", ward["period"])), case.get("holidays", ward["holidays"])
+    return Period(**case.get("period", shop["period"])), case.get("holidays", shop["holidays"])
 
 
 def _spec(c: dict | BaseModel) -> Any:
@@ -166,7 +166,7 @@ def _targets(request: ScheduleRequest, spec: Any) -> list[tuple[list[tuple[str, 
     """규칙이 세는 칸(기간 안)과 그 칸의 근무 셀렉터. 세기마다 하나."""
     if spec.type == "fixed_assignment":
         p = spec.params
-        return [([(p.nurse_id, p.day)], Shifts(in_=[p.shift]))]
+        return [([(p.employee_id, p.day)], Shifts(in_=[p.shift]))]
     body = spec.body
     if isinstance(body, Balance):
         return [([(n, d) for n, ds in select.balance_cells(request, body).items() for d in ds], body.shifts)]
@@ -177,18 +177,18 @@ def _targets(request: ScheduleRequest, spec: Any) -> list[tuple[list[tuple[str, 
     ]
 
 
-def judge_schedules(case: dict | None, config: WardConfig, expected: list) -> list[tuple[ScheduleRequest, dict]]:
+def judge_schedules(case: dict | None, config: ShopConfig, expected: list) -> list[tuple[ScheduleRequest, dict]]:
     """판정 근무표: 무작위 K_RANDOM개(이월 포함) + 기대 규칙의 세기마다 세는 칸을 뒤집은 FLIPS_PER_COUNT개. 고정 시드."""
-    ward = _ward()
-    period, holidays = _period(case, ward)
+    shop = _shop()
+    period, holidays = _period(case, shop)
     rng = random.Random(SEED)
     codes = [s.code for s in config.shifts if s.active]
-    ids = [n["id"] for n in ward["nurses"]]
-    base = {"config": config, "nurses": ward["nurses"], "period": period, "holidays": holidays, "input_version": 0}
+    ids = [n["id"] for n in shop["employees"]]
+    base = {"config": config, "employees": shop["employees"], "period": period, "holidays": holidays, "input_version": 0}
 
     out = []
     for _ in range(K_RANDOM):
-        carry = [{"nurse_id": nid, "shifts": rng.choices(codes, k=CARRY_OVER_DAYS)} for nid in ids]
+        carry = [{"employee_id": nid, "shifts": rng.choices(codes, k=CARRY_OVER_DAYS)} for nid in ids]
         assignments = {nid: rng.choices(codes, k=period.days) for nid in ids}
         out.append((ScheduleRequest.model_validate({**base, "carry_over": carry}), assignments))
 
@@ -236,13 +236,13 @@ def _violation_keys(request: ScheduleRequest, assignments: dict, spec: Any) -> f
     """근무표 하나의 위반 집합 {(사람 묶음, 날)}. 사람이 묶인 범위는 그 사람, 아니면 규칙이 세는 사람 전체로 본다."""
     if spec.type == "fixed_assignment":
         p = spec.params
-        return frozenset() if assignments[p.nurse_id][p.day - 1] == p.shift else frozenset({(frozenset({p.nurse_id}), p.day)})
+        return frozenset() if assignments[p.employee_id][p.day - 1] == p.shift else frozenset({(frozenset({p.employee_id}), p.day)})
     if spec.type != "rule":
         raise ValueError(f"식이 아닌 제약 {spec.type}")
     everyone = _scope_people(request, spec)
     keys = set()
     for v in evaluate.evaluate_rule(request, assignments, spec):
-        group = frozenset({v.instance.nurse_id}) if v.instance.nurse_id else everyone
+        group = frozenset({v.instance.employee_id}) if v.instance.employee_id else everyone
         if isinstance(spec.body, Balance):
             keys.add((group, None))
             continue
@@ -264,7 +264,7 @@ def _judge_key(spec: Any, schedules: list) -> tuple:
     return (_signature(spec, schedules), spec.hardness, priority)
 
 
-def score_constraints(expected: list, actual: list, case: dict | None = None, config: WardConfig | None = None) -> tuple[int, int, int]:
+def score_constraints(expected: list, actual: list, case: dict | None = None, config: ShopConfig | None = None) -> tuple[int, int, int]:
     """의미 기준 일대일 매칭(식 규칙 단위). (일치 수, 기대 수, 실제 수)."""
     config = config or judge_config([])
     exp_rules, act_rules = [_spec(c) for c in expected], [_spec(c) for c in actual]
@@ -298,8 +298,8 @@ def _people_selectors(spec: Any) -> list[People]:
 
 
 def validate_dataset(cases: list[dict]) -> list[str]:
-    ward = _ward()
-    known_tags = _known_tags(ward)
+    shop = _shop()
+    known_tags = _known_tags(shop)
     errors: list[str] = []
     ids = [c.get("id") for c in cases]
     dups = sorted({i for i in ids if ids.count(i) > 1})
@@ -340,9 +340,9 @@ def validate_dataset(cases: list[dict]) -> list[str]:
             req = ScheduleRequest.model_validate(
                 {
                     "config": config,
-                    "nurses": ward["nurses"],
-                    "period": c.get("period", ward["period"]),
-                    "holidays": c.get("holidays", ward["holidays"]),
+                    "employees": shop["employees"],
+                    "period": c.get("period", shop["period"]),
+                    "holidays": c.get("holidays", shop["holidays"]),
                     "constraints": specs,
                     "input_version": 0,
                 }
@@ -397,21 +397,21 @@ class CaseResult:
     actual_changes: list[dict] = field(default_factory=list)  # 실제 근무 형태 변경(ShiftDef)
 
 
-def _request(case: dict, ward: dict) -> TranslateRequest:
+def _request(case: dict, shop: dict) -> TranslateRequest:
     return TranslateRequest(
         text=case["text"],
         scope=case["scope"],
         context=TranslateContext(
-            nurses=[Nurse(**n) for n in ward["nurses"]],
-            period=Period(**case.get("period", ward["period"])),
-            holidays=case.get("holidays", ward["holidays"]),
+            employees=[Employee(**n) for n in shop["employees"]],
+            period=Period(**case.get("period", shop["period"])),
+            holidays=case.get("holidays", shop["holidays"]),
             today=date.fromisoformat(case["today"]),
         ),
         input_version=0,
     )
 
 
-def run_case(case: dict, client: LLMClient, ward: dict) -> CaseResult:
+def run_case(case: dict, client: LLMClient, shop: dict) -> CaseResult:
     metered = _MeteredClient(client)
     expected = case["expected"]
     exp_constraints = expected.get("constraints", [])
@@ -419,7 +419,7 @@ def run_case(case: dict, client: LLMClient, ward: dict) -> CaseResult:
     status, actual, changes, detail, error = None, [], [], None, None
     start = time.perf_counter()
     try:
-        res = translate(_request(case, ward), metered)
+        res = translate(_request(case, shop), metered)
         status = res.status
         if status == "ok":
             actual, changes = res.constraints, res.config_changes
@@ -458,10 +458,10 @@ def run_case(case: dict, client: LLMClient, ward: dict) -> CaseResult:
 
 
 def run_cases(cases: list[dict], client: LLMClient, progress: bool = False) -> list[CaseResult]:
-    ward = _ward()
+    shop = _shop()
     results = []
     for i, case in enumerate(cases, 1):
-        r = run_case(case, client, ward)
+        r = run_case(case, client, shop)
         results.append(r)
         if progress:
             mark = "OK" if r.exact else "FAIL"

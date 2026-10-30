@@ -3,8 +3,8 @@
 import { useEffect, useRef, useState } from "react";
 
 import type { PeriodUnit } from "@/lib/period";
-import { MAX_NURSES } from "@/lib/roster-import";
-import { isNurseUsed, MAX_TAG_CHARS, MAX_TAGS_PER_NURSE, orphanConstraintIds, useAppStore, type WardNurse } from "@/lib/store";
+import { MAX_EMPLOYEES } from "@/lib/roster-import";
+import { isEmployeeUsed, MAX_TAG_CHARS, MAX_TAGS_PER_EMPLOYEE, orphanConstraintIds, useAppStore, type ShopEmployee } from "@/lib/store";
 import { unitName } from "@/lib/wording";
 
 import CoverageForm, { type CoverageDrafts } from "./CoverageForm";
@@ -20,11 +20,11 @@ const TABS = [
 
 const UNITS: PeriodUnit[] = ["month", "1w", "2w", "4w"];
 
-export default function WardSettings() {
+export default function ShopSettings() {
   const tab = useAppStore((s) => (s.view.screen === "settings" ? s.view.tab : "roster"));
-  const ward = useAppStore((s) => s.ward);
+  const shop = useAppStore((s) => s.shop);
   const go = useAppStore((s) => s.go);
-  if (!ward) return null;
+  if (!shop) return null;
 
   return (
     <div className="flex flex-col gap-5">
@@ -62,7 +62,7 @@ export default function WardSettings() {
       ) : (
         <>
           <UnconvertedNotice />
-          <RulesStep key="ward" scope="ward" />
+          <RulesStep key="shop" scope="shop" />
         </>
       )}
     </div>
@@ -71,7 +71,7 @@ export default function WardSettings() {
 
 /** 옛 저장 문서에서 새 형식으로 옮기지 못한 규칙 원문. 다시 입력한 뒤 하나씩 지운다. */
 function UnconvertedNotice() {
-  const items = useAppStore((s) => s.ward?.unconverted ?? []);
+  const items = useAppStore((s) => s.shop?.unconverted ?? []);
   const dismiss = useAppStore((s) => s.dismissUnconverted);
   if (items.length === 0) return null;
   return (
@@ -91,10 +91,10 @@ function UnconvertedNotice() {
   );
 }
 
-/** "기본" 영역: 병동 이름, 근무표 주기. 처음 설정 ①에서도 쓴다. */
+/** "기본" 영역: 매장 이름, 근무표 주기. 처음 설정 ①에서도 쓴다. */
 export function BasicSection() {
-  const ward = useAppStore((s) => s.ward)!;
-  const setWardName = useAppStore((s) => s.setWardName);
+  const shop = useAppStore((s) => s.shop)!;
+  const setShopName = useAppStore((s) => s.setShopName);
   const setUnit = useAppStore((s) => s.setUnit);
   const [unitChanged, setUnitChanged] = useState(false);
   // 근무표가 아직 없으면(처음 설정) 바뀐 주기가 영향을 줄 근무표도 없다
@@ -107,8 +107,8 @@ export function BasicSection() {
         <label className="flex flex-col gap-1">
           <span className={ui.label}>병동 이름</span>
           <input
-            value={ward.name}
-            onChange={(e) => setWardName(e.target.value)}
+            value={shop.name}
+            onChange={(e) => setShopName(e.target.value)}
             placeholder="예: 내과 병동"
             className={`${ui.input} w-64`}
           />
@@ -116,7 +116,7 @@ export function BasicSection() {
         <label className="flex flex-col gap-1">
           <span className={ui.label}>근무표 주기</span>
           <select
-            value={ward.unit}
+            value={shop.unit}
             onChange={(e) => {
               setUnit(e.target.value as PeriodUnit);
               setUnitChanged(true);
@@ -142,8 +142,8 @@ export function BasicSection() {
 
 /** 명단 표. 맨 아래 줄에 적어 한 명씩 더한다. 처음 설정 ①에서도 쓴다. */
 export function RosterSection() {
-  const ward = useAppStore((s) => s.ward)!;
-  const orphanCount = orphanConstraintIds(ward, null).length;
+  const shop = useAppStore((s) => s.shop)!;
+  const orphanCount = orphanConstraintIds(shop, null).length;
 
   return (
     <section className={`${ui.card} flex flex-col gap-3.5`}>
@@ -153,7 +153,7 @@ export function RosterSection() {
           맨 아래 줄에 이름을 적고 Enter를 누르면 한 명씩 더해져요. 이름 입력란에는 이니셜을 써도 됩니다. 바꾼 내용은 바로 저장돼요.
         </p>
       </div>
-      <NurseTable nurses={ward.nurses} />
+      <EmployeeTable employees={shop.employees} />
       {orphanCount > 0 && (
         <p className="text-xs font-medium text-[#A15C07]">
           명단에 없거나 근무표에서 뺀 간호사를 가리키는 병동 규칙이 {orphanCount}개 있어요. [병동 규칙] 탭에서 확인해 주세요.
@@ -192,12 +192,12 @@ export function CoverageSection({ collapsible = false }: { collapsible?: boolean
   );
 }
 
-function NurseTable({ nurses }: { nurses: WardNurse[] }) {
+function EmployeeTable({ employees }: { employees: ShopEmployee[] }) {
   const [showInactive, setShowInactive] = useState(false);
-  const active = nurses.filter((n) => n.active);
-  const inactive = nurses.filter((n) => !n.active);
-  // 자동 완성 후보: 병동에 있는 태그
-  const knownTags = [...new Set(nurses.flatMap((n) => n.tags))];
+  const active = employees.filter((n) => n.active);
+  const inactive = employees.filter((n) => !n.active);
+  // 자동 완성 후보: 매장에 있는 태그
+  const knownTags = [...new Set(employees.flatMap((n) => n.tags))];
 
   return (
     <div className="flex flex-col gap-2">
@@ -218,10 +218,10 @@ function NurseTable({ nurses }: { nurses: WardNurse[] }) {
           </thead>
           <tbody>
             {active.map((n, i) => (
-              <NurseRow key={n.id} nurse={n} index={i} nurses={nurses} />
+              <EmployeeRow key={n.id} employee={n} index={i} employees={employees} />
             ))}
-            {showInactive && inactive.map((n, i) => <NurseRow key={n.id} nurse={n} index={active.length + i} nurses={nurses} />)}
-            <NewNurseRow nurses={nurses} />
+            {showInactive && inactive.map((n, i) => <EmployeeRow key={n.id} employee={n} index={active.length + i} employees={employees} />)}
+            <NewEmployeeRow employees={employees} />
           </tbody>
         </table>
       </div>
@@ -231,16 +231,16 @@ function NurseTable({ nurses }: { nurses: WardNurse[] }) {
             {showInactive ? `제외된 간호사 ${inactive.length}명 접기` : `제외된 간호사 ${inactive.length}명 보기`}
           </button>
         )}
-        {nurses.length > 0 && <p className={ui.help}>근무표에서 빼도 지난 근무표와 통계에는 남아요.</p>}
+        {employees.length > 0 && <p className={ui.help}>근무표에서 빼도 지난 근무표와 통계에는 남아요.</p>}
       </div>
     </div>
   );
 }
 
 const cellInput = ui.cell;
-const TAG_LIST_ID = "ward-tags";
+const TAG_LIST_ID = "shop-tags";
 
-/** 태그 칩 입력. Enter나 쉼표로 칩을 만들고, 병동 태그를 자동 완성한다. */
+/** 태그 칩 입력. Enter나 쉼표로 칩을 만들고, 매장 태그를 자동 완성한다. */
 function TagInput({
   tags,
   onAdd,
@@ -260,7 +260,7 @@ function TagInput({
   setDraft: (v: string) => void;
 }) {
   const [msg, setMsg] = useState<string | null>(null);
-  const full = tags.length >= MAX_TAGS_PER_NURSE;
+  const full = tags.length >= MAX_TAGS_PER_EMPLOYEE;
 
   /** 칩 하나를 만든다. 만들 수 없으면 오류를 보이고 false. */
   const commit = (raw: string) => {
@@ -269,7 +269,7 @@ function TagInput({
       t.length > MAX_TAG_CHARS
         ? `태그는 ${MAX_TAG_CHARS}자까지예요`
         : full && t !== "" && !tags.includes(t)
-          ? `태그는 한 사람에 ${MAX_TAGS_PER_NURSE}개까지예요`
+          ? `태그는 한 사람에 ${MAX_TAGS_PER_EMPLOYEE}개까지예요`
           : null;
     setMsg(error);
     if (error) return false;
@@ -333,27 +333,27 @@ function TagInput({
 }
 
 /** 유효한 값은 바로 저장하고, 아니면 입력 중인 값과 오류를 행에 남긴다(id는 바뀌지 않는다). */
-function NurseRow({ nurse, index, nurses }: { nurse: WardNurse; index: number; nurses: WardNurse[] }) {
-  const updateNurse = useAppStore((s) => s.updateNurse);
+function EmployeeRow({ employee, index, employees }: { employee: ShopEmployee; index: number; employees: ShopEmployee[] }) {
+  const updateEmployee = useAppStore((s) => s.updateEmployee);
   const addTag = useAppStore((s) => s.addTag);
   const removeTag = useAppStore((s) => s.removeTag);
-  const setNurseActive = useAppStore((s) => s.setNurseActive);
-  const removeNurse = useAppStore((s) => s.removeNurse);
-  const deletable = useAppStore((s) => (s.ward ? !isNurseUsed(nurse.id, s.ward, s.periods) : false));
+  const setEmployeeActive = useAppStore((s) => s.setEmployeeActive);
+  const removeEmployee = useAppStore((s) => s.removeEmployee);
+  const deletable = useAppStore((s) => (s.shop ? !isEmployeeUsed(employee.id, s.shop, s.periods) : false));
   const [name, setName] = useState<string | null>(null);
   const [tagDraft, setTagDraft] = useState("");
 
   const nameError = (v: string) =>
     v.trim() === ""
       ? "이름이 비어 있어요"
-      : nurses.some((o) => o.id !== nurse.id && o.name === v.trim())
+      : employees.some((o) => o.id !== employee.id && o.name === v.trim())
         ? "같은 이름이 이미 있어요"
         : null;
   const nameMsg = name === null ? null : nameError(name);
 
   const onName = (v: string) => {
     if (nameError(v)) return setName(v);
-    updateNurse(nurse.id, { name: v.trim() });
+    updateEmployee(employee.id, { name: v.trim() });
     setName(null);
   };
 
@@ -362,11 +362,11 @@ function NurseRow({ nurse, index, nurses }: { nurse: WardNurse; index: number; n
   return (
     <tr className="border-b border-[#EFEFEB] last:border-b-0">
       <td className="px-2 py-1 font-mono text-xs text-[#66665E]">{row}</td>
-      {nurse.active ? (
+      {employee.active ? (
         <>
           <td className="px-1 py-1">
             <input
-              value={name ?? nurse.name}
+              value={name ?? employee.name}
               onChange={(e) => onName(e.target.value)}
               aria-label={`${row}행 이름`}
               aria-invalid={nameMsg !== null || undefined}
@@ -376,9 +376,9 @@ function NurseRow({ nurse, index, nurses }: { nurse: WardNurse; index: number; n
           </td>
           <td className="px-1 py-1">
             <TagInput
-              tags={nurse.tags}
-              onAdd={(t) => addTag(nurse.id, t)}
-              onRemove={(t) => removeTag(nurse.id, t)}
+              tags={employee.tags}
+              onAdd={(t) => addTag(employee.id, t)}
+              onRemove={(t) => removeTag(employee.id, t)}
               label={`${row}행 태그`}
               draft={tagDraft}
               setDraft={setTagDraft}
@@ -389,19 +389,19 @@ function NurseRow({ nurse, index, nurses }: { nurse: WardNurse; index: number; n
         <>
           <td className="px-2 py-1">
             <span className="flex items-center gap-2 text-[#66665E]">
-              {nurse.name}
+              {employee.name}
               <span className={`${ui.badge} bg-[#EFEFEB] text-[#66665E]`}>제외</span>
             </span>
           </td>
-          <td className="px-2 py-1 text-[#66665E]">{nurse.tags.join(", ")}</td>
+          <td className="px-2 py-1 text-[#66665E]">{employee.tags.join(", ")}</td>
         </>
       )}
       <td className="px-1 py-1">
         <div className="flex items-center justify-end gap-1">
-          <button type="button" onClick={() => setNurseActive(nurse.id, !nurse.active)} className={ui.textSm}>
-            {nurse.active ? "근무표에서 빼기" : "다시 넣기"}
+          <button type="button" onClick={() => setEmployeeActive(employee.id, !employee.active)} className={ui.textSm}>
+            {employee.active ? "근무표에서 빼기" : "다시 넣기"}
           </button>
-          {deletable ? <RowMenu name={nurse.name} onDelete={() => removeNurse(nurse.id)} /> : <span className="w-8" />}
+          {deletable ? <RowMenu name={employee.name} onDelete={() => removeEmployee(employee.id)} /> : <span className="w-8" />}
         </div>
       </td>
     </tr>
@@ -409,17 +409,17 @@ function NurseRow({ nurse, index, nurses }: { nurse: WardNurse; index: number; n
 }
 
 /** 표 맨 아래 입력 줄. Enter나 [추가]로 한 명을 더하고 다시 이름 칸으로 돌아간다. */
-function NewNurseRow({ nurses }: { nurses: WardNurse[] }) {
-  const addNurses = useAppStore((s) => s.addNurses);
+function NewEmployeeRow({ employees }: { employees: ShopEmployee[] }) {
+  const addEmployees = useAppStore((s) => s.addEmployees);
   const [name, setName] = useState("");
   const [tags, setTags] = useState<string[]>([]);
   const [tagDraft, setTagDraft] = useState("");
   const [tried, setTried] = useState(false);
   const nameRef = useRef<HTMLInputElement>(null);
 
-  const full = nurses.filter((n) => n.active).length >= MAX_NURSES;
+  const full = employees.filter((n) => n.active).length >= MAX_EMPLOYEES;
   const nameMsg =
-    name.trim() === "" ? "이름을 적어 주세요" : nurses.some((o) => o.name === name.trim()) ? "같은 이름이 이미 있어요" : null;
+    name.trim() === "" ? "이름을 적어 주세요" : employees.some((o) => o.name === name.trim()) ? "같은 이름이 이미 있어요" : null;
 
   const add = () => {
     if (full) return;
@@ -427,7 +427,7 @@ function NewNurseRow({ nurses }: { nurses: WardNurse[] }) {
     // 칸에 적다 만 태그도 함께 넣는다
     const draft = tagDraft.trim();
     const all = draft && draft.length <= MAX_TAG_CHARS && !tags.includes(draft) ? [...tags, draft] : tags;
-    addNurses([{ name: name.trim(), tags: all.slice(0, MAX_TAGS_PER_NURSE) }]);
+    addEmployees([{ name: name.trim(), tags: all.slice(0, MAX_TAGS_PER_EMPLOYEE) }]);
     setName("");
     setTags([]);
     setTagDraft("");
@@ -444,7 +444,7 @@ function NewNurseRow({ nurses }: { nurses: WardNurse[] }) {
     return (
       <tr>
         <td colSpan={4} className={`${ui.help} px-2 py-2`}>
-          간호사는 최대 {MAX_NURSES}명까지 넣을 수 있어요.
+          간호사는 최대 {MAX_EMPLOYEES}명까지 넣을 수 있어요.
         </td>
       </tr>
     );
@@ -490,7 +490,7 @@ function NewNurseRow({ nurses }: { nurses: WardNurse[] }) {
   );
 }
 
-/** 행 끝 ⋯ 메뉴. [삭제]는 근무표에 들어간 적 없는 간호사에게만 둔다. */
+/** 행 끝 ⋯ 메뉴. [삭제]는 근무표에 들어간 적 없는 직원에게만 둔다. */
 function RowMenu({ name, onDelete }: { name: string; onDelete: () => void }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);

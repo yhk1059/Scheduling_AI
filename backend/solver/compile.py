@@ -33,7 +33,7 @@ class _Bound:
     lo: int | None
     hi: int | None
     span: int  # |expr|의 상한
-    cell: tuple[str, int, object] | None = None  # (nurse_id, 날, 셀렉터)
+    cell: tuple[str, int, object] | None = None  # (employee_id, 날, 셀렉터)
 
     def holds(self, v: int) -> bool:
         return (self.lo is None or v >= self.lo) and (self.hi is None or v <= self.hi)

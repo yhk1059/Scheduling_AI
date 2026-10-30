@@ -29,10 +29,10 @@ export default function CoverageForm({
   drafts: CoverageDrafts;
   setDrafts: (update: (d: CoverageDrafts) => CoverageDrafts) => void;
 }) {
-  const ward = useAppStore((s) => s.ward);
-  const constraints = ward?.rules ?? [];
+  const shop = useAppStore((s) => s.shop);
+  const constraints = shop?.rules ?? [];
   const setCoverage = useAppStore((s) => s.setCoverage);
-  const SHIFTS = coverageCodes(ward?.config ?? { shifts: [{ code: "O", name: "휴무", hours: 0 }] }).map((s) => ({
+  const SHIFTS = coverageCodes(shop?.config ?? { shifts: [{ code: "O", name: "휴무", hours: 0 }] }).map((s) => ({
     shift: s.code,
     label: s.name,
   }));

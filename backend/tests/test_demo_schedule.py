@@ -1,4 +1,4 @@
-"""샘플 데모 근무표(lib/samples/demo-schedule.json): 샘플 병동의 고정된 한 달을 병동 규칙대로 풀어 둔 것(ADR-016)."""
+"""샘플 데모 근무표(lib/samples/demo-schedule.json): 샘플 매장의 고정된 한 달을 매장 규칙대로 풀어 둔 것(ADR-016)."""
 
 import json
 from pathlib import Path
@@ -8,7 +8,7 @@ from backend.gen_demo import DEMO_PERIOD, demo_request
 from backend.solver.model import solve
 
 ROOT = Path(__file__).resolve().parents[2]
-WARD = json.loads((ROOT / "lib" / "samples" / "ward-15.json").read_text(encoding="utf-8"))
+SHOP = json.loads((ROOT / "lib" / "samples" / "shop-12.json").read_text(encoding="utf-8"))
 DEMO = json.loads((ROOT / "lib" / "samples" / "demo-schedule.json").read_text(encoding="utf-8"))
 
 
@@ -24,11 +24,11 @@ def _max_run(row: list[str]) -> int:
     return best
 
 
-def test_sample_ward_rules():
-    """샘플 병동 파일(lib/samples)은 식 규칙이다. 필요 인원은 기본 규칙."""
-    rules = {c["id"]: c for c in WARD["constraints"] if not c["id"].startswith("cov-")}
-    assert all(c["scope"] == "ward" and c["type"] == "rule" for c in WARD["constraints"])
-    assert all(c["default"] for c in WARD["constraints"] if c["id"].startswith("cov-"))
+def test_sample_shop_rules():
+    """샘플 매장 파일(lib/samples)은 식 규칙이다. 필요 인원은 기본 규칙."""
+    rules = {c["id"]: c for c in SHOP["constraints"] if not c["id"].startswith("cov-")}
+    assert all(c["scope"] == "shop" and c["type"] == "rule" for c in SHOP["constraints"])
+    assert all(c["default"] for c in SHOP["constraints"] if c["id"].startswith("cov-"))
     assert {cid: (c["hardness"], c["default"]) for cid, c in rules.items()} == {
         "rule-noff": ("hard", False),
         "rule-max-work": ("hard", False),
@@ -42,12 +42,12 @@ def test_sample_ward_rules():
     assert rules["rule-min-off"]["values"]["min"]["value"] == 8
 
 
-def test_demo_request_uses_ward_rules_only():
-    """샘플 병동 규칙을 그대로 쓴다."""
+def test_demo_request_uses_shop_rules_only():
+    """샘플 매장 규칙을 그대로 쓴다."""
     req = demo_request()
     assert req.period.model_dump(mode="json") == DEMO_PERIOD
     assert req.holidays == [] and req.carry_over == [] and req.previous is None
-    assert [c.id for c in req.constraints] == [c["id"] for c in WARD["constraints"]]
+    assert [c.id for c in req.constraints] == [c["id"] for c in SHOP["constraints"]]
     assert {c.type for c in req.constraints} == {"rule"}
 
 
@@ -57,7 +57,7 @@ def test_file_records_period():
 
 def test_schedule_shape():
     a = _assignments()
-    assert sorted(a) == sorted(n["id"] for n in WARD["nurses"])
+    assert sorted(a) == sorted(n["id"] for n in SHOP["employees"])
     assert all(len(row) == DEMO_PERIOD["length"] for row in a.values())
 
 
@@ -68,11 +68,11 @@ def test_everyone_gets_days_off():
         assert _max_run(row) <= 5, nid
 
 
-def test_schedule_satisfies_ward_rules():
+def test_schedule_satisfies_shop_rules():
     """모든 칸을 고정 배정으로 걸고 다시 풀어도 해가 있다 = 필요 인원과 hard 규칙을 모두 지킨다."""
     fixed = [
         {"id": f"fx-{nid}-{d}", "type": "fixed_assignment", "scope": "period", "source_text": "데모",
-         "params": {"nurse_id": nid, "day": d, "shift": s}}
+         "params": {"employee_id": nid, "day": d, "shift": s}}
         for nid, row in _assignments().items()
         for d, s in enumerate(row, start=1)
     ]

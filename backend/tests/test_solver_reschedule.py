@@ -5,7 +5,7 @@ import pytest
 from backend.domain.models import ScheduleRequest, SolveOk
 from backend.solver.model import solve
 from backend.tests.rules import fixed, leave, sample_data
-from backend.tests.test_solver_hard import nurse
+from backend.tests.test_solver_hard import employee
 
 
 def sample() -> dict:
@@ -30,10 +30,10 @@ def changed_cells(before: dict, after: dict) -> set[tuple[str, int]]:
 
 def assert_diff_matches(result, previous: dict) -> None:
     expected = changed_cells(previous, result.assignments)
-    assert {(c.nurse_id, c.day) for c in result.diff} == expected
+    assert {(c.employee_id, c.day) for c in result.diff} == expected
     for c in result.diff:
-        assert c.before == previous[c.nurse_id][c.day - 1]
-        assert c.after == result.assignments[c.nurse_id][c.day - 1]
+        assert c.before == previous[c.employee_id][c.day - 1]
+        assert c.after == result.assignments[c.employee_id][c.day - 1]
 
 
 @pytest.fixture(scope="module")
@@ -52,7 +52,7 @@ def test_identical_rerun_has_empty_diff(base):
 
 
 def test_sick_leave_changes_few_cells(base):
-    nid = "n03"
+    nid = "e03"
     raw = sample()
     raw["previous"] = base
     raw["constraints"].append(leave("sick", nid, [10, 11, 12]))
@@ -63,23 +63,23 @@ def test_sick_leave_changes_few_cells(base):
 
 
 def test_fixed_assignment_edit_is_applied_with_few_changes(base):
-    nid, day = "n05", 15
+    nid, day = "e05", 15
     target = "N" if base[nid][day - 1] != "N" else "D"
     raw = sample()
     raw["previous"] = base
     raw["constraints"].append(fixed("fix", nid, day, target))
     result = solve_result(raw)
     assert result.assignments[nid][day - 1] == target
-    assert (nid, day) in {(c.nurse_id, c.day) for c in result.diff}
+    assert (nid, day) in {(c.employee_id, c.day) for c in result.diff}
     assert len(result.diff) <= 6
     assert_diff_matches(result, base)
 
 
-def test_new_nurse_not_in_previous_is_ignored_by_diff(base):
+def test_new_employee_not_in_previous_is_ignored_by_diff(base):
     raw = sample()
-    raw["nurses"].append(nurse("n99"))
+    raw["employees"].append(employee("e99"))
     raw["previous"] = base
     result = solve_result(raw)
-    assert "n99" in result.assignments
-    assert all(c.nurse_id != "n99" for c in result.diff)
+    assert "e99" in result.assignments
+    assert all(c.employee_id != "e99" for c in result.diff)
     assert_diff_matches(result, base)

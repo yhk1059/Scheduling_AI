@@ -19,10 +19,10 @@ from backend.domain.constants import (
     EXAMPLES_TIME_BUDGET_S,
     MAX_CONSTRAINTS,
     MAX_FIXED_ASSIGNMENTS,
-    MAX_NURSES,
+    MAX_EMPLOYEES,
     MAX_PROPOSALS,
     MAX_SHIFT_CODES,
-    MAX_TAGS_PER_NURSE,
+    MAX_TAGS_PER_EMPLOYEE,
     MAX_TEXT_CHARS,
     PROPOSAL_VERIFY_TIME_LIMIT_S,
 )
@@ -44,7 +44,7 @@ from backend.domain.models import (
     TranslateOk,
     TranslateRequest,
     TranslateUnsupported,
-    WardConfig,
+    ShopConfig,
     with_value,
 )
 from backend.env import load_local_env
@@ -168,13 +168,13 @@ def _check_limits(data: Any) -> None:
     for part in (data, data.get("context"), data.get("request")):
         if not isinstance(part, dict):
             continue
-        nurses, constraints = part.get("nurses"), part.get("constraints")
-        if isinstance(nurses, list) and len(nurses) > MAX_NURSES:
-            raise ApiError(413, "PAYLOAD_TOO_LARGE", f"간호사는 최대 {MAX_NURSES}명입니다")
-        if isinstance(nurses, list) and any(
-            isinstance(n, dict) and isinstance(n.get("tags"), list) and len(n["tags"]) > MAX_TAGS_PER_NURSE for n in nurses
+        employees, constraints = part.get("employees"), part.get("constraints")
+        if isinstance(employees, list) and len(employees) > MAX_EMPLOYEES:
+            raise ApiError(413, "PAYLOAD_TOO_LARGE", f"직원은 최대 {MAX_EMPLOYEES}명입니다")
+        if isinstance(employees, list) and any(
+            isinstance(n, dict) and isinstance(n.get("tags"), list) and len(n["tags"]) > MAX_TAGS_PER_EMPLOYEE for n in employees
         ):
-            raise ApiError(413, "PAYLOAD_TOO_LARGE", f"태그는 사람당 최대 {MAX_TAGS_PER_NURSE}개입니다")
+            raise ApiError(413, "PAYLOAD_TOO_LARGE", f"태그는 사람당 최대 {MAX_TAGS_PER_EMPLOYEE}개입니다")
         config = part.get("config")
         if isinstance(config, dict) and isinstance(config.get("shifts"), list) and len(config["shifts"]) > MAX_SHIFT_CODES:
             raise ApiError(413, "PAYLOAD_TOO_LARGE", f"근무 코드는 최대 {MAX_SHIFT_CODES}개입니다")
@@ -242,19 +242,19 @@ def _examples(req: TranslateRequest, ok: TranslateOk) -> dict[str, list[RuleExam
     ctx = req.context
     rules = [c for c in ok.constraints if isinstance(c, Rule)]
     out: dict[str, list[RuleExample]] = {r.id: [] for r in rules}
-    if not ctx.nurses:
+    if not ctx.employees:
         return out
     shifts = {s.code: s for s in ctx.config.shifts}
     for change in ok.config_changes:  # translate가 이미 검증했다
         shifts[change.shift.code] = change.shift
-    config = WardConfig(shifts=list(shifts.values()))
+    config = ShopConfig(shifts=list(shifts.values()))
     deadline = monotonic() + EXAMPLES_TIME_BUDGET_S
     for rule in rules:
         if monotonic() >= deadline:
             break
         request = ScheduleRequest(
             config=config,
-            nurses=ctx.nurses,
+            employees=ctx.employees,
             period=ctx.period,
             holidays=ctx.holidays,
             constraints=[rule],

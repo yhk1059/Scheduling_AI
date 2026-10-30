@@ -1,8 +1,8 @@
 "use client";
 
 import { formatRange } from "@/lib/period";
-import { homeSummary, isWardReady, upcomingRange, useAppStore, viewForPeriod, type WorkPeriod } from "@/lib/store";
-import { nextTask, scheduleName, TASK_STEPS, taskDoneSteps, unitShort, wardRuleCount } from "@/lib/wording";
+import { homeSummary, isShopReady, upcomingRange, useAppStore, viewForPeriod, type WorkPeriod } from "@/lib/store";
+import { nextTask, scheduleName, TASK_STEPS, taskDoneSteps, unitShort, shopRuleCount } from "@/lib/wording";
 
 import { markConfirmedEntry } from "./confirmedEntry";
 import { today } from "./RulesStep";
@@ -64,24 +64,24 @@ function TaskProgress({ done }: { done: number }) {
   );
 }
 
-export default function WardHome() {
-  const ward = useAppStore((s) => s.ward);
+export default function ShopHome() {
+  const shop = useAppStore((s) => s.shop);
   const periods = useAppStore((s) => s.periods);
   const createPeriod = useAppStore((s) => s.createPeriod);
   const go = useAppStore((s) => s.go);
-  if (!ward) return null;
+  if (!shop) return null;
 
-  const ready = isWardReady(ward);
-  const nurseCount = ward.nurses.filter((n) => n.active).length;
+  const ready = isShopReady(shop);
+  const employeeCount = shop.employees.filter((n) => n.active).length;
   const now = today();
   const { operating, next, recent } = homeSummary(periods, now);
-  const task = nextTask(ward, periods, now);
+  const task = nextTask(shop, periods, now);
   const create = () => createPeriod(now);
   const open = (p: WorkPeriod) => go(viewForPeriod(p));
-  const name = (p: WorkPeriod) => scheduleName(p, ward.unit);
+  const name = (p: WorkPeriod) => scheduleName(p, shop.unit);
   // 다음 근무표가 확정됐고 그 뒤에 만든 근무표가 없으면 그다음 근무표를 만들 수 있다
   const canCreateAfter = next.state === "confirmed" && periods.at(-1)?.id === next.period.id;
-  const afterName = scheduleName(upcomingRange(ward.unit, periods, now), ward.unit);
+  const afterName = scheduleName(upcomingRange(shop.unit, periods, now), shop.unit);
   // 운영 중 카드·지금 할 일 카드에 나온 근무표는 다시 보여 주지 않는다
   const shown = new Set([operating?.id, next.state === "none" ? undefined : next.period.id]);
   const past = recent.filter((p) => p.status === "confirmed" && !shown.has(p.id));
@@ -103,11 +103,11 @@ export default function WardHome() {
   return (
     <div className="flex flex-col gap-5">
       <div className="flex items-center justify-between gap-4">
-        <h1 className="text-[22px] font-semibold text-[#1B1B18]">{ward.name || "이름 없는 병동"}</h1>
+        <h1 className="text-[22px] font-semibold text-[#1B1B18]">{shop.name || "이름 없는 병동"}</h1>
         <div className="flex items-center gap-2 text-sm text-[#3D3D38]">
           <span>
-            간호사 <span className="font-mono">{nurseCount}</span>명 · 병동 규칙{" "}
-            <span className="font-mono">{wardRuleCount(ward.rules)}</span>개 · {unitShort(ward.unit)}
+            간호사 <span className="font-mono">{employeeCount}</span>명 · 병동 규칙{" "}
+            <span className="font-mono">{shopRuleCount(shop.rules)}</span>개 · {unitShort(shop.unit)}
           </span>
           <button type="button" onClick={() => go({ screen: "settings", tab: "roster" })} className={ui.text}>
             병동 설정
@@ -160,7 +160,7 @@ export default function WardHome() {
               <div className="flex items-center gap-2">
                 <h2 className={ui.cardTitle}>{task.name}</h2>
                 <span className="font-mono text-xs text-[#66665E]">
-                  {formatRange(next.state === "none" ? upcomingRange(ward.unit, periods, now) : next.period)}
+                  {formatRange(next.state === "none" ? upcomingRange(shop.unit, periods, now) : next.period)}
                 </span>
               </div>
               <TaskProgress done={taskDoneSteps(task)} />

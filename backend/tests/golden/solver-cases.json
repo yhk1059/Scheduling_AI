@@ -1,7 +1,7 @@
 [
  {
   "id": "sample-2w",
-  "description": "샘플 병동 필요 인원 + 병동 규칙 6개(최소 휴무 4일), 2주, 공휴일 1일(수), 이월, 최근 4주 부담",
+  "description": "샘플 매장 필요 인원 + 매장 규칙 6개(최소 휴무 4일), 2주, 공휴일 1일(수), 이월, 최근 4주 부담",
   "request": {
    "config": {
     "shifts": [
@@ -35,79 +35,79 @@
      }
     ]
    },
-   "nurses": [
+   "employees": [
     {
-     "id": "n01",
+     "id": "e01",
      "name": "이영희",
      "tags": []
     },
     {
-     "id": "n02",
+     "id": "e02",
      "name": "박민수",
      "tags": []
     },
     {
-     "id": "n03",
+     "id": "e03",
      "name": "김철수",
      "tags": []
     },
     {
-     "id": "n04",
+     "id": "e04",
      "name": "정유진",
      "tags": []
     },
     {
-     "id": "n05",
+     "id": "e05",
      "name": "최지훈",
      "tags": []
     },
     {
-     "id": "n06",
+     "id": "e06",
      "name": "강서연",
      "tags": []
     },
     {
-     "id": "n07",
+     "id": "e07",
      "name": "윤지민",
      "tags": []
     },
     {
-     "id": "n08",
+     "id": "e08",
      "name": "임하늘",
      "tags": []
     },
     {
-     "id": "n09",
+     "id": "e09",
      "name": "한소율",
      "tags": []
     },
     {
-     "id": "n10",
+     "id": "e10",
      "name": "오민준",
      "tags": []
     },
     {
-     "id": "n11",
+     "id": "e11",
      "name": "서예린",
      "tags": []
     },
     {
-     "id": "n12",
+     "id": "e12",
      "name": "신도윤",
      "tags": []
     },
     {
-     "id": "n13",
+     "id": "e13",
      "name": "조은비",
      "tags": []
     },
     {
-     "id": "n14",
+     "id": "e14",
      "name": "문가람",
      "tags": []
     },
     {
-     "id": "n15",
+     "id": "e15",
      "name": "배수아",
      "tags": []
     }
@@ -122,7 +122,7 @@
    "constraints": [
     {
      "id": "cov-weekday-D",
-     "scope": "ward",
+     "scope": "shop",
      "hardness": "hard",
      "weight": 10,
      "source_text": "평일 데이 3명",
@@ -168,7 +168,7 @@
     },
     {
      "id": "cov-weekday-E",
-     "scope": "ward",
+     "scope": "shop",
      "hardness": "hard",
      "weight": 10,
      "source_text": "평일 이브닝 3명",
@@ -214,7 +214,7 @@
     },
     {
      "id": "cov-weekday-N",
-     "scope": "ward",
+     "scope": "shop",
      "hardness": "hard",
      "weight": 10,
      "source_text": "평일 나이트 2명",
@@ -260,7 +260,7 @@
     },
     {
      "id": "cov-weekend-D",
-     "scope": "ward",
+     "scope": "shop",
      "hardness": "hard",
      "weight": 10,
      "source_text": "주말·공휴일 데이 3명",
@@ -306,7 +306,7 @@
     },
     {
      "id": "cov-weekend-E",
-     "scope": "ward",
+     "scope": "shop",
      "hardness": "hard",
      "weight": 10,
      "source_text": "주말·공휴일 이브닝 2명",
@@ -352,7 +352,7 @@
     },
     {
      "id": "cov-weekend-N",
-     "scope": "ward",
+     "scope": "shop",
      "hardness": "hard",
      "weight": 10,
      "source_text": "주말·공휴일 나이트 2명",
@@ -398,7 +398,7 @@
     },
     {
      "id": "rule-noff",
-     "scope": "ward",
+     "scope": "shop",
      "hardness": "hard",
      "weight": 10,
      "source_text": "나이트 끝나면 다음 날은 무조건 쉬게",
@@ -483,7 +483,7 @@
     },
     {
      "id": "rule-max-work",
-     "scope": "ward",
+     "scope": "shop",
      "hardness": "hard",
      "weight": 10,
      "source_text": "6일 연속 근무는 안 돼요",
@@ -530,7 +530,7 @@
     },
     {
      "id": "rule-max-nights",
-     "scope": "ward",
+     "scope": "shop",
      "hardness": "hard",
      "weight": 10,
      "source_text": "나이트는 3번 연속까지만",
@@ -577,7 +577,7 @@
     },
     {
      "id": "rule-min-off",
-     "scope": "ward",
+     "scope": "shop",
      "hardness": "hard",
      "weight": 10,
      "source_text": "한 달에 최소 8일은 쉬게",
@@ -623,7 +623,7 @@
     },
     {
      "id": "rule-night-fair",
-     "scope": "ward",
+     "scope": "shop",
      "hardness": "soft",
      "weight": 5,
      "source_text": "나이트는 골고루",
@@ -659,7 +659,7 @@
     },
     {
      "id": "rule-weekend-fair",
-     "scope": "ward",
+     "scope": "shop",
      "hardness": "soft",
      "weight": 5,
      "source_text": "주말 근무도 골고루",
@@ -696,7 +696,7 @@
    ],
    "carry_over": [
     {
-     "nurse_id": "n01",
+     "employee_id": "e01",
      "shifts": [
       "D",
       "D",
@@ -708,7 +708,7 @@
      ]
     },
     {
-     "nurse_id": "n02",
+     "employee_id": "e02",
      "shifts": [
       "D",
       "E",
@@ -720,7 +720,7 @@
      ]
     },
     {
-     "nurse_id": "n03",
+     "employee_id": "e03",
      "shifts": [
       "E",
       "N",
@@ -732,7 +732,7 @@
      ]
     },
     {
-     "nurse_id": "n04",
+     "employee_id": "e04",
      "shifts": [
       "N",
       "N",
@@ -744,7 +744,7 @@
      ]
     },
     {
-     "nurse_id": "n05",
+     "employee_id": "e05",
      "shifts": [
       "N",
       "O",
@@ -756,7 +756,7 @@
      ]
     },
     {
-     "nurse_id": "n06",
+     "employee_id": "e06",
      "shifts": [
       "O",
       "O",
@@ -768,7 +768,7 @@
      ]
     },
     {
-     "nurse_id": "n07",
+     "employee_id": "e07",
      "shifts": [
       "O",
       "D",
@@ -780,7 +780,7 @@
      ]
     },
     {
-     "nurse_id": "n08",
+     "employee_id": "e08",
      "shifts": [
       "D",
       "D",
@@ -792,7 +792,7 @@
      ]
     },
     {
-     "nurse_id": "n09",
+     "employee_id": "e09",
      "shifts": [
       "D",
       "E",
@@ -804,7 +804,7 @@
      ]
     },
     {
-     "nurse_id": "n10",
+     "employee_id": "e10",
      "shifts": [
       "E",
       "N",
@@ -816,7 +816,7 @@
      ]
     },
     {
-     "nurse_id": "n11",
+     "employee_id": "e11",
      "shifts": [
       "N",
       "N",
@@ -828,7 +828,7 @@
      ]
     },
     {
-     "nurse_id": "n12",
+     "employee_id": "e12",
      "shifts": [
       "N",
       "O",
@@ -840,7 +840,7 @@
      ]
     },
     {
-     "nurse_id": "n13",
+     "employee_id": "e13",
      "shifts": [
       "O",
       "O",
@@ -852,7 +852,7 @@
      ]
     },
     {
-     "nurse_id": "n14",
+     "employee_id": "e14",
      "shifts": [
       "O",
       "N",
@@ -864,7 +864,7 @@
      ]
     },
     {
-     "nurse_id": "n15",
+     "employee_id": "e15",
      "shifts": [
       "N",
       "N",
@@ -879,7 +879,7 @@
    "history": {
     "start_date": "2026-10-05",
     "rows": {
-     "n01": [
+     "e01": [
       "E",
       "O",
       "D",
@@ -909,7 +909,7 @@
       "O",
       "D"
      ],
-     "n02": [
+     "e02": [
       "O",
       "E",
       "O",
@@ -939,7 +939,7 @@
       "E",
       "N"
      ],
-     "n03": [
+     "e03": [
       "N",
       "O",
       "O",
@@ -969,7 +969,7 @@
       "D",
       "N"
      ],
-     "n04": [
+     "e04": [
       "O",
       "O",
       "O",
@@ -999,7 +999,7 @@
       "O",
       "O"
      ],
-     "n05": [
+     "e05": [
       "E",
       "O",
       "D",
@@ -1029,7 +1029,7 @@
       "O",
       "E"
      ],
-     "n06": [
+     "e06": [
       "D",
       "O",
       "N",
@@ -1059,7 +1059,7 @@
       "N",
       "O"
      ],
-     "n07": [
+     "e07": [
       "O",
       "D",
       "D",
@@ -1089,7 +1089,7 @@
       "E",
       "O"
      ],
-     "n08": [
+     "e08": [
       "O",
       "E",
       "O",
@@ -1119,7 +1119,7 @@
       "O",
       "E"
      ],
-     "n09": [
+     "e09": [
       "O",
       "O",
       "E",
@@ -1149,7 +1149,7 @@
       "D",
       "E"
      ],
-     "n10": [
+     "e10": [
       "E",
       "N",
       "O",
@@ -1179,7 +1179,7 @@
       "O",
       "O"
      ],
-     "n11": [
+     "e11": [
       "N",
       "N",
       "N",
@@ -1209,7 +1209,7 @@
       "O",
       "O"
      ],
-     "n12": [
+     "e12": [
       "E",
       "O",
       "D",
@@ -1239,7 +1239,7 @@
       "D",
       "O"
      ],
-     "n13": [
+     "e13": [
       "E",
       "E",
       "E",
@@ -1269,7 +1269,7 @@
       "D",
       "N"
      ],
-     "n14": [
+     "e14": [
       "O",
       "O",
       "N",
@@ -1299,7 +1299,7 @@
       "O",
       "O"
      ],
-     "n15": [
+     "e15": [
       "N",
       "O",
       "O",
@@ -1341,7 +1341,7 @@
    "optimal": true,
    "objective": 35,
    "assignments": {
-    "n01": [
+    "e01": [
      "E",
      "E",
      "N",
@@ -1357,7 +1357,7 @@
      "O",
      "E"
     ],
-    "n02": [
+    "e02": [
      "N",
      "O",
      "O",
@@ -1373,7 +1373,7 @@
      "O",
      "D"
     ],
-    "n03": [
+    "e03": [
      "O",
      "O",
      "O",
@@ -1389,7 +1389,7 @@
      "N",
      "N"
     ],
-    "n04": [
+    "e04": [
      "O",
      "D",
      "O",
@@ -1405,7 +1405,7 @@
      "O",
      "D"
     ],
-    "n05": [
+    "e05": [
      "N",
      "O",
      "O",
@@ -1421,7 +1421,7 @@
      "E",
      "O"
     ],
-    "n06": [
+    "e06": [
      "O",
      "E",
      "O",
@@ -1437,7 +1437,7 @@
      "O",
      "O"
     ],
-    "n07": [
+    "e07": [
      "D",
      "N",
      "N",
@@ -1453,7 +1453,7 @@
      "D",
      "O"
     ],
-    "n08": [
+    "e08": [
      "E",
      "E",
      "D",
@@ -1469,7 +1469,7 @@
      "D",
      "O"
     ],
-    "n09": [
+    "e09": [
      "D",
      "N",
      "O",
@@ -1485,7 +1485,7 @@
      "N",
      "N"
     ],
-    "n10": [
+    "e10": [
      "D",
      "O",
      "E",
@@ -1501,7 +1501,7 @@
      "E",
      "O"
     ],
-    "n11": [
+    "e11": [
      "O",
      "O",
      "O",
@@ -1517,7 +1517,7 @@
      "O",
      "O"
     ],
-    "n12": [
+    "e12": [
      "O",
      "D",
      "O",
@@ -1533,7 +1533,7 @@
      "O",
      "O"
     ],
-    "n13": [
+    "e13": [
      "O",
      "O",
      "D",
@@ -1549,7 +1549,7 @@
      "O",
      "E"
     ],
-    "n14": [
+    "e14": [
      "O",
      "O",
      "D",
@@ -1565,7 +1565,7 @@
      "O",
      "D"
     ],
-    "n15": [
+    "e15": [
      "E",
      "D",
      "E",
@@ -1586,7 +1586,7 @@
  },
  {
   "id": "sample-1w-requests",
-  "description": "샘플 병동(최소 휴무 2일), 1주, 요청: 휴가·주말 나이트 기피·특정일 데이 희망·고정 배정",
+  "description": "샘플 매장(최소 휴무 2일), 1주, 요청: 휴가·주말 나이트 기피·특정일 데이 희망·고정 배정",
   "request": {
    "config": {
     "shifts": [
@@ -1620,79 +1620,79 @@
      }
     ]
    },
-   "nurses": [
+   "employees": [
     {
-     "id": "n01",
+     "id": "e01",
      "name": "이영희",
      "tags": []
     },
     {
-     "id": "n02",
+     "id": "e02",
      "name": "박민수",
      "tags": []
     },
     {
-     "id": "n03",
+     "id": "e03",
      "name": "김철수",
      "tags": []
     },
     {
-     "id": "n04",
+     "id": "e04",
      "name": "정유진",
      "tags": []
     },
     {
-     "id": "n05",
+     "id": "e05",
      "name": "최지훈",
      "tags": []
     },
     {
-     "id": "n06",
+     "id": "e06",
      "name": "강서연",
      "tags": []
     },
     {
-     "id": "n07",
+     "id": "e07",
      "name": "윤지민",
      "tags": []
     },
     {
-     "id": "n08",
+     "id": "e08",
      "name": "임하늘",
      "tags": []
     },
     {
-     "id": "n09",
+     "id": "e09",
      "name": "한소율",
      "tags": []
     },
     {
-     "id": "n10",
+     "id": "e10",
      "name": "오민준",
      "tags": []
     },
     {
-     "id": "n11",
+     "id": "e11",
      "name": "서예린",
      "tags": []
     },
     {
-     "id": "n12",
+     "id": "e12",
      "name": "신도윤",
      "tags": []
     },
     {
-     "id": "n13",
+     "id": "e13",
      "name": "조은비",
      "tags": []
     },
     {
-     "id": "n14",
+     "id": "e14",
      "name": "문가람",
      "tags": []
     },
     {
-     "id": "n15",
+     "id": "e15",
      "name": "배수아",
      "tags": []
     }
@@ -1705,7 +1705,7 @@
    "constraints": [
     {
      "id": "cov-weekday-D",
-     "scope": "ward",
+     "scope": "shop",
      "hardness": "hard",
      "weight": 10,
      "source_text": "평일 데이 3명",
@@ -1751,7 +1751,7 @@
     },
     {
      "id": "cov-weekday-E",
-     "scope": "ward",
+     "scope": "shop",
      "hardness": "hard",
      "weight": 10,
      "source_text": "평일 이브닝 3명",
@@ -1797,7 +1797,7 @@
     },
     {
      "id": "cov-weekday-N",
-     "scope": "ward",
+     "scope": "shop",
      "hardness": "hard",
      "weight": 10,
      "source_text": "평일 나이트 2명",
@@ -1843,7 +1843,7 @@
     },
     {
      "id": "cov-weekend-D",
-     "scope": "ward",
+     "scope": "shop",
      "hardness": "hard",
      "weight": 10,
      "source_text": "주말·공휴일 데이 3명",
@@ -1889,7 +1889,7 @@
     },
     {
      "id": "cov-weekend-E",
-     "scope": "ward",
+     "scope": "shop",
      "hardness": "hard",
      "weight": 10,
      "source_text": "주말·공휴일 이브닝 2명",
@@ -1935,7 +1935,7 @@
     },
     {
      "id": "cov-weekend-N",
-     "scope": "ward",
+     "scope": "shop",
      "hardness": "hard",
      "weight": 10,
      "source_text": "주말·공휴일 나이트 2명",
@@ -1981,7 +1981,7 @@
     },
     {
      "id": "rule-noff",
-     "scope": "ward",
+     "scope": "shop",
      "hardness": "hard",
      "weight": 10,
      "source_text": "나이트 끝나면 다음 날은 무조건 쉬게",
@@ -2066,7 +2066,7 @@
     },
     {
      "id": "rule-max-work",
-     "scope": "ward",
+     "scope": "shop",
      "hardness": "hard",
      "weight": 10,
      "source_text": "6일 연속 근무는 안 돼요",
@@ -2113,7 +2113,7 @@
     },
     {
      "id": "rule-max-nights",
-     "scope": "ward",
+     "scope": "shop",
      "hardness": "hard",
      "weight": 10,
      "source_text": "나이트는 3번 연속까지만",
@@ -2160,7 +2160,7 @@
     },
     {
      "id": "rule-min-off",
-     "scope": "ward",
+     "scope": "shop",
      "hardness": "hard",
      "weight": 10,
      "source_text": "한 달에 최소 8일은 쉬게",
@@ -2206,7 +2206,7 @@
     },
     {
      "id": "rule-night-fair",
-     "scope": "ward",
+     "scope": "shop",
      "hardness": "soft",
      "weight": 5,
      "source_text": "나이트는 골고루",
@@ -2242,7 +2242,7 @@
     },
     {
      "id": "rule-weekend-fair",
-     "scope": "ward",
+     "scope": "shop",
      "hardness": "soft",
      "weight": 5,
      "source_text": "주말 근무도 골고루",
@@ -2298,7 +2298,7 @@
        "per": "person",
        "people": {
         "ids": [
-         "n01"
+         "e01"
         ],
         "exclude_tags": []
        },
@@ -2351,7 +2351,7 @@
        "per": "person",
        "people": {
         "ids": [
-         "n02"
+         "e02"
         ],
         "exclude_tags": []
        },
@@ -2400,7 +2400,7 @@
        "per": "person",
        "people": {
         "ids": [
-         "n04"
+         "e04"
         ],
         "exclude_tags": []
        },
@@ -2439,7 +2439,7 @@
      "enabled": true,
      "type": "fixed_assignment",
      "params": {
-      "nurse_id": "n03",
+      "employee_id": "e03",
       "day": 1,
       "shift": "E"
      }
@@ -2453,7 +2453,7 @@
    "optimal": true,
    "objective": 10,
    "assignments": {
-    "n01": [
+    "e01": [
      "O",
      "O",
      "O",
@@ -2462,7 +2462,7 @@
      "O",
      "D"
     ],
-    "n02": [
+    "e02": [
      "O",
      "O",
      "O",
@@ -2471,7 +2471,7 @@
      "O",
      "O"
     ],
-    "n03": [
+    "e03": [
      "E",
      "E",
      "E",
@@ -2480,7 +2480,7 @@
      "O",
      "N"
     ],
-    "n04": [
+    "e04": [
      "O",
      "O",
      "D",
@@ -2489,7 +2489,7 @@
      "N",
      "O"
     ],
-    "n05": [
+    "e05": [
      "D",
      "D",
      "D",
@@ -2498,7 +2498,7 @@
      "O",
      "N"
     ],
-    "n06": [
+    "e06": [
      "O",
      "N",
      "O",
@@ -2507,7 +2507,7 @@
      "O",
      "E"
     ],
-    "n07": [
+    "e07": [
      "O",
      "O",
      "O",
@@ -2516,7 +2516,7 @@
      "O",
      "D"
     ],
-    "n08": [
+    "e08": [
      "D",
      "N",
      "O",
@@ -2525,7 +2525,7 @@
      "D",
      "O"
     ],
-    "n09": [
+    "e09": [
      "E",
      "E",
      "N",
@@ -2534,7 +2534,7 @@
      "E",
      "O"
     ],
-    "n10": [
+    "e10": [
      "E",
      "D",
      "N",
@@ -2543,7 +2543,7 @@
      "O",
      "E"
     ],
-    "n11": [
+    "e11": [
      "O",
      "O",
      "O",
@@ -2552,7 +2552,7 @@
      "D",
      "O"
     ],
-    "n12": [
+    "e12": [
      "N",
      "O",
      "E",
@@ -2561,7 +2561,7 @@
      "O",
      "D"
     ],
-    "n13": [
+    "e13": [
      "N",
      "O",
      "E",
@@ -2570,7 +2570,7 @@
      "E",
      "O"
     ],
-    "n14": [
+    "e14": [
      "O",
      "D",
      "O",
@@ -2579,7 +2579,7 @@
      "D",
      "O"
     ],
-    "n15": [
+    "e15": [
      "D",
      "E",
      "D",
@@ -2627,40 +2627,40 @@
      }
     ]
    },
-   "nurses": [
+   "employees": [
     {
-     "id": "n01",
-     "name": "간호사1",
+     "id": "e01",
+     "name": "직원1",
      "tags": []
     },
     {
-     "id": "n02",
-     "name": "간호사2",
+     "id": "e02",
+     "name": "직원2",
      "tags": []
     },
     {
-     "id": "n03",
-     "name": "간호사3",
+     "id": "e03",
+     "name": "직원3",
      "tags": []
     },
     {
-     "id": "n04",
-     "name": "간호사4",
+     "id": "e04",
+     "name": "직원4",
      "tags": []
     },
     {
-     "id": "n05",
-     "name": "간호사5",
+     "id": "e05",
+     "name": "직원5",
      "tags": []
     },
     {
-     "id": "n06",
-     "name": "간호사6",
+     "id": "e06",
+     "name": "직원6",
      "tags": []
     },
     {
-     "id": "n07",
-     "name": "간호사7",
+     "id": "e07",
+     "name": "직원7",
      "tags": []
     }
    ],
@@ -2672,7 +2672,7 @@
    "constraints": [
     {
      "id": "cov-weekday-D",
-     "scope": "ward",
+     "scope": "shop",
      "hardness": "soft",
      "weight": 10,
      "source_text": "cov-weekday-D",
@@ -2718,7 +2718,7 @@
     },
     {
      "id": "cov-weekday-E",
-     "scope": "ward",
+     "scope": "shop",
      "hardness": "hard",
      "weight": 10,
      "source_text": "cov-weekday-E",
@@ -2764,7 +2764,7 @@
     },
     {
      "id": "cov-weekday-N",
-     "scope": "ward",
+     "scope": "shop",
      "hardness": "hard",
      "weight": 10,
      "source_text": "cov-weekday-N",
@@ -2810,7 +2810,7 @@
     },
     {
      "id": "cov-weekend-D",
-     "scope": "ward",
+     "scope": "shop",
      "hardness": "hard",
      "weight": 10,
      "source_text": "cov-weekend-D",
@@ -2856,7 +2856,7 @@
     },
     {
      "id": "cov-weekend-E",
-     "scope": "ward",
+     "scope": "shop",
      "hardness": "hard",
      "weight": 10,
      "source_text": "cov-weekend-E",
@@ -2902,7 +2902,7 @@
     },
     {
      "id": "cov-weekend-N",
-     "scope": "ward",
+     "scope": "shop",
      "hardness": "hard",
      "weight": 10,
      "source_text": "cov-weekend-N",
@@ -2948,7 +2948,7 @@
     },
     {
      "id": "seq-n-d",
-     "scope": "ward",
+     "scope": "shop",
      "hardness": "soft",
      "weight": 10,
      "source_text": "seq-n-d",
@@ -3014,7 +3014,7 @@
     },
     {
      "id": "max-work",
-     "scope": "ward",
+     "scope": "shop",
      "hardness": "soft",
      "weight": 10,
      "source_text": "max-work",
@@ -3061,7 +3061,7 @@
     },
     {
      "id": "max-nights",
-     "scope": "ward",
+     "scope": "shop",
      "hardness": "soft",
      "weight": 10,
      "source_text": "max-nights",
@@ -3115,7 +3115,7 @@
    "optimal": true,
    "objective": 30,
    "assignments": {
-    "n01": [
+    "e01": [
      "O",
      "D",
      "D",
@@ -3124,7 +3124,7 @@
      "N",
      "O"
     ],
-    "n02": [
+    "e02": [
      "N",
      "O",
      "E",
@@ -3133,7 +3133,7 @@
      "O",
      "D"
     ],
-    "n03": [
+    "e03": [
      "D",
      "E",
      "D",
@@ -3142,7 +3142,7 @@
      "O",
      "E"
     ],
-    "n04": [
+    "e04": [
      "D",
      "O",
      "D",
@@ -3151,7 +3151,7 @@
      "O",
      "O"
     ],
-    "n05": [
+    "e05": [
      "D",
      "O",
      "E",
@@ -3160,7 +3160,7 @@
      "O",
      "O"
     ],
-    "n06": [
+    "e06": [
      "E",
      "E",
      "N",
@@ -3169,7 +3169,7 @@
      "E",
      "N"
     ],
-    "n07": [
+    "e07": [
      "E",
      "N",
      "O",
@@ -3217,40 +3217,40 @@
      }
     ]
    },
-   "nurses": [
+   "employees": [
     {
-     "id": "n01",
-     "name": "간호사1",
+     "id": "e01",
+     "name": "직원1",
      "tags": []
     },
     {
-     "id": "n02",
-     "name": "간호사2",
+     "id": "e02",
+     "name": "직원2",
      "tags": []
     },
     {
-     "id": "n03",
-     "name": "간호사3",
+     "id": "e03",
+     "name": "직원3",
      "tags": []
     },
     {
-     "id": "n04",
-     "name": "간호사4",
+     "id": "e04",
+     "name": "직원4",
      "tags": []
     },
     {
-     "id": "n05",
-     "name": "간호사5",
+     "id": "e05",
+     "name": "직원5",
      "tags": []
     },
     {
-     "id": "n06",
-     "name": "간호사6",
+     "id": "e06",
+     "name": "직원6",
      "tags": []
     },
     {
-     "id": "n07",
-     "name": "간호사7",
+     "id": "e07",
+     "name": "직원7",
      "tags": []
     }
    ],
@@ -3262,7 +3262,7 @@
    "constraints": [
     {
      "id": "cov-weekday-D",
-     "scope": "ward",
+     "scope": "shop",
      "hardness": "hard",
      "weight": 10,
      "source_text": "cov-weekday-D",
@@ -3308,7 +3308,7 @@
     },
     {
      "id": "cov-weekday-E",
-     "scope": "ward",
+     "scope": "shop",
      "hardness": "hard",
      "weight": 10,
      "source_text": "cov-weekday-E",
@@ -3354,7 +3354,7 @@
     },
     {
      "id": "cov-weekday-N",
-     "scope": "ward",
+     "scope": "shop",
      "hardness": "hard",
      "weight": 10,
      "source_text": "cov-weekday-N",
@@ -3400,7 +3400,7 @@
     },
     {
      "id": "cov-weekend-D",
-     "scope": "ward",
+     "scope": "shop",
      "hardness": "hard",
      "weight": 10,
      "source_text": "cov-weekend-D",
@@ -3446,7 +3446,7 @@
     },
     {
      "id": "cov-weekend-E",
-     "scope": "ward",
+     "scope": "shop",
      "hardness": "hard",
      "weight": 10,
      "source_text": "cov-weekend-E",
@@ -3492,7 +3492,7 @@
     },
     {
      "id": "cov-weekend-N",
-     "scope": "ward",
+     "scope": "shop",
      "hardness": "hard",
      "weight": 10,
      "source_text": "cov-weekend-N",
@@ -3538,7 +3538,7 @@
     },
     {
      "id": "min-off",
-     "scope": "ward",
+     "scope": "shop",
      "hardness": "soft",
      "weight": 10,
      "source_text": "min-off",
@@ -3584,7 +3584,7 @@
     },
     {
      "id": "off-after-n",
-     "scope": "ward",
+     "scope": "shop",
      "hardness": "soft",
      "weight": 10,
      "source_text": "off-after-n",
@@ -3676,49 +3676,49 @@
    "optimal": true,
    "objective": 110,
    "assignments": {
-    "n01": [
+    "e01": [
      "E",
      "E",
      "N",
      "N",
      "N"
     ],
-    "n02": [
+    "e02": [
      "O",
      "O",
      "D",
      "D",
      "O"
     ],
-    "n03": [
+    "e03": [
      "D",
      "O",
      "O",
      "D",
      "O"
     ],
-    "n04": [
+    "e04": [
      "N",
      "N",
      "O",
      "O",
      "E"
     ],
-    "n05": [
+    "e05": [
      "D",
      "D",
      "D",
      "E",
      "D"
     ],
-    "n06": [
+    "e06": [
      "O",
      "E",
      "E",
      "O",
      "E"
     ],
-    "n07": [
+    "e07": [
      "E",
      "D",
      "E",
@@ -3764,45 +3764,45 @@
      }
     ]
    },
-   "nurses": [
+   "employees": [
     {
-     "id": "n01",
-     "name": "간호사1",
+     "id": "e01",
+     "name": "직원1",
      "tags": []
     },
     {
-     "id": "n02",
-     "name": "간호사2",
+     "id": "e02",
+     "name": "직원2",
      "tags": []
     },
     {
-     "id": "n03",
-     "name": "간호사3",
+     "id": "e03",
+     "name": "직원3",
      "tags": []
     },
     {
-     "id": "n04",
-     "name": "간호사4",
+     "id": "e04",
+     "name": "직원4",
      "tags": []
     },
     {
-     "id": "n05",
-     "name": "간호사5",
+     "id": "e05",
+     "name": "직원5",
      "tags": []
     },
     {
-     "id": "n06",
-     "name": "간호사6",
+     "id": "e06",
+     "name": "직원6",
      "tags": []
     },
     {
-     "id": "n07",
-     "name": "간호사7",
+     "id": "e07",
+     "name": "직원7",
      "tags": []
     },
     {
-     "id": "n08",
-     "name": "간호사8",
+     "id": "e08",
+     "name": "직원8",
      "tags": []
     }
    ],
@@ -3814,7 +3814,7 @@
    "constraints": [
     {
      "id": "cov-weekday-D",
-     "scope": "ward",
+     "scope": "shop",
      "hardness": "hard",
      "weight": 10,
      "source_text": "cov-weekday-D",
@@ -3860,7 +3860,7 @@
     },
     {
      "id": "cov-weekday-E",
-     "scope": "ward",
+     "scope": "shop",
      "hardness": "hard",
      "weight": 10,
      "source_text": "cov-weekday-E",
@@ -3906,7 +3906,7 @@
     },
     {
      "id": "cov-weekday-N",
-     "scope": "ward",
+     "scope": "shop",
      "hardness": "hard",
      "weight": 10,
      "source_text": "cov-weekday-N",
@@ -3952,7 +3952,7 @@
     },
     {
      "id": "cov-weekend-D",
-     "scope": "ward",
+     "scope": "shop",
      "hardness": "hard",
      "weight": 10,
      "source_text": "cov-weekend-D",
@@ -3998,7 +3998,7 @@
     },
     {
      "id": "cov-weekend-E",
-     "scope": "ward",
+     "scope": "shop",
      "hardness": "hard",
      "weight": 10,
      "source_text": "cov-weekend-E",
@@ -4044,7 +4044,7 @@
     },
     {
      "id": "cov-weekend-N",
-     "scope": "ward",
+     "scope": "shop",
      "hardness": "hard",
      "weight": 10,
      "source_text": "cov-weekend-N",
@@ -4090,7 +4090,7 @@
     },
     {
      "id": "seq-n-d",
-     "scope": "ward",
+     "scope": "shop",
      "hardness": "hard",
      "weight": 10,
      "source_text": "seq-n-d",
@@ -4156,7 +4156,7 @@
     },
     {
      "id": "off-after-n",
-     "scope": "ward",
+     "scope": "shop",
      "hardness": "hard",
      "weight": 10,
      "source_text": "off-after-n",
@@ -4241,7 +4241,7 @@
     },
     {
      "id": "min-off",
-     "scope": "ward",
+     "scope": "shop",
      "hardness": "hard",
      "weight": 10,
      "source_text": "min-off",
@@ -4287,7 +4287,7 @@
     },
     {
      "id": "max-work",
-     "scope": "ward",
+     "scope": "shop",
      "hardness": "hard",
      "weight": 10,
      "source_text": "max-work",
@@ -4334,7 +4334,7 @@
     },
     {
      "id": "max-nights",
-     "scope": "ward",
+     "scope": "shop",
      "hardness": "hard",
      "weight": 10,
      "source_text": "max-nights",
@@ -4381,7 +4381,7 @@
     },
     {
      "id": "night-fair",
-     "scope": "ward",
+     "scope": "shop",
      "hardness": "soft",
      "weight": 5,
      "source_text": "night-fair",
@@ -4424,7 +4424,7 @@
    "optimal": true,
    "objective": 5,
    "assignments": {
-    "n01": [
+    "e01": [
      "O",
      "E",
      "O",
@@ -4436,7 +4436,7 @@
      "E",
      "E"
     ],
-    "n02": [
+    "e02": [
      "E",
      "N",
      "O",
@@ -4448,7 +4448,7 @@
      "D",
      "D"
     ],
-    "n03": [
+    "e03": [
      "N",
      "O",
      "O",
@@ -4460,7 +4460,7 @@
      "D",
      "D"
     ],
-    "n04": [
+    "e04": [
      "E",
      "D",
      "E",
@@ -4472,7 +4472,7 @@
      "N",
      "O"
     ],
-    "n05": [
+    "e05": [
      "D",
      "D",
      "D",
@@ -4484,7 +4484,7 @@
      "O",
      "N"
     ],
-    "n06": [
+    "e06": [
      "D",
      "O",
      "N",
@@ -4496,7 +4496,7 @@
      "O",
      "O"
     ],
-    "n07": [
+    "e07": [
      "O",
      "E",
      "E",
@@ -4508,7 +4508,7 @@
      "E",
      "E"
     ],
-    "n08": [
+    "e08": [
      "O",
      "O",
      "D",
@@ -4559,40 +4559,40 @@
      }
     ]
    },
-   "nurses": [
+   "employees": [
     {
-     "id": "n01",
-     "name": "간호사1",
+     "id": "e01",
+     "name": "직원1",
      "tags": []
     },
     {
-     "id": "n02",
-     "name": "간호사2",
+     "id": "e02",
+     "name": "직원2",
      "tags": []
     },
     {
-     "id": "n03",
-     "name": "간호사3",
+     "id": "e03",
+     "name": "직원3",
      "tags": []
     },
     {
-     "id": "n04",
-     "name": "간호사4",
+     "id": "e04",
+     "name": "직원4",
      "tags": []
     },
     {
-     "id": "n05",
-     "name": "간호사5",
+     "id": "e05",
+     "name": "직원5",
      "tags": []
     },
     {
-     "id": "n06",
-     "name": "간호사6",
+     "id": "e06",
+     "name": "직원6",
      "tags": []
     },
     {
-     "id": "n07",
-     "name": "간호사7",
+     "id": "e07",
+     "name": "직원7",
      "tags": []
     }
    ],
@@ -4606,7 +4606,7 @@
    "constraints": [
     {
      "id": "cov-weekday-D",
-     "scope": "ward",
+     "scope": "shop",
      "hardness": "hard",
      "weight": 10,
      "source_text": "cov-weekday-D",
@@ -4652,7 +4652,7 @@
     },
     {
      "id": "cov-weekday-E",
-     "scope": "ward",
+     "scope": "shop",
      "hardness": "hard",
      "weight": 10,
      "source_text": "cov-weekday-E",
@@ -4698,7 +4698,7 @@
     },
     {
      "id": "cov-weekday-N",
-     "scope": "ward",
+     "scope": "shop",
      "hardness": "hard",
      "weight": 10,
      "source_text": "cov-weekday-N",
@@ -4744,7 +4744,7 @@
     },
     {
      "id": "cov-weekend-D",
-     "scope": "ward",
+     "scope": "shop",
      "hardness": "hard",
      "weight": 10,
      "source_text": "cov-weekend-D",
@@ -4790,7 +4790,7 @@
     },
     {
      "id": "cov-weekend-E",
-     "scope": "ward",
+     "scope": "shop",
      "hardness": "hard",
      "weight": 10,
      "source_text": "cov-weekend-E",
@@ -4836,7 +4836,7 @@
     },
     {
      "id": "cov-weekend-N",
-     "scope": "ward",
+     "scope": "shop",
      "hardness": "hard",
      "weight": 10,
      "source_text": "cov-weekend-N",
@@ -4882,7 +4882,7 @@
     },
     {
      "id": "weekend-fair",
-     "scope": "ward",
+     "scope": "shop",
      "hardness": "soft",
      "weight": 5,
      "source_text": "weekend-fair",
@@ -4938,7 +4938,7 @@
        "per": "person",
        "people": {
         "ids": [
-         "n01"
+         "e01"
         ],
         "exclude_tags": []
        },
@@ -4974,7 +4974,7 @@
    "optimal": true,
    "objective": 10,
    "assignments": {
-    "n01": [
+    "e01": [
      "N",
      "N",
      "O",
@@ -4983,7 +4983,7 @@
      "O",
      "O"
     ],
-    "n02": [
+    "e02": [
      "E",
      "E",
      "O",
@@ -4992,7 +4992,7 @@
      "N",
      "E"
     ],
-    "n03": [
+    "e03": [
      "D",
      "O",
      "O",
@@ -5001,7 +5001,7 @@
      "O",
      "O"
     ],
-    "n04": [
+    "e04": [
      "E",
      "D",
      "E",
@@ -5010,7 +5010,7 @@
      "O",
      "O"
     ],
-    "n05": [
+    "e05": [
      "D",
      "O",
      "N",
@@ -5019,7 +5019,7 @@
      "E",
      "O"
     ],
-    "n06": [
+    "e06": [
      "O",
      "E",
      "O",
@@ -5028,7 +5028,7 @@
      "D",
      "N"
     ],
-    "n07": [
+    "e07": [
      "O",
      "D",
      "D",
@@ -5076,40 +5076,40 @@
      }
     ]
    },
-   "nurses": [
+   "employees": [
     {
-     "id": "n01",
-     "name": "간호사1",
+     "id": "e01",
+     "name": "직원1",
      "tags": []
     },
     {
-     "id": "n02",
-     "name": "간호사2",
+     "id": "e02",
+     "name": "직원2",
      "tags": []
     },
     {
-     "id": "n03",
-     "name": "간호사3",
+     "id": "e03",
+     "name": "직원3",
      "tags": []
     },
     {
-     "id": "n04",
-     "name": "간호사4",
+     "id": "e04",
+     "name": "직원4",
      "tags": []
     },
     {
-     "id": "n05",
-     "name": "간호사5",
+     "id": "e05",
+     "name": "직원5",
      "tags": []
     },
     {
-     "id": "n06",
-     "name": "간호사6",
+     "id": "e06",
+     "name": "직원6",
      "tags": []
     },
     {
-     "id": "n07",
-     "name": "간호사7",
+     "id": "e07",
+     "name": "직원7",
      "tags": []
     }
    ],
@@ -5121,7 +5121,7 @@
    "constraints": [
     {
      "id": "cov-weekday-D",
-     "scope": "ward",
+     "scope": "shop",
      "hardness": "hard",
      "weight": 10,
      "source_text": "cov-weekday-D",
@@ -5167,7 +5167,7 @@
     },
     {
      "id": "cov-weekday-E",
-     "scope": "ward",
+     "scope": "shop",
      "hardness": "hard",
      "weight": 10,
      "source_text": "cov-weekday-E",
@@ -5213,7 +5213,7 @@
     },
     {
      "id": "cov-weekday-N",
-     "scope": "ward",
+     "scope": "shop",
      "hardness": "hard",
      "weight": 10,
      "source_text": "cov-weekday-N",
@@ -5259,7 +5259,7 @@
     },
     {
      "id": "cov-weekend-D",
-     "scope": "ward",
+     "scope": "shop",
      "hardness": "hard",
      "weight": 10,
      "source_text": "cov-weekend-D",
@@ -5305,7 +5305,7 @@
     },
     {
      "id": "cov-weekend-E",
-     "scope": "ward",
+     "scope": "shop",
      "hardness": "hard",
      "weight": 10,
      "source_text": "cov-weekend-E",
@@ -5351,7 +5351,7 @@
     },
     {
      "id": "cov-weekend-N",
-     "scope": "ward",
+     "scope": "shop",
      "hardness": "hard",
      "weight": 10,
      "source_text": "cov-weekend-N",
@@ -5397,7 +5397,7 @@
     },
     {
      "id": "max-work",
-     "scope": "ward",
+     "scope": "shop",
      "hardness": "hard",
      "weight": 10,
      "source_text": "max-work",
@@ -5464,7 +5464,7 @@
        "per": "person",
        "people": {
         "ids": [
-         "n01"
+         "e01"
         ],
         "exclude_tags": []
        },
@@ -5499,7 +5499,7 @@
    ],
    "carry_over": [],
    "previous": {
-    "n01": [
+    "e01": [
      "N",
      "O",
      "N",
@@ -5508,7 +5508,7 @@
      "N",
      "O"
     ],
-    "n02": [
+    "e02": [
      "O",
      "N",
      "O",
@@ -5517,7 +5517,7 @@
      "O",
      "O"
     ],
-    "n03": [
+    "e03": [
      "E",
      "E",
      "O",
@@ -5526,7 +5526,7 @@
      "O",
      "O"
     ],
-    "n04": [
+    "e04": [
      "E",
      "E",
      "E",
@@ -5535,7 +5535,7 @@
      "O",
      "N"
     ],
-    "n05": [
+    "e05": [
      "D",
      "D",
      "D",
@@ -5544,7 +5544,7 @@
      "O",
      "E"
     ],
-    "n06": [
+    "e06": [
      "D",
      "O",
      "E",
@@ -5553,7 +5553,7 @@
      "E",
      "D"
     ],
-    "n07": [
+    "e07": [
      "O",
      "D",
      "D",
@@ -5570,7 +5570,7 @@
    "optimal": true,
    "objective": 120,
    "assignments": {
-    "n01": [
+    "e01": [
      "N",
      "O",
      "O",
@@ -5579,7 +5579,7 @@
      "N",
      "O"
     ],
-    "n02": [
+    "e02": [
      "O",
      "N",
      "N",
@@ -5588,7 +5588,7 @@
      "O",
      "O"
     ],
-    "n03": [
+    "e03": [
      "E",
      "E",
      "O",
@@ -5597,7 +5597,7 @@
      "O",
      "O"
     ],
-    "n04": [
+    "e04": [
      "E",
      "E",
      "E",
@@ -5606,7 +5606,7 @@
      "O",
      "N"
     ],
-    "n05": [
+    "e05": [
      "D",
      "D",
      "D",
@@ -5615,7 +5615,7 @@
      "O",
      "E"
     ],
-    "n06": [
+    "e06": [
      "D",
      "O",
      "E",
@@ -5624,7 +5624,7 @@
      "E",
      "D"
     ],
-    "n07": [
+    "e07": [
      "O",
      "D",
      "D",
@@ -5672,35 +5672,35 @@
      }
     ]
    },
-   "nurses": [
+   "employees": [
     {
-     "id": "n01",
-     "name": "간호사1",
+     "id": "e01",
+     "name": "직원1",
      "tags": []
     },
     {
-     "id": "n02",
-     "name": "간호사2",
+     "id": "e02",
+     "name": "직원2",
      "tags": []
     },
     {
-     "id": "n03",
-     "name": "간호사3",
+     "id": "e03",
+     "name": "직원3",
      "tags": []
     },
     {
-     "id": "n04",
-     "name": "간호사4",
+     "id": "e04",
+     "name": "직원4",
      "tags": []
     },
     {
-     "id": "n05",
-     "name": "간호사5",
+     "id": "e05",
+     "name": "직원5",
      "tags": []
     },
     {
-     "id": "n06",
-     "name": "간호사6",
+     "id": "e06",
+     "name": "직원6",
      "tags": []
     }
    ],
@@ -5712,7 +5712,7 @@
    "constraints": [
     {
      "id": "cov-weekday-D",
-     "scope": "ward",
+     "scope": "shop",
      "hardness": "hard",
      "weight": 10,
      "source_text": "cov-weekday-D",
@@ -5758,7 +5758,7 @@
     },
     {
      "id": "cov-weekday-E",
-     "scope": "ward",
+     "scope": "shop",
      "hardness": "hard",
      "weight": 10,
      "source_text": "cov-weekday-E",
@@ -5804,7 +5804,7 @@
     },
     {
      "id": "cov-weekday-N",
-     "scope": "ward",
+     "scope": "shop",
      "hardness": "hard",
      "weight": 10,
      "source_text": "cov-weekday-N",
@@ -5850,7 +5850,7 @@
     },
     {
      "id": "cov-weekend-D",
-     "scope": "ward",
+     "scope": "shop",
      "hardness": "hard",
      "weight": 10,
      "source_text": "cov-weekend-D",
@@ -5896,7 +5896,7 @@
     },
     {
      "id": "cov-weekend-E",
-     "scope": "ward",
+     "scope": "shop",
      "hardness": "hard",
      "weight": 10,
      "source_text": "cov-weekend-E",
@@ -5942,7 +5942,7 @@
     },
     {
      "id": "cov-weekend-N",
-     "scope": "ward",
+     "scope": "shop",
      "hardness": "hard",
      "weight": 10,
      "source_text": "cov-weekend-N",
@@ -6008,7 +6008,7 @@
        "per": "person",
        "people": {
         "ids": [
-         "n01"
+         "e01"
         ],
         "exclude_tags": []
        },
@@ -6060,7 +6060,7 @@
        "per": "person",
        "people": {
         "ids": [
-         "n02"
+         "e02"
         ],
         "exclude_tags": []
        },
@@ -6149,30 +6149,30 @@
      }
     ]
    },
-   "nurses": [
+   "employees": [
     {
      "id": "n0",
-     "name": "간호사0",
+     "name": "직원0",
      "tags": []
     },
     {
      "id": "n1",
-     "name": "간호사1",
+     "name": "직원1",
      "tags": []
     },
     {
      "id": "n2",
-     "name": "간호사2",
+     "name": "직원2",
      "tags": []
     },
     {
      "id": "n3",
-     "name": "간호사3",
+     "name": "직원3",
      "tags": []
     },
     {
      "id": "n4",
-     "name": "간호사4",
+     "name": "직원4",
      "tags": []
     }
    ],
@@ -6184,7 +6184,7 @@
    "constraints": [
     {
      "id": "cov-D",
-     "scope": "ward",
+     "scope": "shop",
      "hardness": "hard",
      "weight": 10,
      "source_text": "cov-D",
@@ -6230,7 +6230,7 @@
     },
     {
      "id": "cov-M",
-     "scope": "ward",
+     "scope": "shop",
      "hardness": "hard",
      "weight": 10,
      "source_text": "cov-M",
@@ -6276,7 +6276,7 @@
     },
     {
      "id": "cov-N",
-     "scope": "ward",
+     "scope": "shop",
      "hardness": "hard",
      "weight": 10,
      "source_text": "cov-N",
@@ -6322,7 +6322,7 @@
     },
     {
      "id": "n-off",
-     "scope": "ward",
+     "scope": "shop",
      "hardness": "hard",
      "weight": 10,
      "source_text": "n-off",
@@ -6407,7 +6407,7 @@
     },
     {
      "id": "nf",
-     "scope": "ward",
+     "scope": "shop",
      "hardness": "soft",
      "weight": 5,
      "source_text": "nf",
@@ -6544,20 +6544,20 @@
      }
     ]
    },
-   "nurses": [
+   "employees": [
     {
      "id": "n0",
-     "name": "간호사0",
+     "name": "직원0",
      "tags": []
     },
     {
      "id": "n1",
-     "name": "간호사1",
+     "name": "직원1",
      "tags": []
     },
     {
      "id": "n2",
-     "name": "간호사2",
+     "name": "직원2",
      "tags": []
     }
    ],
@@ -6569,7 +6569,7 @@
    "constraints": [
     {
      "id": "cov-D",
-     "scope": "ward",
+     "scope": "shop",
      "hardness": "hard",
      "weight": 10,
      "source_text": "cov-D",
@@ -6615,7 +6615,7 @@
     },
     {
      "id": "cov-E",
-     "scope": "ward",
+     "scope": "shop",
      "hardness": "hard",
      "weight": 10,
      "source_text": "cov-E",
@@ -6661,7 +6661,7 @@
     },
     {
      "id": "de-max",
-     "scope": "ward",
+     "scope": "shop",
      "hardness": "hard",
      "weight": 10,
      "source_text": "de-max",
@@ -6774,10 +6774,10 @@
      }
     ]
    },
-   "nurses": [
+   "employees": [
     {
      "id": "n0",
-     "name": "간호사0",
+     "name": "직원0",
      "tags": []
     }
    ],
@@ -6789,7 +6789,7 @@
    "constraints": [
     {
      "id": "week52",
-     "scope": "ward",
+     "scope": "shop",
      "hardness": "hard",
      "weight": 10,
      "source_text": "week52",
@@ -6835,7 +6835,7 @@
     },
     {
      "id": "want-work",
-     "scope": "ward",
+     "scope": "shop",
      "hardness": "soft",
      "weight": 10,
      "source_text": "want-work",
@@ -6882,7 +6882,7 @@
    ],
    "carry_over": [
     {
-     "nurse_id": "n0",
+     "employee_id": "n0",
      "shifts": [
       "D",
       "D",
@@ -6945,10 +6945,10 @@
      }
     ]
    },
-   "nurses": [
+   "employees": [
     {
      "id": "n0",
-     "name": "간호사0",
+     "name": "직원0",
      "tags": []
     }
    ],
@@ -6960,7 +6960,7 @@
    "constraints": [
     {
      "id": "off7",
-     "scope": "ward",
+     "scope": "shop",
      "hardness": "hard",
      "weight": 10,
      "source_text": "off7",
@@ -7007,7 +7007,7 @@
     },
     {
      "id": "want-work",
-     "scope": "ward",
+     "scope": "shop",
      "hardness": "soft",
      "weight": 10,
      "source_text": "want-work",
@@ -7054,7 +7054,7 @@
    ],
    "carry_over": [
     {
-     "nurse_id": "n0",
+     "employee_id": "n0",
      "shifts": [
       "D",
       "D",
@@ -7123,20 +7123,20 @@
      }
     ]
    },
-   "nurses": [
+   "employees": [
     {
      "id": "n0",
-     "name": "간호사0",
+     "name": "직원0",
      "tags": []
     },
     {
      "id": "n1",
-     "name": "간호사1",
+     "name": "직원1",
      "tags": []
     },
     {
      "id": "n2",
-     "name": "간호사2",
+     "name": "직원2",
      "tags": []
     }
    ],
@@ -7148,7 +7148,7 @@
    "constraints": [
     {
      "id": "cov-N",
-     "scope": "ward",
+     "scope": "shop",
      "hardness": "hard",
      "weight": 10,
      "source_text": "cov-N",
@@ -7194,7 +7194,7 @@
     },
     {
      "id": "n-run",
-     "scope": "ward",
+     "scope": "shop",
      "hardness": "hard",
      "weight": 10,
      "source_text": "n-run",
@@ -7241,7 +7241,7 @@
     },
     {
      "id": "n-run-2",
-     "scope": "ward",
+     "scope": "shop",
      "hardness": "hard",
      "weight": 10,
      "source_text": "n-run",
@@ -7327,19 +7327,19 @@
    ],
    "carry_over": [
     {
-     "nurse_id": "n0",
+     "employee_id": "n0",
      "shifts": [
       "O"
      ]
     },
     {
-     "nurse_id": "n1",
+     "employee_id": "n1",
      "shifts": [
       "O"
      ]
     },
     {
-     "nurse_id": "n2",
+     "employee_id": "n2",
      "shifts": [
       "O"
      ]
@@ -7427,30 +7427,30 @@
      }
     ]
    },
-   "nurses": [
+   "employees": [
     {
      "id": "n0",
-     "name": "간호사0",
+     "name": "직원0",
      "tags": []
     },
     {
      "id": "n1",
-     "name": "간호사1",
+     "name": "직원1",
      "tags": []
     },
     {
      "id": "n2",
-     "name": "간호사2",
+     "name": "직원2",
      "tags": []
     },
     {
      "id": "n3",
-     "name": "간호사3",
+     "name": "직원3",
      "tags": []
     },
     {
      "id": "n4",
-     "name": "간호사4",
+     "name": "직원4",
      "tags": []
     }
    ],
@@ -7462,7 +7462,7 @@
    "constraints": [
     {
      "id": "cov-D",
-     "scope": "ward",
+     "scope": "shop",
      "hardness": "hard",
      "weight": 10,
      "source_text": "cov-D",
@@ -7508,7 +7508,7 @@
     },
     {
      "id": "cov-N",
-     "scope": "ward",
+     "scope": "shop",
      "hardness": "hard",
      "weight": 10,
      "source_text": "cov-N",
@@ -7554,7 +7554,7 @@
     },
     {
      "id": "after-n",
-     "scope": "ward",
+     "scope": "shop",
      "hardness": "hard",
      "weight": 10,
      "source_text": "after-n",
@@ -7745,44 +7745,44 @@
      }
     ]
    },
-   "nurses": [
+   "employees": [
     {
      "id": "n0",
-     "name": "간호사0",
+     "name": "직원0",
      "tags": [
       "책임"
      ]
     },
     {
      "id": "n1",
-     "name": "간호사1",
+     "name": "직원1",
      "tags": []
     },
     {
      "id": "n2",
-     "name": "간호사2",
+     "name": "직원2",
      "tags": []
     },
     {
      "id": "n3",
-     "name": "간호사3",
+     "name": "직원3",
      "tags": [
       "책임"
      ]
     },
     {
      "id": "n4",
-     "name": "간호사4",
+     "name": "직원4",
      "tags": []
     },
     {
      "id": "n5",
-     "name": "간호사5",
+     "name": "직원5",
      "tags": []
     },
     {
      "id": "n6",
-     "name": "간호사6",
+     "name": "직원6",
      "tags": []
     }
    ],
@@ -7794,7 +7794,7 @@
    "constraints": [
     {
      "id": "cov-D",
-     "scope": "ward",
+     "scope": "shop",
      "hardness": "hard",
      "weight": 10,
      "source_text": "cov-D",
@@ -7840,7 +7840,7 @@
     },
     {
      "id": "cov-E",
-     "scope": "ward",
+     "scope": "shop",
      "hardness": "hard",
      "weight": 10,
      "source_text": "cov-E",
@@ -7886,7 +7886,7 @@
     },
     {
      "id": "cov-N",
-     "scope": "ward",
+     "scope": "shop",
      "hardness": "hard",
      "weight": 10,
      "source_text": "cov-N",
@@ -7932,7 +7932,7 @@
     },
     {
      "id": "n-off",
-     "scope": "ward",
+     "scope": "shop",
      "hardness": "hard",
      "weight": 10,
      "source_text": "n-off",
@@ -8017,7 +8017,7 @@
     },
     {
      "id": "charge-d",
-     "scope": "ward",
+     "scope": "shop",
      "hardness": "hard",
      "weight": 10,
      "source_text": "charge-d",
@@ -8069,7 +8069,7 @@
     },
     {
      "id": "wf",
-     "scope": "ward",
+     "scope": "shop",
      "hardness": "soft",
      "weight": 5,
      "source_text": "wf",
@@ -8214,20 +8214,20 @@
      }
     ]
    },
-   "nurses": [
+   "employees": [
     {
      "id": "n0",
-     "name": "간호사0",
+     "name": "직원0",
      "tags": []
     },
     {
      "id": "n1",
-     "name": "간호사1",
+     "name": "직원1",
      "tags": []
     },
     {
      "id": "n2",
-     "name": "간호사2",
+     "name": "직원2",
      "tags": []
     }
    ],
@@ -8239,7 +8239,7 @@
    "constraints": [
     {
      "id": "cov-N",
-     "scope": "ward",
+     "scope": "shop",
      "hardness": "hard",
      "weight": 10,
      "source_text": "cov-N",
@@ -8285,7 +8285,7 @@
     },
     {
      "id": "n-even",
-     "scope": "ward",
+     "scope": "shop",
      "hardness": "hard",
      "weight": 5,
      "source_text": "n-even",
@@ -8391,35 +8391,35 @@
      }
     ]
    },
-   "nurses": [
+   "employees": [
     {
      "id": "n0",
-     "name": "간호사0",
+     "name": "직원0",
      "tags": []
     },
     {
      "id": "n1",
-     "name": "간호사1",
+     "name": "직원1",
      "tags": []
     },
     {
      "id": "n2",
-     "name": "간호사2",
+     "name": "직원2",
      "tags": []
     },
     {
      "id": "n3",
-     "name": "간호사3",
+     "name": "직원3",
      "tags": []
     },
     {
      "id": "n4",
-     "name": "간호사4",
+     "name": "직원4",
      "tags": []
     },
     {
      "id": "n5",
-     "name": "간호사5",
+     "name": "직원5",
      "tags": []
     }
    ],
@@ -8431,7 +8431,7 @@
    "constraints": [
     {
      "id": "cov-D",
-     "scope": "ward",
+     "scope": "shop",
      "hardness": "hard",
      "weight": 10,
      "source_text": "cov-D",
@@ -8477,7 +8477,7 @@
     },
     {
      "id": "cov-E",
-     "scope": "ward",
+     "scope": "shop",
      "hardness": "hard",
      "weight": 10,
      "source_text": "cov-E",
@@ -8523,7 +8523,7 @@
     },
     {
      "id": "cov-N",
-     "scope": "ward",
+     "scope": "shop",
      "hardness": "hard",
      "weight": 10,
      "source_text": "cov-N",
@@ -8569,7 +8569,7 @@
     },
     {
      "id": "n-off",
-     "scope": "ward",
+     "scope": "shop",
      "hardness": "hard",
      "weight": 10,
      "source_text": "n-off",
@@ -8913,20 +8913,20 @@
      }
     ]
    },
-   "nurses": [
+   "employees": [
     {
      "id": "n0",
-     "name": "간호사0",
+     "name": "직원0",
      "tags": []
     },
     {
      "id": "n1",
-     "name": "간호사1",
+     "name": "직원1",
      "tags": []
     },
     {
      "id": "n2",
-     "name": "간호사2",
+     "name": "직원2",
      "tags": []
     }
    ],
@@ -8938,7 +8938,7 @@
    "constraints": [
     {
      "id": "cov-D",
-     "scope": "ward",
+     "scope": "shop",
      "hardness": "hard",
      "weight": 10,
      "source_text": "cov-D",
@@ -8984,7 +8984,7 @@
     },
     {
      "id": "cov-E",
-     "scope": "ward",
+     "scope": "shop",
      "hardness": "hard",
      "weight": 10,
      "source_text": "cov-E",
@@ -9030,7 +9030,7 @@
     },
     {
      "id": "cov-N",
-     "scope": "ward",
+     "scope": "shop",
      "hardness": "hard",
      "weight": 10,
      "source_text": "cov-N",
@@ -9076,7 +9076,7 @@
     },
     {
      "id": "max-n",
-     "scope": "ward",
+     "scope": "shop",
      "hardness": "hard",
      "weight": 10,
      "source_text": "max-n",
@@ -9123,7 +9123,7 @@
     },
     {
      "id": "no-nd",
-     "scope": "ward",
+     "scope": "shop",
      "hardness": "soft",
      "weight": 10,
      "source_text": "no-nd",
@@ -9189,7 +9189,7 @@
     },
     {
      "id": "no-ne",
-     "scope": "ward",
+     "scope": "shop",
      "hardness": "soft",
      "weight": 30,
      "source_text": "no-ne",
@@ -9328,27 +9328,27 @@
      }
     ]
    },
-   "nurses": [
+   "employees": [
     {
-     "id": "n01",
-     "name": "간호사1",
+     "id": "e01",
+     "name": "직원1",
      "tags": []
     },
     {
-     "id": "n02",
-     "name": "간호사2",
+     "id": "e02",
+     "name": "직원2",
      "tags": []
     },
     {
-     "id": "n03",
-     "name": "간호사3",
+     "id": "e03",
+     "name": "직원3",
      "tags": [
       "파트"
      ]
     },
     {
-     "id": "n04",
-     "name": "간호사4",
+     "id": "e04",
+     "name": "직원4",
      "tags": [
       "파트"
      ]
@@ -9362,7 +9362,7 @@
    "constraints": [
     {
      "id": "cov-weekday-D",
-     "scope": "ward",
+     "scope": "shop",
      "hardness": "hard",
      "weight": 10,
      "source_text": "cov-weekday-D",
@@ -9408,7 +9408,7 @@
     },
     {
      "id": "cov-weekday-E",
-     "scope": "ward",
+     "scope": "shop",
      "hardness": "hard",
      "weight": 10,
      "source_text": "cov-weekday-E",
@@ -9454,7 +9454,7 @@
     },
     {
      "id": "cov-weekday-N",
-     "scope": "ward",
+     "scope": "shop",
      "hardness": "hard",
      "weight": 10,
      "source_text": "cov-weekday-N",
@@ -9520,7 +9520,7 @@
        "per": "person",
        "people": {
         "ids": [
-         "n01"
+         "e01"
         ],
         "exclude_tags": []
        },
@@ -9552,7 +9552,7 @@
     },
     {
      "id": "part-only",
-     "scope": "ward",
+     "scope": "shop",
      "hardness": "hard",
      "weight": 10,
      "source_text": "파트는 나이트와 휴무만",
@@ -9650,17 +9650,17 @@
      }
     ]
    },
-   "nurses": [
+   "employees": [
     {
      "id": "n0",
-     "name": "간호사0",
+     "name": "직원0",
      "tags": [
       "파트"
      ]
     },
     {
      "id": "n1",
-     "name": "간호사1",
+     "name": "직원1",
      "tags": [
       "파트"
      ]
@@ -9674,7 +9674,7 @@
    "constraints": [
     {
      "id": "part-only",
-     "scope": "ward",
+     "scope": "shop",
      "hardness": "hard",
      "weight": 10,
      "source_text": "파트는 나이트와 휴무만",
@@ -9724,7 +9724,7 @@
     },
     {
      "id": "cov-D",
-     "scope": "ward",
+     "scope": "shop",
      "hardness": "hard",
      "weight": 10,
      "source_text": "cov-D",
@@ -9770,7 +9770,7 @@
     },
     {
      "id": "cov-N",
-     "scope": "ward",
+     "scope": "shop",
      "hardness": "hard",
      "weight": 10,
      "source_text": "cov-N",

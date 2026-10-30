@@ -21,7 +21,7 @@ from backend.tests.rules import (
     sample_data,
     weekend_fair,
 )
-from backend.tests.test_solver_hard import START, WEEKENDS, forbid, nurse, request, solve_ok
+from backend.tests.test_solver_hard import START, WEEKENDS, forbid, employee, request, solve_ok
 
 
 def pref(cid: str, nid: str, shift: str, prefer: bool, days: list[int] | None = None,
@@ -37,8 +37,8 @@ def basic_coverage() -> list[dict]:
     return [coverage(s, k, 1, 1) for s in "DEN" for k in ("weekday", "weekend")]
 
 
-def night_spread(assignments: dict, nurse_ids: list[str]) -> int:
-    counts = [assignments[n].count("N") for n in nurse_ids]
+def night_spread(assignments: dict, employee_ids: list[str]) -> int:
+    counts = [assignments[n].count("N") for n in employee_ids]
     return max(counts) - min(counts)
 
 
@@ -73,12 +73,12 @@ def test_soft_constraint_creates_no_hard_literal():
 
 
 def test_night_fairness_reduces_or_keeps_spread():
-    nurses = [nurse(f"n{i}") for i in range(1, 7)]
+    employees = [employee(f"n{i}") for i in range(1, 7)]
     base = [coverage("N", k, 2, 2) for k in ("weekday", "weekend")]
     regular = [f"n{i}" for i in range(1, 7)]
 
-    without = solve_ok(request(nurses, base))
-    with_fair = solve_ok(request(nurses, base + [night_fair()]))
+    without = solve_ok(request(employees, base))
+    with_fair = solve_ok(request(employees, base + [night_fair()]))
     assert night_spread(with_fair, regular) <= night_spread(without, regular)
     assert night_spread(with_fair, regular) <= 1
 
@@ -92,9 +92,9 @@ def test_weekend_fairness_balances_weekend_work():
 
 def test_soft_coverage_allows_shortage_but_minimizes_it():
     # 2명뿐인데 데이 3명 요구(soft) → 해는 있고 매일 2명 배정
-    nurses = [nurse("n1"), nurse("n2")]
+    employees = [employee("n1"), employee("n2")]
     cons = [coverage("D", k, 3, 3, hardness="soft") for k in ("weekday", "weekend")]
-    res = solve(request(nurses, cons))
+    res = solve(request(employees, cons))
     assert isinstance(res, SolveOk)
     a = res.result.assignments
     assert all(a["n1"][d] == "D" and a["n2"][d] == "D" for d in range(30))
@@ -102,10 +102,10 @@ def test_soft_coverage_allows_shortage_but_minimizes_it():
 
 
 def test_soft_max_consecutive_work_penalizes_excess():
-    nurses = [nurse("n1"), nurse("n2")]
+    employees = [employee("n1"), employee("n2")]
     cons = [coverage("D", k, 1, 1) for k in ("weekday", "weekend")]
     cons.append(max_work("mcw", 3, hardness="soft"))
-    a = solve_ok(request(nurses, cons))
+    a = solve_ok(request(employees, cons))
     for row in a.values():
         run = best = 0
         for s in row:
@@ -135,7 +135,7 @@ def test_solve_fills_result_stats():
 
 
 def stats_request(constraints: list[dict], **extra) -> ScheduleRequest:
-    return request([nurse("a"), nurse("b"), nurse("c", tags=["파트"])], constraints, **extra)
+    return request([employee("a"), employee("b"), employee("c", tags=["파트"])], constraints, **extra)
 
 
 def regular_night_fair() -> dict:
@@ -194,7 +194,7 @@ def test_compute_result_preferences():
     assert r.stats["b"].preference_rate == 1.0
     assert r.stats["c"].preference_rate is None
     v = [x for x in r.soft_violations if x.constraint_id == "p1"]
-    assert [(x.nurse_id, x.day) for x in v] == [("a", 9)]
+    assert [(x.employee_id, x.day) for x in v] == [("a", 9)]
 
 
 def test_compute_result_weekends_only_preference():
@@ -213,7 +213,7 @@ def test_compute_result_soft_violations_for_toggled_rules():
     r = compute_result(stats_request(cons), {"a": A, "b": B, "c": C}, optimal=True)
     ids = {x.constraint_id for x in r.soft_violations}
     assert "mcw" in ids and "mcw-hard" not in ids
-    assert any(x.constraint_id == "mcw" and x.nurse_id == "a" for x in r.soft_violations)
+    assert any(x.constraint_id == "mcw" and x.employee_id == "a" for x in r.soft_violations)
     # 평일 D가 2명인 날은 없다(a 혼자이거나 0명, 30일은 b만) → 평일 21일 모두 위반
     assert sum(x.constraint_id == "cov-weekday-D" for x in r.soft_violations) == 21
     assert r.summary.soft_violation_count == len(r.soft_violations)
@@ -237,7 +237,7 @@ def test_compute_result_disabled_soft_not_listed():
 
 
 def history_sample(constraints: list[dict], rows: dict[str, list[str]] | None = None) -> ScheduleRequest:
-    """15명 샘플 병동. N 연속 3일 + N-OFF 2일(hard)."""
+    """15명 샘플 매장. N 연속 3일 + N-OFF 2일(hard)."""
     data = sample_data()
     data["constraints"] += [max_nights("mcn", 3), off_after_night("noff", 2), *constraints]
     if rows is not None:
@@ -265,8 +265,8 @@ def weekend_work(req: ScheduleRequest, row: list[str]) -> int:
 
 def test_night_history_reduces_nights_this_period():
     nf = [night_fair()]
-    before = solve_ok(history_sample(nf))["n03"].count("N")
-    after = solve_ok(history_sample(nf, {"n03": ["N"] * 8}))["n03"].count("N")
+    before = solve_ok(history_sample(nf))["e03"].count("N")
+    after = solve_ok(history_sample(nf, {"e03": ["N"] * 8}))["e03"].count("N")
     assert before >= 1
     assert after < before
 
@@ -274,9 +274,9 @@ def test_night_history_reduces_nights_this_period():
 def test_weekend_history_reduces_weekend_work_this_period():
     wf = [weekend_fair()]
     req = history_sample(wf)
-    before = weekend_work(req, solve_ok(req)["n03"])
-    loaded = history_sample(wf, {"n03": ["D"] * 28})  # 주말 8일 모두 근무
-    after = weekend_work(loaded, solve_ok(loaded)["n03"])
+    before = weekend_work(req, solve_ok(req)["e03"])
+    loaded = history_sample(wf, {"e03": ["D"] * 28})  # 주말 8일 모두 근무
+    after = weekend_work(loaded, solve_ok(loaded)["e03"])
     assert before >= 1
     assert after < before
 
@@ -284,7 +284,7 @@ def test_weekend_history_reduces_weekend_work_this_period():
 def test_empty_or_zero_history_keeps_objective():
     fair = [night_fair(), weekend_fair()]
     base = objective(history_sample(fair))
-    all_off = {f"n{i:02d}": ["O"] * 28 for i in range(1, 16)}
+    all_off = {f"e{i:02d}": ["O"] * 28 for i in range(1, 16)}
     assert objective(history_sample(fair, {})) == base
     assert objective(history_sample(fair, all_off)) == base
 
@@ -308,7 +308,7 @@ def test_compute_result_fairness_detail_without_history_unchanged():
 # --- 성능 ---
 
 
-def test_sample_ward_31_days_solves_within_10s():
+def test_sample_shop_31_days_solves_within_10s():
     data = sample_data()
     data["period"] = {"start_date": "2026-12-01", "length": 31}
     data["constraints"] += [
@@ -321,9 +321,9 @@ def test_sample_ward_31_days_solves_within_10s():
         min_off("mdo", 8),
         night_fair(),
         weekend_fair(),
-        rules.preference("p1", "n01", "O", 2, [24, 25]),
-        rules.preference("p2", "n05", "O", 8, weekends_only=True),  # 12월 주말 8일
-        rules.preference("p3", "n11", "N"),
+        rules.preference("p1", "e01", "O", 2, [24, 25]),
+        rules.preference("p2", "e05", "O", 8, weekends_only=True),  # 12월 주말 8일
+        rules.preference("p3", "e11", "N"),
     ]
     req = ScheduleRequest.model_validate(data)
 
@@ -332,10 +332,10 @@ def test_sample_ward_31_days_solves_within_10s():
     elapsed = time.monotonic() - start
     assert isinstance(res, SolveOk), res
     assert elapsed < 10, elapsed
-    assert len(res.result.assignments["n01"]) == 31
+    assert len(res.result.assignments["e01"]) == 31
 
 
-def test_sample_ward_31_days_with_history_solves_within_10s():
+def test_sample_shop_31_days_with_history_solves_within_10s():
     data = sample_data()
     data["period"] = {"start_date": "2026-12-01", "length": 31}
     data["constraints"] += [
@@ -345,7 +345,7 @@ def test_sample_ward_31_days_with_history_solves_within_10s():
         night_fair(),
         weekend_fair(),
     ]
-    data["history"] = history("2026-12-01", {f"n{i:02d}": ["N"] * (i % 9) + ["D", "O"] * (i % 5) for i in range(1, 16)})
+    data["history"] = history("2026-12-01", {f"e{i:02d}": ["N"] * (i % 9) + ["D", "O"] * (i % 5) for i in range(1, 16)})
     req = ScheduleRequest.model_validate(data)
 
     start = time.monotonic()

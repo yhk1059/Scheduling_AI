@@ -12,7 +12,7 @@ if TYPE_CHECKING:
 
 def add_fixed_assignment(ctx: "ModelContext", c: Any, lit) -> None:
     p = c.params
-    var = ctx.x.get((p.nurse_id, p.day, p.shift))
+    var = ctx.x.get((p.employee_id, p.day, p.shift))
     if var is None:  # 끈 코드는 배정할 수 없다
         ctx.model.add_bool_or([lit.Not()])
         return

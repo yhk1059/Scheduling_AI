@@ -6,14 +6,14 @@ from pathlib import Path
 
 from backend.domain.constants import HISTORY_DAYS
 
-SAMPLE_PATH = Path(__file__).resolve().parents[2] / "lib" / "samples" / "ward-15.json"
+SAMPLE_PATH = Path(__file__).resolve().parents[2] / "lib" / "samples" / "shop-12.json"
 
 
 N, O = {"in": ["N"]}, {"in": ["O"]}
 WORK = {"not_in": ["O"]}
 
 
-def con(cid: str, body: dict, values: dict | None = None, hardness: str = "hard", scope: str = "ward", **extra) -> dict:
+def con(cid: str, body: dict, values: dict | None = None, hardness: str = "hard", scope: str = "shop", **extra) -> dict:
     return {"id": cid, "type": "rule", "scope": scope, "hardness": hardness, "source_text": "원문",
             "values": values or {}, "body": body, **extra}
 
@@ -126,17 +126,17 @@ def window_off(cid: str, window: int, n: int = 1, **extra) -> dict:
     return count(cid, O, "person_window", lo=n, window=window, **extra)
 
 
-def leave(cid: str, nurse_id: str, days: list[int], **extra) -> dict:
+def leave(cid: str, employee_id: str, days: list[int], **extra) -> dict:
     """휴가: 그 사람의 그 날들에 휴무 말고 0번(반드시)."""
-    return count(cid, WORK, "person", hi=0, people={"ids": [nurse_id]}, days={"days": days}, **{"scope": "period", **extra})
+    return count(cid, WORK, "person", hi=0, people={"ids": [employee_id]}, days={"days": days}, **{"scope": "period", **extra})
 
 
-def fixed(cid: str, nurse_id: str, day: int, shift: str, **extra) -> dict:
+def fixed(cid: str, employee_id: str, day: int, shift: str, **extra) -> dict:
     return {"id": cid, "type": "fixed_assignment", "scope": "period", "hardness": "hard", "source_text": "원문",
-            "params": {"nurse_id": nurse_id, "day": day, "shift": shift}, **extra}
+            "params": {"employee_id": employee_id, "day": day, "shift": shift}, **extra}
 
 
-def preference(cid: str, nurse_id: str, shift: str, n_days: int | None = None, days: list[int] | None = None,
+def preference(cid: str, employee_id: str, shift: str, n_days: int | None = None, days: list[int] | None = None,
                weekends_only: bool = False, **extra) -> dict:
     """희망(n_days = 대상 날짜 수, 최소) 또는 기피(n_days=None, 최대 0). 기본은 가능하면·기간 범위."""
     sel: dict = {}
@@ -145,7 +145,7 @@ def preference(cid: str, nurse_id: str, shift: str, n_days: int | None = None, d
     if days is not None:
         sel["days"] = days
     bound = {"lo": n_days} if n_days is not None else {"hi": 0}
-    return count(cid, {"in": [shift]}, "person", people={"ids": [nurse_id]}, days=sel,
+    return count(cid, {"in": [shift]}, "person", people={"ids": [employee_id]}, days=sel,
                  **bound, **{"hardness": "soft", "scope": "period", **extra})
 
 
@@ -185,7 +185,7 @@ def history(start: str, rows: dict[str, list[str]], holidays: list[str] = ()) ->
 
 
 def sample_data() -> dict:
-    """샘플 병동(식 규칙) 요청 dict. next_requests(다음 근무표 요청)는 뺀다."""
+    """샘플 매장(식 규칙) 요청 dict. next_requests(다음 근무표 요청)는 뺀다."""
     data = json.loads(SAMPLE_PATH.read_text(encoding="utf-8"))
     del data["next_requests"]
     return data

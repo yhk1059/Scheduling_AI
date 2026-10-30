@@ -1,7 +1,7 @@
 // 지난 근무(이월) 붙여넣기 파싱 (순수 함수).
-import type { CarryOverRow, Nurse, WardConfig } from "./types.gen";
+import type { CarryOverRow, Employee, ShopConfig } from "./types.gen";
 
-export const MAX_NURSES = 40; // backend/domain/constants.py MAX_NURSES
+export const MAX_EMPLOYEES = 40; // backend/domain/constants.py MAX_EMPLOYEES
 export const CARRY_OVER_DAYS = 7; // backend/domain/constants.py CARRY_OVER_DAYS
 
 /** row·col은 입력 rows 기준 인덱스. row가 null이면 표 전체, col이 null이면 행 전체 오류. */
@@ -67,7 +67,7 @@ const SHIFT_SYNONYMS: Record<string, string> = {
 };
 
 /** 근무 형태의 코드(대소문자 무시)·이름과 기본 코드의 다른 표기 → 코드. */
-function codeLookup(config: WardConfig): Map<string, string> {
+function codeLookup(config: ShopConfig): Map<string, string> {
   const map = new Map<string, string>();
   for (const [word, code] of Object.entries(SHIFT_SYNONYMS)) {
     if (config.shifts.some((s) => s.code === code)) map.set(word, code);
@@ -82,10 +82,10 @@ function codeLookup(config: WardConfig): Map<string, string> {
 /** 지난 근무 붙여넣기. 첫 열은 이름, 나머지는 오래된 날부터 근무 코드(근무 형태의 코드나 이름). */
 export function parseCarryOver(
   text: string,
-  nurses: Nurse[],
-  config: WardConfig,
+  employees: Employee[],
+  config: ShopConfig,
 ): { rows: CarryOverRow[]; warnings: string[]; errors: CellError[] } {
-  const byName = new Map(nurses.map((n) => [n.name, n.id]));
+  const byName = new Map(employees.map((n) => [n.name, n.id]));
   const codes = codeLookup(config);
   const rows: CarryOverRow[] = [];
   const warnings: string[] = [];
@@ -94,8 +94,8 @@ export function parseCarryOver(
   parseDelimited(text).forEach((cells, r) => {
     const [name, ...cellCodes] = cells;
     if (NAME_HEADERS.includes(name.replace(/\s+/g, ""))) return;
-    const nurseId = byName.get(name);
-    if (nurseId === undefined) {
+    const employeeId = byName.get(name);
+    if (employeeId === undefined) {
       warnings.push(`명단에 없는 이름이라 무시했어요: ${name}`);
       return;
     }
@@ -111,7 +111,7 @@ export function parseCarryOver(
         ok = false;
       }
     });
-    if (ok) rows.push({ nurse_id: nurseId, shifts: shifts.slice(-CARRY_OVER_DAYS) });
+    if (ok) rows.push({ employee_id: employeeId, shifts: shifts.slice(-CARRY_OVER_DAYS) });
   });
 
   return { rows, warnings, errors };

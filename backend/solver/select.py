@@ -5,7 +5,7 @@
 
 from datetime import date, timedelta
 from backend.domain.constants import BASE_SHIFT_HOURS, MINUTES_PER_HOUR
-from backend.domain.models import Balance, Days, People, ScheduleRequest, Shifts, WardConfig, covers
+from backend.domain.models import Balance, Days, People, ScheduleRequest, Shifts, ShopConfig, covers
 
 def is_weekend(request: ScheduleRequest, day: int) -> bool:
     """토·일 또는 체크한 공휴일. 이월 칸(day <= 0)은 요일만 본다."""
@@ -34,7 +34,7 @@ def days(request: ScheduleRequest, sel: Days) -> list[int]:
 
 def people(request: ScheduleRequest, sel: People) -> list[str]:
     out = []
-    for n in request.nurses:
+    for n in request.employees:
         if sel.ids is not None and n.id not in sel.ids:
             continue
         if sel.tags is not None and not set(sel.tags) & set(n.tags):
@@ -45,38 +45,38 @@ def people(request: ScheduleRequest, sel: People) -> list[str]:
     return out
 
 
-def matches(config: WardConfig, code: str, sel: Shifts) -> bool:
+def matches(config: ShopConfig, code: str, sel: Shifts) -> bool:
     """칸 코드의 세는 근무조가 in과 겹치거나(not_in과 겹치지 않거나)."""
     c = covers(config, code)
     return bool(c & set(sel.in_)) if sel.in_ is not None else not c & set(sel.not_in or [])
 
 
-def codes_matching(config: WardConfig, sel: Shifts) -> list[str]:
+def codes_matching(config: ShopConfig, sel: Shifts) -> list[str]:
     """맞는 코드(config 순서, 비활성 포함)."""
     return [s.code for s in config.shifts if matches(config, s.code, sel)]
 
 
-def minutes_of(config: WardConfig, code: str) -> int:
+def minutes_of(config: ShopConfig, code: str) -> int:
     return round(next(s.hours for s in config.shifts if s.code == code) * MINUTES_PER_HOUR)
 
 
-def value(config: WardConfig, code: str, sel: Shifts, measure: str) -> int:
+def value(config: ShopConfig, code: str, sel: Shifts, measure: str) -> int:
     """칸 하나의 값: 개수(0/1) 또는 분."""
     if not matches(config, code, sel):
         return 0
     return 1 if measure == "count" else minutes_of(config, code)
 
 
-def first_day(request: ScheduleRequest, nurse_id: str) -> int:
+def first_day(request: ScheduleRequest, employee_id: str) -> int:
     """이월을 포함해 근무를 아는 가장 이른 날."""
-    return 1 - len(carry(request).get(nurse_id, []))
+    return 1 - len(carry(request).get(employee_id, []))
 
 
 def carry(request: ScheduleRequest) -> dict[str, list[str]]:
-    return {r.nurse_id: list(r.shifts) for r in request.carry_over}
+    return {r.employee_id: list(r.shifts) for r in request.carry_over}
 
 
-def history_count(request: ScheduleRequest, nurse_id: str, days_sel: Days, shifts_sel: Shifts, measure: str) -> int:
+def history_count(request: ScheduleRequest, employee_id: str, days_sel: Days, shifts_sel: Shifts, measure: str) -> int:
     """최근 28일 원본(history)에서 같은 셀렉터로 센 값. 요일·공휴일은 history.start_date·holidays로 판정한다.
 
     Days.days(기간 날짜 인덱스)를 지정한 셀렉터는 이력 날짜를 고르지 않는다.
@@ -86,7 +86,7 @@ def history_count(request: ScheduleRequest, nurse_id: str, days_sel: Days, shift
         return 0
     holidays = set(h.holidays)
     total = 0
-    for i, code in enumerate(h.rows.get(nurse_id, [])):
+    for i, code in enumerate(h.rows.get(employee_id, [])):
         dt: date = h.start_date + timedelta(days=i)
         holiday = dt in holidays
         if _date_matches(days_sel, dt.weekday(), dt.weekday() >= 5 or holiday, holiday):
@@ -110,6 +110,6 @@ def measure_unit(measure: str) -> int:
     return 1 if measure == "count" else BASE_SHIFT_HOURS * MINUTES_PER_HOUR
 
 
-def max_cell_value(config: WardConfig, sel: Shifts, measure: str) -> int:
+def max_cell_value(config: ShopConfig, sel: Shifts, measure: str) -> int:
     """칸 하나가 가질 수 있는 가장 큰 값."""
     return max((value(config, c, sel, measure) for c in codes_matching(config, sel)), default=0)

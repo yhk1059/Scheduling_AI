@@ -1,6 +1,6 @@
 // 기간 날짜 계산 (ADR-015). "YYYY-MM-DD"를 UTC 자정 기준 일수로만 다뤄 브라우저 타임존과 무관하게 한다.
 
-/** 병동의 기간 단위. 첫 기간은 아무 날에서 시작할 수 있고(달력 월은 1~28일), 이후는 연속이다(ADR-018). */
+/** 매장의 기간 단위. 첫 기간은 아무 날에서 시작할 수 있고(달력 월은 1~28일), 이후는 연속이다(ADR-018). */
 export type PeriodUnit = "1w" | "2w" | "4w" | "month";
 /** 백엔드 Period와 같은 모양. start_date는 "YYYY-MM-DD". */
 export interface PeriodRange {

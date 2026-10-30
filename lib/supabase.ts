@@ -1,4 +1,4 @@
-// Supabase 얇은 래퍼: Google 로그인과 병동 문서(wards 1행) load/save/delete (ADR-014).
+// Supabase 얇은 래퍼: Google 로그인과 매장 문서(shops 1행) load/save/delete (ADR-014).
 // 접근 제어는 RLS(owner_id = auth.uid())가 한다. 오류는 Error로 throw한다.
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
@@ -45,25 +45,25 @@ export async function signOut(): Promise<void> {
   if (error) throw new Error(error.message);
 }
 
-export interface WardRow {
+export interface ShopRow {
   data: unknown;
   updatedAt: string;
 }
 
-/** 내 병동 문서. 없으면 null. RLS가 내 행만 보여 준다. */
-export async function loadWard(): Promise<WardRow | null> {
+/** 내 매장 문서. 없으면 null. RLS가 내 행만 보여 준다. */
+export async function loadShop(): Promise<ShopRow | null> {
   const { data, error } = await supabase()
-    .from("wards")
+    .from("shops")
     .select("data, updated_at")
     .maybeSingle();
   if (error) throw new Error(error.message);
   return data ? { data: data.data, updatedAt: data.updated_at as string } : null;
 }
 
-/** 내 병동 문서를 통째로 저장한다(owner_id 기준 upsert, 마지막 저장이 이김). */
-export async function saveWard(userId: string, data: unknown): Promise<{ updatedAt: string }> {
+/** 내 매장 문서를 통째로 저장한다(owner_id 기준 upsert, 마지막 저장이 이김). */
+export async function saveShop(userId: string, data: unknown): Promise<{ updatedAt: string }> {
   const { data: row, error } = await supabase()
-    .from("wards")
+    .from("shops")
     .upsert({ owner_id: userId, data }, { onConflict: "owner_id" })
     .select("updated_at")
     .single();
@@ -71,10 +71,10 @@ export async function saveWard(userId: string, data: unknown): Promise<{ updated
   return { updatedAt: row.updated_at as string };
 }
 
-/** 내 병동 문서를 지운다. Google 계정 연결은 남는다. */
-export async function deleteWard(): Promise<void> {
+/** 내 매장 문서를 지운다. Google 계정 연결은 남는다. */
+export async function deleteShop(): Promise<void> {
   const { data, error: authError } = await supabase().auth.getUser();
   if (authError || !data.user) throw new Error(authError?.message ?? "Not signed in");
-  const { error } = await supabase().from("wards").delete().eq("owner_id", data.user.id);
+  const { error } = await supabase().from("shops").delete().eq("owner_id", data.user.id);
   if (error) throw new Error(error.message);
 }

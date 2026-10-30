@@ -17,11 +17,11 @@ export interface ApiTypes {
   [k: string]: unknown;
 }
 export interface ScheduleRequest {
-  config?: WardConfig;
+  config?: ShopConfig;
   /**
    * @minItems 1
    */
-  nurses: [Nurse, ...Nurse[]];
+  employees: [Employee, ...Employee[]];
   period: Period;
   holidays?: number[];
   constraints?: (Rule | FixedAssignment)[];
@@ -32,7 +32,7 @@ export interface ScheduleRequest {
   history?: History | null;
   input_version: number;
 }
-export interface WardConfig {
+export interface ShopConfig {
   /**
    * @minItems 1
    * @maxItems 8
@@ -47,7 +47,7 @@ export interface ShiftDef {
   start?: string | null;
   active?: boolean;
 }
-export interface Nurse {
+export interface Employee {
   id: string;
   name: string;
   /**
@@ -67,7 +67,7 @@ export interface Period {
  */
 export interface Rule {
   id: string;
-  scope: "ward" | "period";
+  scope: "shop" | "period";
   hardness?: "hard" | "soft";
   weight?: number;
   source_text: string;
@@ -188,7 +188,7 @@ export interface Days2 {
  */
 export interface FixedAssignment {
   id: string;
-  scope: "ward" | "period";
+  scope: "shop" | "period";
   hardness?: "hard" | "soft";
   weight?: number;
   source_text: string;
@@ -197,12 +197,12 @@ export interface FixedAssignment {
   params: FixedAssignmentParams;
 }
 export interface FixedAssignmentParams {
-  nurse_id: string;
+  employee_id: string;
   day: number;
   shift: string;
 }
 export interface CarryOverRow {
-  nurse_id: string;
+  employee_id: string;
   /**
    * @maxItems 7
    */
@@ -232,7 +232,7 @@ export interface ScheduleResult {
   };
   summary: Summary;
   stats: {
-    [k: string]: NurseStats;
+    [k: string]: EmployeeStats;
   };
   soft_violations: SoftViolation[];
   diff?: DiffCell[] | null;
@@ -243,7 +243,7 @@ export interface Summary {
   preferences_met: number;
   soft_violation_count: number;
 }
-export interface NurseStats {
+export interface EmployeeStats {
   counts: {
     [k: string]: number;
   };
@@ -255,12 +255,12 @@ export interface NurseStats {
 }
 export interface SoftViolation {
   constraint_id: string;
-  nurse_id?: string | null;
+  employee_id?: string | null;
   day?: number | null;
   detail: string;
 }
 export interface DiffCell {
-  nurse_id: string;
+  employee_id: string;
   day: number;
   before: string;
   after: string;
@@ -281,18 +281,18 @@ export interface SolveTimeout {
 }
 export interface TranslateRequest {
   text: string;
-  scope: "ward" | "period";
+  scope: "shop" | "period";
   context: TranslateContext;
   input_version: number;
 }
 export interface TranslateContext {
-  config?: WardConfig1;
-  nurses: Nurse[];
+  config?: ShopConfig1;
+  employees: Employee[];
   period: Period;
   holidays?: number[];
   today: string;
 }
-export interface WardConfig1 {
+export interface ShopConfig1 {
   /**
    * @minItems 1
    * @maxItems 8
@@ -326,7 +326,7 @@ export interface RuleExample {
    * @minItems 1
    * @maxItems 3
    */
-  nurse_ids: [string, ...string[]];
+  employee_ids: [string, ...string[]];
   /**
    * @minItems 1
    * @maxItems 7

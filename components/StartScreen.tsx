@@ -3,11 +3,11 @@
 import Link from "next/link";
 import { useState } from "react";
 
-import sample from "@/lib/samples/ward-15.json";
+import sample from "@/lib/samples/shop-12.json";
 import { currentPeriod, useAppStore, type View } from "@/lib/store";
 import { supabaseConfigured } from "@/lib/supabase";
 import type { ConstraintSpec } from "@/lib/types.gen";
-import { scheduleName, wardRuleCount } from "@/lib/wording";
+import { scheduleName, shopRuleCount } from "@/lib/wording";
 
 import { PrivacyLink } from "./Account";
 import Dialog from "./Dialog";
@@ -18,8 +18,8 @@ const SCREEN_LABELS: Record<Exclude<View["screen"], "period" | "confirmed">, str
   setup: "처음 설정",
   settings: "병동 설정",
 };
-const SAMPLE_NURSES = sample.nurses.length;
-const SAMPLE_RULES = wardRuleCount(sample.constraints as unknown as ConstraintSpec[]);
+const SAMPLE_EMPLOYEES = sample.employees.length;
+const SAMPLE_RULES = shopRuleCount(sample.constraints as unknown as ConstraintSpec[]);
 
 export default function StartScreen({ onDone }: { onDone: () => void }) {
   const hasInput = useAppStore((s) => s.hasInput());
@@ -27,15 +27,15 @@ export default function StartScreen({ onDone }: { onDone: () => void }) {
   const screenLabel = useAppStore((s) => {
     if (s.view.screen !== "period" && s.view.screen !== "confirmed") return SCREEN_LABELS[s.view.screen];
     const p = currentPeriod(s);
-    return p && s.ward ? scheduleName(p, s.ward.unit) : "근무표";
+    return p && s.shop ? scheduleName(p, s.shop.unit) : "근무표";
   });
-  const nurseCount = useAppStore((s) => s.ward?.nurses.filter((n) => n.active).length ?? 0);
-  const startWard = useAppStore((s) => s.startWard);
+  const employeeCount = useAppStore((s) => s.shop?.employees.filter((n) => n.active).length ?? 0);
+  const startShop = useAppStore((s) => s.startShop);
   const showLogin = useAppStore((s) => supabaseConfigured && s.auth === null);
   const [pending, setPending] = useState(false);
 
   const fresh = () => {
-    startWard();
+    startShop();
     onDone();
   };
   // 입력이 있으면 지우기 전에 확인한다
@@ -46,7 +46,7 @@ export default function StartScreen({ onDone }: { onDone: () => void }) {
       ? [
           {
             title: "이어서 하기",
-            body: `이 브라우저에 저장된 입력으로 돌아가요. ${screenLabel}${nurseCount > 0 ? ` · 간호사 ${nurseCount}명` : ""}`,
+            body: `이 브라우저에 저장된 입력으로 돌아가요. ${screenLabel}${employeeCount > 0 ? ` · 간호사 ${employeeCount}명` : ""}`,
             action: "이어서 하기",
             onClick: onDone,
           },
@@ -54,7 +54,7 @@ export default function StartScreen({ onDone }: { onDone: () => void }) {
       : []),
     {
       title: "샘플로 체험하기",
-      body: `간호사 ${SAMPLE_NURSES}명과 병동 규칙 ${SAMPLE_RULES}개로 만든 한 달 근무표를 볼 수 있어요. 지금 입력은 그대로 남아요.`,
+      body: `간호사 ${SAMPLE_EMPLOYEES}명과 병동 규칙 ${SAMPLE_RULES}개로 만든 한 달 근무표를 볼 수 있어요. 지금 입력은 그대로 남아요.`,
       action: "샘플로 체험하기",
       href: "/demo",
     },

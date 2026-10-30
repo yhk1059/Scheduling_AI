@@ -1,16 +1,16 @@
 // 배정에서 개인별 통계를 다시 센다(★12: 변환 전에 확정한 근무표는 옛 형식 통계 대신 이 값을 보여 준다).
-// backend/solver/stats.py compute_result의 NurseStats와 같은 정의다. 희망 반영률은 셀 수 없어 null.
+// backend/solver/stats.py compute_result의 EmployeeStats와 같은 정의다. 희망 반영률은 셀 수 없어 null.
 import { isWeekendDay, type PeriodRange } from "./period";
-import type { NurseStats, ScheduleResult, WardConfig } from "./types.gen";
+import type { EmployeeStats, ScheduleResult, ShopConfig } from "./types.gen";
 
 const OFF = "O";
 
 export function statsFromAssignments(
   assignments: ScheduleResult["assignments"],
-  config: WardConfig,
+  config: ShopConfig,
   period: PeriodRange,
   holidays: number[],
-): Record<string, NurseStats> {
+): Record<string, EmployeeStats> {
   const hours = new Map(config.shifts.map((s) => [s.code, s.hours]));
   const work = Object.fromEntries(Object.entries(assignments).map(([id, row]) => [id, row.filter((c) => c !== OFF).length]));
   const values = Object.values(work);
@@ -23,7 +23,7 @@ export function statsFromAssignments(
         run = code === OFF ? 0 : run + 1;
         longest = Math.max(longest, run);
       }
-      const stats: NurseStats = {
+      const stats: EmployeeStats = {
         counts: Object.fromEntries(
           config.shifts
             .filter((s) => s.active !== false || row.includes(s.code))

@@ -1,7 +1,7 @@
-"""최악 병동 성능 확인(ADR-008, ADR-019). 실행: npm run bench
+"""최악 매장 성능 확인(ADR-008, ADR-019). 실행: npm run bench
 
-입력 상한(constants.py)을 꽉 채운 병동이 시간 예산 안에 해를 내는지, 휴가 충돌을 더한 변형에서
-충돌 분석이 예산 안에 끝나는지 확인한다. 병동 규칙은 옛 블록 60개를 식으로 옮긴 규칙(설계 §2.5 모양)에
+입력 상한(constants.py)을 꽉 채운 매장이 시간 예산 안에 해를 내는지, 휴가 충돌을 더한 변형에서
+충돌 분석이 예산 안에 끝나는지 확인한다. 매장 규칙은 옛 블록 60개를 식으로 옮긴 규칙(설계 §2.5 모양)에
 식 고유 규칙(조건부·짝·세기끼리 비교·offset 폭 상한)을 더한 것이다.
 하나라도 넘으면 exit 1. 넘으면 시간 예산을 늘리지 말고 상한을 낮춘다. 시간이 걸려서 npm run test에는 넣지 않는다.
 """
@@ -15,7 +15,7 @@ from backend.domain.constants import (
     CARRY_OVER_DAYS,
     CONFLICT_TIME_LIMIT_S,
     HISTORY_DAYS,
-    MAX_NURSES,
+    MAX_EMPLOYEES,
     MAX_OFFSET_SPAN,
     MAX_PATTERN_LEN,
     MAX_PATTERNS,
@@ -52,16 +52,16 @@ WORK = {"not_in": ["O"]}
 ALL_N = IN("N")
 
 
-def nurses() -> list[dict]:
+def employees() -> list[dict]:
     """40명. 태그 2종: 책임 8명, 신규 6명."""
     rows = []
-    for i in range(MAX_NURSES):
+    for i in range(MAX_EMPLOYEES):
         tags = []
         if i % 5 == 0:
             tags.append("책임")
         elif i % 6 == 1:
             tags.append("신규")
-        rows.append({"id": f"n{i:02d}", "name": f"간호사{i:02d}", "tags": tags})
+        rows.append({"id": f"e{i:02d}", "name": f"직원{i:02d}", "tags": tags})
     return rows
 
 
@@ -96,7 +96,7 @@ def expr_rule(cid: str, for_each: dict, then: dict, when: dict | None = None, va
     body: dict = {"kind": "require", "for_each": for_each, "then": then}
     if when is not None:
         body["when"] = when
-    return {"id": cid, "type": "rule", "scope": "ward", "hardness": hardness, "priority": priority, "source_text": cid,
+    return {"id": cid, "type": "rule", "scope": "shop", "hardness": hardness, "priority": priority, "source_text": cid,
             "values": values or {}, "body": body}
 
 
@@ -160,7 +160,7 @@ def off_after(cid: str, after: dict, k: int) -> dict:
 
 def balance(cid: str, shifts: dict, **extra: Any) -> dict:
     body = {"kind": "balance", **extra, "shifts": shifts, "max_gap": {"value": "max_gap"}}
-    return {"id": cid, "type": "rule", "scope": "ward", "hardness": "soft", "priority": "low", "source_text": cid,
+    return {"id": cid, "type": "rule", "scope": "shop", "hardness": "soft", "priority": "low", "source_text": cid,
             "values": {"max_gap": {"value": 1, "label": "최대 차이"}}, "body": body}
 
 
@@ -228,7 +228,7 @@ def rules(people: list[dict]) -> list[dict]:
 def expr_rules() -> list[dict]:
     """조건부 5개(when + 그리고), 짝 3개, 세기끼리 비교 2개, offset 폭 상한 2개."""
     charge, new = {"tags": ["책임"]}, {"tags": ["신규"]}
-    ids = lambda *ns: {"ids": [f"n{i:02d}" for i in ns]}  # noqa: E731
+    ids = lambda *ns: {"ids": [f"e{i:02d}" for i in ns]}  # noqa: E731
     day, person_day = {"per": "day"}, {"per": "person_day"}
     return [
         # 조건부: 신규가 나이트면 책임도 나이트에
@@ -260,24 +260,24 @@ def expr_rules() -> list[dict]:
     ]
 
 
-def worst_ward() -> dict:
-    people = nurses()
+def worst_shop() -> dict:
+    people = employees()
     past = past_rows(people)
     return {
         "config": CONFIG,
-        "nurses": people,
+        "employees": people,
         "period": {"start_date": START.isoformat(), "length": MAX_PERIOD_DAYS},
         "holidays": HOLIDAYS,
         "constraints": rules(people) + expr_rules(),
-        "carry_over": [{"nurse_id": nid, "shifts": row[-CARRY_OVER_DAYS:]} for nid, row in past.items()],
+        "carry_over": [{"employee_id": nid, "shifts": row[-CARRY_OVER_DAYS:]} for nid, row in past.items()],
         "history": {"start_date": (START - timedelta(days=HISTORY_DAYS)).isoformat(), "rows": past, "holidays": []},
         "input_version": 1,
     }
 
 
 def with_leave_conflict(data: dict) -> dict:
-    """휴가 규칙 하나: 간호사 30명이 같은 날 쉬면 필요 인원을 채울 수 없다."""
-    ids = [n["id"] for n in data["nurses"]][:30]
+    """휴가 규칙 하나: 직원 30명이 같은 날 쉬면 필요 인원을 채울 수 없다."""
+    ids = [n["id"] for n in data["employees"]][:30]
     leave = count("leave-crowd", IN("O"), "person", lo=1, people={"ids": ids}, days={"days": [LEAVE_DAY]})
     return {**data, "constraints": data["constraints"] + [leave]}
 
@@ -295,7 +295,7 @@ def timed(fn, *args, **kwargs):
 def measure(label: str, req: ScheduleRequest, bad: ScheduleRequest) -> bool:
     """풀이·충돌 변형 풀이·충돌 분석을 재고 통과 여부를 낸다."""
     rules = sum(1 for c in req.constraints if c.type != "fixed_assignment")
-    print(f"[{label}] 간호사 {len(req.nurses)}명 × {req.period.length}일, 근무 코드 {len(req.config.shifts)}개, 규칙 {rules}개")
+    print(f"[{label}] 직원 {len(req.employees)}명 × {req.period.length}일, 근무 코드 {len(req.config.shifts)}개, 규칙 {rules}개")
     ok = True
 
     res, elapsed = timed(solve, req)
@@ -321,7 +321,7 @@ def measure(label: str, req: ScheduleRequest, bad: ScheduleRequest) -> bool:
 
 
 def main() -> int:
-    data = worst_ward()
+    data = worst_shop()
     req = ScheduleRequest.model_validate(data)
     bad = ScheduleRequest.model_validate(with_leave_conflict(data))
     return 0 if measure("식", req, bad) else 1

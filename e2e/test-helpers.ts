@@ -2,18 +2,18 @@
 import { expect, type Locator, type Page, test } from "@playwright/test";
 
 import { isWeekendDay, type PeriodRange, periodDays } from "../lib/period";
-import type { Ward, WorkPeriod } from "../lib/store";
+import type { Shop, WorkPeriod } from "../lib/store";
 import { DEFAULT_CONFIG, ruleShape } from "../lib/rules";
 import type { ConstraintSpec, Days, People, ScheduleRequest, ScheduleResult, Shifts, TranslateResponse } from "../lib/types.gen";
 
-/** 근무 코드. 기본은 D/E/N/O이고 병동이 더한 코드(M, DE 등)도 온다. */
+/** 근무 코드. 기본은 D/E/N/O이고 매장이 더한 코드(M, DE 등)도 온다. */
 export type Code = "D" | "E" | "N" | "O" | (string & {});
 export type Grid = Record<string, Code[]>;
 export type Load = { nights: number; weekends: number };
-type StoredState = { ward: Ward; periods: WorkPeriod[]; view: { screen: string; periodId?: string } };
+type StoredState = { shop: Shop; periods: WorkPeriod[]; view: { screen: string; periodId?: string } };
 
 export const T0 = new Date("2026-10-28T09:00:00+09:00");
-export const NURSE_COUNT = 15;
+export const EMPLOYEE_COUNT = 15;
 export const CARRY_OVER_DAYS = 7;
 
 export const pendingCards = (page: Page) => page.locator("article").filter({ hasText: "적용 대기" });
@@ -25,11 +25,11 @@ const idleButton = (page: Page) => page.getByRole("button", { name: /^(근무표
 export const primaryButtons = (page: Page) => page.locator('main button[class*="bg-[#155E75]"]');
 
 export async function readState(page: Page): Promise<StoredState> {
-  return page.evaluate(() => JSON.parse(localStorage.getItem("nurse-scheduler")!).state);
+  return page.evaluate(() => JSON.parse(localStorage.getItem("shop-scheduler")!).state);
 }
 
-export async function nurseId(page: Page, name: string): Promise<string> {
-  const n = (await readState(page)).ward.nurses.find((x) => x.name === name);
+export async function employeeId(page: Page, name: string): Promise<string> {
+  const n = (await readState(page)).shop.employees.find((x) => x.name === name);
   expect(n, `명단에 ${name}`).toBeTruthy();
   return n!.id;
 }
@@ -42,9 +42,9 @@ export async function periodByStart(page: Page, start: string): Promise<WorkPeri
 
 /** 저장된 근무표의 최신 확정본을 이름 기준 Grid로 바꾼다. */
 export async function confirmedGrid(page: Page, start: string): Promise<Grid> {
-  const { ward, periods } = await readState(page);
+  const { shop, periods } = await readState(page);
   const assignments = periods.find((x) => x.start_date === start)!.versions.at(-1)!.assignments;
-  return Object.fromEntries(ward.nurses.map((n) => [n.name, assignments[n.id] as Code[]]));
+  return Object.fromEntries(shop.employees.map((n) => [n.name, assignments[n.id] as Code[]]));
 }
 
 /** 근무 칸 aria-label 끝의 근무 코드(대문자·숫자 1~3자). */
@@ -92,7 +92,7 @@ export function gridDiff(before: Grid, after: Grid): { name: string; day: number
   return out;
 }
 
-/** 확정본의 fromDay일부터 끝까지(다음 근무표 직전 28일)에서 간호사별 나이트 수와 주말·공휴일 근무 수. */
+/** 확정본의 fromDay일부터 끝까지(다음 근무표 직전 28일)에서 직원별 나이트 수와 주말·공휴일 근무 수. */
 export function expectedHistory(grid: Grid, period: PeriodRange, holidays: number[], fromDay: number): Record<string, Load> {
   const out: Record<string, Load> = {};
   for (const [name, row] of Object.entries(grid)) {
@@ -105,17 +105,17 @@ export function expectedHistory(grid: Grid, period: PeriodRange, holidays: numbe
   return out;
 }
 
-/** 휴가 모양 규칙(고른 사람 × 날짜에 근무 없음)이면 사람마다 { nurse_id, days }. 아니면 빈 목록. */
-export function leavesOf(c: ConstraintSpec): { nurse_id: string; days: number[] }[] {
+/** 휴가 모양 규칙(고른 사람 × 날짜에 근무 없음)이면 사람마다 { employee_id, days }. 아니면 빈 목록. */
+export function leavesOf(c: ConstraintSpec): { employee_id: string; days: number[] }[] {
   const p = ruleShape(c);
   if (p?.kind !== "count") return [];
   const ids = p.people.ids;
   if (p.per !== "person" || p.max?.n !== 0 || !p.shifts.not_in?.includes("O") || !ids?.length || !p.days.days) return [];
-  return ids.map((nurse_id) => ({ nurse_id, days: p.days.days! }));
+  return ids.map((employee_id) => ({ employee_id, days: p.days.days! }));
 }
 
-/** 한 사람의 휴가 모양 블록이면 { nurse_id, days }. */
-export function leaveOf(c: ConstraintSpec): { nurse_id: string; days: number[] } | null {
+/** 한 사람의 휴가 모양 블록이면 { employee_id, days }. */
+export function leaveOf(c: ConstraintSpec): { employee_id: string; days: number[] } | null {
   const list = leavesOf(c);
   return list.length === 1 ? list[0] : null;
 }
@@ -128,29 +128,29 @@ export function leaveOf(c: ConstraintSpec): { nurse_id: string; days: number[] }
  */
 export function hardViolations(req: ScheduleRequest, grid: Grid): string[] {
   const out: string[] = [];
-  const { nurses, period, holidays = [], constraints = [], carry_over = [] } = req;
+  const { employees, period, holidays = [], constraints = [], carry_over = [] } = req;
   const config = req.config ?? DEFAULT_CONFIG;
   const days = period.length;
   const pdays = periodDays(period);
   const isWeekend = (d: number) => isWeekendDay(period, d, holidays);
   const rows = new Map<string, Code[]>();
   const extended = new Map<string, { row: Code[]; offset: number }>();
-  for (const n of nurses) {
+  for (const n of employees) {
     const row = grid[n.name];
     if (!row || row.length !== days || row.some((c) => !c)) {
       out.push(`${n.name}: 근무표 행이 없거나 ${days}칸이 아님`);
       continue;
     }
     rows.set(n.id, row);
-    const carry = (carry_over.find((r) => r.nurse_id === n.id)?.shifts ?? []) as Code[];
+    const carry = (carry_over.find((r) => r.employee_id === n.id)?.shifts ?? []) as Code[];
     extended.set(n.id, { row: [...carry, ...row], offset: carry.length });
   }
-  const name = (id: string) => nurses.find((n) => n.id === id)?.name ?? id;
+  const name = (id: string) => employees.find((n) => n.id === id)?.name ?? id;
   const covers = (code: string) => [code, ...(config.shifts.find((s) => s.code === code)?.parts ?? [])];
   const matches = (code: string, sel: Shifts) =>
     sel.in ? covers(code).some((c) => sel.in!.includes(c)) : !covers(code).some((c) => sel.not_in!.includes(c));
   const people = (p: People | undefined) =>
-    nurses
+    employees
       .filter(
         (n) =>
           (!p?.ids || p.ids.includes(n.id)) &&
@@ -172,8 +172,8 @@ export function hardViolations(req: ScheduleRequest, grid: Grid): string[] {
     if (c.enabled === false || (c.hardness ?? (balance ? "soft" : "hard")) !== "hard") continue;
     const tag = `${c.type} "${c.source_text}"`;
     if (c.type === "fixed_assignment") {
-      if (rows.get(c.params.nurse_id)?.[c.params.day - 1] !== c.params.shift)
-        out.push(`${tag}: ${name(c.params.nurse_id)} ${c.params.day}일`);
+      if (rows.get(c.params.employee_id)?.[c.params.day - 1] !== c.params.shift)
+        out.push(`${tag}: ${name(c.params.employee_id)} ${c.params.day}일`);
       continue;
     }
     const p = ruleShape(c);
@@ -253,14 +253,14 @@ export async function evaluatedViolations(page: Page, req: ScheduleRequest, grid
       constraints.push({ ...c, hardness: "soft" });
     }
   }
-  for (const n of req.nurses)
+  for (const n of req.employees)
     (grid[n.name] ?? []).forEach((shift, i) =>
       constraints.push({
         id: `e2e-${n.id}-${i + 1}`,
         type: "fixed_assignment",
         scope: "period",
         source_text: "e2e",
-        params: { nurse_id: n.id, day: i + 1, shift },
+        params: { employee_id: n.id, day: i + 1, shift },
       }),
     );
   const res = await page.request.post("/api/py/solve", { data: { ...req, previous: null, constraints }, timeout: 60_000 });
@@ -275,7 +275,7 @@ export async function evaluatedViolations(page: Page, req: ScheduleRequest, grid
 export async function expectHardRulesHold(page: Page, period: PeriodRange, lastSolve: ScheduleRequest | undefined) {
   const grid = await readGrid(page, period);
   expect(lastSolve, "마지막 /solve 요청").toBeTruthy();
-  expect(cellCount(grid), "근무 칸 수").toBe(lastSolve!.nurses.length * period.length);
+  expect(cellCount(grid), "근무 칸 수").toBe(lastSolve!.employees.length * period.length);
   expect(lastSolve!.period).toEqual(period);
   expect(hardViolations(lastSolve!, grid), "반드시 규칙 위반").toEqual([]);
   expect(await evaluatedViolations(page, lastSolve!, grid), "반드시 규칙 위반(식 규칙 평가)").toEqual([]);
@@ -367,7 +367,7 @@ export async function readHistoryColumns(page: Page): Promise<Record<string, Loa
 }
 
 // 화면에 보이면 안 되는 개발·옛 용어(UI_GUIDE "문구"). LLM이 쓴 문장이 없는 화면에서만 검사한다.
-const DEV_TERMS = /\b(hard|soft)\b|해 있음|해 없음|초안|이월|기간|달력 월|생성|재풀이|\bn\d{2}\b/i;
+const DEV_TERMS = /\b(hard|soft)\b|해 있음|해 없음|초안|이월|기간|달력 월|생성|재풀이|\be\d{2}\b/i;
 
 export async function expectNoDevTerms(page: Page, where: string) {
   const hit = DEV_TERMS.exec(await page.locator("body").innerText());

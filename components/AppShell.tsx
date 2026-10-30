@@ -12,11 +12,11 @@ import PeriodWork from "./PeriodWork";
 import SetupFlow from "./SetupFlow";
 import StartScreen from "./StartScreen";
 import { ui } from "./ui";
-import WardHome from "./WardHome";
-import WardSettings from "./WardSettings";
+import ShopHome from "./ShopHome";
+import ShopSettings from "./ShopSettings";
 
 export default function AppShell() {
-  const ward = useAppStore((s) => s.ward);
+  const shop = useAppStore((s) => s.shop);
   const view = useAppStore((s) => s.view);
   const go = useAppStore((s) => s.go);
   const storageAvailable = useAppStore((s) => s.storageAvailable);
@@ -25,14 +25,14 @@ export default function AppShell() {
   const auth = useAppStore((s) => s.auth);
   const syncStatus = useAppStore((s) => s.sync.status);
   const retrySave = useAppStore((s) => s.retrySave);
-  // 병동이 있으면(게스트 입력 포함) 바로 들어간다. 게스트는 [시작 화면]으로 새로 시작을 다시 고를 수 있다(PRD J0)
+  // 매장이 있으면(게스트 입력 포함) 바로 들어간다. 게스트는 [시작 화면]으로 새로 시작을 다시 고를 수 있다(PRD J0)
   const [showStart, setShowStart] = useState(false);
   // 첫 세션 확인 전에는 시작 화면을 띄우지 않는다
   const [authChecked, setAuthChecked] = useState(!supabaseConfigured);
   const loading = !authChecked || (auth !== null && syncStatus === "loading");
-  // 랜딩의 [내 병동으로 시작하기]: /app?start=new. 병동이 이미 있으면(로그인·게스트 입력) 그대로 들어간다
+  // 랜딩의 [내 매장으로 시작하기]: /app?start=new. 매장이 이미 있으면(로그인·게스트 입력) 그대로 들어간다
   const [startNew] = useState(() => new URLSearchParams(window.location.search).get("start") === "new");
-  const started = !showStart && ward !== null && !loading;
+  const started = !showStart && shop !== null && !loading;
   const startHandled = useRef(false);
 
   useEffect(() => {
@@ -40,14 +40,14 @@ export default function AppShell() {
     startHandled.current = true;
     window.history.replaceState(null, "", "/app");
     const s = useAppStore.getState();
-    if (s.auth === null && !s.hasInput()) s.startWard();
+    if (s.auth === null && !s.hasInput()) s.startShop();
   }, [startNew, loading]);
 
-  // 근무표를 한 번도 만들지 않은 병동은 처음 설정의 못 끝낸 첫 단계부터 연다
+  // 근무표를 한 번도 만들지 않은 매장은 처음 설정의 못 끝낸 첫 단계부터 연다
   useEffect(() => {
     if (!started) return;
     const s = useAppStore.getState();
-    if (s.ward && s.periods.length === 0 && s.view.screen !== "setup") s.go({ screen: "setup", step: setupStep(s.ward) });
+    if (s.shop && s.periods.length === 0 && s.view.screen !== "setup") s.go({ screen: "setup", step: setupStep(s.shop) });
   }, [started]);
 
   useEffect(() => {
@@ -79,7 +79,7 @@ export default function AppShell() {
             <span className="text-[15px] font-semibold text-[#1B1B18]">간호사 근무표</span>
             {started && (
               <span className="text-xs font-medium text-[#66665E]">
-                {ward.name || "이름 없는 병동"} · {unitShort(ward.unit)}
+                {shop.name || "이름 없는 병동"} · {unitShort(shop.unit)}
               </span>
             )}
           </div>
@@ -140,11 +140,11 @@ export default function AppShell() {
         ) : !started ? (
           <StartScreen onDone={() => setShowStart(false)} />
         ) : view.screen === "home" ? (
-          <WardHome />
+          <ShopHome />
         ) : view.screen === "setup" ? (
           <SetupFlow />
         ) : view.screen === "settings" ? (
-          <WardSettings />
+          <ShopSettings />
         ) : view.screen === "confirmed" ? (
           <ConfirmedPeriod key={view.periodId} />
         ) : (

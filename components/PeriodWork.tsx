@@ -26,7 +26,7 @@ export default function PeriodWork() {
   const period = useAppStore(currentPeriod);
   const step = useAppStore((s) => (s.view.screen === "period" ? s.view.step : 1));
   const go = useAppStore((s) => s.go);
-  const unit = useAppStore((s) => s.ward?.unit ?? "month");
+  const unit = useAppStore((s) => s.shop?.unit ?? "month");
 
   // 단계를 옮기면 새 단계 제목으로 포커스를 옮긴다(처음 열 때는 옮기지 않는다)
   const rootRef = useRef<HTMLDivElement>(null);
@@ -70,15 +70,15 @@ export default function PeriodWork() {
 
 /** ① 요청 위의 준비 요약 한 줄 + [바꾸기]. 명단이나 이어지는 근무가 바뀌었을 때만 처음부터 펼친다. */
 function PrepareSummary({ period }: { period: WorkPeriod }) {
-  const ward = useAppStore((s) => s.ward);
+  const shop = useAppStore((s) => s.shop);
   const periods = useAppStore((s) => s.periods);
   const go = useAppStore((s) => s.go);
-  const [open, setOpen] = useState(() => (ward ? prepareNeedsReview(ward, periods, period.id) : false));
-  if (!ward) return null;
-  const active = ward.nurses.filter((n) => n.active).length;
+  const [open, setOpen] = useState(() => (shop ? prepareNeedsReview(shop, periods, period.id) : false));
+  if (!shop) return null;
+  const active = shop.employees.filter((n) => n.active).length;
   const prev = previousConfirmedPeriod(periods, period);
   const hasPrevious = periods.some((p) => p.status === "confirmed" && p.start_date < period.start_date);
-  const { added, deactivated } = rosterChangesFor(ward, periods, period.id);
+  const { added, deactivated } = rosterChangesFor(shop, periods, period.id);
   const names = (list: { name: string }[]) => list.map((n) => n.name).join(", ");
   const carry = prev
     ? "지난 근무표에서 이어져요"
@@ -161,21 +161,21 @@ function PrepareSummary({ period }: { period: WorkPeriod }) {
  * 미루면 지난 근무표와 이어지지 않아 지난 근무를 직접 입력한다(아래 지난 근무 칸이 붙여넣기로 바뀐다).
  */
 function DatesSection({ period }: { period: WorkPeriod }) {
-  const ward = useAppStore((s) => s.ward);
+  const shop = useAppStore((s) => s.shop);
   const periods = useAppStore((s) => s.periods);
   const postponeStart = useAppStore((s) => s.postponeStart);
   const [editing, setEditing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  if (!ward) return null;
+  if (!shop) return null;
   const before = periods.filter((p) => p.id !== period.id && p.start_date < period.start_date).at(-1);
   const earliest = before ? dateOfDay(before, before.length + 1) : undefined;
   const earliestLabel = before ? monthDay(before, before.length + 1) : "";
   const broken = before !== undefined && previousConfirmedPeriod(periods, period) === null;
-  const monthly = ward.unit === "month";
+  const monthly = shop.unit === "month";
 
   const onChange = (date: string) => {
     if (!date) return;
-    if (!validStart(ward.unit, date)) {
+    if (!validStart(shop.unit, date)) {
       setError(`한 달 근무표는 1~${MAX_MONTH_START_DAY}일에만 시작할 수 있어요. 다른 날을 골라 주세요.`);
       return;
     }
@@ -253,13 +253,13 @@ function cellErrorText(e: CellError): string {
 
 /** 지난 근무 마지막 며칠(지난 확정본). 근무 셀 모양의 읽기 전용 표(편집하려면 지난 근무표를 고친다). */
 function CarryOverTable({ period, prev }: { period: WorkPeriod; prev: WorkPeriod }) {
-  const ward = useAppStore((s) => s.ward);
-  const nurses = ward?.nurses.filter((n) => n.active) ?? [];
-  const rows = carryOverFrom(prev, nurses.map((n) => n.id));
+  const shop = useAppStore((s) => s.shop);
+  const employees = shop?.employees.filter((n) => n.active) ?? [];
+  const rows = carryOverFrom(prev, employees.map((n) => n.id));
   const width = Math.max(0, ...rows.map((r) => r.shifts.length));
   const days = Array.from({ length: width }, (_, i) => prev.length - width + 1 + i);
   const grid = { gridTemplateColumns: `150px repeat(${width}, 30px)` };
-  const name = (id: string) => nurses.find((n) => n.id === id)?.name ?? id;
+  const name = (id: string) => employees.find((n) => n.id === id)?.name ?? id;
 
   return (
     <section className={`${ui.card} flex flex-col gap-3`}>
@@ -267,7 +267,7 @@ function CarryOverTable({ period, prev }: { period: WorkPeriod; prev: WorkPeriod
         <h3 className={ui.cardTitle}>지난 근무 마지막 며칠</h3>
         <p className={ui.help}>
           지난 근무표에서 가져왔어요. 나이트 다음 휴무 같은 규칙이 근무표 사이에서도 지켜지게 써요
-          {rows.length < nurses.length && ` · 지난 근무표에 없던 ${nurses.length - rows.length}명은 지난 근무 없이 시작해요`}
+          {rows.length < employees.length && ` · 지난 근무표에 없던 ${employees.length - rows.length}명은 지난 근무 없이 시작해요`}
         </p>
       </div>
       <div className="overflow-x-auto" aria-label={`${formatRange(period)} 지난 근무 마지막 며칠`}>
@@ -281,14 +281,14 @@ function CarryOverTable({ period, prev }: { period: WorkPeriod; prev: WorkPeriod
             ))}
           </div>
           {rows.map((r) => (
-            <div key={r.nurse_id} className="grid gap-x-0.5" style={grid}>
-              <span className="flex h-7 items-center truncate text-sm text-[#1B1B18]">{name(r.nurse_id)}</span>
+            <div key={r.employee_id} className="grid gap-x-0.5" style={grid}>
+              <span className="flex h-7 items-center truncate text-sm text-[#1B1B18]">{name(r.employee_id)}</span>
               {r.shifts.map((code, i) => {
                 const d = prev.length - r.shifts.length + 1 + i;
                 return (
                   <div
                     key={d}
-                    aria-label={`${name(r.nurse_id)} ${monthDay(prev, d)} ${code}`}
+                    aria-label={`${name(r.employee_id)} ${monthDay(prev, d)} ${code}`}
                     className={`${CELL} ${codeClass(code, isWeekendDay(prev, d, prev.holidays))}`}
                   >
                     {code}
@@ -310,8 +310,8 @@ function CarryOverSection({ period }: { period: WorkPeriod }) {
 }
 
 function CarryOverPaste({ period }: { period: WorkPeriod }) {
-  const ward = useAppStore((s) => s.ward);
-  const nurses = ward?.nurses.filter((n) => n.active) ?? [];
+  const shop = useAppStore((s) => s.shop);
+  const employees = shop?.employees.filter((n) => n.active) ?? [];
   const { carryOver } = period;
   const setCarryOver = useAppStore((s) => s.setCarryOver);
 
@@ -320,7 +320,7 @@ function CarryOverPaste({ period }: { period: WorkPeriod }) {
   const [result, setResult] = useState<ReturnType<typeof parseCarryOver> | null>(null);
 
   const onApply = () => {
-    const parsed = parseCarryOver(text, nurses, ward!.config);
+    const parsed = parseCarryOver(text, employees, shop!.config);
     setResult(parsed);
     if (parsed.errors.length === 0) setCarryOver(period.id, parsed.rows);
   };
@@ -347,7 +347,7 @@ function CarryOverPaste({ period }: { period: WorkPeriod }) {
       <label className="flex flex-col gap-1">
         <span className={ui.label}>
           이름, 그다음 오래된 날부터 근무 코드(
-          {ward!.config.shifts
+          {shop!.config.shifts
             .filter((x) => x.active !== false)
             .map((x) => x.code)
             .join("/")}

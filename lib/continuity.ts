@@ -1,15 +1,15 @@
 // 기간 연속성(ADR-015): 이월, 최근 4주 원본(history), 지난 날짜 잠금. 모두 순수 함수이고 날짜는 lib/period.ts로만 다룬다.
 import { CARRY_OVER_DAYS } from "./roster-import";
 import { dateOfDay, dayOfDate, isWeekendDay, monthDay, periodDays, periodEnd, type PeriodRange } from "./period";
-import type { Assignments, WardNurse, WorkPeriod } from "./store";
-import type { CarryOverRow, DiffCell, FixedAssignment, History, Nurse, WardConfig } from "./types.gen";
+import type { Assignments, ShopEmployee, WorkPeriod } from "./store";
+import type { CarryOverRow, DiffCell, FixedAssignment, History, Employee, ShopConfig } from "./types.gen";
 
 export const HISTORY_DAYS = 28; // backend/domain/constants.py HISTORY_DAYS
 const OFF = "O";
 
-/** 간호사별 최근 4주 나이트·주말·공휴일 근무 수(화면 표시용). */
+/** 직원별 최근 4주 나이트·주말·공휴일 근무 수(화면 표시용). */
 export interface HistoryLoad {
-  nurse_id: string;
+  employee_id: string;
   nights: number;
   weekends: number;
 }
@@ -29,22 +29,22 @@ export function previousConfirmedPeriod(periods: WorkPeriod[], target: PeriodRan
 
 /**
  * 지난 확정본의 마지막 CARRY_OVER_DAYS일 → carry_over 행.
- * nurseIds에 있는 간호사만, 행 길이는 min(7, 지난 기간 길이).
+ * employeeIds에 있는 직원만, 행 길이는 min(7, 지난 기간 길이).
  */
-export function carryOverFrom(prev: WorkPeriod, nurseIds: string[]): CarryOverRow[] {
+export function carryOverFrom(prev: WorkPeriod, employeeIds: string[]): CarryOverRow[] {
   const a = latestConfirmed(prev);
   if (!a) return [];
-  return nurseIds.filter((id) => a[id]).map((id) => ({ nurse_id: id, shifts: a[id].slice(-CARRY_OVER_DAYS) }));
+  return employeeIds.filter((id) => a[id]).map((id) => ({ employee_id: id, shifts: a[id].slice(-CARRY_OVER_DAYS) }));
 }
 
 /**
  * target 시작일 직전 HISTORY_DAYS일 안에 있는 확정 기간들의 최신 확정본 원본(백엔드 history).
  * 시작은 확정본이 있는 첫날, 끝은 마지막 날. 사이가 비거나 그 기간에 행이 없는 날은 휴무(O)로 채운다.
- * nurseIds에 있고 창 안에 배정이 하나라도 있는 간호사만 행을 둔다. 공휴일은 그 기간들의 공휴일 날짜. 없으면 null.
+ * employeeIds에 있고 창 안에 배정이 하나라도 있는 직원만 행을 둔다. 공휴일은 그 기간들의 공휴일 날짜. 없으면 null.
  */
-export function historyFor(periods: WorkPeriod[], target: PeriodRange, nurseIds: string[]): History | null {
+export function historyFor(periods: WorkPeriod[], target: PeriodRange, employeeIds: string[]): History | null {
   const window: PeriodRange = { start_date: dateOfDay(target, 1 - HISTORY_DAYS), length: HISTORY_DAYS };
-  const cells = new Map(nurseIds.map((id) => [id, new Map<number, string>()]));
+  const cells = new Map(employeeIds.map((id) => [id, new Map<number, string>()]));
   const covered: number[] = [];
   const holidays: string[] = [];
   for (const p of periods) {
@@ -74,15 +74,15 @@ export function historyFor(periods: WorkPeriod[], target: PeriodRange, nurseIds:
 }
 
 /** 화면의 "최근 4주 나이트·주말" 숫자: history 원본에서 나이트(세는 근무조 N)와 주말·공휴일 근무를 센다. 둘 다 0이면 뺀다. */
-export function historyLoadFor(history: History | null, config: WardConfig): HistoryLoad[] {
+export function historyLoadFor(history: History | null, config: ShopConfig): HistoryLoad[] {
   if (!history) return [];
   const covers = (code: string) => [code, ...(config.shifts.find((s) => s.code === code)?.parts ?? [])];
   return Object.entries(history.rows)
-    .map(([nurse_id, row]) => {
+    .map(([employee_id, row]) => {
       const range: PeriodRange = { start_date: history.start_date, length: row.length };
       const holidays = (history.holidays ?? []).map((d) => dayOfDate(range, d)).filter((d): d is number => d !== null);
       return {
-        nurse_id,
+        employee_id,
         nights: row.filter((code) => covers(code).includes("N")).length,
         weekends: row.filter((code, i) => code !== OFF && isWeekendDay(range, i + 1, holidays)).length,
       };
@@ -97,14 +97,14 @@ export function isOperating(period: WorkPeriod, today: string): boolean {
 
 /**
  * 운영 중인 기간에서 today 이전(today 미포함) 날짜를 최신 확정본으로 잠그는 fixed_assignment 목록.
- * id는 `lock-{nurse_id}-{day}`, scope "period", source_text "지난 날짜 고정: {이름} {M}/{D} {코드}".
+ * id는 `lock-{employee_id}-{day}`, scope "period", source_text "지난 날짜 고정: {이름} {M}/{D} {코드}".
  * today가 기간 시작 이전이면 [], 기간이 끝났으면 전체 날짜. 확정본이 없으면 [].
  */
-export function pastDayLocks(period: WorkPeriod, nurses: Nurse[], today: string): FixedAssignment[] {
+export function pastDayLocks(period: WorkPeriod, employees: Employee[], today: string): FixedAssignment[] {
   const a = latestConfirmed(period);
   if (!a || today <= period.start_date) return [];
   const lastDay = today > periodEnd(period) ? period.length : dayOfDate(period, today)! - 1;
-  return nurses.flatMap((n) =>
+  return employees.flatMap((n) =>
     a[n.id]
       ? a[n.id].slice(0, lastDay).map((shift, i): FixedAssignment => ({
           id: `lock-${n.id}-${i + 1}`,
@@ -114,40 +114,40 @@ export function pastDayLocks(period: WorkPeriod, nurses: Nurse[], today: string)
           weight: 1,
           source_text: `지난 날짜 고정: ${n.name} ${monthDay(period, i + 1)} ${shift}`,
           enabled: true,
-          params: { nurse_id: n.id, day: i + 1, shift },
+          params: { employee_id: n.id, day: i + 1, shift },
         }))
       : [],
   );
 }
 
-/** 두 배정의 바뀐 칸(공통 간호사·날짜만). */
+/** 두 배정의 바뀐 칸(공통 직원·날짜만). */
 export function diffAssignments(before: Assignments, after: Assignments): DiffCell[] {
   return Object.keys(before).flatMap((id) => {
     const b = before[id];
     const c = after[id];
     if (!c) return [];
     return b.flatMap((code, i) =>
-      i < c.length && c[i] !== code ? [{ nurse_id: id, day: i + 1, before: code, after: c[i] }] : [],
+      i < c.length && c[i] !== code ? [{ employee_id: id, day: i + 1, before: code, after: c[i] }] : [],
     );
   });
 }
 
-/** 같은 carry_over인지(간호사 순서 무관). 이월 변경 배너 판정에 쓴다. */
+/** 같은 carry_over인지(직원 순서 무관). 이월 변경 배너 판정에 쓴다. */
 export function sameCarryOver(a: CarryOverRow[], b: CarryOverRow[]): boolean {
   if (a.length !== b.length) return false;
-  const byId = new Map(b.map((r) => [r.nurse_id, r.shifts.join("")]));
-  return a.every((r) => byId.get(r.nurse_id) === r.shifts.join(""));
+  const byId = new Map(b.map((r) => [r.employee_id, r.shifts.join("")]));
+  return a.every((r) => byId.get(r.employee_id) === r.shifts.join(""));
 }
 
-/** 지난 확정 기간의 snapshot 명단과 현재 활성 명단 비교: 추가·비활성화된 간호사. */
+/** 지난 확정 기간의 snapshot 명단과 현재 활성 명단 비교: 추가·비활성화된 직원. */
 export function rosterChanges(
   prev: WorkPeriod | null,
-  nurses: WardNurse[],
-): { added: WardNurse[]; deactivated: WardNurse[] } {
+  employees: ShopEmployee[],
+): { added: ShopEmployee[]; deactivated: ShopEmployee[] } {
   if (!prev?.snapshot) return { added: [], deactivated: [] };
-  const before = new Set(prev.snapshot.nurses.map((n) => n.id));
+  const before = new Set(prev.snapshot.employees.map((n) => n.id));
   return {
-    added: nurses.filter((n) => n.active && !before.has(n.id)),
-    deactivated: nurses.filter((n) => !n.active && before.has(n.id)),
+    added: employees.filter((n) => n.active && !before.has(n.id)),
+    deactivated: employees.filter((n) => !n.active && before.has(n.id)),
   };
 }

@@ -24,9 +24,9 @@ function partsText(s: ShiftDef): string {
   return s.parts?.length ? s.parts.join(" + ") : s.code;
 }
 
-/** 근무 형태(근무 코드 표). 맨 아래 줄에 적어 하나씩 더한다. 병동 설정 [근무 형태] 탭과 처음 설정 ②에서 쓴다. */
+/** 근무 형태(근무 코드 표). 맨 아래 줄에 적어 하나씩 더한다. 매장 설정 [근무 형태] 탭과 처음 설정 ②에서 쓴다. */
 export default function ShiftTable() {
-  const shifts = useAppStore((s) => s.ward?.config.shifts ?? []);
+  const shifts = useAppStore((s) => s.shop?.config.shifts ?? []);
 
   return (
     <div className="flex flex-col gap-2">
@@ -60,7 +60,7 @@ function ShiftRow({ shift, shifts }: { shift: ShiftDef; shifts: ShiftDef[] }) {
   const setShift = useAppStore((s) => s.setShift);
   const setShiftActive = useAppStore((s) => s.setShiftActive);
   const removeShift = useAppStore((s) => s.removeShift);
-  const used = useAppStore((s) => (s.ward ? isShiftUsed(shift.code, s.ward, s.periods) : true));
+  const used = useAppStore((s) => (s.shop ? isShiftUsed(shift.code, s.shop, s.periods) : true));
   const [name, setName] = useState<string | null>(null);
   const [hours, setHours] = useState<string | null>(null);
 

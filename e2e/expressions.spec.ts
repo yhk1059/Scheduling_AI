@@ -1,12 +1,12 @@
 // docs/BROWSER_TEST_SCENARIOS.md S16~S18. 식 규칙(ADR-019)으로 바뀐 것: v5 저장본 열기, 조건부·짝 규칙과 예시 판정, 값 수정,
-// 말로 적는 병동 소개, 사람이 모자란 필요 인원. 페이지 하나를 공유하며 순서대로 돈다. 게스트 모드만 다룬다(ADR-014).
+// 말로 적는 매장 소개, 사람이 모자란 필요 인원. 페이지 하나를 공유하며 순서대로 돈다. 게스트 모드만 다룬다(ADR-014).
 // LLM은 mock하지 않는다(ADR-013). LLM 해석은 흔들릴 수 있어 카드 문장은 핵심 낱말만 본다.
 import { type BrowserContext, expect, type Page, test } from "@playwright/test";
 
-import wardOct from "./fixtures/ward-oct.json";
+import shopOct from "./fixtures/shop-oct.json";
 
 import type { PeriodRange } from "../lib/period";
-import type { Ward } from "../lib/store";
+import type { Shop } from "../lib/store";
 import type { ConstraintSpec, ScheduleRequest } from "../lib/types.gen";
 import {
   applyAllPending,
@@ -25,7 +25,7 @@ import {
 const NOV: PeriodRange = { start_date: "2026-11-01", length: 30 };
 const NOV_WEEKEND_DAYS = [1, 7, 8, 14, 15, 21, 22, 28, 29];
 const RULE_INPUT = "병동 규칙 입력";
-// 사람이 모자란 병동(S18): D1의 앞 6명
+// 사람이 모자란 매장(S18): D1의 앞 6명
 const SMALL_ROSTER: [string, number][] = [
   ["이영희", 12],
   ["박민수", 9],
@@ -58,7 +58,7 @@ async function makeRules(text: string) {
   return body.status === "ok" ? body : null;
 }
 
-const namesWithTag = (ward: Ward, tag: string) => ward.nurses.filter((n) => n.tags.includes(tag)).map((n) => n.name);
+const namesWithTag = (shop: Shop, tag: string) => shop.employees.filter((n) => n.tags.includes(tag)).map((n) => n.name);
 
 test.beforeAll(async ({ browser }) => {
   context = await browser.newContext({ locale: "ko-KR", timezoneId: "Asia/Seoul", viewport: { width: 1440, height: 1000 } });
@@ -87,15 +87,15 @@ test.afterEach(async () => {
 
 test("S16. 저장된 병동 열기 → 다시 만들기", async () => {
   await page.goto("/app");
-  await page.evaluate((doc) => localStorage.setItem("nurse-scheduler", JSON.stringify(doc)), wardOct);
+  await page.evaluate((doc) => localStorage.setItem("shop-scheduler", JSON.stringify(doc)), shopOct);
   await page.reload();
   await expect(page.getByRole("heading", { name: "외과 병동", level: 1 })).toBeVisible();
 
-  const stored = await page.evaluate(() => JSON.parse(localStorage.getItem("nurse-scheduler")!));
-  const ward = stored.state.ward as Ward;
-  const savedRules = wardOct.state.ward.rules;
-  expect(ward.rules.map((r) => r.id), "규칙 수와 id가 같다").toEqual(savedRules.map((r) => r.id));
-  const savedNov = wardOct.state.periods.find((p) => p.start_date === NOV.start_date)!;
+  const stored = await page.evaluate(() => JSON.parse(localStorage.getItem("shop-scheduler")!));
+  const shop = stored.state.shop as Shop;
+  const savedRules = shopOct.state.shop.rules;
+  expect(shop.rules.map((r) => r.id), "규칙 수와 id가 같다").toEqual(savedRules.map((r) => r.id));
+  const savedNov = shopOct.state.periods.find((p) => p.start_date === NOV.start_date)!;
   const nov = await periodByStart(page, NOV.start_date);
   expect(nov.requests.map((r) => r.id), "요청도 같은 id").toEqual(savedNov.requests.map((r) => r.id));
   await expect(page.getByRole("main")).toContainText("간호사 15명 · 병동 규칙 7개 · 한 달 단위");
@@ -170,9 +170,9 @@ test("S17. 조건부·짝 규칙 → 예시 판정 → 적용 → 값 수정 →
 
   // 따로 확인: 짝은 같은 날 둘 다 나이트가 없고, 신규가 나이트인 날은 책임도 나이트에 있다
   const grid = await readGrid(page, NOV);
-  const { ward } = await readState(page);
-  const novice = namesWithTag(ward, "신규");
-  const charge = namesWithTag(ward, "책임");
+  const { shop } = await readState(page);
+  const novice = namesWithTag(shop, "신규");
+  const charge = namesWithTag(shop, "책임");
   for (let d = 0; d < NOV.length; d++) {
     expect(grid["김철수"][d] === "N" && grid["박민수"][d] === "N", `${d + 1}일 짝 나이트`).toBe(false);
     if (novice.some((n) => grid[n][d] === "N"))
@@ -196,7 +196,7 @@ test("S18. 말로 병동 소개 → 근무표 → 사람이 모자란 필요 인
   }
   await page.getByRole("button", { name: "다음", exact: true }).click();
 
-  // ② 병동 소개를 말로: 더블 근무 형태 카드 + 필요 인원 카드(기본)
+  // ② 매장 소개를 말로: 더블 근무 형태 카드 + 필요 인원 카드(기본)
   const text = "데이 평일 3명 이상, 주말 2명, 더블도 있어";
   await page.getByRole("button", { name: text }).click();
   await expect(page.getByRole("textbox", { name: "병동 소개 입력" })).toHaveValue(text);
@@ -214,9 +214,9 @@ test("S18. 말로 병동 소개 → 근무표 → 사람이 모자란 필요 인
   // 적용한 설정 카드는 카드가 아니라 근무 형태가 되어 목록에서 빠진다(순서 비교 없이 [모두 적용])
   await page.getByRole("button", { name: "모두 적용" }).click();
   await expect(pendingCards(page)).toHaveCount(0);
-  const { ward } = await readState(page);
-  expect(ward.config.shifts.some((s) => [...(s.parts ?? [])].sort().join() === "D,E"), "더블이 근무 형태에").toBe(true);
-  const staffing = (ward.rules as ConstraintSpec[]).filter((r) => r.type === "rule" && r.default && r.id !== "night-only");
+  const { shop } = await readState(page);
+  expect(shop.config.shifts.some((s) => [...(s.parts ?? [])].sort().join() === "D,E"), "더블이 근무 형태에").toBe(true);
+  const staffing = (shop.rules as ConstraintSpec[]).filter((r) => r.type === "rule" && r.default && r.id !== "night-only");
   expect(staffing.length, "필요 인원 기본 규칙").toBeGreaterThan(0);
   await expect(page.getByText("필요 인원 없이 만들면 인원을 맞추지 않아요")).toHaveCount(0);
 
@@ -236,7 +236,7 @@ test("S18. 말로 병동 소개 → 근무표 → 사람이 모자란 필요 인
     expect(n, `${d}일 평일 데이`).toBeGreaterThanOrEqual(3);
   }
 
-  // 병동 설정에서 평일 데이를 정확히 9명으로(명단은 6명). 폼은 합계로 막지 않는다
+  // 매장 설정에서 평일 데이를 정확히 9명으로(명단은 6명). 폼은 합계로 막지 않는다
   await page.getByRole("button", { name: "병동 설정", exact: true }).click();
   await page.getByRole("textbox", { name: "평일 데이 최소 인원" }).fill("9");
   await page.getByRole("textbox", { name: "평일 데이 최대 인원" }).fill("9");

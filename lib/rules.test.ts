@@ -23,7 +23,7 @@ describe("normalizeRule", () => {
     const raw = {
       id: "r",
       type: "rule",
-      scope: "ward",
+      scope: "shop",
       source_text: "원문",
       weight: 99,
       values: { min: { value: 1, label: "인원" } },
@@ -37,7 +37,7 @@ describe("normalizeRule", () => {
     expect(normalizeRule(raw)).toEqual({
       id: "r",
       type: "rule",
-      scope: "ward",
+      scope: "shop",
       hardness: "hard",
       priority: "normal",
       weight: 10,
@@ -58,7 +58,7 @@ describe("normalizeRule", () => {
   });
 
   it("고르게는 기본이 가능하면·낮음, max_gap 1", () => {
-    const raw = { id: "b", type: "rule", scope: "ward", source_text: "", body: { kind: "balance", shifts: { in: ["N"] } } } as unknown as Rule;
+    const raw = { id: "b", type: "rule", scope: "shop", source_text: "", body: { kind: "balance", shifts: { in: ["N"] } } } as unknown as Rule;
     expect(normalizeRule(raw)).toMatchObject({
       hardness: "soft",
       priority: "low",
@@ -72,7 +72,7 @@ describe("normalizeRule", () => {
 
 describe("칸 고정", () => {
   it("normalizeRule은 항상 hard, 기본값을 채운다", () => {
-    expect(fixedCell("n01", 2, "E")).toEqual({
+    expect(fixedCell("e01", 2, "E")).toEqual({
       id: "f",
       type: "fixed_assignment",
       scope: "period",
@@ -80,7 +80,7 @@ describe("칸 고정", () => {
       weight: 10,
       enabled: true,
       source_text: "",
-      params: { nurse_id: "n01", day: 2, shift: "E" },
+      params: { employee_id: "e01", day: 2, shift: "E" },
     });
   });
 });
@@ -103,14 +103,14 @@ describe("ruleShape: 블록 모양으로 되읽기", () => {
 
   it("고르게와 칸 고정", () => {
     expect(ruleShape(balance({ shifts: N, max_gap: 0 }, { hardness: "hard" }))).toMatchObject({ kind: "balance", max_gap: { name: "max_gap" } });
-    expect(ruleShape(fixedCell("n01", 2, "E"))).toBeNull();
+    expect(ruleShape(fixedCell("e01", 2, "E"))).toBeNull();
   });
 
   it("틀에 없는 식(조건부·세기끼리)은 null", () => {
     const rule = {
       id: "x",
       type: "rule",
-      scope: "ward",
+      scope: "shop",
       source_text: "",
       body: {
         kind: "require",

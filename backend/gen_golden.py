@@ -37,7 +37,7 @@ def solve_case(request: ScheduleRequest, conflicts: bool = True) -> dict[str, An
     if status == cp_model.OPTIMAL:
         assignments = {
             n.id: [next(s for s in ctx.codes if solver.boolean_value(ctx.x[n.id, d, s])) for d in range(1, ctx.days + 1)]
-            for n in request.nurses
+            for n in request.employees
         }
         objective = round(solver.objective_value) if ctx.objective_terms else 0
         return {"status": "ok", "optimal": True, "objective": objective, "assignments": assignments}

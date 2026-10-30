@@ -21,13 +21,13 @@ START, DAYS = "2026-11-01", 30
 WEEKENDS = {1, 7, 8, 14, 15, 21, 22, 28, 29}
 
 
-def nurse(nid: str, tags: list[str] | None = None) -> dict:
-    return {"id": nid, "name": f"간호사{nid}", "tags": tags or []}
+def employee(nid: str, tags: list[str] | None = None) -> dict:
+    return {"id": nid, "name": f"직원{nid}", "tags": tags or []}
 
 
-def request(nurses: list[dict] | None = None, constraints: list[dict] | None = None, **extra) -> ScheduleRequest:
+def request(employees: list[dict] | None = None, constraints: list[dict] | None = None, **extra) -> ScheduleRequest:
     return ScheduleRequest.model_validate({
-        "nurses": nurses if nurses is not None else [nurse(f"n{i}") for i in range(1, 7)],
+        "employees": employees if employees is not None else [employee(f"n{i}") for i in range(1, 7)],
         "period": {"start_date": START, "length": DAYS},
         "constraints": constraints or [],
         "input_version": 1,
@@ -44,7 +44,7 @@ def solve_ok(req: ScheduleRequest) -> dict[str, list[str]]:
 
 def combined(req: ScheduleRequest, assignments: dict, nid: str) -> tuple[list[str], int]:
     """(이월 + 대상 월 근무, 이월 길이)."""
-    carry = next((r.shifts for r in req.carry_over if r.nurse_id == nid), [])
+    carry = next((r.shifts for r in req.carry_over if r.employee_id == nid), [])
     return list(carry) + assignments[nid], len(carry)
 
 
@@ -64,10 +64,10 @@ def runs(seq: list[str], pred, offset: int) -> list[int]:
 # --- 기본 구조 ---
 
 
-def test_every_nurse_has_one_shift_per_day():
+def test_every_employee_has_one_shift_per_day():
     req = request()
     a = solve_ok(req)
-    assert set(a) == {n.id for n in req.nurses}
+    assert set(a) == {n.id for n in req.employees}
     assert all(len(row) == DAYS and set(row) <= set("DENO") for row in a.values())
 
 
@@ -117,7 +117,7 @@ def test_forbidden_sequence_within_month():
 def test_forbidden_sequence_checks_carry_over_last_day():
     req = request(
         constraints=[forbid("fs", "N", "D")],
-        carry_over=[{"nurse_id": "n1", "shifts": ["D", "N"]}],
+        carry_over=[{"employee_id": "n1", "shifts": ["D", "N"]}],
     )
     assert solve_ok(req)["n1"][0] != "D"
 
@@ -126,7 +126,7 @@ def test_forbidden_sequence_carry_last_n_with_fixed_day1_d_is_infeasible():
     req = request(
         constraints=[forbid("fs", "N", "D"),
                      fixed("fx", "n1", 1, "D")],
-        carry_over=[{"nurse_id": "n1", "shifts": ["N"]}],
+        carry_over=[{"employee_id": "n1", "shifts": ["N"]}],
     )
     assert isinstance(solve(req), SolveInfeasible)
 
@@ -136,7 +136,7 @@ def test_violation_only_inside_carry_over_is_ignored():
         constraints=[forbid("fs", "N", "D"),
                      max_work("mw", 2),
                      max_nights("mn", 1)],
-        carry_over=[{"nurse_id": "n1", "shifts": ["N", "N", "D", "O"]}],
+        carry_over=[{"employee_id": "n1", "shifts": ["N", "N", "D", "O"]}],
     )
     assert isinstance(solve(req), SolveOk)
 
@@ -146,7 +146,7 @@ def test_max_consecutive_work_including_carry_over():
         constraints=[coverage("D", "weekday", 2, 2), coverage("E", "weekday", 2, 2),
                      coverage("D", "weekend", 2, 2), coverage("E", "weekend", 2, 2),
                      max_work("mw", 4)],
-        carry_over=[{"nurse_id": "n1", "shifts": ["D", "D", "E"]}],
+        carry_over=[{"employee_id": "n1", "shifts": ["D", "D", "E"]}],
     )
     a = solve_ok(req)
     for nid in a:
@@ -158,7 +158,7 @@ def test_max_consecutive_work_carry_full_forces_day1_off():
     req = request(
         constraints=[max_work("mw", 3),
                      fixed("fx", "n1", 1, "E")],
-        carry_over=[{"nurse_id": "n1", "shifts": ["D", "D", "D"]}],
+        carry_over=[{"employee_id": "n1", "shifts": ["D", "D", "D"]}],
     )
     assert isinstance(solve(req), SolveInfeasible)
 
@@ -167,7 +167,7 @@ def test_max_consecutive_nights_including_carry_over():
     req = request(
         constraints=[coverage("N", "weekday", 2, 2), coverage("N", "weekend", 2, 2),
                      max_nights("mn", 2)],
-        carry_over=[{"nurse_id": "n1", "shifts": ["N"]}],
+        carry_over=[{"employee_id": "n1", "shifts": ["N"]}],
     )
     a = solve_ok(req)
     for nid in a:
@@ -187,7 +187,7 @@ def test_off_after_night_block_including_carry_over():
         constraints=[coverage("N", "weekday", 1, 1), coverage("N", "weekend", 1, 1),
                      coverage("D", "weekday", 2, 2), coverage("D", "weekend", 2, 2),
                      off_after_night("noff", 2)],
-        carry_over=[{"nurse_id": "n1", "shifts": ["D", "N"]}],
+        carry_over=[{"employee_id": "n1", "shifts": ["D", "N"]}],
     )
     a = solve_ok(req)
     for nid in a:
@@ -202,7 +202,7 @@ def test_off_after_night_block_carry_n_then_day1_work_is_infeasible():
     req = request(
         constraints=[off_after_night("noff", 1),
                      fixed("fx", "n1", 1, "E")],
-        carry_over=[{"nurse_id": "n1", "shifts": ["N"]}],
+        carry_over=[{"employee_id": "n1", "shifts": ["N"]}],
     )
     assert isinstance(solve(req), SolveInfeasible)
 
@@ -245,7 +245,7 @@ def test_soft_toggled_template_is_skipped_in_hard_phase():
     assert isinstance(solve(request(constraints=[{**impossible, "hardness": "soft"}])), SolveOk)
 
 
-def test_sample_ward_has_solution():
+def test_sample_shop_has_solution():
     req = ScheduleRequest.model_validate(sample_data())
     a = solve_ok(req)
     for c in req.constraints:

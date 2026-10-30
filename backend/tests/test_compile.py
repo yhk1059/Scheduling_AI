@@ -37,7 +37,7 @@ def _hard_rule_violations(req: ScheduleRequest, a: dict) -> dict[str, list]:
 
 START = date(2026, 11, 5)  # 목요일. 1=목 2=금 3=토 4=일 5=월 6=화 7=수
 LENGTH = 7
-NURSES = [
+EMPLOYEES = [
     {"id": "n1", "name": "가"},
     {"id": "n2", "name": "나", "tags": ["신규"]},
     {"id": "n3", "name": "다", "tags": ["책임"]},
@@ -64,7 +64,7 @@ def require(per: str, then: dict, when: dict | None = None, **for_each) -> dict:
 
 def rule(cid: str, body: dict, values: dict | None = None, hardness: str = "hard", priority: str = "normal") -> dict:
     return {
-        "id": cid, "type": "rule", "scope": "ward", "hardness": hardness, "priority": priority, "source_text": cid,
+        "id": cid, "type": "rule", "scope": "shop", "hardness": hardness, "priority": priority, "source_text": cid,
         "values": {k: {"value": v, "label": k} for k, v in (values or {}).items()}, "body": body,
     }
 
@@ -157,17 +157,17 @@ ALL_RULES = _shape_rules() + FEATURE_RULES
 
 def _request(rng: random.Random, constraints: list[dict], carry: bool) -> ScheduleRequest:
     raw = {
-        "nurses": NURSES,
+        "employees": EMPLOYEES,
         "period": {"start_date": START.isoformat(), "length": LENGTH},
         "holidays": [6],
         "constraints": constraints,
         "carry_over": [
-            {"nurse_id": n["id"], "shifts": [rng.choice(CODES) for _ in range(rng.randint(1, 7))]}
-            for n in NURSES if carry and rng.random() < 0.8
+            {"employee_id": n["id"], "shifts": [rng.choice(CODES) for _ in range(rng.randint(1, 7))]}
+            for n in EMPLOYEES if carry and rng.random() < 0.8
         ],
         "history": {
             "start_date": (START - timedelta(days=HISTORY_DAYS)).isoformat(),
-            "rows": {n["id"]: [rng.choice(CODES) for _ in range(HISTORY_DAYS)] for n in NURSES[:3]},
+            "rows": {n["id"]: [rng.choice(CODES) for _ in range(HISTORY_DAYS)] for n in EMPLOYEES[:3]},
         },
         "input_version": 0,
     }
@@ -177,7 +177,7 @@ def _request(rng: random.Random, constraints: list[dict], carry: bool) -> Schedu
 def _fix_all(a: dict) -> list[dict]:
     return [
         {"id": f"fix-{nid}-{d}", "type": "fixed_assignment", "scope": "period", "hardness": "hard",
-         "source_text": "고정", "params": {"nurse_id": nid, "day": d, "shift": code}}
+         "source_text": "고정", "params": {"employee_id": nid, "day": d, "shift": code}}
         for nid, row in a.items()
         for d, code in enumerate(row, start=1)
     ]
@@ -185,7 +185,7 @@ def _fix_all(a: dict) -> list[dict]:
 
 def _random_rows(rng: random.Random, bias: str) -> dict:
     weights = [3 if c == bias else 1 for c in CODES]
-    return {n["id"]: rng.choices(CODES, weights, k=LENGTH) for n in NURSES}
+    return {n["id"]: rng.choices(CODES, weights, k=LENGTH) for n in EMPLOYEES}
 
 
 def _compile_penalty(req: ScheduleRequest, a: dict, r: Rule) -> int:
@@ -231,7 +231,7 @@ def test_free_solve_keeps_hard_and_objective_matches(raw):
     cov = [rule(f"cov-{c}", require("day", cmp(cnt([c]), "eq", 1))) for c in "DN"]
     req = _request(rng, [raw, *cov], carry=True)
     out = solve_case(req)
-    if out["status"] == "infeasible":  # 작은 병동에서 규칙과 인원이 맞지 않으면 core에 그 규칙이 있어야 한다
+    if out["status"] == "infeasible":  # 작은 매장에서 규칙과 인원이 맞지 않으면 core에 그 규칙이 있어야 한다
         assert raw["id"] in out["conflict_ids"] or any(c.startswith("cov-") for c in out["conflict_ids"])
         return
     assert out["status"] == "ok" and out["optimal"]
@@ -248,12 +248,12 @@ FEATURE = {r["id"]: r for r in FEATURE_RULES}
 
 def _fix(nid: str, d: int, code: str) -> dict:
     return {"id": f"fix-{nid}-{d}", "type": "fixed_assignment", "scope": "period", "hardness": "hard",
-            "source_text": "고정", "params": {"nurse_id": nid, "day": d, "shift": code}}
+            "source_text": "고정", "params": {"employee_id": nid, "day": d, "shift": code}}
 
 
 def _plain(constraints: list[dict]) -> ScheduleRequest:
     raw = {
-        "nurses": NURSES,
+        "employees": EMPLOYEES,
         "period": {"start_date": START.isoformat(), "length": LENGTH},
         "constraints": constraints,
         "input_version": 0,

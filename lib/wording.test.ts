@@ -2,8 +2,8 @@ import { describe, expect, it } from "vitest";
 
 import { DEFAULT_CONFIG } from "./rules";
 import { balance, count, fixedCell, forbid, maxRun, minRun, OFF, offAfter, WORK } from "./test-rules";
-import { isLeaveRule, type Ward, type WorkPeriod } from "./store";
-import type { ConstraintSpec, Nurse, Rule, Shifts, WardConfig } from "./types.gen";
+import { isLeaveRule, type Shop, type WorkPeriod } from "./store";
+import type { ConstraintSpec, Employee, Rule, Shifts, ShopConfig } from "./types.gen";
 import {
   configSummary,
   describeRule,
@@ -17,31 +17,31 @@ import {
   taskDoneSteps,
   unitName,
   unitShort,
-  wardRuleCount,
+  shopRuleCount,
 } from "./wording";
 
 const NOV = { start_date: "2026-11-01", length: 30 };
-const NURSES: Nurse[] = [
-  { id: "n01", name: "이영희" },
-  { id: "n02", name: "박민수" },
-  { id: "n03", name: "정유진" },
-  { id: "n04", name: "최지훈" },
+const EMPLOYEES: Employee[] = [
+  { id: "e01", name: "이영희" },
+  { id: "e02", name: "박민수" },
+  { id: "e03", name: "정유진" },
+  { id: "e04", name: "최지훈" },
 ];
-const CONFIG: WardConfig = {
+const CONFIG: ShopConfig = {
   shifts: [
     ...DEFAULT_CONFIG.shifts.slice(0, 3),
     { code: "M", name: "미드", hours: 8 },
     { code: "DE", name: "더블", hours: 16, parts: ["D", "E"] },
     DEFAULT_CONFIG.shifts[3],
   ],
-} as unknown as WardConfig;
+} as unknown as ShopConfig;
 
-const text = (c: ConstraintSpec, config: WardConfig = DEFAULT_CONFIG) => describeRule(c, config, NURSES, NOV).text;
+const text = (c: ConstraintSpec, config: ShopConfig = DEFAULT_CONFIG) => describeRule(c, config, EMPLOYEES, NOV).text;
 
 const D: Shifts = { in: ["D"] };
 const E: Shifts = { in: ["E"] };
 const N: Shifts = { in: ["N"] };
-const person = { people: { ids: ["n02"] }, per: "person" as const };
+const person = { people: { ids: ["e02"] }, per: "person" as const };
 type CountSpec = Parameters<typeof count>[0];
 const hard = { hardness: "hard" } as const;
 const soft = { hardness: "soft" } as const;
@@ -127,9 +127,9 @@ describe("presetName / describeRule: 프리셋 모양", () => {
     ["나이트 다음 휴무 2일", offAfter(N, 2), "나이트 다음 휴무", "나이트 다음 날은 휴무 2일"],
     ["주 근무 시간", count({ shifts: WORK, per: "person_week", measure: "hours", max: 52 }), "근무 시간", "모든 사람 주마다 근무 시간 52시간 이하"],
     ["휴무 간격", count({ people: { exclude_tags: ["신규"] }, shifts: OFF, per: "person_window", window: 7, min: 1 }), "휴무 간격", "신규 빼고 7일마다 휴무 1일 이상"],
-    ["휴가", count({ people: { ids: ["n01"] }, days: { days: [3, 4, 5] }, shifts: WORK, per: "person", max: 0 }, hard), "휴가", "이영희 · 11/3~11/5 · 휴무"],
+    ["휴가", count({ people: { ids: ["e01"] }, days: { days: [3, 4, 5] }, shifts: WORK, per: "person", max: 0 }, hard), "휴가", "이영희 · 11/3~11/5 · 휴무"],
     ["명단에 없는 휴가", count({ people: { ids: ["n1"] }, days: { days: [3, 4, 5] }, shifts: WORK, per: "person", max: 0 }, hard), "휴가", "(명단에 없는 간호사) · 11/3~11/5 · 휴무"],
-    ["고정 근무", fixedCell("n01", 2, "E"), "고정 근무", "이영희 · 11/2 · 이브닝 고정"],
+    ["고정 근무", fixedCell("e01", 2, "E"), "고정 근무", "이영희 · 11/2 · 이브닝 고정"],
     ["명단에 없는 고정", fixedCell("n1", 2, "E"), "고정 근무", "(명단에 없는 간호사) · 11/2 · 이브닝 고정"],
     ["희망 전체", count({ ...person, shifts: OFF, min: 14 }, soft), "희망·기피 근무", "박민수 · 근무표 전체 · 휴무 희망"],
     ["희망 주말", count({ ...person, days: { kind: "weekend" }, shifts: OFF, min: 5 }, soft), "희망·기피 근무", "박민수 · 주말·공휴일 · 휴무 희망"],
@@ -204,11 +204,11 @@ describe("presetName / describeRule: 새 모양", () => {
       "근무 횟수",
       "모든 사람 근무표마다 더블(DE) 2번까지",
     ]);
-    expect(d(count({ people: { ids: ["n01", "n02", "n03", "n04"] }, shifts: { in: ["N"] }, per: "person", min: 4, max: 6 }))).toEqual([
+    expect(d(count({ people: { ids: ["e01", "e02", "e03", "e04"] }, shifts: { in: ["N"] }, per: "person", min: 4, max: 6 }))).toEqual([
       "근무 횟수",
       "이영희 외 3명 근무표마다 나이트 4~6번",
     ]);
-    expect(d(count({ people: { ids: ["n01", "n02"] }, days: { days: [10] }, shifts: { in: ["D", "M"] }, per: "day", min: 1 }))).toEqual([
+    expect(d(count({ people: { ids: ["e01", "e02"] }, days: { days: [10] }, shifts: { in: ["D", "M"] }, per: "day", min: 1 }))).toEqual([
       "세는 규칙",
       "11/10마다 이영희 박민수 데이·미드 1명 이상",
     ]);
@@ -242,18 +242,18 @@ describe("presetName / describeRule: 새 모양", () => {
   });
 
   it("희망·기피는 가능하면인 한 사람 세기, 반드시면 근무 횟수", () => {
-    const want: CountSpec = { people: { ids: ["n03"] }, days: { days: [20] }, shifts: { in: ["M"] }, per: "person", min: 1 };
+    const want: CountSpec = { people: { ids: ["e03"] }, days: { days: [20] }, shifts: { in: ["M"] }, per: "person", min: 1 };
     expect(d(count(want, { hardness: "soft", priority: "high" }))).toEqual(["희망·기피 근무", "정유진 · 11/20 · 미드 희망"]);
     expect(d(count(want, hard))).toEqual(["근무 횟수", "정유진 11/20 미드 1번 이상"]);
   });
 
   it("명단에 없는 간호사", () => {
-    const leave: CountSpec = { people: { ids: ["n99"] }, days: { days: [20] }, shifts: { not_in: ["O"] }, per: "person", max: 0 };
+    const leave: CountSpec = { people: { ids: ["e99"] }, days: { days: [20] }, shifts: { not_in: ["O"] }, per: "person", max: 0 };
     expect(d(count(leave))).toEqual(["휴가", "(명단에 없는 간호사) · 11/20 · 휴무"]);
   });
 
   it("휴가 모양이어도 가능하면이면 휴무 희망(토글을 숨기지 않는다)", () => {
-    const offWish: CountSpec = { people: { ids: ["n02"] }, days: { kind: "weekend" }, shifts: { not_in: ["O"] }, per: "person", max: 0 };
+    const offWish: CountSpec = { people: { ids: ["e02"] }, days: { kind: "weekend" }, shifts: { not_in: ["O"] }, per: "person", max: 0 };
     const wish = count(offWish, soft);
     expect(d(wish)).toEqual(["희망·기피 근무", "박민수 · 주말·공휴일 · 휴무 희망"]);
     expect(isLeaveRule(wish)).toBe(false);
@@ -264,14 +264,14 @@ describe("presetName / describeRule: 새 모양", () => {
 describe("describeRule: 조정 가능한 값의 위치(parts)", () => {
   it("값은 이름과 함께 따로 나오고, 이어 붙이면 text다", () => {
     const r = count({ days: { kind: "weekday" }, shifts: D, per: "day", min: 3, max: 4 });
-    const s = describeRule(r, DEFAULT_CONFIG, NURSES, NOV);
+    const s = describeRule(r, DEFAULT_CONFIG, EMPLOYEES, NOV);
     expect(s.text).toBe("평일마다 데이 3~4명");
     expect(s.parts).toEqual([{ text: "평일마다 데이 " }, { value: "min", text: "3" }, { text: "~" }, { value: "max", text: "4" }, { text: "명" }]);
     expect(s.parts.map((p) => p.text).join("")).toBe(s.text);
   });
 
   it("최대 연속·고르게 차이도 값, 구조 숫자(휴무 일수 offset)는 값이 아니다", () => {
-    const values = (r: ConstraintSpec) => describeRule(r, DEFAULT_CONFIG, NURSES, NOV).parts.filter((p) => "value" in p);
+    const values = (r: ConstraintSpec) => describeRule(r, DEFAULT_CONFIG, EMPLOYEES, NOV).parts.filter((p) => "value" in p);
     expect(values(maxRun(N, 3))).toEqual([{ value: "max_len", text: "3" }]);
     expect(values(balance({ shifts: N, max_gap: 0 }, hard))).toEqual([{ value: "max_gap", text: "0" }]);
     expect(values(offAfter(N, 2))).toEqual([]);
@@ -280,9 +280,9 @@ describe("describeRule: 조정 가능한 값의 위치(parts)", () => {
 
 describe("describeRule: 새로 표현되는 규칙(설계 §2.6)", () => {
   const rule = (body: unknown, values: Rule["values"] = {}): ConstraintSpec =>
-    ({ id: "x", type: "rule", scope: "ward", source_text: "", values, body }) as ConstraintSpec;
+    ({ id: "x", type: "rule", scope: "shop", source_text: "", values, body }) as ConstraintSpec;
   const count = (shifts: string[], extra: object = {}) => ({ ...extra, shifts: { in: shifts } });
-  const d = (r: ConstraintSpec) => [presetName(r), describeRule(r, CONFIG, NURSES, NOV).text];
+  const d = (r: ConstraintSpec) => [presetName(r), describeRule(r, CONFIG, EMPLOYEES, NOV).text];
 
   it("신규가 나이트면 책임도 나이트에 1명", () => {
     const r = rule({
@@ -295,7 +295,7 @@ describe("describeRule: 새로 표현되는 규칙(설계 §2.6)", () => {
   });
 
   it("둘은 같은 날 나이트 금지", () => {
-    const r = rule({ kind: "require", for_each: { per: "day" }, then: { left: count(["N"], { who: { ids: ["n01", "n02"] } }), op: "le", right: 1 } });
+    const r = rule({ kind: "require", for_each: { per: "day" }, then: { left: count(["N"], { who: { ids: ["e01", "e02"] } }), op: "le", right: 1 } });
     expect(d(r)).toEqual(["세는 규칙", "매일 이영희 박민수 나이트 1명까지"]);
   });
 
@@ -303,7 +303,7 @@ describe("describeRule: 새로 표현되는 규칙(설계 §2.6)", () => {
     const r = rule({
       kind: "require",
       for_each: { per: "day" },
-      then: { left: count(["D"], { who: { ids: ["n01"] } }), op: "eq", right: count(["D"], { who: { ids: ["n02"] } }) },
+      then: { left: count(["D"], { who: { ids: ["e01"] } }), op: "eq", right: count(["D"], { who: { ids: ["e02"] } }) },
     });
     expect(d(r)).toEqual(["세는 규칙", "매일 이영희 데이와 박민수 데이가 같음"]);
   });
@@ -349,7 +349,7 @@ describe("describeRule: 새로 표현되는 규칙(설계 §2.6)", () => {
       },
       { max: { value: 10, label: "최대 횟수" } },
     );
-    const s = describeRule(r, CONFIG, NURSES, NOV);
+    const s = describeRule(r, CONFIG, EMPLOYEES, NOV);
     expect([presetName(r), s.text]).toEqual(["세는 규칙", "근무표 전체 더블(DE) 10번 이하 또는 나이트 근무 시간 16시간 이상"]);
     expect(s.parts.filter((p) => "value" in p)).toEqual([{ value: "max", text: "10" }]);
     const seq = rule({
@@ -361,7 +361,7 @@ describe("describeRule: 새로 표현되는 규칙(설계 §2.6)", () => {
   });
 });
 
-describe("wardRuleCount", () => {
+describe("shopRuleCount", () => {
   it("필요 인원은 세지 않는다", () => {
     const coverage = (kind: "weekday" | "weekend", code: string) =>
       count({ days: { kind }, shifts: { in: [code] }, per: "day", min: 2, max: 2 });
@@ -371,8 +371,8 @@ describe("wardRuleCount", () => {
       offAfter(N, 1),
       balance({ shifts: N }),
     ];
-    expect(wardRuleCount(rules)).toBe(2);
-    expect(wardRuleCount([])).toBe(0);
+    expect(shopRuleCount(rules)).toBe(2);
+    expect(shopRuleCount([])).toBe(0);
   });
 });
 
@@ -389,12 +389,12 @@ describe("formatDeviation", () => {
 });
 
 describe("nextTask", () => {
-  const ward: Ward = {
+  const shop: Shop = {
     name: "내과 병동",
     unit: "month",
     config: DEFAULT_CONFIG,
-    nurses: NURSES.map((n) => ({ ...n, tags: [], active: true })),
-    nextNurseNo: 5,
+    employees: EMPLOYEES.map((n) => ({ ...n, tags: [], active: true })),
+    nextEmployeeNo: 5,
     rules: [],
     pendingRules: [],
     pendingConfig: [],
@@ -432,22 +432,22 @@ describe("nextTask", () => {
     });
 
   it("기간이 없으면 오늘 이후 첫 근무표를 만들 차례", () => {
-    expect(nextTask(ward, [], TODAY)).toEqual({ kind: "none", name: "11월 근무표" });
+    expect(nextTask(shop, [], TODAY)).toEqual({ kind: "none", name: "11월 근무표" });
   });
 
   it("작성 중, 생성 전: 적용한 요청 수", () => {
     const p = period("2026-11-01", 30, {
       requests: [
-        fixedCell("n01", 15, "O"),
+        fixedCell("e01", 15, "O"),
         balance({ shifts: N }, { scope: "period" }),
       ],
-      pendingRequests: [fixedCell("n02", 3, "O")],
+      pendingRequests: [fixedCell("e02", 3, "O")],
     });
-    expect(nextTask(ward, [p], TODAY)).toEqual({ kind: "drafting", name: "11월 근무표", requests: 2 });
+    expect(nextTask(shop, [p], TODAY)).toEqual({ kind: "drafting", name: "11월 근무표", requests: 2 });
   });
 
   it("작성 중, 생성 후", () => {
-    expect(nextTask(ward, [period("2026-11-01", 30, { result })], TODAY)).toEqual({
+    expect(nextTask(shop, [period("2026-11-01", 30, { result })], TODAY)).toEqual({
       kind: "generated",
       name: "11월 근무표",
     });
@@ -455,7 +455,7 @@ describe("nextTask", () => {
 
   it("확정", () => {
     const p = confirmed("2026-11-01", 30, "2026-10-28T05:32:00.000Z");
-    expect(nextTask(ward, [p], TODAY)).toEqual({
+    expect(nextTask(shop, [p], TODAY)).toEqual({
       kind: "confirmed",
       name: "11월 근무표",
       confirmedAt: "2026-10-28T05:32:00.000Z",
@@ -465,8 +465,8 @@ describe("nextTask", () => {
   it("운영 중 근무표가 있으면 그다음 근무표를 고른다", () => {
     const nov = confirmed("2026-11-01", 30, "2026-10-28T05:32:00.000Z");
     const during = "2026-11-09";
-    expect(nextTask(ward, [nov], during)).toEqual({ kind: "none", name: "12월 근무표" });
-    expect(nextTask(ward, [nov, period("2026-12-01", 31)], during)).toEqual({
+    expect(nextTask(shop, [nov], during)).toEqual({ kind: "none", name: "12월 근무표" });
+    expect(nextTask(shop, [nov, period("2026-12-01", 31)], during)).toEqual({
       kind: "drafting",
       name: "12월 근무표",
       requests: 0,
@@ -474,7 +474,7 @@ describe("nextTask", () => {
   });
 
   it("주 단위 병동은 날짜로 이름을 붙인다", () => {
-    expect(nextTask({ ...ward, unit: "2w" }, [], TODAY)).toEqual({ kind: "none", name: "11/2~11/15 근무표" });
+    expect(nextTask({ ...shop, unit: "2w" }, [], TODAY)).toEqual({ kind: "none", name: "11/2~11/15 근무표" });
   });
 });
 
@@ -494,8 +494,8 @@ describe("taskDoneSteps", () => {
 
 describe("configSummary", () => {
   const shift = (code: string, name: string, hours: number, extra: object = {}) => ({ code, name, hours, ...extra });
-  const config = (...shifts: ReturnType<typeof shift>[]): WardConfig =>
-    ({ shifts: [...shifts, shift("O", "휴무", 0)] }) as unknown as WardConfig;
+  const config = (...shifts: ReturnType<typeof shift>[]): ShopConfig =>
+    ({ shifts: [...shifts, shift("O", "휴무", 0)] }) as unknown as ShopConfig;
 
   it("기본 근무 형태는 UI_GUIDE 문구와 같다", () => {
     expect(configSummary(DEFAULT_CONFIG)).toBe("데이·이브닝·나이트 3교대, 각 8시간");
