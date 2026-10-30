@@ -34,6 +34,9 @@ DEFAULT_SHIFTS: list[tuple[str, str, float, str | None, str | None]] = [
     (OFF_CODE, "휴무", 0, None, None),
 ]
 
+# 직원 가능 시간에서 만든 규칙의 id 접두사. 완화 제안 대상이 아니다
+AVAILABILITY_RULE_PREFIX = "avail-"
+
 # LLM
 LLM_MAX_RETRIES = 2
 LLM_TIMEOUT_S = 30

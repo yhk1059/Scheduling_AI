@@ -7,7 +7,7 @@ from datetime import date
 import pytest
 
 from backend.domain import constants
-from backend.domain.models import Conflict, Employee, Period, ScheduleRequest
+from backend.domain.models import DEFAULT_CONFIG, Conflict, Employee, Period, ScheduleRequest
 from backend.llm.client import LLMInvalidOutputError, ToolCallResult
 from backend.llm.explainer import explain, fallback_explanation
 from backend.llm.prompts import EXPLAIN_SYSTEM, EXPLAIN_TOOL
@@ -19,13 +19,13 @@ EMPLOYEES = [
     Employee(id="e03", name="김지훈", tags=["리더"]),
 ]
 
-COVERAGE = rules.count("cov", {"in": ["D"]}, "day", 3, 3, days={"kind": "weekend"}, source_text="주말 D 최소 3명")
+COVERAGE = rules.count("cov", {"in": ["A"]}, "day", 3, 3, days={"kind": "weekend"}, source_text="주말 A 최소 3명")
 LEAVE = rules.leave("lv1", "e01", [14, 15], source_text="이영희 14~15일 휴가")
-FIXED = rules.fixed("fx1", "e02", 14, "N", source_text="박민수 14일 N 고정")
-UNRELATED = rules.forbid("seq", "N", "D", source_text="나이트 다음 날 데이 금지")
+FIXED = rules.fixed("fx1", "e02", 14, "C", source_text="박민수 14일 C 고정")
+UNRELATED = rules.forbid("seq", "C", "A", source_text="마감 다음 날 오픈 금지")
 
 REQUEST = ScheduleRequest(
-    config=rules.DEN_CONFIG,
+    config=DEFAULT_CONFIG,
     employees=EMPLOYEES,
     period=Period(start_date=date(2026, 11, 1), length=30),
     holidays=[5],
@@ -33,12 +33,12 @@ REQUEST = ScheduleRequest(
     input_version=3,
 )
 CONFLICTS = [
-    Conflict(constraint_id="cov", type="rule", source_text="주말 D 최소 3명"),
+    Conflict(constraint_id="cov", type="rule", source_text="주말 A 최소 3명"),
     Conflict(constraint_id="lv1", type="rule", source_text="이영희 14~15일 휴가"),
-    Conflict(constraint_id="fx1", type="fixed_assignment", source_text="박민수 14일 N 고정"),
+    Conflict(constraint_id="fx1", type="fixed_assignment", source_text="박민수 14일 C 고정"),
 ]
 
-TEXT = "e01의 14~15일 휴가 때문에 주말 데이 인원 3명을 채울 수 없습니다. e02도 14일 나이트로 고정되어 있습니다."
+TEXT = "e01의 14~15일 휴가 때문에 주말 오픈 인원 3명을 채울 수 없습니다. e02도 14일 마감로 고정되어 있습니다."
 
 
 def ok(tool_input: dict | None, stop_reason: str = "tool_use") -> ToolCallResult:
@@ -72,9 +72,9 @@ def set_hardness(cid: str, hardness: str = "soft") -> dict:
 
 
 THREE = [
-    proposal("주말 D 최소 2명으로", set_value("cov", "min", 2)),
+    proposal("주말 A 최소 2명으로", set_value("cov", "min", 2)),
     proposal("e02 고정 해제", disable("fx1")),
-    proposal("주말 D 인원을 soft로", set_hardness("cov")),
+    proposal("주말 A 인원을 soft로", set_hardness("cov")),
 ]
 
 
@@ -87,7 +87,7 @@ def test_explain_text_and_three_proposals():
 
     assert text.startswith("이영희의 14~15일 휴가")
     assert "박민수도" in text
-    assert [p.title for p in proposals] == ["주말 D 최소 2명으로", "박민수 고정 해제", "주말 D 인원을 soft로"]
+    assert [p.title for p in proposals] == ["주말 A 최소 2명으로", "박민수 고정 해제", "주말 A 인원을 soft로"]
     assert proposals[1].changes[0].action == "disable"
     assert proposals[1].changes[0].constraint_id == "fx1"
     assert all(p.verified_summary is None for p in proposals)
@@ -130,8 +130,8 @@ def test_request_is_pseudonymized_and_uses_tool():
     for old in ("target_month", "days_in_month", "period_start", "period_end", "period_length"):
         assert old not in context
     assert context["weekend_and_holiday_days"][:4] == [1, 5, 7, 8]
-    assert [s["code"] for s in context["config"]["shifts"]] == ["D", "E", "N", "O"]
-    assert context["config"]["shifts"][2] == {"code": "N", "name": "나이트", "hours": 8, "parts": [], "active": True}
+    assert [s["code"] for s in context["config"]["shifts"]] == ["A", "M", "C", "O"]
+    assert context["config"]["shifts"][2] == {"code": "C", "name": "마감", "hours": 6, "parts": [], "start": "17:00", "end": "23:00", "active": True}
     assert {"id": "e03", "tags": ["리더"]} in context["employees"]
 
 
@@ -269,35 +269,35 @@ COV_RULE = {
     "body": {
         "kind": "require",
         "for_each": {"per": "day", "days": {"kind": "weekend"}},
-        "then": {"left": {"shifts": {"in": ["D"]}}, "op": "eq", "right": {"value": "min"}},
+        "then": {"left": {"shifts": {"in": ["A"]}}, "op": "eq", "right": {"value": "min"}},
     },
-    "source_text": "주말 데이 3명",
+    "source_text": "주말 오픈 3명",
 }
-MAX_NIGHTS = {
+MAX_CLOSES = {
     "id": "mx",
     "scope": "shop",
     "type": "rule",
-    "values": {"max_len": {"value": 3, "label": "최대 연속 나이트"}},
+    "values": {"max_len": {"value": 3, "label": "최대 연속 마감"}},
     "body": {
         "kind": "require",
         "for_each": {"per": "person_window", "window": 4},
-        "then": {"left": {"shifts": {"in": ["N"]}}, "op": "le", "right": {"value": "max_len"}},
+        "then": {"left": {"shifts": {"in": ["C"]}}, "op": "le", "right": {"value": "max_len"}},
     },
-    "source_text": "나이트 3연속까지",
+    "source_text": "마감 3연속까지",
 }
 RULE_REQUEST = ScheduleRequest(
-    config=rules.DEN_CONFIG,
+    config=DEFAULT_CONFIG,
     employees=EMPLOYEES,
     period=Period(start_date=date(2026, 11, 1), length=30),
     holidays=[5],
-    constraints=[COV_RULE, MAX_NIGHTS, LEAVE, FIXED, UNRELATED],
+    constraints=[COV_RULE, MAX_CLOSES, LEAVE, FIXED, UNRELATED],
     input_version=4,
 )
 RULE_CONFLICTS = [
-    Conflict(constraint_id="cov-r", type="rule", source_text="주말 데이 3명"),
-    Conflict(constraint_id="mx", type="rule", source_text="나이트 3연속까지"),
+    Conflict(constraint_id="cov-r", type="rule", source_text="주말 오픈 3명"),
+    Conflict(constraint_id="mx", type="rule", source_text="마감 3연속까지"),
     Conflict(constraint_id="lv1", type="rule", source_text="이영희 14~15일 휴가"),
-    Conflict(constraint_id="fx1", type="fixed_assignment", source_text="박민수 14일 N 고정"),
+    Conflict(constraint_id="fx1", type="fixed_assignment", source_text="박민수 14일 C 고정"),
 ]
 
 
@@ -317,14 +317,14 @@ def test_rule_context_has_expression_values_and_source_text():
     assert cov["values"] == {"min": {"value": 3, "label": "인원"}}
     assert cov["body"]["for_each"] == {"per": "day", "days": {"kind": "weekend"}}  # 기본값은 빼고 보낸다
     assert cov["body"]["then"]["right"] == {"value": "min"}
-    assert cov["source_text"] == "주말 데이 3명"
+    assert cov["source_text"] == "주말 오픈 3명"
     assert "params" not in cov
     fx = next(x for x in items if x["id"] == "fx1")
-    assert fx["params"] == {"employee_id": "e02", "day": 14, "shift": "N"}  # 칸 고정은 그대로 params
+    assert fx["params"] == {"employee_id": "e02", "day": 14, "shift": "C"}  # 칸 고정은 그대로 params
 
 
 def test_set_value_kept_with_name_and_value():
-    (p,) = explain_rules(proposal("최대 연속 나이트 3 → 4", set_value("mx", "max_len", 4)))
+    (p,) = explain_rules(proposal("최대 연속 마감 3 → 4", set_value("mx", "max_len", 4)))
     (change,) = p.changes
     assert (change.action, change.constraint_id, change.name, change.value) == ("set_value", "mx", "max_len", 4)
     assert change.hardness is None
@@ -379,13 +379,69 @@ def test_prompt_explains_rules_and_relaxation_kinds():
     assert "구조" in EXPLAIN_SYSTEM and "바꾸지 않는다" in EXPLAIN_SYSTEM
 
 
+# --- 가능 시간: 설명에는 나와도 바꾸지 않는다 ---
+
+AVAIL = {
+    "id": "avail-e01",
+    "scope": "period",
+    "type": "rule",
+    "body": {
+        "kind": "require",
+        "for_each": {"per": "person", "people": {"ids": ["e01"]}, "days": {"days": [14]}},
+        "then": {"left": {"shifts": {"not_in": ["O"]}}, "op": "le", "right": 0},
+    },
+    "source_text": "이영희 가능 시간",
+}
+AVAIL_REQUEST = ScheduleRequest(
+    config=DEFAULT_CONFIG,
+    employees=EMPLOYEES,
+    period=RULE_REQUEST.period,
+    holidays=[5],
+    constraints=[COV_RULE, AVAIL],
+    input_version=5,
+)
+AVAIL_CONFLICTS = [
+    Conflict(constraint_id="cov-r", type="rule", source_text="주말 오픈 3명"),
+    Conflict(constraint_id="avail-e01", type="rule", source_text="이영희 가능 시간"),
+]
+
+
+def test_availability_prefix_constant():
+    assert constants.AVAILABILITY_RULE_PREFIX == "avail-"
+
+
+@pytest.mark.parametrize("change", [disable("avail-e01"), set_hardness("avail-e01")])
+def test_availability_rule_changes_rejected(change):
+    props = [proposal("가능 시간 완화", change), proposal("섞인 제안", disable("cov-r"), change), proposal("정상", disable("cov-r"))]
+    client = FakeClient(ok({"text": TEXT, "proposals": props}))
+    _, proposals = explain(AVAIL_REQUEST, AVAIL_CONFLICTS, client)
+    assert [p.title for p in proposals] == ["정상"]
+
+
+def test_availability_rule_still_in_explanation_context():
+    client = FakeClient(ok({"text": TEXT, "proposals": []}))
+    explain(AVAIL_REQUEST, AVAIL_CONFLICTS, client)
+    items = json.loads(client.calls[0]["messages"][0]["content"].split("<conflicts>\n")[1].split("\n</conflicts>")[0])
+    assert any(x["id"] == "avail-e01" for x in items)
+
+
+def test_prompt_forbids_availability_changes():
+    assert constants.AVAILABILITY_RULE_PREFIX in EXPLAIN_SYSTEM and "가능 시간" in EXPLAIN_SYSTEM
+
+
+def test_prompt_is_about_shops():
+    assert "스케줄 매니저" in EXPLAIN_SYSTEM
+    for old in ("간호", "병동", "나이트"):
+        assert old not in EXPLAIN_SYSTEM
+
+
 # --- 결정적 대체 경로 ---
 
 
 def test_fallback_lists_conflict_source_texts():
     text = fallback_explanation(REQUEST, CONFLICTS)
     assert text == (
-        "다음 규칙들이 동시에 지켜질 수 없습니다: “주말 D 최소 3명”, “이영희 14~15일 휴가”, “박민수 14일 N 고정”."
+        "다음 규칙들이 동시에 지켜질 수 없습니다: “주말 A 최소 3명”, “이영희 14~15일 휴가”, “박민수 14일 C 고정”."
     )
 
 

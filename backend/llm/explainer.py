@@ -5,7 +5,7 @@ from typing import Any
 
 from pydantic import TypeAdapter, ValidationError
 
-from backend.domain.constants import LLM_MAX_RETRIES, MAX_PROPOSALS
+from backend.domain.constants import AVAILABILITY_RULE_PREFIX, LLM_MAX_RETRIES, MAX_PROPOSALS
 from backend.domain.models import (
     Conflict,
     ConstraintChange,
@@ -49,7 +49,7 @@ def _context_message(request: ScheduleRequest, specs: dict[str, Any], conflicts:
         {d for d in range(1, days + 1) if period.weekday(d) >= 5} | set(request.holidays)
     )
     context = {
-        "config": {"shifts": [s.model_dump(include={"code", "name", "hours", "parts", "active"}) for s in request.config.shifts]},
+        "config": {"shifts": [s.model_dump(include={"code", "name", "hours", "parts", "start", "end", "active"}) for s in request.config.shifts]},
         "employee_count": len(employees),
         "employees": [{"id": n.id, "tags": n.tags} for n in employees],
         "period": {"start": period.start_date.isoformat(), "end": period.date_of(days).isoformat(), "length": days},
@@ -108,6 +108,8 @@ def _to_proposal(
     changes = []
     for change in draft.changes:
         if change.constraint_id not in conflict_ids or change.constraint_id not in specs:
+            return None
+        if change.constraint_id.startswith(AVAILABILITY_RULE_PREFIX):  # 가능 시간은 직원이 정한 것이라 완화하지 않는다
             return None
         checked = _check_change(change, request, specs[change.constraint_id])
         if checked is None:
