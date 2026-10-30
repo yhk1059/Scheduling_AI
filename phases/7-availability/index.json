@@ -21,7 +21,10 @@
     {
       "step": 2,
       "name": "login-required",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-10-31T00:33:00+0900",
+      "summary": "게스트 모드 제거: lib/store(sync idle, loginPrompt·introSeen·setupStep·markIntroSeen 삭제, view setup은 step 없음), LoginScreen(값 없으면 '로그인 설정이 필요해요' + 샘플 링크), ShopSetup(매장 준비, [첫 근무표 시작하기]), AppShell·Account·ConfirmedPeriod·ScheduleStep의 게스트 분기·배너·대화상자·[시작 화면] 삭제, SetupFlow·StartScreen·configSummary 삭제. 결정: 랜딩 href는 PRD·S1 문서대로 /app?start=new를 그대로 두고 앱은 이 값을 읽지 않는다(경로는 /app). 손상된 서버 문서는 shop null 대신 빈 매장의 매장 준비 + resetNotice로 연다(시작 화면이 없어져 갈 곳이 필요함). 서버 문서가 없고 캐시가 있으면 올린다(첫 저장 실패 복구). 다른 계정으로 올라가지 않게 세션 없이 열면 남은 캐시를 지운다. 서버 문서를 못 읽고 캐시도 없으면 [다시 시도] 알림을 보인다. startShop은 테스트 준비에서만 쓰지만 남겼다. e2e는 아직 게스트 기준이라 step 4에서 고친다.",
+      "completed_at": "2026-10-31T00:37:43+0900"
     },
     {
       "step": 3,
