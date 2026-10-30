@@ -24,7 +24,6 @@ const SECTIONS: { title: string; items: string[] }[] = [
     title: "3. 보관 위치와 기간",
     items: [
       "로그인하면 매장 데이터를 Supabase(서울 리전)에 저장하고, 사용자가 [내 매장 데이터 삭제]를 할 때까지 보관합니다.",
-      "로그인하지 않으면 이 브라우저에만 저장됩니다.",
     ],
   },
   {

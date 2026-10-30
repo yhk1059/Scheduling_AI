@@ -20,7 +20,6 @@ import {
   rosterChangesFor,
   SAVE_DEBOUNCE_MS,
   STORAGE_KEY,
-  setupStep,
   toScheduleRequest,
   summarizedCoverageIds,
   viewForPeriod,
@@ -104,7 +103,7 @@ function startDenShop(store: ReturnType<typeof fresh>) {
   store.setState((s) => ({ shop: { ...s.shop!, unit: "month", config: DEN_CONFIG } }));
 }
 
-/** 게스트 입력: 매장(이영희 e01, 박민수 e02, 월 단위) + 첫 기간. */
+/** 이 브라우저에 남은 캐시: 매장(이영희 e01, 박민수 e02, 월 단위) + 첫 기간. */
 function addInput(store: ReturnType<typeof createAppStore>) {
   startDenShop(store);
   store.getState().addEmployees(rows);
@@ -135,7 +134,7 @@ describe("초기 상태", () => {
 });
 
 describe("매장", () => {
-  it("startShop는 빈 매장을 만들고 처음 설정 ①로 간다", () => {
+  it("startShop는 빈 매장을 만들고 매장 준비로 간다", () => {
     const store = fresh();
     store.getState().startShop();
     const s = store.getState();
@@ -143,7 +142,7 @@ describe("매장", () => {
     // 기본 근무 형태, 기본 규칙 없음
     expect(s.shop!.config).toEqual(DEFAULT_CONFIG);
     expect(s.shop!.rules).toEqual([]);
-    expect(s.view).toEqual({ screen: "setup", step: 1 });
+    expect(s.view).toEqual({ screen: "setup" });
     expect(s.hasInput()).toBe(true);
     expect(s.inputVersion).toBe(1);
   });
@@ -1245,14 +1244,13 @@ describe("로그인 분기", () => {
   beforeEach(() => vi.useFakeTimers());
   afterEach(() => vi.useRealTimers());
 
-  it("초기 sync는 guest, auth와 loginPrompt는 null", () => {
+  it("초기 sync는 idle, auth는 null", () => {
     const s = synced(fakeRemote().remote).getState();
     expect(s.auth).toBeNull();
-    expect(s.sync).toEqual({ status: "guest", savedAt: null });
-    expect(s.loginPrompt).toBeNull();
+    expect(s.sync).toEqual({ status: "idle", savedAt: null });
   });
 
-  it("서버에 매장이 있고 게스트 입력도 있으면 서버 문서로 바꾸고 안내한다", async () => {
+  it("서버에 매장이 있으면 이 브라우저의 캐시를 버리고 서버 문서로 바꾼다", async () => {
     const f = fakeRemote({ data: serverDoc(), updatedAt: SERVER_AT });
     const store = synced(f.remote);
     addInput(store);
@@ -1262,28 +1260,25 @@ describe("로그인 분기", () => {
     expect(s.periods).toEqual([]);
     expect(s.auth).toEqual({ userId: "u1", email: "employee@example.com" });
     expect(s.sync).toEqual({ status: "saved", savedAt: SERVER_AT });
-    expect(s.loginPrompt).toEqual({ kind: "server-replaced-guest" });
     await vi.advanceTimersByTimeAsync(SAVE_DEBOUNCE_MS * 2);
     expect(f.calls.save).toHaveLength(0);
   });
 
-  it("서버에 매장이 있고 게스트 입력이 없으면 안내 없이 서버 문서로 바꾼다", async () => {
+  it("서버에 매장이 있고 캐시가 없으면 서버 문서로 바꾼다", async () => {
     const f = fakeRemote({ data: serverDoc(), updatedAt: SERVER_AT });
     const store = synced(f.remote);
     const v = store.getState().inputVersion;
     await store.getState().signedIn(USER);
     const s = store.getState();
     expect(s.shop!.name).toBe("서버 매장");
-    expect(s.loginPrompt).toBeNull();
     expect(s.inputVersion).toBeGreaterThan(Math.max(v, serverDoc().state.inputVersion));
     expect(f.calls.save).toHaveLength(0);
   });
 
-  it("서버에 없고 게스트 입력이 있으면 그대로 올린다", async () => {
+  it("서버에 없고 캐시가 있으면(첫 저장 실패) 그대로 올린다", async () => {
     const f = fakeRemote();
     const { store } = withPeriodSynced(f.remote);
     await store.getState().signedIn(USER);
-    expect(store.getState().loginPrompt).toBeNull();
     expect(f.calls.save).toHaveLength(1);
     const state = savedState(f.calls.save[0]);
     expect((state.shop as { employees: unknown[] }).employees).toHaveLength(2);
@@ -1291,44 +1286,45 @@ describe("로그인 분기", () => {
     expect(store.getState().sync).toEqual({ status: "saved", savedAt: "2026-10-28T07:00:00.000Z" });
   });
 
-  it("둘 다 없으면 빈 매장을 올리고 처음 설정 ①로 간다", async () => {
+  it("둘 다 없으면 빈 매장을 올리고 매장 준비로 간다", async () => {
     const f = fakeRemote();
     const store = synced(f.remote);
     await store.getState().signedIn(USER);
     const s = store.getState();
     expect(s.shop).toMatchObject({ name: "", employees: [] });
-    expect(s.view).toEqual({ screen: "setup", step: 1 });
+    expect(s.view).toEqual({ screen: "setup" });
     expect(f.calls.save).toHaveLength(1);
   });
 
-  it("서버 문서가 손상됐으면 빈 상태 + resetNotice, 바꾸기 전에는 저장하지 않는다", async () => {
+  it("서버 문서가 손상됐으면 빈 매장의 매장 준비 + resetNotice, 바꾸기 전에는 저장하지 않는다", async () => {
     const f = fakeRemote({ data: { version: 3, state: { step: 1 } }, updatedAt: SERVER_AT });
     const store = synced(f.remote);
     await store.getState().signedIn(USER);
-    expect(store.getState().shop).toBeNull();
+    expect(store.getState().shop).toMatchObject({ name: "", employees: [] });
+    expect(store.getState().view).toEqual({ screen: "setup" });
     expect(store.getState().resetNotice).toBe(true);
     await vi.advanceTimersByTimeAsync(SAVE_DEBOUNCE_MS * 2);
     expect(f.calls.save).toHaveLength(0);
 
-    startDenShop(store);
+    store.getState().setShopName("새 매장");
     await vi.advanceTimersByTimeAsync(SAVE_DEBOUNCE_MS);
     expect(f.calls.save).toHaveLength(1);
   });
 
-  it("서버 문서 버전이 지금과 다르면 변환하지 않고 빈 상태로 시작한다", async () => {
+  it("서버 문서 버전이 지금과 다르면 변환하지 않고 빈 매장으로 시작한다", async () => {
     const { state } = serverDoc();
     const f = fakeRemote({ data: { version: STORAGE_VERSION - 1, state }, updatedAt: SERVER_AT });
     const store = synced(f.remote);
     await store.getState().signedIn(USER);
-    expect(store.getState().shop).toBeNull();
+    expect(store.getState().shop).toMatchObject({ name: "", employees: [] });
     expect(store.getState().resetNotice).toBe(true);
   });
 
-  it("모양이 손상된 서버 문서도 빈 상태로 시작한다", async () => {
+  it("모양이 손상된 서버 문서도 빈 매장으로 시작한다", async () => {
     const f = fakeRemote({ data: { version: STORAGE_VERSION, state: { shop: { employees: "x" } } }, updatedAt: SERVER_AT });
     const store = synced(f.remote);
     await store.getState().signedIn(USER);
-    expect(store.getState().shop).toBeNull();
+    expect(store.getState().shop).toMatchObject({ name: "", employees: [] });
     expect(store.getState().resetNotice).toBe(true);
     expect(f.calls.save).toHaveLength(0);
   });
@@ -1343,11 +1339,11 @@ function withPeriodSynced(remote: ShopRemote, storage: Storage = new MemoryStora
   return { store, id };
 }
 
-describe("게스트 확정과 다음 기간", () => {
+describe("로그인 전 확정과 다음 기간", () => {
   beforeEach(() => vi.useFakeTimers());
   afterEach(() => vi.useRealTimers());
 
-  it("게스트가 확정하면 버전 1개를 남기고 remote를 부르지 않는다", async () => {
+  it("확정하면 버전 1개를 남기고, 로그인 전에는 remote를 부르지 않는다", async () => {
     const f = fakeRemote();
     const { store, id } = withPeriodSynced(f.remote);
     store.getState().setResult(id, result({ e01: fill(30, "D"), e02: fill(30, "O") }), []);
@@ -1357,10 +1353,10 @@ describe("게스트 확정과 다음 기간", () => {
     expect(p.versions).toHaveLength(1);
     await vi.advanceTimersByTimeAsync(SAVE_DEBOUNCE_MS * 2);
     expect(f.calls).toMatchObject({ load: 0, save: [] });
-    expect(store.getState().sync.status).toBe("guest");
+    expect(store.getState().sync.status).toBe("idle");
   });
 
-  it("게스트가 확정 기간 뒤에 다음 기간을 만들고 이월을 계산한다", async () => {
+  it("확정 기간 뒤에 다음 기간을 만들고 이월을 계산한다", async () => {
     const f = fakeRemote();
     const { store, id } = withPeriodSynced(f.remote);
     const e01 = fill(30, "DDEENNO");
@@ -1474,7 +1470,7 @@ describe("자동 저장", () => {
     expect(store.getState().sync.status).toBe("saved");
   });
 
-  it("게스트 모드에서는 remote를 부르지 않는다", async () => {
+  it("로그인 전에는 remote를 부르지 않는다", async () => {
     const f = fakeRemote();
     const { store, id } = withPeriodSynced(f.remote);
     store.getState().setShopName("가");
@@ -1483,7 +1479,7 @@ describe("자동 저장", () => {
     await store.getState().retrySave();
     await vi.advanceTimersByTimeAsync(SAVE_DEBOUNCE_MS * 3);
     expect(f.calls).toEqual({ load: 0, save: [], remove: 0 });
-    expect(store.getState().sync.status).toBe("guest");
+    expect(store.getState().sync.status).toBe("idle");
   });
 });
 
@@ -1502,14 +1498,14 @@ describe("로그아웃과 데이터 삭제", () => {
     expect(s.shop).toBeNull();
     expect(s.periods).toEqual([]);
     expect(s.auth).toBeNull();
-    expect(s.sync.status).toBe("guest");
+    expect(s.sync.status).toBe("idle");
     expect(storage.getItem(STORAGE_KEY)).toBeNull();
     await vi.advanceTimersByTimeAsync(SAVE_DEBOUNCE_MS * 2);
     expect(f.calls.save).toHaveLength(1);
     expect(f.calls.remove).toBe(0);
   });
 
-  it("deleteShopData는 서버 문서를 지우고 빈 매장 + 처음 설정 ①, 로그인은 유지한다", async () => {
+  it("deleteShopData는 서버 문서를 지우고 빈 매장 + 매장 준비, 로그인은 유지한다", async () => {
     const f = fakeRemote();
     const { store } = withPeriodSynced(f.remote);
     await store.getState().signedIn(USER);
@@ -1518,7 +1514,7 @@ describe("로그아웃과 데이터 삭제", () => {
     expect(f.calls.remove).toBe(1);
     expect(s.shop).toMatchObject({ name: "", employees: [] });
     expect(s.periods).toEqual([]);
-    expect(s.view).toEqual({ screen: "setup", step: 1 });
+    expect(s.view).toEqual({ screen: "setup" });
     expect(s.auth).toEqual({ userId: "u1", email: "employee@example.com" });
     await vi.advanceTimersByTimeAsync(SAVE_DEBOUNCE_MS * 2);
     expect(f.calls.save).toHaveLength(1);
@@ -1534,32 +1530,18 @@ describe("로그아웃과 데이터 삭제", () => {
   });
 });
 
-describe("매장 준비와 처음 설정 단계", () => {
-  const COVERAGE = ["D", "E", "N"] as const;
-  function fullCoverage(store: ReturnType<typeof createAppStore>) {
-    for (const shift of COVERAGE) {
-      store.getState().setCoverage(shift, "weekday", 1, 2);
-      store.getState().setCoverage(shift, "weekend", 1, 2);
-    }
-  }
-
-  it("명단이 없으면 ①, 매장 소개에서 [다음]을 누르지 않았으면 ②, 그 밖은 ③. 필요 인원은 필수가 아니다", () => {
+describe("매장 준비", () => {
+  it("활성 직원이 있어야 시작할 수 있고, 필요 인원은 필수가 아니다", () => {
     const store = fresh();
     startDenShop(store);
     const shop = () => store.getState().shop!;
-    expect([setupStep(shop()), hasCoverage(shop()), isShopReady(shop())]).toEqual([1, false, false]);
+    expect([hasCoverage(shop()), isShopReady(shop())]).toEqual([false, false]);
     store.getState().addEmployees(rows);
-    expect([setupStep(shop()), isShopReady(shop())]).toEqual([2, true]);
-    fullCoverage(store);
-    expect([setupStep(shop()), hasCoverage(shop())]).toEqual([2, true]);
-    const v = store.getState().inputVersion;
-    store.getState().markIntroSeen();
-    expect([setupStep(shop()), isShopReady(shop())]).toEqual([3, true]);
-    expect(store.getState().inputVersion).toBe(v);
+    expect([hasCoverage(shop()), isShopReady(shop())]).toEqual([false, true]);
     // 모두 근무표에서 빼면 명단이 없는 것으로 본다
     store.getState().setEmployeeActive("e01", false);
     store.getState().setEmployeeActive("e02", false);
-    expect([setupStep(shop()), isShopReady(shop())]).toEqual([1, false]);
+    expect(isShopReady(shop())).toBe(false);
   });
 });
 
@@ -1649,19 +1631,19 @@ describe("옛 화면 상태 불러오기", () => {
     expect(reload(store, { screen: "home" }).resetNotice).toBe(false);
   });
 
-  it("근무표가 없는 매장은 설정·홈 화면을 처음 설정의 못 끝낸 첫 단계로 바꾼다", () => {
+  it("근무표가 없는 매장은 어느 화면이든 매장 준비로 바꾼다", () => {
     const store = fresh();
     startDenShop(store);
-    expect(reload(store, { screen: "settings", tab: "roster" }).view).toEqual({ screen: "setup", step: 1 });
+    expect(reload(store, { screen: "settings", tab: "roster" }).view).toEqual({ screen: "setup" });
     store.getState().addEmployees(rows);
-    expect(reload(store, { screen: "settings", tab: "rules" }).view).toEqual({ screen: "setup", step: 2 });
-    expect(reload(store, { screen: "home" }).view).toEqual({ screen: "setup", step: 2 });
-    expect(reload(store, { screen: "setup", step: 1 }).view).toEqual({ screen: "setup", step: 2 });
+    expect(reload(store, { screen: "settings", tab: "rules" }).view).toEqual({ screen: "setup" });
+    expect(reload(store, { screen: "home" }).view).toEqual({ screen: "setup" });
+    expect(reload(store, { screen: "setup" }).view).toEqual({ screen: "setup" });
   });
 
-  it("근무표가 있는 매장의 처음 설정, 없는 기간을 가리키는 화면은 홈으로 바꾼다", () => {
+  it("근무표가 있는 매장의 매장 준비, 없는 기간을 가리키는 화면은 홈으로 바꾼다", () => {
     const { store } = withPeriod();
-    expect(reload(store, { screen: "setup", step: 3 }).view).toEqual({ screen: "home" });
+    expect(reload(store, { screen: "setup" }).view).toEqual({ screen: "home" });
     expect(reload(store, { screen: "period", periodId: "p-없음", step: 2 }).view).toEqual({ screen: "home" });
     expect(reload(store, { screen: "confirmed", periodId: "p-없음" }).view).toEqual({ screen: "home" });
   });

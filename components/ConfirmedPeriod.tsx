@@ -14,10 +14,8 @@ import {
   toScheduleRequest,
   useAppStore,
 } from "@/lib/store";
-import { supabaseConfigured } from "@/lib/supabase";
 import { scheduleName } from "@/lib/wording";
 
-import { LoginButton } from "./Account";
 import { takeConfirmedEntry } from "./confirmedEntry";
 import ConstraintCard from "./ConstraintCard";
 import { Spinner, today } from "./RulesStep";
@@ -40,7 +38,6 @@ export default function ConfirmedPeriod() {
   const removeRequest = useAppStore((s) => s.removeRequest);
   const addPendingRequests = useAppStore((s) => s.addPendingRequests);
   const go = useAppStore((s) => s.go);
-  const guest = useAppStore((s) => s.auth === null);
   const sv = useSolve(period?.id ?? "");
 
   const [entry] = useState(() => (period ? takeConfirmedEntry(period.id) : null));
@@ -157,13 +154,6 @@ export default function ConfirmedPeriod() {
           </div>
         </div>
       </div>
-
-      {entry === "guest-confirmed" && guest && (
-        <div role="status" className={ui.banner}>
-          확정했어요. 이 브라우저에만 저장돼 있어요
-          {supabaseConfigured && <LoginButton className={ui.secondarySm} />}
-        </div>
-      )}
 
       {!ended && carryOverChanged(period, periods) && (
         <div role="status" className={ui.banner}>

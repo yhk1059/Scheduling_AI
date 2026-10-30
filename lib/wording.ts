@@ -30,22 +30,6 @@ export function coverageText(range: { min: number; max: number | null } | null):
   return range.min === range.max ? `${range.min}명` : `${range.min}~${range.max}명`;
 }
 
-export function configSummary(config: ShopConfig): string {
-  const live = config.shifts.filter((s) => s.active !== false && s.hours > 0);
-  const base = live.filter((s) => !s.parts?.length);
-  const doubles = live.filter((s) => s.parts?.length);
-  const names = base.map((s) => s.name).join("·");
-  const sameHours = base.every((s) => s.hours === base[0]?.hours);
-  const hours =
-    base.length === 1
-      ? `${base[0].hours}시간`
-      : sameHours
-        ? `각 ${base[0]?.hours ?? 0}시간`
-        : base.map((s) => `${s.name} ${s.hours}시간`).join("·");
-  const kind = base.length === 1 ? `${names} 근무` : names;
-  return `${kind}, ${hours}${doubles.length ? ` · 더블 ${doubles.map((s) => s.code).join(", ")}` : ""}`;
-}
-
 /** 설정 변경 카드 한 줄: "근무 코드 추가 · P 피크 · 11:00~14:00 · 3시간", 더블은 세는 근무조를 붙인다. */
 export function describeShiftChange(change: ShiftChange, config: ShopConfig): string {
   const { code, name, hours, start, end, parts } = change.shift;

@@ -5,7 +5,7 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 const URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
-/** env가 없으면 false. 이때 앱은 게스트 모드로만 동작한다(빌드·e2e가 env 없이도 돌아야 함). */
+/** env가 없으면 false. 이때 앱은 로그인 설정 안내만 보인다(빌드는 env 없이도 돌아야 함). */
 export const supabaseConfigured: boolean = Boolean(URL && ANON_KEY);
 
 let client: SupabaseClient | null = null;

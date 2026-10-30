@@ -32,7 +32,6 @@ import type {
 import { statsFromAssignments } from "@/lib/stats";
 import { describeRule, formatDeviation, hardnessLabel, josa, presetName } from "@/lib/wording";
 
-import { markConfirmedEntry } from "./confirmedEntry";
 import RulesStep, { Spinner, today } from "./RulesStep";
 import { ui } from "./ui";
 
@@ -359,7 +358,6 @@ export default function ScheduleStep() {
   const periods = useAppStore((s) => s.periods);
   const confirm = useAppStore((s) => s.confirm);
   const go = useAppStore((s) => s.go);
-  const guest = useAppStore((s) => s.auth === null);
   const sv = useSolve(period?.id ?? "");
 
   if (!shop || !period) return null;
@@ -367,12 +365,6 @@ export default function ScheduleStep() {
   const { result } = period;
   const { busy, loading } = sv;
   const employees = toScheduleRequest(shop, period, periods, today()).employees;
-
-  const onConfirm = () => {
-    // 게스트는 확정 근무표 화면 맨 위에 저장 안내를 본다
-    if (guest) markConfirmedEntry(periodId, "guest-confirmed");
-    confirm(periodId);
-  };
 
   return (
     <div className="flex flex-col gap-5">
@@ -404,7 +396,7 @@ export default function ScheduleStep() {
               {loading && <Spinner />}
               {loading ? "만드는 중…" : "다시 만들기"}
             </button>
-            <button type="button" onClick={onConfirm} disabled={busy} className={ui.primary}>
+            <button type="button" onClick={() => confirm(periodId)} disabled={busy} className={ui.primary}>
               확정
             </button>
           </>
