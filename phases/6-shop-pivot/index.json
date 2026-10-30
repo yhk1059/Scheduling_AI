@@ -61,7 +61,10 @@
     {
       "step": 7,
       "name": "llm-shop",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-10-30T23:39:20+0900",
+      "summary": "prompts.py를 매장 기준으로 다시 씀(모델러=스케줄 매니저, 예시 오픈·미들·마감, 태그 리더·신입, 시간대 필요 인원·노동법과 가능 시간 절 추가, TIME_WINDOW_EXAMPLES 3개), translate·explain 문맥 근무조에 start·end 추가, constants에 AVAILABILITY_RULE_PREFIX, explainer가 avail- 규칙을 바꾸는 제안을 통째로 버림(충돌 문맥에는 남김), test_llm_translator·explainer를 A/M/C·DEFAULT_CONFIG로 옮기고 시간대 예시의 코드 집합을 근무조 시각으로 계산해 대조. 결정: 시간대 문구는 notes/time-window-probe의 순서 1~5와 예시 뜻을 그대로 옮김(3명은 eq 유지); 설정 변경 tool은 ShiftDef가 이미 시각을 받아 스키마는 그대로 두고 프롬프트에 시각 필수·hours 기본값(시각 차이)을 적고 시각 없는 add가 재시도됨을 테스트함; 평소 되는 시간을 말하면 규칙 없이 clarification_question으로 링크 안내(다른 규칙이 함께면 그 규칙만), 휴가·희망은 그대로 규칙; 법 기준을 숫자 없이 말하면 되묻기; 복합 코드는 시간대 코드 집합에 넣지 않음(parts로 함께 세어짐); 프롬프트 안 기간은 LLM용 말로 두고 매니저가 읽는 질문·설명에만 '이번 근무표'를 쓰라고 적음; translator.py의 서버 고정 문구 '이번 기간(1~N일) 밖'은 범위 밖이라 남김(테스트가 고정, 뒤 step에서 화면 문구 정리 필요); 실제 API는 부르지 않아 정확도는 미측정(eval-shop에서 측정), eval은 아직 den-shop 기준",
+      "completed_at": "2026-10-30T23:44:35+0900"
     },
     {
       "step": 8,
