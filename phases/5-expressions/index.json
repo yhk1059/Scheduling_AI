@@ -45,7 +45,10 @@
     {
       "step": 5,
       "name": "llm-expr",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-10-30T13:56:44+0900",
+      "completed_at": "2026-10-30T14:08:20+0900",
+      "summary": "translate 출력 = TranslatorOutput{rules: RuleDraft[], config_changes, clarification_question, unsupported_reason}, RuleDraft = {hardness?, priority?, values, body(require|balance), source_text}; tool input_schema는 model_json_schema에서 만들고 $ref 순환 없음·All/Any 항목은 Cmp뿐임을 테스트. TRANSLATE_SYSTEM 재작성(모델러, 범위→세기→비교→조건 순서, values 이름·label, unsupported는 시각 겹침·하루 세 근무·교육 시간뿐, 조건부·짝은 지원); 모양별 예시 27개(§2.5 전부 + §2.6 + 더블·병동 소개)를 TRANSLATE_EXAMPLES dict로 두고 JSON으로 프롬프트에 넣어 테스트가 전부 RuleDraft·Rule 검증과 translate 통과를 확인. 검증 순서: Pydantic → 설정 변경 → 식(ValueRef ⊂ values·안 쓰는 값·offset은 day/person_day만, 그 뒤 Rule 검증) → 참조(id·태그는 for_each/who/balance 모든 People·코드 ⊂ config∪변경·날짜) → 빈 대상(모든 사람 셀렉터 0명, 범위 날 0일) → 싼 모순(day 범위 then의 Cmp·All 안 ge/eq 숫자·값 > who 인원, offset 없음·count만; Any·when은 안 봄); 재시도 ≤2 후 clarify. explain: ConstraintChange.action에 set_value{name, value}·set_hardness 추가(모델 검증: 필드 필수); 식 규칙은 disable·set_value(name ∈ values, value ≥ 0, 바꾼 Rule 검증)·set_hardness만, update 거부; 블록은 disable·update 그대로(set_* 거부); 충돌 컨텍스트는 식 규칙이면 values(label)+body(기본값 생략)+source_text; EXPLAIN_SYSTEM에 식 읽는 법과 '값·끄기·가능하면만'. routes._apply가 set_value(values 값 교체)·set_hardness 적용, 재풀이 검증 경로는 그대로. pytest 1269·vitest 292, build·lint(기존 경고 1)·eval --dry-run·gen:golden --check 통과. 결정: RuleDraft는 type·weight도 뺌(서버가 채움); 나이트전담 규칙(사람 셀렉터에 태그)은 식이면 끄기뿐 아니라 set_value·set_hardness도 거부(값 0→크게가 사실상 끄기); 필요 인원·휴가·희망 예시는 convert와 같은 모양(values min/max, 휴가 le max 0)으로, 구조 숫자(금지 0, when ≥1, 짝 ≤1)는 리터럴; eval/run.py는 기대·실제를 block_to_rules로 규칙 단위로 맞추고(금지 패턴 2개는 규칙 2개로 셈), 날·기간 범위 규칙의 사람 없는 위반 묶음은 세기 who 사람들로 봄(블록 people과 같게) — eval 본 작업은 step 7; types.gen.ts는 재생성하지 않음(클라이언트는 step 9). 발견(범위 밖): prompts._strip이 'title' 키를 지워 EXPLAIN_TOOL 스키마의 ProposalDraft.properties에 title이 없는데 required에는 있음(이전부터)."
     },
     {
       "step": 6,
