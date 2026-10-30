@@ -183,10 +183,12 @@ def _balance_detail(request: ScheduleRequest, p: Any, gap: int) -> str:
 # --- 규칙 식(ADR-019): evaluate.py로 평가하고 위반 목록 형식으로 바꾼다 ---
 
 
-def _who_label(request: ScheduleRequest, who: People | None) -> str:
+def _who_label(request: ScheduleRequest, who: People | None, names: bool = True) -> str:
     if who is None:
         return ""
     if who.ids is not None:
+        if not names:
+            return "지정한 간호사 "
         names = {n.id: n.name for n in request.nurses}
         return "·".join(names[i] for i in who.ids) + " "
     parts = list(who.tags or [])
@@ -197,8 +199,8 @@ def _who_label(request: ScheduleRequest, who: People | None) -> str:
     return " ".join(parts) + " " if parts else ""
 
 
-def _count_label(request: ScheduleRequest, c: Count) -> str:
-    return _who_label(request, c.who) + _DAY_KIND_LABEL[c.days.kind] + _shift_label(request.config, c.shifts)
+def _count_label(request: ScheduleRequest, c: Count, names: bool = True) -> str:
+    return _who_label(request, c.who, names) + _DAY_KIND_LABEL[c.days.kind] + _shift_label(request.config, c.shifts)
 
 
 def _count_unit(per: str, c: Count) -> str:
@@ -210,20 +212,25 @@ def _count_unit(per: str, c: Count) -> str:
 _OP_TEXT = {"ge": " 이상", "le": " 이하", "eq": ""}
 
 
-def _cmp_detail(request: ScheduleRequest, assignments: Assignments, rule: Any, inst: evaluate.Instance, c: Cmp) -> str:
+def _cmp_detail(
+    request: ScheduleRequest, assignments: Assignments, rule: Any, inst: evaluate.Instance, c: Cmp, names: bool = True
+) -> str:
     per = rule.body.for_each.per
     left, right = evaluate.cmp_sides(request, assignments, rule, inst, c)
     unit = _count_unit(per, c.left)
     prefix = {"person_week": "주 ", "person_window": f"{rule.body.for_each.window}일 중 "}.get(per, "")
     base = f"{_num(right / select.measure_scale(c.left.measure))}{unit}"
     if isinstance(c.right, Count):
-        base = f"{_count_label(request, c.right)} {_num(right / select.measure_scale(c.right.measure))}{_count_unit(per, c.right)}"
+        base = f"{_count_label(request, c.right, names)} {_num(right / select.measure_scale(c.right.measure))}{_count_unit(per, c.right)}"
     value = f"{_num(left / select.measure_scale(c.left.measure))}{unit}"
-    return f"{prefix}{_count_label(request, c.left)} {value} (기준 {base}{_OP_TEXT[c.op]})"
+    return f"{prefix}{_count_label(request, c.left, names)} {value} (기준 {base}{_OP_TEXT[c.op]})"
 
 
-def describe_violation(request: ScheduleRequest, assignments: Assignments, rule: Any, v: evaluate.RuleViolation) -> str:
-    """위반 한 줄: "{묶음} {값} (기준 {범위})". 그리고/또는은 어긴 비교를 " · "로 잇는다."""
+def describe_violation(
+    request: ScheduleRequest, assignments: Assignments, rule: Any, v: evaluate.RuleViolation, names: bool = True
+) -> str:
+    """위반 한 줄: "{묶음} {값} (기준 {범위})". 그리고/또는은 어긴 비교를 " · "로 잇는다.
+    names=False면 간호사 이름 대신 "지정한 간호사"를 쓴다(예시 판정, 이름은 화면이 그린다)."""
     body = rule.body
     if isinstance(body, Balance):
         values = evaluate.balance_values(request, assignments, body)
@@ -231,7 +238,7 @@ def describe_violation(request: ScheduleRequest, assignments: Assignments, rule:
     failed = [
         c for c in cond_cmps(body.then) if not evaluate.cmp_holds(request, assignments, rule, v.instance, c)
     ]
-    return " · ".join(_cmp_detail(request, assignments, rule, v.instance, c) for c in failed)
+    return " · ".join(_cmp_detail(request, assignments, rule, v.instance, c, names) for c in failed)
 
 
 def _rep_day(rule: Any, inst: evaluate.Instance) -> int | None:

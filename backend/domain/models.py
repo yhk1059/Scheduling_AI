@@ -9,6 +9,9 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 from backend.domain.constants import (
     CARRY_OVER_DAYS,
     DEFAULT_SHIFTS,
+    EXAMPLES_MAX_DAYS,
+    EXAMPLES_MAX_NURSES,
+    EXAMPLES_PER_RULE,
     HISTORY_DAYS,
     MAX_PATTERN_LEN,
     MAX_PATTERNS,
@@ -671,11 +674,22 @@ class ShiftChange(_Strict):
     shift: ShiftDef
 
 
+class RuleExample(_Strict):
+    """예시 판정(설계 §4.2): 샘플 근무표에서 규칙을 어긴 사례 하나. 카드가 작은 근무 띠로 그린다."""
+
+    nurse_ids: list[str] = Field(min_length=1, max_length=EXAMPLES_MAX_NURSES)  # 띠에 보일 간호사
+    days: list[int] = Field(min_length=1, max_length=EXAMPLES_MAX_DAYS)  # 띠에 보일 날짜(연속, 기간 안)
+    cells: dict[str, list[ShiftCode]]  # nurse_id → days 길이만큼의 코드
+    marks: list[tuple[str, int]]  # 어긋난 칸 (nurse_id, day)
+    detail: str  # 한 줄 설명. 코드 이름은 config에서, 간호사 이름은 넣지 않는다(화면이 그린다)
+
+
 class TranslateOk(_Strict):
     status: Literal["ok"]
     input_version: int
     constraints: list[ConstraintSpec]
     config_changes: list[ShiftChange] = []
+    examples: dict[str, Annotated[list[RuleExample], Field(max_length=EXAMPLES_PER_RULE)]] = {}  # 규칙 id → 예시
 
 
 class TranslateClarify(_Strict):
