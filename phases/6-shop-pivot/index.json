@@ -21,7 +21,10 @@
     {
       "step": 2,
       "name": "remove-legacy-backend",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-10-30T23:05:39+0900",
+      "summary": "legacy.py·convert.py·eval/convert_dataset.py·test_convert*·test_domain_blocks·block_oracle·옛 골든 4개 삭제, gen_golden은 solver-cases.json만 다시 쓰고 --check, eval 묶음 legacy→basic. 결정: test_compile의 컴파일=평가 검사가 쓰던 식 모양 규칙은 test_compile.py의 SHAPE_RULES로 옮김(rules.py 도우미로 쓰고 삭제 전 expr-convert-cases와 같음을 대조); 블록 동등성 검사(test_evaluate)와 블록 기준 희망 통계 검사(test_compile)는 oracle 전용이라 삭제(희망 통계는 test_solver_soft_stats가 봄); DEFAULT_RULE_PREFIX·NIGHT_ONLY_SOURCE는 convert 밖에서 안 써 옮기지 않고 삭제, legacy만 쓰던 MIN_PATTERN_LEN 삭제; eval/results.md는 지난 실행 기록이라 legacy 표기를 남김(다음 eval 실행 때 다시 씀)",
+      "completed_at": "2026-10-30T23:08:48+0900"
     },
     {
       "step": 3,
