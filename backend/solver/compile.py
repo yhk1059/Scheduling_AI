@@ -43,7 +43,7 @@ class _Bound:
 def _count(ctx: "ModelContext", rule: Rule, inst: evaluate.Instance, c: Count):
     cells = evaluate.count_scope(ctx.request, rule, inst, c)
     expr = sum(ctx.value(nid, d, c.shifts, c.measure) for nid, d in cells)
-    span = len(cells) * select.max_cell_value(ctx.request.config, c.shifts, c.measure)
+    span = len(cells) * ctx.max_value(c.shifts, c.measure)
     return cells, expr, span
 
 
