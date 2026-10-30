@@ -29,7 +29,10 @@
     {
       "step": 3,
       "name": "compile-expr",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-10-30T13:36:11+0900",
+      "completed_at": "2026-10-30T13:44:08+0900",
+      "summary": "backend/solver/compile.py: add_rule_hard(ctx, rule, lit)·add_rule_soft(ctx, rule)를 model.py의 HARD_ADDERS·SOFT_ADDERS(블록 ADDERS + rule)로 연결, 인스턴스는 evaluate.instances, 세는 칸은 evaluate에 새로 뺀 count_scope(아는 칸 목록, count_cells도 이것을 씀)를 공유. Cmp는 정수 범위 lo≤식≤hi(숫자·값은 왼쪽 단위, min 올림·max 내림, 세기끼리는 왼쪽−오른쪽 vs 0, 상수는 미리 판정); 칸 하나 개수 비교는 ctx.literal 캐시 리터럴, 그 밖은 when(양방향 reify)·then 또는(한 방향)에서만 bool 보조 변수; hard는 [lit, *when 리터럴]로 OnlyEnforceIf(when 그리고는 보조 변수 없이 enforcement 목록, 또는만 w 하나); soft는 비교 하나면 벗어난 양(soft._units, when이 있으면 enforcement 붙인 같은 식), 그리고/또는은 위반 bool 1, × PRIORITY_WEIGHTS; Balance는 hard.balance_exprs·spread_vars(max_gap ValueRef 해석, 내림)와 soft.add_balance 그대로. stats._preference_cells가 규칙도 셈(soft·period·person 범위·when 없음·한 사람(who.ids 또는 for_each.people.ids)·개수를 숫자·값과 비교, 0 이하/0과 같음이면 기피). 골든 동등성: blocks-cases 17 feasible 모두 rules_request로 OPTIMAL·목적값 같음·hard 위반 0, 기록 배정 hard 위반 0, infeasible 3개 conflict_ids가 변환 id→원 블록 id로 같음; 지금 골든에는 위반량 모양이 바뀌는 soft 블록(세기 min≠max, run.min_len)이 없어 목적값 비교 제외 케이스 없음(생기면 hard 위반 0만 보도록 테스트에 분기). test_compile 187개: 변환표 모양 28 + 새 식 18(조건부·짝 따로/같이·세기끼리·요일 조건부 순서·또는 when/그리고 then·시간·소수 값·음수 offset·period·창 날 거르기·hard/soft balance) × 모든 칸 고정 무작위 근무표 6개(이월 포함)에서 soft 목적값 = Σ 위반량×weight, hard 풀림 ⇔ 위반 없음; 자유 풀이에서 hard 위반 0·목적값 일치; 새 기능 5개 hard 풀이와 불가능 설정 시 core에 그 규칙 id; 블록·식 희망 반영 요약 같음. 전체 pytest 1203 통과, gen:golden --check·build·lint(기존 경고 1) 통과. 결정: hard·soft ADDERS 순환 import를 피하려고 model.py에서 dict를 합침; soft 고르게 목적값은 블록처럼 (최대−최소) 그대로(evaluate는 FAIRNESS_TOLERANCE 이하를 위반으로 나열하지 않아 컴파일=평가 테스트에서 고르게만 차이로 계산); gen_golden은 바꾸지 않음(동등성은 테스트에서 재풀이로 확인)."
     },
     {
       "step": 4,
