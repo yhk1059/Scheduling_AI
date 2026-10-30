@@ -3,7 +3,7 @@ import { expect, type Locator, type Page, test } from "@playwright/test";
 
 import { isWeekendDay, type PeriodRange, periodDays } from "../lib/period";
 import type { Ward, WorkPeriod } from "../lib/store";
-import { DEFAULT_CONFIG } from "../lib/migrate";
+import { DEFAULT_CONFIG, ruleShape } from "../lib/migrate";
 import type { ConstraintSpec, Days, People, ScheduleRequest, Shifts, TranslateResponse } from "../lib/types.gen";
 
 /** 근무 코드. 기본은 D/E/N/O이고 병동이 더한 코드(M, DE 등)도 온다. */
@@ -105,13 +105,13 @@ export function expectedHistory(grid: Grid, period: PeriodRange, holidays: numbe
   return out;
 }
 
-/** 휴가 모양 블록(고른 사람 × 날짜에 근무 없음)이면 사람마다 { nurse_id, days }. 아니면 빈 목록. */
+/** 휴가 모양 규칙(고른 사람 × 날짜에 근무 없음)이면 사람마다 { nurse_id, days }. 아니면 빈 목록. */
 export function leavesOf(c: ConstraintSpec): { nurse_id: string; days: number[] }[] {
-  if (c.type !== "count") return [];
-  const p = c.params;
-  const ids = p.people?.ids;
-  if (p.per !== "person" || p.max !== 0 || !p.shifts.not_in?.includes("O") || !ids?.length || !p.days?.days) return [];
-  return ids.map((nurse_id) => ({ nurse_id, days: p.days!.days! }));
+  const p = ruleShape(c);
+  if (p?.kind !== "count") return [];
+  const ids = p.people.ids;
+  if (p.per !== "person" || p.max?.n !== 0 || !p.shifts.not_in?.includes("O") || !ids?.length || !p.days.days) return [];
+  return ids.map((nurse_id) => ({ nurse_id, days: p.days.days! }));
 }
 
 /** 한 사람의 휴가 모양 블록이면 { nurse_id, days }. */
@@ -122,7 +122,8 @@ export function leaveOf(c: ConstraintSpec): { nurse_id: string; days: number[] }
 
 /**
  * /solve 요청의 hard 제약(꺼진 것 제외)을 근무표에 대어 위반을 모은다. 솔버와 따로 구현한 검사다.
- * 블록은 세기(날마다·사람마다, 개수), 순서(금지 패턴·최대 연속·끝난 뒤 휴무), 칸 고정만 본다. 그 밖의 모양은 검사하지 않는다.
+ * 식 규칙은 변환표의 블록 모양(ruleShape)으로 읽어 세기(날마다·사람마다, 개수), 순서(금지 패턴·최대 연속·끝난 뒤 휴무)와
+ * 칸 고정만 본다. 그 밖의 모양(조건부·짝 등)은 검사하지 않는다.
  * 순서 규칙은 지난 근무 마지막 며칠(carry_over)을 앞에 붙여 근무표 경계도 본다.
  */
 export function hardViolations(req: ScheduleRequest, grid: Grid): string[] {
@@ -169,49 +170,57 @@ export function hardViolations(req: ScheduleRequest, grid: Grid): string[] {
   const outOfRange = (v: number, min?: number | null, max?: number | null) => (min != null && v < min) || (max != null && v > max);
 
   for (const c of constraints) {
-    if (c.enabled === false || (c.hardness ?? (c.type === "balance" ? "soft" : "hard")) !== "hard") continue;
+    const balance = c.type === "rule" && c.body.kind === "balance";
+    if (c.enabled === false || (c.hardness ?? (balance ? "soft" : "hard")) !== "hard") continue;
     const tag = `${c.type} "${c.source_text}"`;
-    switch (c.type) {
+    if (c.type === "fixed_assignment") {
+      if (rows.get(c.params.nurse_id)?.[c.params.day - 1] !== c.params.shift)
+        out.push(`${tag}: ${name(c.params.nurse_id)} ${c.params.day}일`);
+      continue;
+    }
+    const p = ruleShape(c);
+    switch (p?.kind) {
       case "count": {
-        const p = c.params;
-        if ((p.measure ?? "count") !== "count") break;
+        if (p.measure !== "count") break;
         const ids = people(p.people);
         const dayList = pdays.map((x) => x.day).filter((d) => dayOk(d, p.days));
         const hit = (id: string, d: number) => matches(rows.get(id)?.[d - 1] ?? "O", p.shifts);
         if (p.per === "day") {
           for (const d of dayList) {
             const count = ids.filter((id) => hit(id, d)).length;
-            if (outOfRange(count, p.min, p.max)) out.push(`${tag}: ${d}일 ${count}명`);
+            if (outOfRange(count, p.min?.n, p.max?.n)) out.push(`${tag}: ${d}일 ${count}명`);
           }
         } else if (p.per === "person") {
           for (const id of ids) {
             const count = dayList.filter((d) => hit(id, d)).length;
-            if (outOfRange(count, p.min, p.max)) out.push(`${tag}: ${name(id)} ${count}일`);
+            if (outOfRange(count, p.min?.n, p.max?.n)) out.push(`${tag}: ${name(id)} ${count}일`);
           }
         }
         break;
       }
-      case "sequence": {
-        const p = c.params;
+      case "forbid":
+      case "max_run":
+      case "off_after": {
         for (const id of people(p.people)) {
           const ext = extended.get(id);
           if (!ext) continue;
           const { row: r, offset } = ext;
-          for (const pattern of p.forbid ?? []) {
+          if (p.kind === "forbid") {
+            const pattern = p.pattern;
             for (let i = Math.max(0, offset - pattern.length + 1); i + pattern.length <= r.length; i++)
               if (pattern.every((sel, k) => matches(r[i + k], sel))) out.push(`${tag}: ${name(id)} ${i - offset + 1}일부터`);
           }
-          if (p.run && p.max_len != null) {
+          if (p.kind === "max_run") {
             let cur = 0;
             for (const code of r) {
               cur = matches(code, p.run) ? cur + 1 : 0;
-              if (cur > p.max_len) {
+              if (cur > p.max_len.n) {
                 out.push(`${tag}: ${name(id)}`);
                 break;
               }
             }
           }
-          if (p.after && p.then_off != null) {
+          if (p.kind === "off_after") {
             for (let i = 0; i + 1 < r.length; i++) {
               if (!matches(r[i], p.after) || matches(r[i + 1], p.after)) continue;
               for (let k = 1; k <= p.then_off && i + k < r.length; k++)
@@ -222,10 +231,6 @@ export function hardViolations(req: ScheduleRequest, grid: Grid): string[] {
         }
         break;
       }
-      case "fixed_assignment":
-        if (rows.get(c.params.nurse_id)?.[c.params.day - 1] !== c.params.shift)
-          out.push(`${tag}: ${name(c.params.nurse_id)} ${c.params.day}일`);
-        break;
     }
   }
   return out;

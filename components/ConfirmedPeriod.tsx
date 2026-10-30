@@ -74,7 +74,7 @@ export default function ConfirmedPeriod() {
     try {
       const res = await translate({ text: input, scope: "period", context: { config: ward.config, nurses, period: range, holidays, today: today() } });
       if (res.status === "ok") {
-        addPendingRequests(periodId, res.constraints);
+        addPendingRequests(periodId, res.constraints, res.examples);
         setChangeIds((ids) => [...ids, ...res.constraints.map((c) => c.id)]);
         return null;
       }

@@ -3,6 +3,7 @@
 // LLM 해석은 흔들릴 수 있어 카드 문장은 핵심 낱말만 본다.
 import { type BrowserContext, expect, type Page, test } from "@playwright/test";
 
+import { ruleShape } from "../lib/migrate";
 import type { PeriodRange } from "../lib/period";
 import type { ScheduleRequest } from "../lib/types.gen";
 import {
@@ -140,9 +141,10 @@ test("S14. 근무 형태(미드 추가, 더블)와 태그 배치 규칙", async 
   const doubles = (body.config_changes ?? []).filter((c) => c.action === "add" && [...(c.shift.parts ?? [])].sort().join() === "D,E");
   expect(doubles, "D와 E를 세는 더블 코드 추가").toHaveLength(1);
   const dCode = doubles[0].shift.code;
-  const limits = body.constraints.filter(
-    (c) => c.type === "count" && c.params.per === "person" && c.params.shifts.in?.includes(dCode) && c.params.max === 2,
-  );
+  const limits = body.constraints.filter((c) => {
+    const s = ruleShape(c);
+    return s?.kind === "count" && s.per === "person" && s.shifts.in?.includes(dCode) && s.max?.n === 2;
+  });
   expect(limits, `${dCode} 사람마다 2번까지`).toHaveLength(1);
   test.info().annotations.push({ type: "더블 코드", description: dCode });
 
@@ -159,20 +161,24 @@ test("S14. 근무 형태(미드 추가, 더블)와 태그 배치 규칙", async 
   const { ward: afterDouble } = await readState(page);
   const added = afterDouble.config.shifts.find((s) => s.code === dCode);
   expect([...(added?.parts ?? [])].sort(), "더블이 데이·이브닝으로 센다").toEqual(["D", "E"]);
-  expect(afterDouble.rules.some((r) => r.id === limits[0].id || (r.type === "count" && r.params.shifts.in?.includes(dCode)))).toBe(
-    true,
-  );
+  expect(
+    afterDouble.rules.some((r) => {
+      const s = ruleShape(r);
+      return r.id === limits[0].id || (s?.kind === "count" && s.shifts.in?.includes(dCode));
+    }),
+  ).toBe(true);
 
   // 태그 배치 규칙: 책임 태그가 매일 데이에 1명 이상
   const tagText = "책임 간호사는 매일 데이에 1명 이상 있어야 해";
   const tagCards = await interpretOk(page, RULE_INPUT, "규칙 만들기", tagText);
   expect(tagCards.length).toBeGreaterThan(0);
   for (const c of tagCards) {
-    expect(c.type).toBe("count");
-    if (c.type === "count") {
-      expect(c.params.people?.tags, "책임 태그 대상").toEqual(["책임"]);
-      expect(c.params.min).toBe(1);
-      expect(c.params.shifts.in).toContain("D");
+    const s = ruleShape(c);
+    expect(s?.kind).toBe("count");
+    if (s?.kind === "count") {
+      expect(s.people.tags, "책임 태그 대상").toEqual(["책임"]);
+      expect(s.min?.n).toBe(1);
+      expect(s.shifts.in).toContain("D");
     }
   }
   await expect(pendingCards(page).first()).toContainText("책임");

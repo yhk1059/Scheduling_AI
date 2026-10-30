@@ -141,8 +141,8 @@ export default function RulesStep({ scope, pendingNote = true }: { scope: "ward"
         context: { config: ward.config, nurses, period: range, holidays, today: today() },
       });
       if (res.status === "ok") {
-        if (scope === "ward") addPendingRules(res.constraints, res.config_changes ?? []);
-        else addPendingRequests(period!.id, res.constraints);
+        if (scope === "ward") addPendingRules(res.constraints, res.config_changes ?? [], res.examples);
+        else addPendingRequests(period!.id, res.constraints, res.examples);
         setText("");
       } else if (res.status === "clarify") {
         setNotice({ kind: "clarify", text: res.question });

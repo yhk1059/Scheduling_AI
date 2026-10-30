@@ -1,6 +1,6 @@
 "use client";
 
-import { type Code, coverageCodes, coverageRule, type DayKind, useAppStore } from "@/lib/store";
+import { type Code, coverageCodes, coverageRange, type DayKind, useAppStore } from "@/lib/store";
 
 import { ui } from "./ui";
 
@@ -32,8 +32,8 @@ export default function CoverageForm({
   }));
 
   const stored = (shift: Shift, kind: DayKind) => {
-    const p = coverageRule(constraints, shift, kind)?.params;
-    return p ? { min: p.min ?? 0, max: p.max ?? p.min ?? 0 } : null;
+    const r = coverageRange(constraints, shift, kind);
+    return r ? { min: r.min, max: r.max ?? r.min } : null;
   };
   // 예전에 범위(최소~최대)로 저장한 값은 그대로 보여 주고, 고치면 숫자 하나로 바뀐다
   const shown = (shift: Shift, kind: DayKind) => {

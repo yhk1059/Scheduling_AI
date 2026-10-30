@@ -14,7 +14,19 @@ import {
   rosterChanges,
   sameCarryOver,
 } from "./continuity";
-import { DEFAULT_CONFIG, migrateV4, nightOnlyRule, normalizeBlock, OFF_CODE, type Priority } from "./migrate";
+import {
+  blockToRules,
+  COVERAGE_RULE_PREFIX,
+  DEFAULT_CONFIG,
+  nightOnlyRule,
+  normalizeRule,
+  OFF_CODE,
+  ruleShape,
+  stableJson,
+  STORAGE_VERSION,
+  upgradeDoc,
+  type Priority,
+} from "./migrate";
 import {
   dateOfDay,
   dayOfDate,
@@ -30,11 +42,13 @@ import {
 import { deleteWard, loadWard, saveWard, supabaseConfigured, type AuthUser } from "./supabase";
 import type {
   CarryOverRow,
+  Count,
   ConstraintChange,
   ConstraintSpec,
-  CountRule,
   DiffCell,
   Nurse,
+  Rule,
+  RuleExample,
   ScheduleRequest,
   ScheduleResult,
   ShiftChange,
@@ -43,7 +57,6 @@ import type {
 } from "./types.gen";
 
 export const STORAGE_KEY = "nurse-scheduler";
-const STORAGE_VERSION = 5;
 const COVERAGE_SOURCE_TEXT = "필요 인원 설정";
 export const MAX_SHIFT_CODES = 8; // backend/domain/constants.py MAX_SHIFT_CODES
 export const MAX_TAGS_PER_NURSE = 5; // backend/domain/constants.py MAX_TAGS_PER_NURSE
@@ -55,10 +68,10 @@ export type Assignments = ScheduleResult["assignments"];
 export type Hardness = "hard" | "soft";
 /** 근무 코드. 병동 근무 형태(config)가 정한다 */
 export type Code = string;
+/** 카드 [반드시/가능하면]·중요도. 값은 setRuleValue·setRequestValue로 바꾼다. */
 export interface CardPatch {
   hardness?: Hardness;
   priority?: Priority;
-  params?: ConstraintSpec["params"];
 }
 
 export interface WardNurse extends Nurse {
@@ -83,7 +96,7 @@ export interface Ward {
   nurses: WardNurse[];
   /** 다음에 부여할 번호. 줄어들지 않는다 */
   nextNurseNo: number;
-  /** scope "ward". 필요 인원(세기 블록 cov-*)도 여기 */
+  /** scope "ward". 필요 인원(기본 규칙 cov-*)도 여기 */
   rules: ConstraintSpec[];
   pendingRules: ConstraintSpec[];
   /** 적용 대기 중인 설정 변경 카드 */
@@ -92,6 +105,10 @@ export interface Ward {
   unconverted: { source_text: string }[];
   /** 카드 표시 순서(새 카드가 앞). 적용해도 바뀌지 않는다. 옛 저장본에는 없다 */
   cardOrder?: string[];
+  /** 처음 설정 ② 병동 소개에서 [다음]을 한 번 눌렀다 */
+  introSeen: boolean;
+  /** 규칙 카드 id → 예시 판정(translate 응답). 카드에 한 번만 두고 요청 본문에는 넣지 않는다 */
+  examples?: Record<string, RuleExample[]>;
 }
 
 export interface PeriodVersion {
@@ -128,6 +145,8 @@ export interface WorkPeriod extends PeriodRange {
   versions: PeriodVersion[];
   /** 확정 시점의 명단·병동 규칙 */
   snapshot: { nurses: WardNurse[]; rules: ConstraintSpec[] } | null;
+  /** 요청 카드 id → 예시 판정(translate 응답) */
+  examples?: Record<string, RuleExample[]>;
 }
 
 export type SetupStep = 1 | 2 | 3;
@@ -177,8 +196,10 @@ export interface AppState extends Data {
   startWard: () => void;
   setWardName: (name: string) => void;
   setUnit: (unit: PeriodUnit) => void;
-  /** 필요 인원: 세기 블록(날마다, 평일/주말·공휴일, 그 코드, 정확히 min~max). */
-  setCoverage: (code: Code, dayKind: DayKind, min: number, max: number) => void;
+  /** 필요 인원 기본 규칙(날마다, 평일/주말·공휴일, 그 코드, min 이상·max 이하, 같으면 정확히, max null이면 이상). */
+  setCoverage: (code: Code, dayKind: DayKind, min: number, max: number | null) => void;
+  /** 처음 설정 ② 병동 소개에서 [다음]을 눌렀다. */
+  markIntroSeen: () => void;
   // 근무 형태
   /** 코드의 이름·시간·시작 시각·세는 근무조를 바꾼다. O는 바꾸지 않는다. */
   setShift: (code: Code, patch: Partial<Omit<ShiftDef, "code" | "active">>) => void;
@@ -190,13 +211,15 @@ export interface AppState extends Data {
   removeShift: (code: Code) => void;
   /** 옮기지 못한 옛 규칙 원문 하나를 목록에서 지운다(다시 입력한 뒤). */
   dismissUnconverted: (index: number) => void;
-  /** 대기 카드를 더한다. changes는 설정 변경 카드가 되고, 새 코드를 쓰는 규칙 카드가 거기에 딸린다. */
-  addPendingRules: (cards: ConstraintSpec[], changes?: ShiftChange[]) => void;
+  /** 대기 카드를 더한다. changes는 설정 변경 카드가 되고, 새 코드를 쓰는 규칙 카드가 거기에 딸린다. examples는 카드 id별 예시 판정. */
+  addPendingRules: (cards: ConstraintSpec[], changes?: ShiftChange[], examples?: Record<string, RuleExample[]>) => void;
   /** 규칙 카드: 딸린 설정 카드도 함께 적용한다. 설정 카드: 근무 형태만 바꾼다. */
   applyRule: (id: string) => void;
   /** 대기 카드는 그대로, 적용된 규칙은 inputVersion을 올리며 바꾼다. */
   updateRule: (id: string, patch: CardPatch) => void;
-  /** 설정 카드를 지우면 딸린 대기 규칙 카드도 지운다. */
+  /** 조정 가능한 값 하나를 바꾼다. 이름이 없거나 값이 0보다 작으면 아무것도 하지 않는다. */
+  setRuleValue: (id: string, name: string, value: number) => void;
+  /** 설정 카드를 지우면 딸린 대기 규칙 카드도 지운다. 기본 규칙은 지우지 않고 끈다. */
   removeRule: (id: string) => void;
   // 명단
   addNurses: (rows: NurseRow[]) => void;
@@ -217,13 +240,14 @@ export interface AppState extends Data {
   postponeStart: (periodId: string, date: string) => boolean;
   toggleHoliday: (periodId: string, day: number) => void;
   setCarryOver: (periodId: string, rows: CarryOverRow[]) => void;
-  addPendingRequests: (periodId: string, cards: ConstraintSpec[]) => void;
+  addPendingRequests: (periodId: string, cards: ConstraintSpec[], examples?: Record<string, RuleExample[]>) => void;
   applyRequest: (periodId: string, id: string) => void;
   updateRequest: (periodId: string, id: string, patch: CardPatch) => void;
+  setRequestValue: (periodId: string, id: string, name: string, value: number) => void;
   removeRequest: (periodId: string, id: string) => void;
   /** 이 기간의 disabledIds만 바꾼다. 병동 규칙·요청 원본은 그대로 둔다. */
   setDisabled: (periodId: string, constraintId: string, disabled: boolean) => void;
-  /** 검증된 제안: disable → disabledIds, update → 요청은 직접, 병동 규칙은 ruleOverrides. */
+  /** 검증된 제안: disable → disabledIds, set_value·set_hardness → 요청은 직접, 병동 규칙은 ruleOverrides. */
   applyChanges: (periodId: string, changes: ConstraintChange[]) => void;
   /** 그 칸의 기존 고정 배정을 지우고 수동 고정 제약을 추가한다. */
   setFixed: (periodId: string, nurseId: string, day: number, shift: Code) => void;
@@ -258,6 +282,7 @@ function emptyWard(): Ward {
     pendingRules: [],
     pendingConfig: [],
     unconverted: [],
+    introSeen: false,
   };
 }
 
@@ -282,41 +307,57 @@ function newPeriod(range: PeriodRange): WorkPeriod {
 
 const nurseId = (no: number) => `n${String(no).padStart(2, "0")}`;
 
-/** 휴가 모양: 한 사람 × 날짜에 근무 없음(per=person, not_in [O], max 0). 항상 hard로 다룬다. */
+/** 휴가 모양: 한 사람 × 날짜에 근무 없음(per=person, not_in [O], 0번). 항상 hard로 다룬다. */
 export function isLeaveRule(c: ConstraintSpec): boolean {
   // 가능하면이면 휴가가 아니라 휴무 희망이다(휴가는 항상 반드시)
-  if (c.type !== "count" || (c.hardness ?? "hard") !== "hard") return false;
-  const p = c.params;
+  const s = ruleShape(c);
+  if (s?.kind !== "count" || (c.hardness ?? "hard") !== "hard") return false;
   return (
-    p.per === "person" &&
-    (p.measure ?? "count") === "count" &&
-    p.people?.ids?.length === 1 &&
-    p.shifts.not_in?.length === 1 &&
-    p.shifts.not_in[0] === OFF_CODE &&
-    p.max === 0 &&
-    (p.min ?? null) === null
+    s.per === "person" &&
+    s.measure === "count" &&
+    s.people.ids?.length === 1 &&
+    s.shifts.not_in?.length === 1 &&
+    s.shifts.not_in[0] === OFF_CODE &&
+    s.max?.n === 0 &&
+    !s.min
   );
 }
 
-/** 필요 인원 모양: 병동 규칙, 날마다 모든 사람, 평일 또는 주말·공휴일, 코드 하나의 개수. */
-export function isCoverageRule(c: ConstraintSpec): c is CountRule {
-  if (c.type !== "count" || c.scope !== "ward") return false;
-  const { people = {}, days = {}, shifts, per, measure = "count" } = c.params;
+/** 필요 인원 폼 모양: 병동 규칙, 날마다 모든 사람, 평일 또는 주말·공휴일, 코드 하나의 개수. 그 (코드, 요일 종류). */
+function coverageKey(c: ConstraintSpec): { code: Code; kind: DayKind; min: number; max: number | null } | null {
+  const s = ruleShape(c);
+  if (c.scope !== "ward" || s?.kind !== "count") return null;
+  const { people, days, shifts } = s;
   const noPeople = !people.ids && !people.tags && !people.exclude_tags?.length && people.min_years == null && people.max_years == null;
-  return (
-    per === "day" &&
-    measure === "count" &&
+  const ok =
+    s.per === "day" &&
+    s.measure === "count" &&
     noPeople &&
     (days.kind === "weekday" || days.kind === "weekend") &&
     !days.weekdays &&
     !days.days &&
-    shifts.in?.length === 1
-  );
+    shifts.in?.length === 1;
+  return ok ? { code: shifts.in![0], kind: days.kind as DayKind, min: s.min?.n ?? 0, max: s.max?.n ?? null } : null;
 }
 
-/** 필요 인원 규칙(코드·요일 종류). */
-export function coverageRule(rules: ConstraintSpec[], code: Code, kind: DayKind): CountRule | undefined {
-  return rules.find((c): c is CountRule => isCoverageRule(c) && c.params.shifts.in![0] === code && c.params.days!.kind === kind);
+/** 필요 인원 모양(폼에 나오는 규칙). */
+export function isCoverageRule(c: ConstraintSpec): boolean {
+  return coverageKey(c) !== null;
+}
+
+/** 필요 인원 규칙(코드·요일 종류). 폼 모양이 아닌 규칙(토요일만 등)은 찾지 않는다. */
+export function coverageRule(rules: ConstraintSpec[], code: Code, kind: DayKind): ConstraintSpec | undefined {
+  return rules.find((c) => {
+    const k = coverageKey(c);
+    return k?.code === code && k.kind === kind;
+  });
+}
+
+/** 필요 인원 폼 한 칸의 범위(최소, 최대 또는 null = 이상). 폼 모양 규칙이 없으면 null. */
+export function coverageRange(rules: ConstraintSpec[], code: Code, kind: DayKind): { min: number; max: number | null } | null {
+  const c = coverageRule(rules, code, kind);
+  const k = c ? coverageKey(c) : null;
+  return k && { min: k.min, max: k.max };
 }
 
 /** 필요 인원 폼의 행: 활성 기본 코드(복합·휴무 제외). */
@@ -324,30 +365,18 @@ export function coverageCodes(config: WardConfig): ShiftDef[] {
   return config.shifts.filter((s) => s.active !== false && !s.parts?.length && s.code !== OFF_CODE);
 }
 
-/** 키를 정렬한 JSON(교체 기준 비교용). */
-function stableJson(v: unknown): string {
-  if (Array.isArray(v)) return `[${v.map(stableJson).join(",")}]`;
-  if (v && typeof v === "object") {
-    return `{${Object.keys(v)
-      .sort()
-      .map((k) => `${JSON.stringify(k)}:${stableJson((v as Record<string, unknown>)[k])}`)
-      .join(",")}}`;
-  }
-  return JSON.stringify(v);
-}
-
 const BOUND_KEYS = ["min", "max", "min_len", "max_len", "then_off", "max_gap"];
 
 /**
- * 교체 기준: 같은 type·scope와, 수(min·max·길이·휴무 일수·차이)를 뺀 같은 params.
+ * 교체 기준: 같은 scope와, 수(최소·최대·길이·휴무 일수·차이)를 뺀 같은 블록 모양. 블록 모양이 아니면 같은 식 본문.
  * 칸 고정은 같은 칸(nurse_id·day). 휴가는 날짜별 요청이 공존해야 하므로 교체하지 않는다(null).
  */
 function replaceKey(c: ConstraintSpec): string | null {
   if (c.type === "fixed_assignment") return `${c.type}|${c.scope}|${c.params.nurse_id}@${c.params.day}`;
   if (isLeaveRule(c)) return null;
-  const n = normalizeBlock(c);
-  const shape = Object.fromEntries(Object.entries(n.params).filter(([k]) => !BOUND_KEYS.includes(k)));
-  return `${n.type}|${n.scope}|${stableJson(shape)}`;
+  const shape = ruleShape(c);
+  if (shape) return `shape|${c.scope}|${stableJson(Object.fromEntries(Object.entries(shape).filter(([k]) => !BOUND_KEYS.includes(k))))}`;
+  return `rule|${c.scope}|${stableJson((normalizeRule(c) as Rule).body)}`;
 }
 
 function upsert(list: ConstraintSpec[], card: ConstraintSpec): ConstraintSpec[] {
@@ -381,43 +410,76 @@ export function findReplaced(constraints: ConstraintSpec[], card: ConstraintSpec
 }
 
 function patched(c: ConstraintSpec, patch: CardPatch): ConstraintSpec {
-  const next = { ...c, ...(patch.params !== undefined && { params: patch.params }) } as ConstraintSpec;
-  if (next.type === "fixed_assignment") return next;
-  return normalizeBlock({
-    ...next,
+  if (c.type === "fixed_assignment") return c;
+  return normalizeRule({
+    ...c,
     ...(patch.hardness !== undefined && !isLeaveRule(c) && { hardness: patch.hardness }),
     ...(patch.priority !== undefined && { priority: patch.priority }),
-  } as ConstraintSpec);
+  });
 }
 
-/** 제안의 update는 params 최상위 키 단위로 바꾼다(셀렉터는 통째로). */
-function changePatch(ch: ConstraintChange, c: ConstraintSpec): CardPatch {
-  return {
-    ...(ch.params && { params: { ...c.params, ...ch.params } as ConstraintSpec["params"] }),
-    ...(ch.hardness && { hardness: ch.hardness }),
-  };
+/**
+ * 조정 가능한 값 하나를 바꾼 규칙. 이름이 없거나 값이 0보다 작거나 수가 아니면 null.
+ * 최대 연속(창 = 값 + 1)은 창 길이도 함께 바꾼다(창 2~14일이 아니면 null).
+ */
+export function withRuleValue(c: ConstraintSpec, name: string, value: number): ConstraintSpec | null {
+  if (c.type !== "rule" || !c.values?.[name] || !Number.isFinite(value) || value < 0) return null;
+  let next: Rule = { ...c, values: { ...c.values, [name]: { ...c.values[name], value } } };
+  const shape = ruleShape(c);
+  if (shape?.kind === "max_run" && shape.max_len.name === name && c.body.kind === "require") {
+    if (!Number.isInteger(value) || value < 1 || value > 13) return null;
+    next = { ...next, body: { ...c.body, for_each: { ...c.body.for_each, window: value + 1 } } };
+  }
+  return normalizeRule(next);
+}
+
+/** 검증된 제안 변경 하나(set_value·set_hardness)를 규칙에 반영한다. 반영할 수 없으면 그대로. */
+function changed(c: ConstraintSpec, ch: ConstraintChange): ConstraintSpec {
+  if (ch.action === "set_value") return withRuleValue(c, ch.name ?? "", ch.value ?? -1) ?? c;
+  if (ch.action === "set_hardness" && ch.hardness) return patched(c, { hardness: ch.hardness });
+  return c;
+}
+
+/** 카드 예시를 더한다(예시가 있는 카드만). */
+function withExamples(
+  map: Record<string, RuleExample[]> | undefined,
+  cards: ConstraintSpec[],
+  examples: Record<string, RuleExample[]>,
+): Record<string, RuleExample[]> | undefined {
+  const add = cards.filter((c) => examples[c.id]?.length).map((c) => [c.id, examples[c.id]] as const);
+  return add.length ? { ...map, ...Object.fromEntries(add) } : map;
+}
+
+/** 카드 예시를 지운다. */
+function withoutExamples(map: Record<string, RuleExample[]> | undefined, ids: string[]): Record<string, RuleExample[]> | undefined {
+  if (!map || !ids.some((id) => id in map)) return map;
+  return Object.fromEntries(Object.entries(map).filter(([id]) => !ids.includes(id)));
 }
 
 function isFixedCell(c: ConstraintSpec, nurseId: string, day: number): boolean {
   return c.type === "fixed_assignment" && c.params.nurse_id === nurseId && c.params.day === day;
 }
 
-/** 제약이 직접 가리키는 간호사 id(칸 고정의 nurse_id, 블록의 people.ids). */
-function refNurses(c: ConstraintSpec): string[] {
-  return c.type === "fixed_assignment" ? [c.params.nurse_id] : (c.params.people?.ids ?? []);
+/** 규칙의 모든 세기(비교 양쪽). */
+function ruleCounts(r: Rule): Count[] {
+  if (r.body.kind === "balance") return [];
+  const cmps = [r.body.when, r.body.then].flatMap((c) => (!c ? [] : "all" in c ? c.all : "any" in c ? c.any : [c]));
+  return cmps.flatMap((c) => [c.left, ...(typeof c.right === "object" && "shifts" in c.right ? [c.right] : [])]);
+}
+
+/** 제약이 직접 가리키는 간호사 id(칸 고정의 nurse_id, 규칙의 범위·세기·고르게 사람 셀렉터의 ids). */
+export function refNurses(c: ConstraintSpec): string[] {
+  if (c.type === "fixed_assignment") return [c.params.nurse_id];
+  const people = c.body.kind === "balance" ? [c.body.people] : [c.body.for_each.people, ...ruleCounts(c).map((n) => n.who)];
+  return people.flatMap((p) => p?.ids ?? []);
 }
 
 /** 제약이 직접 적은 근무 코드. */
 export function ruleCodes(c: ConstraintSpec): Code[] {
   const sel = (x: { in?: string[] | null; not_in?: string[] | null } | null | undefined) => [...(x?.in ?? []), ...(x?.not_in ?? [])];
-  switch (c.type) {
-    case "fixed_assignment":
-      return [c.params.shift];
-    case "sequence":
-      return [...(c.params.forbid ?? []).flat().flatMap(sel), ...sel(c.params.run), ...sel(c.params.after)];
-    default:
-      return sel(c.params.shifts);
-  }
+  if (c.type === "fixed_assignment") return [c.params.shift];
+  if (c.body.kind === "balance") return sel(c.body.shifts);
+  return ruleCounts(c).flatMap((n) => sel(n.shifts));
 }
 
 /** 근무 형태에 설정 변경 하나를 반영한다. 추가는 O 앞에, 수정은 같은 코드 자리에. */
@@ -470,17 +532,16 @@ export function toScheduleRequest(
   const ids = new Set(activeIds);
   const liveCoverage = new Set(coverageCodes(ward.config).map((s) => s.code));
   const locks = isOperating(period, today) ? pastDayLocks(period, active, today) : [];
-  const locked = new Set(locks.map((c) => `${refNurses(c)[0]}@${(c.params as { day: number }).day}`));
+  const locked = new Set(locks.map((c) => `${c.params.nurse_id}@${c.params.day}`));
   const constraints = [...rules.map((r) => period.ruleOverrides[r.id] ?? r), ...period.requests]
     .filter((c) => refNurses(c).every((id) => ids.has(id)))
     // 지난 날짜 잠금이 같은 칸의 수동 고정보다 우선한다
     .filter((c) => !(c.type === "fixed_assignment" && locked.has(`${c.params.nurse_id}@${c.params.day}`)))
     // 필요 인원 폼에 행이 없는 코드(꺼진 코드)의 필요 인원은 지킬 수 없으므로 끈다
-    .map((c) =>
-      period.disabledIds.includes(c.id) || (isCoverageRule(c) && !liveCoverage.has(c.params.shifts.in![0]))
-        ? { ...c, enabled: false }
-        : c,
-    );
+    .map((c) => {
+      const cov = coverageKey(c);
+      return period.disabledIds.includes(c.id) || (cov && !liveCoverage.has(cov.code)) ? { ...c, enabled: false } : c;
+    });
   const previous = period.result
     ? Object.fromEntries(Object.entries(period.result.assignments).filter(([id]) => ids.has(id)))
     : null;
@@ -557,15 +618,15 @@ export function hasCoverage(ward: Ward): boolean {
   );
 }
 
-/** 활성 명단과 필요 인원이 모두 있어야 기간을 만들 수 있다. */
+/** 활성 간호사가 있으면 근무표를 만들 수 있다(필요 인원은 필수가 아니다, ADR-019). */
 export function isWardReady(ward: Ward): boolean {
-  return ward.nurses.some((n) => n.active) && hasCoverage(ward);
+  return ward.nurses.some((n) => n.active);
 }
 
-/** 처음 설정에서 아직 못 끝낸 첫 단계: 명단 없음 → ①, 필요 인원 없음 → ②, 그 밖 → ③. */
+/** 처음 설정에서 아직 못 끝낸 첫 단계: 명단 없음 → ①, ② 병동 소개를 한 번도 지나지 않음 → ②, 그 밖 → ③. */
 export function setupStep(ward: Ward): SetupStep {
   if (!ward.nurses.some((n) => n.active)) return 1;
-  return hasCoverage(ward) ? 3 : 2;
+  return ward.introSeen ? 3 : 2;
 }
 
 /** 근무표를 열 때의 화면: 확정 → 확정 근무표, 결과 있음 → 작성 ②, 그 밖 → 작성 ①. */
@@ -839,7 +900,7 @@ export function createAppStore(getStorage: () => Storage, now: () => Date = () =
             if (row) {
               // 서버 우선
               const d = row.data as { version?: unknown; state?: unknown } | null;
-              const state = d?.version === STORAGE_VERSION ? d.state : d?.version === 4 ? migrateV4(d.state, localDate(now())) : null;
+              const state = typeof d?.version === "number" ? upgradeDoc(d.state, d.version, localDate(now())) : null;
               const ok = isData(state);
               replace(ok ? loaded(state) : initialData(), {
                 sync: { status: "saved", savedAt: row.updatedAt },
@@ -880,21 +941,24 @@ export function createAppStore(getStorage: () => Storage, now: () => Date = () =
           startWard: () => bump({ ward: emptyWard(), periods: [], view: { screen: "setup", step: 1 } }),
           setWardName: (name) => editWard((w) => ({ ...w, name })),
           setUnit: (unit) => editWard((w) => ({ ...w, unit })),
-          setCoverage: (code, dayKind, min, max) =>
-            editWard((w) => ({
-              ...w,
-              rules: upsert(
-                w.rules,
-                normalizeBlock({
-                  id: `cov-${dayKind}-${code}`,
-                  type: "count",
-                  scope: "ward",
-                  hardness: "hard",
-                  source_text: COVERAGE_SOURCE_TEXT,
-                  params: { days: { kind: dayKind }, shifts: { in: [code] }, per: "day", min, max },
-                }),
-              ),
-            })),
+          setCoverage: (code, dayKind, min, max) => {
+            if (!(min >= 0) || (max !== null && !(max >= min))) return;
+            editWard((w) => {
+              // 폼 모양의 같은 칸 규칙을 제자리에서 바꾼다(id는 그대로)
+              const old = coverageRule(w.rules, code, dayKind);
+              const [rule] = blockToRules({
+                id: `${COVERAGE_RULE_PREFIX}${dayKind}-${code}`,
+                type: "count",
+                scope: "ward",
+                hardness: "hard",
+                source_text: COVERAGE_SOURCE_TEXT,
+                params: { days: { kind: dayKind }, shifts: { in: [code] }, per: "day", min, max },
+              });
+              const card = { ...rule, ...(old && { id: old.id }), default: true } as ConstraintSpec;
+              return { ...w, rules: old ? w.rules.map((c) => (c === old ? card : c)) : [...w.rules, card] };
+            });
+          },
+          markIntroSeen: () => editWard((w) => (w.introSeen ? w : { ...w, introSeen: true }), false),
           setShift: (code, patch) => {
             if (code === OFF_CODE) return;
             editShifts((shifts) => shifts.map((s) => (s.code === code ? { ...s, ...patch } : s)));
@@ -922,9 +986,9 @@ export function createAppStore(getStorage: () => Storage, now: () => Date = () =
           },
           dismissUnconverted: (index) =>
             editWard((w) => ({ ...w, unconverted: w.unconverted.filter((_, i) => i !== index) }), false),
-          addPendingRules: (cards, changes = []) =>
+          addPendingRules: (cards, changes = [], examples = {}) =>
             editWard((w) => {
-              const blocks = cards.map(normalizeBlock);
+              const blocks = cards.map(normalizeRule);
               const taken = new Set(w.pendingConfig.map((c) => c.id));
               const configCards = changes.map((change): ShiftChangeCard => {
                 const base = `cfg-${change.shift.code}`;
@@ -946,6 +1010,7 @@ export function createAppStore(getStorage: () => Storage, now: () => Date = () =
                 pendingRules: [...w.pendingRules, ...blocks],
                 pendingConfig: [...w.pendingConfig, ...configCards],
                 cardOrder: prependOrder(w.cardOrder, [...configCards, ...blocks]),
+                examples: withExamples(w.examples, blocks, examples),
               };
             }, false),
           applyRule: (id) => {
@@ -960,7 +1025,13 @@ export function createAppStore(getStorage: () => Storage, now: () => Date = () =
             const parent = ward!.pendingConfig.find((c) => c.ruleIds.includes(id));
             editWard((w) => {
               const next = parent ? withConfigCard(w, parent) : w;
-              return { ...next, pendingRules: next.pendingRules.filter((c) => c.id !== id), rules: upsert(next.rules, card) };
+              const replaced = findReplaced(next.rules, card);
+              return {
+                ...next,
+                pendingRules: next.pendingRules.filter((c) => c.id !== id),
+                rules: upsert(next.rules, card),
+                examples: withoutExamples(next.examples, replaced ? [replaced.id] : []),
+              };
             });
           },
           updateRule: (id, patch) => {
@@ -971,6 +1042,16 @@ export function createAppStore(getStorage: () => Storage, now: () => Date = () =
               editWard((w) => ({ ...w, rules: w.rules.map((c) => (c.id === id ? patched(c, patch) : c)) }));
             }
           },
+          setRuleValue: (id, name, value) => {
+            const w = get().ward;
+            const pending = w?.pendingRules.find((c) => c.id === id);
+            const applied = w?.rules.find((c) => c.id === id);
+            const next = (pending ?? applied) && withRuleValue((pending ?? applied)!, name, value);
+            if (!next) return;
+            const swap = (list: ConstraintSpec[]) => list.map((c) => (c.id === id ? next : c));
+            if (pending) editWard((w) => ({ ...w, pendingRules: swap(w.pendingRules) }), false);
+            else editWard((w) => ({ ...w, rules: swap(w.rules) }));
+          },
           removeRule: (id) => {
             const w = get().ward;
             const config = w?.pendingConfig.find((c) => c.id === id);
@@ -980,13 +1061,23 @@ export function createAppStore(getStorage: () => Storage, now: () => Date = () =
                   ...w,
                   pendingConfig: w.pendingConfig.filter((c) => c.id !== id),
                   pendingRules: w.pendingRules.filter((c) => !config.ruleIds.includes(c.id)),
+                  examples: withoutExamples(w.examples, config.ruleIds),
                 }),
                 false,
               );
             } else if (w?.pendingRules.some((c) => c.id === id)) {
-              editWard((w) => ({ ...w, pendingRules: w.pendingRules.filter((c) => c.id !== id) }), false);
+              editWard(
+                (w) => ({ ...w, pendingRules: w.pendingRules.filter((c) => c.id !== id), examples: withoutExamples(w.examples, [id]) }),
+                false,
+              );
             } else if (w?.rules.some((c) => c.id === id)) {
-              editWard((w) => ({ ...w, rules: w.rules.filter((c) => c.id !== id) }));
+              const rule = w.rules.find((c) => c.id === id)!;
+              // 기본 규칙(필요 인원·나이트 전담)은 지우지 않고 끈다
+              if (rule.type === "rule" && rule.default) {
+                editWard((w) => ({ ...w, rules: w.rules.map((c) => (c.id === id ? { ...c, enabled: false } : c)) }));
+              } else {
+                editWard((w) => ({ ...w, rules: w.rules.filter((c) => c.id !== id), examples: withoutExamples(w.examples, [id]) }));
+              }
             }
           },
 
@@ -1055,23 +1146,32 @@ export function createAppStore(getStorage: () => Storage, now: () => Date = () =
                 : [...p.holidays, day].sort((a, b) => a - b),
             })),
           setCarryOver: (periodId, carryOver) => editPeriod(periodId, (p) => ({ ...p, carryOver })),
-          addPendingRequests: (periodId, cards) =>
+          addPendingRequests: (periodId, cards, examples = {}) =>
             editPeriod(
               periodId,
               (p) => {
-                const blocks = cards.map(normalizeBlock);
-                return { ...p, pendingRequests: [...p.pendingRequests, ...blocks], cardOrder: prependOrder(p.cardOrder, blocks) };
+                const blocks = cards.map(normalizeRule);
+                return {
+                  ...p,
+                  pendingRequests: [...p.pendingRequests, ...blocks],
+                  cardOrder: prependOrder(p.cardOrder, blocks),
+                  examples: withExamples(p.examples, blocks, examples),
+                };
               },
               false,
             ),
           applyRequest: (periodId, id) => {
             const card = get().periods.find((p) => p.id === periodId)?.pendingRequests.find((c) => c.id === id);
             if (!card) return;
-            editPeriod(periodId, (p) => ({
-              ...p,
-              pendingRequests: p.pendingRequests.filter((c) => c.id !== id),
-              requests: upsert(p.requests, card),
-            }));
+            editPeriod(periodId, (p) => {
+              const replaced = findReplaced(p.requests, card);
+              return {
+                ...p,
+                pendingRequests: p.pendingRequests.filter((c) => c.id !== id),
+                requests: upsert(p.requests, card),
+                examples: withoutExamples(p.examples, replaced ? [replaced.id] : []),
+              };
+            });
           },
           updateRequest: (periodId, id, patch) => {
             const period = get().periods.find((p) => p.id === periodId);
@@ -1085,12 +1185,26 @@ export function createAppStore(getStorage: () => Storage, now: () => Date = () =
               editPeriod(periodId, (p) => ({ ...p, requests: p.requests.map((c) => (c.id === id ? patched(c, patch) : c)) }));
             }
           },
+          setRequestValue: (periodId, id, name, value) => {
+            const period = get().periods.find((p) => p.id === periodId);
+            const pending = period?.pendingRequests.find((c) => c.id === id);
+            const applied = period?.requests.find((c) => c.id === id);
+            const next = (pending ?? applied) && withRuleValue((pending ?? applied)!, name, value);
+            if (!next) return;
+            const swap = (list: ConstraintSpec[]) => list.map((c) => (c.id === id ? next : c));
+            if (pending) editPeriod(periodId, (p) => ({ ...p, pendingRequests: swap(p.pendingRequests) }), false);
+            else editPeriod(periodId, (p) => ({ ...p, requests: swap(p.requests) }));
+          },
           removeRequest: (periodId, id) => {
             const period = get().periods.find((p) => p.id === periodId);
             if (period?.pendingRequests.some((c) => c.id === id)) {
-              editPeriod(periodId, (p) => ({ ...p, pendingRequests: p.pendingRequests.filter((c) => c.id !== id) }), false);
+              editPeriod(
+                periodId,
+                (p) => ({ ...p, pendingRequests: p.pendingRequests.filter((c) => c.id !== id), examples: withoutExamples(p.examples, [id]) }),
+                false,
+              );
             } else if (period?.requests.some((c) => c.id === id)) {
-              editPeriod(periodId, (p) => ({ ...p, requests: p.requests.filter((c) => c.id !== id) }));
+              editPeriod(periodId, (p) => ({ ...p, requests: p.requests.filter((c) => c.id !== id), examples: withoutExamples(p.examples, [id]) }));
             }
           },
           setDisabled: (periodId, constraintId, disabled) =>
@@ -1111,14 +1225,10 @@ export function createAppStore(getStorage: () => Storage, now: () => Date = () =
                   if (!next.disabledIds.includes(ch.constraint_id))
                     next = { ...next, disabledIds: [...next.disabledIds, ch.constraint_id] };
                 } else if (next.requests.some((c) => c.id === ch.constraint_id)) {
-                  next = {
-                    ...next,
-                    requests: next.requests.map((c) => (c.id === ch.constraint_id ? patched(c, changePatch(ch, c)) : c)),
-                  };
+                  next = { ...next, requests: next.requests.map((c) => (c.id === ch.constraint_id ? changed(c, ch) : c)) };
                 } else {
                   const rule = next.ruleOverrides[ch.constraint_id] ?? rules.find((r) => r.id === ch.constraint_id);
-                  if (rule)
-                    next = { ...next, ruleOverrides: { ...next.ruleOverrides, [rule.id]: patched(rule, changePatch(ch, rule)) } };
+                  if (rule) next = { ...next, ruleOverrides: { ...next.ruleOverrides, [rule.id]: changed(rule, ch) } };
                 }
               }
               return next;
@@ -1198,8 +1308,8 @@ export function createAppStore(getStorage: () => Storage, now: () => Date = () =
         version: STORAGE_VERSION,
         storage,
         partialize: (s): Data => persisted(s),
-        // v4는 v5로 바꾼다. 그 밖의 버전이나 파싱 실패는 버리고, merge에서 초기 상태 + resetNotice로 처리한다
-        migrate: (state, version) => (version === 4 ? migrateV4(state, localDate(now())) : null) as unknown as Data,
+        // v4·v5는 v6으로 바꾼다. 그 밖의 버전이나 파싱 실패는 버리고, merge에서 초기 상태 + resetNotice로 처리한다
+        migrate: (state, version) => upgradeDoc(state, version, localDate(now())) as unknown as Data,
         // 지금은 쓰지 않는 옛 필드는 버리고 Data 필드만 가져온다
         merge: (saved, current) =>
           saved === undefined

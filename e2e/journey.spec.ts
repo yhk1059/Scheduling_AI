@@ -2,6 +2,7 @@
 // 페이지 하나를 공유하며 순서대로 돈다. 게스트 모드만 다룬다(ADR-014). LLM은 mock하지 않는다(ADR-013).
 import { type BrowserContext, expect, type Page, test } from "@playwright/test";
 
+import { ruleShape } from "../lib/migrate";
 import type { PeriodRange } from "../lib/period";
 import type { ConstraintSpec, ScheduleRequest } from "../lib/types.gen";
 import {
@@ -212,7 +213,10 @@ test("S5. 처음 설정 ① 병동·명단 → ② 필요 인원", async () => {
   const coverage = ward.rules.filter((c) => c.id.startsWith("cov-"));
   expect(coverage).toHaveLength(6);
   expect(
-    coverage.every((c) => c.type === "count" && c.params.min === c.params.max),
+    coverage.every((c) => {
+      const s = ruleShape(c);
+      return s?.kind === "count" && s.min?.n === s.max?.n;
+    }),
     "숫자 하나 = 정확히 그 인원",
   ).toBe(true);
   await expect(next).toBeEnabled();
@@ -240,20 +244,25 @@ test("S6. 처음 설정 ③ 병동 규칙 → 첫 근무표 만들기", async ()
   const r1 = await interpretOk(page, RULE_INPUT, "규칙 만들기", "나이트 다음 날은 무조건 쉬게");
   expect(r1.length).toBeGreaterThan(0);
   for (const c of r1) {
-    expect(c.type, "나이트 다음 휴무 또는 금지 순서").toBe("sequence");
-    if (c.type === "sequence" && c.params.forbid) expect(c.params.forbid.every((pattern) => pattern[0].in?.join() === "N")).toBe(true);
-    if (c.type === "sequence" && !c.params.forbid) expect(c.params).toMatchObject({ after: { in: ["N"] } });
+    const s = ruleShape(c);
+    expect(["forbid", "off_after"], "나이트 다음 휴무 또는 금지 순서").toContain(s?.kind);
+    if (s?.kind === "forbid") expect(s.pattern[0].in?.join()).toBe("N");
+    if (s?.kind === "off_after") expect(s).toMatchObject({ after: { in: ["N"] } });
   }
   const r2 = await interpretOk(page, RULE_INPUT, "규칙 만들기", "나이트는 3일 넘게 연속으로 하지 않게");
-  expect(r2.map((c) => c.type)).toEqual(["sequence"]);
-  expect(r2[0].params).toMatchObject({ run: { in: ["N"] }, max_len: 3 });
+  expect(r2.map((c) => ruleShape(c)?.kind)).toEqual(["max_run"]);
+  expect(ruleShape(r2[0])).toMatchObject({ run: { in: ["N"] }, max_len: { n: 3 } });
   const r3 = await interpretOk(page, RULE_INPUT, "규칙 만들기", "근무조마다 3년차 이상 한 명은 꼭 있어야 해");
   expect(r3.length).toBeGreaterThan(0);
   for (const c of r3) {
-    expect(c.type).toBe("count");
-    if (c.type === "count") expect({ min_years: c.params.people?.min_years, min: c.params.min }).toEqual({ min_years: 3, min: 1 });
+    const s = ruleShape(c);
+    expect(s?.kind).toBe("count");
+    if (s?.kind === "count") expect({ min_years: s.people.min_years, min: s.min?.n }).toEqual({ min_years: 3, min: 1 });
   }
-  const shifts = r3.flatMap((c) => (c.type === "count" ? (c.params.shifts.in ?? []) : []));
+  const shifts = r3.flatMap((c) => {
+    const s = ruleShape(c);
+    return s?.kind === "count" ? (s.shifts.in ?? []) : [];
+  });
   expect([...shifts].sort(), "연차별 배치가 D/E/N을 모두 덮는다").toEqual(["D", "E", "N"]);
 
   const total = r1.length + r2.length + r3.length;
@@ -368,16 +377,15 @@ test("S8. ① 요청: 요청 카드", async () => {
   await expectCardChrome(leaveCard, null);
 
   const q2 = await interpretOk(page, REQUEST_INPUT, "요청 만들기", "박민수는 주말에 쉬고 싶대요");
-  expect(q2.map((c) => c.type)).toEqual(["count"]);
+  expect(q2.map((c) => ruleShape(c)?.kind)).toEqual(["count"]);
   const pref = q2[0];
-  if (pref.type === "count") {
-    expect({ ids: pref.params.people?.ids, hardness: pref.hardness }).toEqual({ ids: [park], hardness: "soft" });
+  const p = ruleShape(pref);
+  if (p?.kind === "count") {
+    expect({ ids: p.people.ids, hardness: pref.hardness }).toEqual({ ids: [park], hardness: "soft" });
     // 같은 뜻의 두 모양: 휴무를 대상 날짜 수만큼(in O, min) 또는 근무를 0번(not_in O, max 0)
-    const { shifts, min, max } = pref.params;
-    const offWish = (shifts.in?.join() === "O" && min != null) || (shifts.not_in?.join() === "O" && max === 0);
-    expect(offWish, `휴무 희망 모양: ${JSON.stringify(pref.params)}`).toBe(true);
-    const weekendOnly =
-      pref.params.days?.kind === "weekend" || (pref.params.days?.days ?? []).every((d) => NOV_WEEKEND_DAYS.includes(d));
+    const offWish = (p.shifts.in?.join() === "O" && !!p.min) || (p.shifts.not_in?.join() === "O" && p.max?.n === 0);
+    expect(offWish, `휴무 희망 모양: ${JSON.stringify(pref)}`).toBe(true);
+    const weekendOnly = p.days.kind === "weekend" || (p.days.days ?? []).every((d) => NOV_WEEKEND_DAYS.includes(d));
     expect(weekendOnly, "주말·공휴일만 대상").toBe(true);
   }
   const prefCard = pendingCards(page).filter({ hasText: "희망·기피 근무" });

@@ -6,7 +6,7 @@ import { useState } from "react";
 import sample from "@/lib/samples/ward-15.json";
 import { currentPeriod, useAppStore, type View } from "@/lib/store";
 import { supabaseConfigured } from "@/lib/supabase";
-import type { ConstraintSpec } from "@/lib/types.gen";
+import { blockToRules, type BlockSpec } from "@/lib/migrate";
 import { scheduleName, wardRuleCount } from "@/lib/wording";
 
 import { PrivacyLink } from "./Account";
@@ -19,7 +19,7 @@ const SCREEN_LABELS: Record<Exclude<View["screen"], "period" | "confirmed">, str
   settings: "병동 설정",
 };
 const SAMPLE_NURSES = sample.nurses.length;
-const SAMPLE_RULES = wardRuleCount(sample.constraints as ConstraintSpec[]);
+const SAMPLE_RULES = wardRuleCount((sample.constraints as unknown as BlockSpec[]).flatMap(blockToRules));
 
 export default function StartScreen({ onDone }: { onDone: () => void }) {
   const hasInput = useAppStore((s) => s.hasInput());

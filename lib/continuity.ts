@@ -2,7 +2,7 @@
 import { CARRY_OVER_DAYS } from "./roster-import";
 import { dateOfDay, dayOfDate, isWeekendDay, monthDay, periodDays, periodEnd, type PeriodRange } from "./period";
 import type { Assignments, WardNurse, WorkPeriod } from "./store";
-import type { CarryOverRow, ConstraintSpec, DiffCell, History, Nurse, WardConfig } from "./types.gen";
+import type { CarryOverRow, DiffCell, FixedAssignment, History, Nurse, WardConfig } from "./types.gen";
 
 export const HISTORY_DAYS = 28; // backend/domain/constants.py HISTORY_DAYS
 const OFF = "O";
@@ -100,13 +100,13 @@ export function isOperating(period: WorkPeriod, today: string): boolean {
  * id는 `lock-{nurse_id}-{day}`, scope "period", source_text "지난 날짜 고정: {이름} {M}/{D} {코드}".
  * today가 기간 시작 이전이면 [], 기간이 끝났으면 전체 날짜. 확정본이 없으면 [].
  */
-export function pastDayLocks(period: WorkPeriod, nurses: Nurse[], today: string): ConstraintSpec[] {
+export function pastDayLocks(period: WorkPeriod, nurses: Nurse[], today: string): FixedAssignment[] {
   const a = latestConfirmed(period);
   if (!a || today <= period.start_date) return [];
   const lastDay = today > periodEnd(period) ? period.length : dayOfDate(period, today)! - 1;
   return nurses.flatMap((n) =>
     a[n.id]
-      ? a[n.id].slice(0, lastDay).map((shift, i): ConstraintSpec => ({
+      ? a[n.id].slice(0, lastDay).map((shift, i): FixedAssignment => ({
           id: `lock-${n.id}-${i + 1}`,
           type: "fixed_assignment",
           scope: "period",

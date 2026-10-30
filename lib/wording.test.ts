@@ -3,12 +3,12 @@ import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import { DEFAULT_CONFIG, legacyToBlock, nightOnlyRule, type LegacySpec } from "./migrate";
+import { blockToRules, DEFAULT_CONFIG, legacyToBlock, nightOnlyBlock, type BlockSpec, type LegacySpec } from "./migrate";
 import { isLeaveRule, type Ward, type WorkPeriod } from "./store";
-import type { ConstraintSpec, Nurse, WardConfig } from "./types.gen";
+import type { ConstraintSpec, Nurse, Rule, WardConfig } from "./types.gen";
 import {
   configSummary,
-  describeBlock,
+  describeRule,
   describeShiftChange,
   formatDeviation,
   hardnessLabel,
@@ -38,13 +38,18 @@ const CONFIG: WardConfig = {
   ],
 } as unknown as WardConfig;
 
-/** 블록 하나. 생략한 공통 필드는 기본값. */
-function block(type: ConstraintSpec["type"], params: unknown, over: Partial<ConstraintSpec> = {}): ConstraintSpec {
-  return { id: `c-${type}`, scope: "ward", source_text: "", type, params, ...over } as ConstraintSpec;
+/** 블록 하나를 식 규칙으로(변환표). 나뉘는 블록은 첫 규칙. 생략한 공통 필드는 기본값. */
+function block(type: BlockSpec["type"], params: unknown, over: Partial<BlockSpec> = {}): ConstraintSpec {
+  return blockToRules({ id: `c-${type}`, scope: "ward", source_text: "", type, params, ...over } as BlockSpec)[0];
 }
+const rulesOf = (b: BlockSpec) => blockToRules(b);
+const text = (c: ConstraintSpec, config: WardConfig = DEFAULT_CONFIG) => describeRule(c, config, NURSES, NOV).text;
 
 const CASES: { name: string; template: LegacySpec | null; period: typeof NOV; holidays: number[] }[] = JSON.parse(
   readFileSync(join(__dirname, "..", "backend/tests/golden/convert-cases.json"), "utf-8"),
+);
+const EXPR_CASES: { name: string; block: BlockSpec; rules: ConstraintSpec[] }[] = JSON.parse(
+  readFileSync(join(__dirname, "..", "backend/tests/golden/expr-convert-cases.json"), "utf-8"),
 );
 
 describe("scheduleName", () => {
@@ -107,7 +112,7 @@ describe("hardnessLabel", () => {
   });
 });
 
-describe("presetName / describeBlock: 템플릿 변환표의 모든 모양(convert-cases.json)", () => {
+describe("presetName / describeRule: 템플릿 변환표의 모든 모양(convert-cases.json, 템플릿 → 블록 → 식)", () => {
   const EXPECTED: Record<string, [string, string]> = {
     "daily_coverage-weekday": ["필요 인원", "평일마다 데이 3~4명"],
     "daily_coverage-weekend": ["필요 인원", "주말·공휴일마다 나이트 2명"],
@@ -135,25 +140,28 @@ describe("presetName / describeBlock: 템플릿 변환표의 모든 모양(conve
   /** 케이스 이름에서 hard/soft·가중치·꺼짐 꼬리를 뗀 모양 이름. */
   const shape = (name: string) => (EXPECTED[name] ? name : name.replace(/(-(hard|soft|disabled|weight\d+))+$/, ""));
 
+  const ruleOf = (c: (typeof CASES)[number]) => {
+    const rules = rulesOf(c.template ? legacyToBlock(c.template, c.period, c.holidays) : nightOnlyBlock());
+    expect(rules, c.name).toHaveLength(1);
+    return rules[0];
+  };
+
   for (const c of CASES) {
     it(c.name, () => {
-      const b = c.template ? legacyToBlock(c.template, c.period, c.holidays) : nightOnlyRule();
+      const r = ruleOf(c);
       const want = c.template ? EXPECTED[shape(c.name)] : ["나이트 전담", "나이트전담 태그 나이트 말고 다른 근무 없음"];
       expect(want, c.name).toBeDefined();
-      expect([presetName(b), describeBlock(b, DEFAULT_CONFIG, NURSES, NOV)]).toEqual(want);
+      expect([presetName(r), text(r)]).toEqual(want);
     });
   }
 
   it("내부 id·코드만 있는 표기를 쓰지 않는다", () => {
-    for (const c of CASES) {
-      const b = c.template ? legacyToBlock(c.template, c.period, c.holidays) : nightOnlyRule();
-      expect(describeBlock(b, DEFAULT_CONFIG, NURSES, NOV), c.name).not.toMatch(/n\d\d|\b[DENO]\b|오프|≤|≥/);
-    }
+    for (const c of CASES) expect(text(ruleOf(c)), c.name).not.toMatch(/n\d\d|\b[DENO]\b|오프|≤|≥/);
   });
 });
 
-describe("presetName / describeBlock: 새 모양", () => {
-  const d = (b: ConstraintSpec) => [presetName(b), describeBlock(b, CONFIG, NURSES, NOV)];
+describe("presetName / describeRule: 새 모양", () => {
+  const d = (b: ConstraintSpec) => [presetName(b), text(b, CONFIG)];
 
   it("태그·연차·요일·공휴일로 고른 날마다 인원", () => {
     expect(d(block("count", { people: { tags: ["책임"] }, shifts: { in: ["D"] }, per: "day", min: 1 }))).toEqual([
@@ -207,8 +215,10 @@ describe("presetName / describeBlock: 새 모양", () => {
     ]);
   });
 
-  it("순서: 길이 범위, 다른 근무 금지, 사람 대상", () => {
-    expect(d(block("sequence", { run: { in: ["N"] }, min_len: 2, max_len: 3 }))).toEqual(["나이트 블록 길이", "나이트는 2~3일씩 이어서"]);
+  it("순서: 길이 범위(최대·최소 두 규칙으로 나뉜다), 다른 근무 금지, 사람 대상", () => {
+    const [max, min] = rulesOf({ id: "s", type: "sequence", scope: "ward", source_text: "", params: { run: { in: ["N"] }, min_len: 2, max_len: 3 } });
+    expect(d(max)).toEqual(["최대 연속 나이트", "나이트 연속 3일까지"]);
+    expect(d(min)).toEqual(["나이트 블록 길이", "나이트는 2일 이상씩 이어서"]);
     expect(d(block("sequence", { run: { in: ["E"] }, min_len: 2 }))).toEqual(["순서 규칙", "이브닝은 2일 이상씩 이어서"]);
     expect(d(block("sequence", { forbid: [[{ in: ["N"] }, { not_in: ["N", "O"] }]] }))).toEqual([
       "금지 순서",
@@ -252,6 +262,161 @@ describe("presetName / describeBlock: 새 모양", () => {
   });
 });
 
+describe("presetName / describeRule: 블록 → 식 변환표의 모든 모양(expr-convert-cases.json)", () => {
+  const EXPECTED: Record<string, [string, string][]> = {
+    "count-day-min": [["필요 인원", "매일 데이 3명 이상"]],
+    "count-day-max": [["필요 인원", "주말·공휴일마다 이브닝 4명까지"]],
+    "count-day-min-max": [["필요 인원", "평일마다 데이 3~4명"]],
+    "count-day-eq": [["필요 인원", "매일 나이트 2명"]],
+    "count-day-people": [["연차별 배치", "매일 3년차 이상 이브닝 1명 이상"]],
+    "count-day-hours": [["세는 규칙", "매일 근무 시간 80시간 이하"]],
+    "count-person-min": [["최소 휴무 일수", "모든 사람 근무표마다 휴무 8일 이상"]],
+    "count-person-max-soft": [["희망·기피 근무", "(명단에 없는 간호사) · 주말·공휴일 · 나이트 피하기"]],
+    "count-person-leave": [["휴가", "(명단에 없는 간호사) · 11/3~11/5 · 휴무"]],
+    "count-person-week-hours": [["근무 시간", "모든 사람 주마다 근무 시간 52시간 이하"]],
+    "count-person-window": [["휴무 간격", "신규 빼고 7일마다 휴무 1일 이상"]],
+    "count-disabled": [["최소 휴무 일수", "모든 사람 근무표마다 휴무 8일 이상"]],
+    "forbid-1": [["금지 순서", "나이트 다음 날 데이 금지"]],
+    "forbid-2-split": [
+      ["금지 순서", "나이트 다음 날 데이 금지"],
+      ["금지 순서", "나이트 다음 날 이브닝 금지"],
+    ],
+    "forbid-3-long": [["금지 순서", "신규 태그 나이트 → 휴무 → 데이 금지"]],
+    "run-max-len-night": [["최대 연속 나이트", "나이트 연속 3일까지"]],
+    "run-max-len-work": [["최대 연속 근무", "연속 근무 5일까지"]],
+    "run-min-len": [["나이트 블록 길이", "나이트는 2일 이상씩 이어서"]],
+    "run-min-max-split": [
+      ["최대 연속 나이트", "나이트 연속 3일까지"],
+      ["나이트 블록 길이", "나이트는 2일 이상씩 이어서"],
+    ],
+    "after-then-off-1": [["나이트 다음 휴무", "나이트 다음 날은 휴무 1일"]],
+    "after-then-off-2": [["나이트 다음 휴무", "나이트 다음 날은 휴무 2일"]],
+    "balance-soft": [["나이트 고르게", "나이트전담 빼고 나이트 수를 고르게(최근 4주 포함)"]],
+    "balance-hard-gap": [["나이트 고르게", "나이트 수를 고르게(최근 4주 포함) · 차이 0 이하"]],
+    "balance-hours-no-history": [["고르게 규칙", "주말·공휴일 근무 시간을 고르게"]],
+    "fixed-assignment": [["고정 근무", "(명단에 없는 간호사) · 11/2 · 이브닝 고정"]],
+    "default-coverage": [["필요 인원", "매일 데이 3명"]],
+    "default-night-only": [["나이트 전담", "나이트전담 태그 나이트 말고 다른 근무 없음"]],
+  };
+
+  for (const [name, want] of Object.entries(EXPECTED)) {
+    it(name, () => {
+      const c = EXPR_CASES.find((x) => x.name === name)!;
+      expect(c, name).toBeDefined();
+      expect(c.rules.map((r) => [presetName(r), text(r)])).toEqual(want);
+      // 블록이었을 때와 같은 문장: 블록을 다시 바꿔도 같다
+      expect(blockToRules(c.block).map((r) => text(r))).toEqual(want.map(([, t]) => t));
+    });
+  }
+
+  it("모든 케이스(샘플·골든 요청 포함)에 내부 id·코드만 있는 표기가 없다", () => {
+    for (const c of EXPR_CASES) {
+      for (const r of c.rules) expect(text(r), `${c.name} ${r.id}`).not.toMatch(/n\d\d|\b[DENO]\b|오프|≤|≥|undefined|NaN/);
+    }
+  });
+});
+
+describe("describeRule: 조정 가능한 값의 위치(parts)", () => {
+  it("값은 이름과 함께 따로 나오고, 이어 붙이면 text다", () => {
+    const r = EXPR_CASES.find((x) => x.name === "count-day-min-max")!.rules[0];
+    const s = describeRule(r, DEFAULT_CONFIG, NURSES, NOV);
+    expect(s.text).toBe("평일마다 데이 3~4명");
+    expect(s.parts).toEqual([{ text: "평일마다 데이 " }, { value: "min", text: "3" }, { text: "~" }, { value: "max", text: "4" }, { text: "명" }]);
+    expect(s.parts.map((p) => p.text).join("")).toBe(s.text);
+  });
+
+  it("최대 연속·고르게 차이도 값, 구조 숫자(휴무 일수 offset)는 값이 아니다", () => {
+    const values = (name: string) =>
+      describeRule(EXPR_CASES.find((x) => x.name === name)!.rules[0], DEFAULT_CONFIG, NURSES, NOV).parts.filter((p) => "value" in p);
+    expect(values("run-max-len-night")).toEqual([{ value: "max_len", text: "3" }]);
+    expect(values("balance-hard-gap")).toEqual([{ value: "max_gap", text: "0" }]);
+    expect(values("after-then-off-2")).toEqual([]);
+  });
+});
+
+describe("describeRule: 새로 표현되는 규칙(설계 §2.6)", () => {
+  const rule = (body: unknown, values: Rule["values"] = {}): ConstraintSpec =>
+    ({ id: "x", type: "rule", scope: "ward", source_text: "", values, body }) as ConstraintSpec;
+  const count = (shifts: string[], extra: object = {}) => ({ ...extra, shifts: { in: shifts } });
+  const d = (r: ConstraintSpec) => [presetName(r), describeRule(r, CONFIG, NURSES, NOV).text];
+
+  it("신규가 나이트면 책임도 나이트에 1명", () => {
+    const r = rule({
+      kind: "require",
+      for_each: { per: "day" },
+      when: { left: count(["N"], { who: { tags: ["신규"] } }), op: "ge", right: 1 },
+      then: { left: count(["N"], { who: { tags: ["책임"] } }), op: "ge", right: 1 },
+    });
+    expect(d(r)).toEqual(["조건 규칙", "매일, 신규 태그 나이트 1명 이상이면 책임 태그 나이트 1명 이상"]);
+  });
+
+  it("둘은 같은 날 나이트 금지", () => {
+    const r = rule({ kind: "require", for_each: { per: "day" }, then: { left: count(["N"], { who: { ids: ["n01", "n02"] } }), op: "le", right: 1 } });
+    expect(d(r)).toEqual(["세는 규칙", "매일 이영희 박민수 나이트 1명까지"]);
+  });
+
+  it("둘은 데이를 같이", () => {
+    const r = rule({
+      kind: "require",
+      for_each: { per: "day" },
+      then: { left: count(["D"], { who: { ids: ["n01"] } }), op: "eq", right: count(["D"], { who: { ids: ["n02"] } }) },
+    });
+    expect(d(r)).toEqual(["세는 규칙", "매일 이영희 데이와 박민수 데이가 같음"]);
+  });
+
+  it("책임이 신규보다 적으면 안 됨(나이트)", () => {
+    const r = rule({
+      kind: "require",
+      for_each: { per: "day" },
+      then: { left: count(["N"], { who: { tags: ["책임"] } }), op: "ge", right: count(["N"], { who: { tags: ["신규"] } }) },
+    });
+    expect(d(r)).toEqual(["세는 규칙", "매일 책임 태그 나이트가 신규 태그 나이트 이상"]);
+  });
+
+  it("주말 나이트 다음 월요일은 휴무", () => {
+    const r = rule({
+      kind: "require",
+      for_each: { per: "person_day", days: { weekdays: [6] } },
+      when: { left: { ...count(["N"]), offset: [0, 0] }, op: "ge", right: 1 },
+      then: { left: { ...count(["O"]), offset: [1, 1] }, op: "eq", right: 1 },
+    });
+    expect(d(r)).toEqual(["조건 규칙", "모든 사람 · 일요일마다, 나이트 1번 이상이면 다음 날 휴무 1일"]);
+  });
+
+  it("나이트 블록은 2~3일씩(두 규칙)", () => {
+    const rules = rulesOf({ id: "s", type: "sequence", scope: "ward", source_text: "", params: { run: { in: ["N"] }, min_len: 2, max_len: 3 } });
+    expect(rules.map(d)).toEqual([
+      ["최대 연속 나이트", "나이트 연속 3일까지"],
+      ["나이트 블록 길이", "나이트는 2일 이상씩 이어서"],
+    ]);
+  });
+
+  it("일반 틀: 값·그리고/또는·날짜 이동·근무표 전체", () => {
+    const r = rule(
+      {
+        kind: "require",
+        for_each: { per: "period" },
+        then: {
+          any: [
+            { left: count(["DE"]), op: "le", right: { value: "max" } },
+            { left: { ...count(["N"]), measure: "hours" }, op: "ge", right: 16 },
+          ],
+        },
+      },
+      { max: { value: 10, label: "최대 횟수" } },
+    );
+    const s = describeRule(r, CONFIG, NURSES, NOV);
+    expect([presetName(r), s.text]).toEqual(["세는 규칙", "근무표 전체 더블(DE) 10번 이하 또는 나이트 근무 시간 16시간 이상"]);
+    expect(s.parts.filter((p) => "value" in p)).toEqual([{ value: "max", text: "10" }]);
+    const seq = rule({
+      kind: "require",
+      for_each: { per: "person_day", people: { tags: ["신규"] } },
+      then: { left: { ...count(["N"]), offset: [-2, -1] }, op: "le", right: 1 },
+    });
+    expect(d(seq)).toEqual(["순서 규칙", "신규 태그 · 날마다 앞 2일 나이트 1번 이하"]);
+  });
+});
+
 describe("wardRuleCount", () => {
   it("필요 인원은 세지 않는다", () => {
     const coverage = (kind: string, code: string) =>
@@ -260,7 +425,7 @@ describe("wardRuleCount", () => {
       coverage("weekday", "D"),
       coverage("weekend", "N"),
       block("sequence", { after: { in: ["N"] }, then_off: 1 }),
-      block("balance", { shifts: { in: ["N"] } }),
+      block("balance", { shifts: { in: ["N"] } }, { hardness: "soft", priority: "low" }),
     ];
     expect(wardRuleCount(rules)).toBe(2);
     expect(wardRuleCount([])).toBe(0);
@@ -290,6 +455,7 @@ describe("nextTask", () => {
     pendingRules: [],
     pendingConfig: [],
     unconverted: [],
+    introSeen: true,
   };
   const TODAY = "2026-10-28";
   const result = { assignments: {} } as unknown as NonNullable<WorkPeriod["result"]>;

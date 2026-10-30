@@ -5,7 +5,7 @@ import { useState, type ReactNode } from "react";
 import { ApiError, errorMessage, explain, solve } from "@/lib/api";
 import { toScheduleCsv } from "@/lib/csv";
 import { historyLoadFor, isOperating } from "@/lib/continuity";
-import { DEFAULT_CONFIG, NIGHT_ONLY_TAG, normalizeBlock } from "@/lib/migrate";
+import { DEFAULT_CONFIG, NIGHT_ONLY_TAG } from "@/lib/migrate";
 import { dayHeader, dayOfDate, isWeekendDay, monthDay, periodDays, periodEnd } from "@/lib/period";
 import {
   carryOverChanged,
@@ -28,7 +28,7 @@ import type {
   WardConfig,
 } from "@/lib/types.gen";
 import { statsFromAssignments } from "@/lib/stats";
-import { describeBlock, formatDeviation, presetName } from "@/lib/wording";
+import { describeRule, formatDeviation, hardnessLabel, presetName } from "@/lib/wording";
 
 import { markConfirmedEntry } from "./confirmedEntry";
 import { Spinner, today } from "./RulesStep";
@@ -499,12 +499,10 @@ export function OutcomePanel({
                 const c = constraints.find((x) => x.id === ch.constraint_id);
                 if (!c) return [];
                 if (ch.action === "disable") return [`${presetName(c)} 끄기 · “${c.source_text}”`];
-                const next = normalizeBlock({
-                  ...c,
-                  ...(ch.params && { params: { ...c.params, ...ch.params } }),
-                  ...(ch.hardness && { hardness: ch.hardness }),
-                } as ConstraintSpec);
-                return [`${presetName(c)} → ${describeBlock(next, config, nurses, period)}`];
+                if (ch.action === "set_hardness" && ch.hardness)
+                  return [`${presetName(c)} ${hardnessLabel(c.hardness ?? "hard")} → ${hardnessLabel(ch.hardness)}`];
+                const v = c.type === "rule" ? c.values?.[ch.name ?? ""] : undefined;
+                return v ? [`${v.label} ${v.value} → ${ch.value}`] : [];
               })}
               busy={busy}
               onAccept={() => onAccept(p)}
@@ -526,7 +524,7 @@ export function OutcomePanel({
                     <span className="text-xs font-medium text-[#66665E]">{found ? presetName(found) : "규칙"}</span>
                     “{c.source_text}”
                     {found && (
-                      <span className="font-mono text-xs text-[#66665E]">{describeBlock(found, config, nurses, period)}</span>
+                      <span className="font-mono text-xs text-[#66665E]">{describeRule(found, config, nurses, period).text}</span>
                     )}
                   </span>
                   {found && (
@@ -554,7 +552,7 @@ export function OutcomePanel({
                 <li key={c.id} className="flex items-center justify-between gap-3 border-b border-[#EFEFEB] py-1.5 last:border-b-0">
                   <span className={`flex items-baseline gap-2 text-sm ${on ? "text-[#1B1B18]" : "text-[#66665E]"}`}>
                     <span className="text-xs font-medium text-[#66665E]">{presetName(c)}</span>“{c.source_text}”
-                    <span className="font-mono text-xs text-[#66665E]">{describeBlock(c, config, nurses, period)}</span>
+                    <span className="font-mono text-xs text-[#66665E]">{describeRule(c, config, nurses, period).text}</span>
                   </span>
                   <button
                     type="button"
