@@ -5,7 +5,10 @@
     {
       "step": 0,
       "name": "golden-blocks",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-10-30T13:17:11+0900",
+      "summary": "backend/tests/golden/blocks-cases.json 20케이스 기록(옛 골든 9케이스의 블록 변환 + 블록 기능 11: block-mid-shift, block-double-de, block-week-52h, block-window-7, block-run-min-len, block-then-off-2, block-tag-charge, block-hard-balance, block-soft-prefs, block-soft-forbid, block-infeasible-tag). feasible 17개 모두 OPTIMAL, infeasible 3개(conflict_ids 기록), 케이스당 풀이 ≤0.44s·전체 생성 약 1.2s. gen:golden이 convert-cases.json과 함께 쓰고 --check는 둘 다 비교. test_golden이 재풀이 status·목적값과 기록 배정의 hard 위반 0, 요청 픽스처 최신 여부를 검사. 결정: 기능 케이스 빌더는 tests 모듈 import를 피하려고 gen_golden 안에 작은 헬퍼로 두었다(blocks.py와 같은 모양); 옛 케이스 블록 변환(block_request)은 gen_golden으로 옮겨 test_golden과 공유; 케이스 형식은 {id, description, request, expected}.",
+      "completed_at": "2026-10-30T13:20:08+0900"
     },
     {
       "step": 1,
@@ -67,5 +70,6 @@
       "name": "samples-e2e",
       "status": "pending"
     }
-  ]
+  ],
+  "created_at": "2026-10-30T13:17:11+0900"
 }
