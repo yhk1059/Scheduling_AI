@@ -9,47 +9,42 @@
     },
     {
       "step": 1,
-      "name": "remove-legacy-backend",
+      "name": "remove-legacy-client",
       "status": "pending"
     },
     {
       "step": 2,
-      "name": "rename-backend",
+      "name": "remove-legacy-backend",
       "status": "pending"
     },
     {
       "step": 3,
-      "name": "shift-times",
+      "name": "remove-nurse-concepts",
       "status": "pending"
     },
     {
       "step": 4,
-      "name": "llm-shop",
+      "name": "rename-code",
       "status": "pending"
     },
     {
       "step": 5,
-      "name": "eval-shop",
+      "name": "shift-times",
       "status": "pending"
     },
     {
       "step": 6,
-      "name": "client-lib",
+      "name": "ui-copy",
       "status": "pending"
     },
     {
       "step": 7,
-      "name": "client-rename",
+      "name": "llm-shop",
       "status": "pending"
     },
     {
       "step": 8,
-      "name": "login-required",
-      "status": "pending"
-    },
-    {
-      "step": 9,
-      "name": "availability-db",
+      "name": "eval-shop",
       "status": "pending"
     }
   ]

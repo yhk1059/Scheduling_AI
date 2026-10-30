@@ -58,6 +58,8 @@
 3. harness가 매 step에 문서를 넣으므로 코드 작업 전에 끝낸다.
 
 ## 구현 phase 초안
+초기 초안이다. 실제 순서는 `phases/6-shop-pivot`, `phases/7-availability`를 따른다.
+
 1. `remove-legacy`: 옛 형식 변환과 간호 전용 개념 삭제, 테스트 도우미 이전
 2. `rename-domain`: 백엔드 `shop`·`employee` 이름 변경, 타입 재생성
 3. `shift-times`: `end` 추가, 기본 근무조, 시각을 LLM 문맥에 전달

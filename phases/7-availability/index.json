@@ -14,11 +14,21 @@
     },
     {
       "step": 2,
-      "name": "availability-ui",
+      "name": "login-required",
       "status": "pending"
     },
     {
       "step": 3,
+      "name": "availability-db",
+      "status": "pending"
+    },
+    {
+      "step": 4,
+      "name": "availability-ui",
+      "status": "pending"
+    },
+    {
+      "step": 5,
       "name": "samples-e2e",
       "status": "pending"
     }
