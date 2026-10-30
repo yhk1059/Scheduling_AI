@@ -3,9 +3,18 @@
 import { useState } from "react";
 
 import type { Priority } from "@/lib/migrate";
-import { applyShiftChange, type CardPatch, currentPeriod, type Hardness, isLeaveRule, type ShiftChangeCard, useAppStore } from "@/lib/store";
-import type { ConstraintSpec, WardConfig } from "@/lib/types.gen";
-import { dayRanges, describeBlock, describeShiftChange, hardnessLabel, presetName } from "@/lib/wording";
+import {
+  applyShiftChange,
+  type CardPatch,
+  currentPeriod,
+  type Hardness,
+  isLeaveRule,
+  refNurses,
+  type ShiftChangeCard,
+  useAppStore,
+} from "@/lib/store";
+import type { ConstraintSpec } from "@/lib/types.gen";
+import { describeRule, describeShiftChange, hardnessLabel, presetName } from "@/lib/wording";
 
 import { previewRange } from "./RulesStep";
 import { ui } from "./ui";
@@ -13,152 +22,43 @@ import { ui } from "./ui";
 /** 휴가 모양과 칸 고정은 항상 반드시다(토글을 막는다). */
 const alwaysHard = (c: ConstraintSpec) => c.type === "fixed_assignment" || isLeaveRule(c);
 
-// --- 수정 폼: 블록의 수와 날짜만 고친다(셀렉터는 다시 말로 입력) ---
+// --- 수정 폼: 조정 가능한 값(values)만 고친다(식 구조는 다시 말로 입력, ADR-019) ---
 
-type FieldKind = "int" | "intOptional" | "days" | "code";
 interface Field {
-  /** params 안의 경로. "days.days"처럼 점으로 잇는다 */
+  /** 값 이름(Rule.values의 키) */
   key: string;
   label: string;
-  kind: FieldKind;
 }
 
 function fieldsOf(c: ConstraintSpec): Field[] {
-  switch (c.type) {
-    case "fixed_assignment":
-      return [
-        { key: "day", label: "날짜", kind: "int" },
-        { key: "shift", label: "근무", kind: "code" },
-      ];
-    case "count":
-      return [
-        ...(c.params.days?.days ? [{ key: "days.days", label: "날짜 (예: 15-17, 20)", kind: "days" as const }] : []),
-        ...(isLeaveRule(c)
-          ? []
-          : [
-              { key: "min", label: "최소", kind: "intOptional" as const },
-              { key: "max", label: "최대", kind: "intOptional" as const },
-            ]),
-      ];
-    case "sequence":
-      if (c.params.after) return [{ key: "then_off", label: "휴무 일수", kind: "int" }];
-      if (!c.params.run) return [];
-      return [
-        ...(c.params.min_len != null ? [{ key: "min_len", label: "최소 일수", kind: "intOptional" as const }] : []),
-        ...(c.params.max_len != null ? [{ key: "max_len", label: "일수", kind: "intOptional" as const }] : []),
-      ];
-    case "balance":
-      return [];
-  }
+  if (c.type === "fixed_assignment" || isLeaveRule(c)) return [];
+  return Object.entries(c.values ?? {}).map(([key, v]) => ({ key, label: v.label }));
 }
 
 type Draft = Record<string, string>;
 
-function getPath(params: unknown, key: string): unknown {
-  return key.split(".").reduce<unknown>((v, k) => (v as Record<string, unknown> | undefined)?.[k], params);
-}
-
-function setPath(params: Record<string, unknown>, key: string, value: unknown): Record<string, unknown> {
-  const [head, ...rest] = key.split(".");
-  if (rest.length === 0) return { ...params, [head]: value };
-  return { ...params, [head]: setPath({ ...((params[head] as Record<string, unknown>) ?? {}) }, rest.join("."), value) };
-}
-
 function toDraft(c: ConstraintSpec): Draft {
-  return Object.fromEntries(
-    fieldsOf(c).map(({ key, kind }) => {
-      const v = getPath(c.params, key);
-      if (kind === "days") return [key, Array.isArray(v) ? dayRanges(v).map(([a, b]) => (a === b ? `${a}` : `${a}-${b}`)).join(", ") : ""];
-      return [key, v === undefined || v === null ? "" : String(v)];
-    }),
-  );
+  if (c.type !== "rule") return {};
+  return Object.fromEntries(Object.entries(c.values ?? {}).map(([key, v]) => [key, String(v.value)]));
 }
 
-/** "15-17, 20" → [15,16,17,20]. 범위 밖이거나 형식이 틀리면 null. */
-function parseDays(text: string, last: number): number[] | null {
-  const days: number[] = [];
-  for (const part of text.split(/[,\s]+/).filter(Boolean)) {
-    const m = /^(\d+)(?:[-~](\d+))?$/.exec(part);
-    if (!m) return null;
-    const a = Number(m[1]);
-    const b = m[2] ? Number(m[2]) : a;
-    if (a < 1 || b > last || a > b) return null;
-    for (let d = a; d <= b; d++) days.push(d);
-  }
-  return [...new Set(days)];
-}
-
-/** 폼 값을 params로 바꾼다. 잘못된 값이 있으면 오류 문구를 돌려준다. */
-function fromDraft(
-  c: ConstraintSpec,
-  draft: Draft,
-  last: number,
-  config: WardConfig,
-): { params: ConstraintSpec["params"] } | { error: string } {
-  let params = { ...(c.params as unknown as Record<string, unknown>) };
-  for (const { key, label, kind } of fieldsOf(c)) {
+/** 폼 값을 숫자로 바꾼다. 잘못된 값이 있으면 오류 문구를 돌려준다. */
+function fromDraft(c: ConstraintSpec, draft: Draft): { values: Record<string, number> } | { error: string } {
+  const values: Record<string, number> = {};
+  for (const { key, label } of fieldsOf(c)) {
     const v = draft[key].trim();
-    if (kind === "int" || kind === "intOptional") {
-      if (v === "" && kind === "intOptional") {
-        params = setPath(params, key, null);
-        continue;
-      }
-      if (!/^\d+$/.test(v)) return { error: `${label}: 0 이상의 정수를 입력해 주세요` };
-      if (key === "day" && (Number(v) < 1 || Number(v) > last)) return { error: `${label}: 1~${last}일 사이로 입력해 주세요` };
-      params = setPath(params, key, Number(v));
-    } else if (kind === "days") {
-      const days = parseDays(v, last);
-      if (!days || days.length === 0) return { error: `${label}: 1~${last} 사이 날짜를 쉼표로 구분해 주세요` };
-      params = setPath(params, key, days);
-    } else {
-      if (!config.shifts.some((s) => s.code === v)) return { error: `${label}: 근무를 골라 주세요` };
-      params = setPath(params, key, v);
-    }
+    if (!/^\d+(\.\d+)?$/.test(v)) return { error: `${label}: 0 이상의 숫자를 입력해 주세요` };
+    values[key] = Number(v);
   }
-  const pairs: [string, string][] = c.type === "count" ? [["min", "max"]] : c.type === "sequence" && c.params.run ? [["min_len", "max_len"]] : [];
-  for (const [lo, hi] of pairs) {
-    const a = params[lo] as number | null | undefined;
-    const b = params[hi] as number | null | undefined;
-    if (a == null && b == null) return { error: "숫자를 하나 이상 입력해 주세요" };
-    if (a != null && b != null && a > b) return { error: "최소가 최대보다 커요" };
-  }
-  return { params: params as unknown as ConstraintSpec["params"] };
+  if (values.min != null && values.max != null && values.min > values.max) return { error: "최소가 최대보다 커요" };
+  return { values };
 }
 
-function FieldInput({
-  field,
-  value,
-  config,
-  onChange,
-}: {
-  field: Field;
-  value: string;
-  config: WardConfig;
-  onChange: (v: string) => void;
-}) {
-  const control =
-    field.kind === "code" ? (
-      <select value={value} onChange={(e) => onChange(e.target.value)} className={`${ui.input} h-8`}>
-        {config.shifts.map((s) => (
-          <option key={s.code} value={s.code}>
-            {s.name}
-          </option>
-        ))}
-      </select>
-    ) : field.kind === "days" ? (
-      <input value={value} onChange={(e) => onChange(e.target.value)} className={`${ui.input} h-8 w-48 font-mono`} />
-    ) : (
-      <input
-        inputMode="numeric"
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        className={`${ui.input} h-8 w-20 font-mono`}
-      />
-    );
+function FieldInput({ field, value, onChange }: { field: Field; value: string; onChange: (v: string) => void }) {
   return (
     <label className="flex flex-col gap-1">
       <span className={ui.label}>{field.label}</span>
-      {control}
+      <input inputMode="decimal" value={value} onChange={(e) => onChange(e.target.value)} className={`${ui.input} h-8 w-20 font-mono`} />
     </label>
   );
 }
@@ -299,25 +199,26 @@ export default function ConstraintCard({
   const applyCard = (id: string) => (isRule ? store.applyRule(id) : store.applyRequest(period!.id, id));
   const updateCard = (id: string, patch: CardPatch) =>
     isRule ? store.updateRule(id, patch) : store.updateRequest(period!.id, id, patch);
+  const setValue = (id: string, name: string, value: number) =>
+    isRule ? store.setRuleValue(id, name, value) : store.setRequestValue(period!.id, id, name, value);
   const removeCard = (id: string) => (isRule ? store.removeRule(id) : store.removeRequest(period!.id, id));
 
-  const refs = card.type === "fixed_assignment" ? [card.params.nurse_id] : (card.params.people?.ids ?? []);
-  const orphan = refs.some((id) => !nurses.some((n) => n.id === id));
+  const orphan = refNurses(card).some((id) => !nurses.some((n) => n.id === id));
   const fields = fieldsOf(card);
   const editable = fields.length > 0;
-  const lastDay = range.length;
   // 대기 중인 설정 변경(새 코드)도 이름으로 읽히게 합쳐서 문장을 만든다
   const config = isRule ? ward.pendingConfig.reduce((c, x) => applyShiftChange(c, x.change), ward.config) : ward.config;
-  const hardness: Hardness = alwaysHard(card) ? "hard" : (card.hardness ?? (card.type === "balance" ? "soft" : "hard"));
+  const isBalance = card.type === "rule" && card.body.kind === "balance";
+  const hardness: Hardness = alwaysHard(card) ? "hard" : (card.hardness ?? (isBalance ? "soft" : "hard"));
 
   const save = () => {
     if (!draft) return;
-    const out = fromDraft(card, draft, lastDay, ward.config);
+    const out = fromDraft(card, draft);
     if ("error" in out) {
       setError(out.error);
       return;
     }
-    updateCard(card.id, { params: out.params });
+    for (const [name, value] of Object.entries(out.values)) setValue(card.id, name, value);
     setDraft(null);
     setError(null);
   };
@@ -333,7 +234,7 @@ export default function ConstraintCard({
           <div className="flex items-center gap-2">
             {hardness === "soft" && card.type !== "fixed_assignment" && (
               <PrioritySelect
-                value={card.priority ?? (card.type === "balance" ? "low" : "normal")}
+                value={card.priority ?? (isBalance ? "low" : "normal")}
                 disabled={readOnly}
                 onChange={(priority) => updateCard(card.id, { priority })}
               />
@@ -352,20 +253,14 @@ export default function ConstraintCard({
         <div className="flex flex-col gap-2.5 rounded-sm bg-[#F6F6F3] px-2.5 py-2">
           <div className="flex flex-wrap items-end gap-3">
             {fields.map((f) => (
-              <FieldInput
-                key={f.key}
-                field={f}
-                value={draft[f.key]}
-                config={ward.config}
-                onChange={(v) => setDraft({ ...draft, [f.key]: v })}
-              />
+              <FieldInput key={f.key} field={f} value={draft[f.key]} onChange={(v) => setDraft({ ...draft, [f.key]: v })} />
             ))}
           </div>
           {error && <p className={ui.error}>{error}</p>}
         </div>
       ) : (
         <p className={`rounded-sm bg-[#F6F6F3] px-2.5 py-2 text-xs ${off ? "text-[#66665E]" : "text-[#3D3D38]"}`}>
-          {describeBlock(card, config, nurses, range)}
+          {describeRule(card, config, nurses, range).text}
         </p>
       )}
 

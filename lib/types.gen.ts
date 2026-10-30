@@ -3,7 +3,7 @@
 
 export type SolveResponse = SolveOk | SolveInfeasible | SolveTimeout;
 export type TranslateResponse = TranslateOk | TranslateClarify | TranslateUnsupported;
-export type ConstraintSpec = CountRule | SequenceRule | BalanceRule | FixedAssignment;
+export type ConstraintSpec = Rule | FixedAssignment;
 
 export interface ApiTypes {
   ScheduleRequest: ScheduleRequest;
@@ -24,7 +24,7 @@ export interface ScheduleRequest {
   nurses: [Nurse, ...Nurse[]];
   period: Period;
   holidays?: number[];
-  constraints?: (CountRule | SequenceRule | BalanceRule | FixedAssignment)[];
+  constraints?: (Rule | FixedAssignment)[];
   carry_over?: CarryOverRow[];
   previous?: {
     [k: string]: string[];
@@ -63,7 +63,10 @@ export interface Period {
   start_date: string;
   length: number;
 }
-export interface CountRule {
+/**
+ * 규칙 = 범위 + 본문. 기본 hardness는 require가 hard, balance가 soft·낮음(블록과 같다).
+ */
+export interface Rule {
   id: string;
   scope: "ward" | "period";
   hardness?: "hard" | "soft";
@@ -71,18 +74,34 @@ export interface CountRule {
   source_text: string;
   enabled?: boolean;
   priority?: "high" | "normal" | "low";
-  type: "count";
-  params: CountParams;
+  type: "rule";
+  default?: boolean;
+  values?: {
+    [k: string]: Value;
+  };
+  body: Require | Balance;
 }
-export interface CountParams {
+/**
+ * 조정 가능한 값. 카드 [수정]과 완화 제안은 이 값만 바꾼다.
+ *
+ * This interface was referenced by `undefined`'s JSON-Schema definition
+ * via the `patternProperty` "^[a-z][a-z0-9_]{0,23}$".
+ */
+export interface Value {
+  value: number;
+  label: string;
+}
+export interface Require {
+  kind: "require";
+  for_each: ForEach;
+  when?: Cmp | All | Any | null;
+  then: Cmp | All | Any;
+}
+export interface ForEach {
+  per: "period" | "day" | "person" | "person_day" | "person_week" | "person_window";
   people?: People;
   days?: Days;
-  shifts: Shifts;
-  per: "day" | "person" | "person_week" | "person_window";
   window?: number | null;
-  measure?: "count" | "hours";
-  min?: number | null;
-  max?: number | null;
 }
 export interface People {
   ids?: string[] | null;
@@ -96,32 +115,20 @@ export interface Days {
   weekdays?: number[] | null;
   days?: number[] | null;
 }
+export interface Cmp {
+  left: Count;
+  op: "ge" | "le" | "eq";
+  right: number | ValueRef | Count;
+}
 /**
- * 칸이 맞는다 = 그 칸 코드의 covers가 in과 겹친다(또는 not_in과 겹치지 않는다).
+ * 세는 칸: (who 또는 묶인 사람) × (묶인 날을 days로 거른 것) 중 shifts에 맞는 칸의 수(또는 근무 시간).
  */
-export interface Shifts {
-  in?: [string, ...string[]] | null;
-  not_in?: [string, ...string[]] | null;
-}
-export interface SequenceRule {
-  id: string;
-  scope: "ward" | "period";
-  hardness?: "hard" | "soft";
-  weight?: number;
-  source_text: string;
-  enabled?: boolean;
-  priority?: "high" | "normal" | "low";
-  type: "sequence";
-  params: SequenceParams;
-}
-export interface SequenceParams {
-  people?: People1;
-  forbid?: [[Shifts, Shifts, ...Shifts[]], ...[Shifts, Shifts, ...Shifts[]][]] | null;
-  run?: Shifts | null;
-  min_len?: number | null;
-  max_len?: number | null;
-  after?: Shifts | null;
-  then_off?: number | null;
+export interface Count {
+  who?: People1 | null;
+  days?: Days1;
+  offset?: [unknown, unknown, ...unknown[]] | null;
+  shifts: Shifts;
+  measure?: "count" | "hours";
 }
 export interface People1 {
   ids?: string[] | null;
@@ -130,24 +137,46 @@ export interface People1 {
   min_years?: number | null;
   max_years?: number | null;
 }
-export interface BalanceRule {
-  id: string;
-  scope: "ward" | "period";
-  hardness?: "hard" | "soft";
-  weight?: number;
-  source_text: string;
-  enabled?: boolean;
-  priority?: "high" | "normal" | "low";
-  type: "balance";
-  params: BalanceParams;
+export interface Days1 {
+  kind?: "all" | "weekday" | "weekend" | "holiday";
+  weekdays?: number[] | null;
+  days?: number[] | null;
 }
-export interface BalanceParams {
+/**
+ * 칸이 맞는다 = 그 칸 코드의 covers가 in과 겹친다(또는 not_in과 겹치지 않는다).
+ */
+export interface Shifts {
+  in?: [string, ...string[]] | null;
+  not_in?: [string, ...string[]] | null;
+}
+export interface ValueRef {
+  value: string;
+}
+export interface All {
+  /**
+   * @minItems 2
+   * @maxItems 4
+   */
+  all: [Cmp, Cmp, ...Cmp[]];
+}
+export interface Any {
+  /**
+   * @minItems 2
+   * @maxItems 4
+   */
+  any: [Cmp, Cmp, ...Cmp[]];
+}
+/**
+ * 내장 함수 고르게: 고른 사람 사이 차이를 줄인다(고르게 블록과 같다).
+ */
+export interface Balance {
+  kind: "balance";
   people?: People2;
-  days?: Days1;
+  days?: Days2;
   shifts: Shifts;
   measure?: "count" | "hours";
   with_history?: boolean;
-  max_gap?: number;
+  max_gap?: number | ValueRef;
 }
 export interface People2 {
   ids?: string[] | null;
@@ -156,7 +185,7 @@ export interface People2 {
   min_years?: number | null;
   max_years?: number | null;
 }
-export interface Days1 {
+export interface Days2 {
   kind?: "all" | "weekday" | "weekend" | "holiday";
   weekdays?: number[] | null;
   days?: number[] | null;
@@ -280,8 +309,14 @@ export interface WardConfig1 {
 export interface TranslateOk {
   status: "ok";
   input_version: number;
-  constraints: (CountRule | SequenceRule | BalanceRule | FixedAssignment)[];
+  constraints: (Rule | FixedAssignment)[];
   config_changes?: ShiftChange[];
+  examples?: {
+    /**
+     * @maxItems 3
+     */
+    [k: string]: RuleExample[];
+  };
 }
 /**
  * 설정 변경 카드(ADR-018): 근무 코드 추가·수정. 삭제는 설정 화면에서만 한다.
@@ -289,6 +324,26 @@ export interface TranslateOk {
 export interface ShiftChange {
   action: "add" | "update";
   shift: ShiftDef;
+}
+/**
+ * 예시 판정(설계 §4.2): 샘플 근무표에서 규칙을 어긴 사례 하나. 카드가 작은 근무 띠로 그린다.
+ */
+export interface RuleExample {
+  /**
+   * @minItems 1
+   * @maxItems 3
+   */
+  nurse_ids: [string, ...string[]];
+  /**
+   * @minItems 1
+   * @maxItems 7
+   */
+  days: [number, ...number[]];
+  cells: {
+    [k: string]: string[];
+  };
+  marks: [unknown, unknown, ...unknown[]][];
+  detail: string;
 }
 export interface TranslateClarify {
   status: "clarify";
@@ -316,13 +371,15 @@ export interface RelaxationProposal {
   changes: ConstraintChange[];
   verified_summary?: Summary | null;
 }
+/**
+ * 완화 변경(★7): 끄기, 값 하나 바꾸기, 반드시/가능하면 바꾸기. 식 구조는 바꾸지 않는다.
+ */
 export interface ConstraintChange {
-  action: "disable" | "update";
+  action: "disable" | "set_value" | "set_hardness";
   constraint_id: string;
-  params?: {
-    [k: string]: unknown;
-  } | null;
   hardness?: ("hard" | "soft") | null;
+  name?: string | null;
+  value?: number | null;
 }
 export interface ErrorBody {
   error: ErrorDetail;

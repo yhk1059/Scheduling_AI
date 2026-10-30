@@ -3,17 +3,18 @@
 // 랜딩 첫 화면의 실제 제품 화면 조각. 앱의 그리드 컴포넌트와 카드 문구(lib/wording)를 샘플 데이터로 정적 렌더한다(조작 불가).
 import { isWeekendDay } from "@/lib/period";
 import type { Code } from "@/lib/store";
-import { DEFAULT_CONFIG } from "@/lib/migrate";
+import { blockToRules, DEFAULT_CONFIG, type BlockSpec } from "@/lib/migrate";
 import demo from "@/lib/samples/demo-schedule.json";
 import ward from "@/lib/samples/ward-15.json";
 import type { ConstraintSpec, Nurse, Period, ScheduleResult } from "@/lib/types.gen";
-import { describeBlock, hardnessLabel, presetName } from "@/lib/wording";
+import { describeRule, hardnessLabel, presetName } from "@/lib/wording";
 
 import { ScheduleGrid } from "./ScheduleStep";
 import { ui } from "./ui";
 
 // 샘플 데모(/demo)와 같은 데이터: 병동 규칙 두 장과 근무표 첫 주(2026년 11월 1~7일, 일~토)의 앞 5명.
-const CARDS = (ward.constraints as unknown as ConstraintSpec[]).filter((c) => ["rule-noff", "rule-max-nights"].includes(c.id));
+// 샘플은 아직 블록 형식으로 저장돼 있어 식 규칙으로 바꿔 쓴다
+const CARDS = (ward.constraints as unknown as BlockSpec[]).flatMap(blockToRules).filter((c) => ["rule-noff", "rule-max-nights"].includes(c.id));
 const NURSES: Nurse[] = ward.nurses.slice(0, 5);
 const ROWS: Record<string, Code[]> = Object.fromEntries(
   NURSES.map((n) => [n.id, (demo.result.assignments as Record<string, Code[]>)[n.id].slice(0, 7)]),
@@ -48,7 +49,7 @@ export function PreviewCard({ card, nurses, period }: { card: ConstraintSpec; nu
         </div>
       </div>
       <p className="text-sm text-[#1B1B18]">“{card.source_text}”</p>
-      <p className="rounded-sm bg-[#F6F6F3] px-2.5 py-2 text-xs text-[#3D3D38]">{describeBlock(card, DEFAULT_CONFIG, nurses, period)}</p>
+      <p className="rounded-sm bg-[#F6F6F3] px-2.5 py-2 text-xs text-[#3D3D38]">{describeRule(card, DEFAULT_CONFIG, nurses, period).text}</p>
       <div>
         <span className={`${ui.badge} bg-[#E6F2EA] text-[#1E6B3F]`}>적용됨</span>
       </div>
