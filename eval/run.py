@@ -5,8 +5,11 @@ uv run python eval/run.py [--dry-run] [--gate] [--limit N] [--ids r01,r02]
 --dry-run은 API를 호출하지 않고 데이터셋만 검증한다. 실행 모드는 결과를 eval/results.md에 쓴다.
 --gate는 set별 완전 일치율과 스키마 유효율이 목표(GATE_*) 미만이면 exit 1.
 
-채점은 의미 기준이다(설계 §7). 고정 시드 무작위 근무표와, 기대 블록의 대상 칸을 뒤집은 근무표에서
-stats.violations의 위반 집합이 모두 같고 hardness(soft면 priority도)가 같으면 같은 규칙으로 본다.
+채점은 의미 기준이다(설계 §7). 고정 시드 무작위 근무표와, 기대 규칙이 세는 칸을 뒤집은 근무표에서
+evaluate.evaluate_rule의 위반 집합이 모두 같고 hardness(soft면 priority도)가 같으면 같은 규칙으로 본다.
+위반 하나는 그 위반을 만든 칸(넘친 쪽의 세는 칸, 모자란 쪽의 세지 않은 칸, when 조건의 세는 칸)의
+(사람 묶음, 날)로 펼친다. 그래서 같은 뜻의 다른 식 모양(window ↔ offset, 사람마다 ↔ 사람·날마다, 짝 ≤ 1 ↔ when)이 같다.
+판정에 LLM을 쓰지 않는다.
 """
 
 import argparse
@@ -31,7 +34,9 @@ from pydantic import BaseModel, TypeAdapter, ValidationError  # noqa: E402
 from backend.domain.constants import CARRY_OVER_DAYS, NIGHT_ONLY_TAG, OFF_CODE  # noqa: E402
 from backend.domain.models import (  # noqa: E402
     DEFAULT_CONFIG,
+    Balance,
     ConstraintSpec,
+    Count,
     Nurse,
     People,
     Period,
@@ -41,6 +46,7 @@ from backend.domain.models import (  # noqa: E402
     TranslateContext,
     TranslateRequest,
     WardConfig,
+    cond_cmps,
     rule_counts,
 )
 from backend.domain.convert import block_to_rules  # noqa: E402
@@ -52,24 +58,25 @@ from backend.llm.client import (  # noqa: E402
     ToolCallResult,
 )
 from backend.llm.translator import translate  # noqa: E402
-from backend.solver import select  # noqa: E402
-from backend.solver.stats import violations  # noqa: E402
+from backend.solver import evaluate, select  # noqa: E402
 
 DATASET = ROOT / "eval" / "dataset.jsonl"
 RESULTS = ROOT / "eval" / "results.md"
 SAMPLE = ROOT / "lib" / "samples" / "ward-15.json"
 STATUSES = ("ok", "clarify", "unsupported")
 SCOPES = ("ward", "period")
-SETS = ("legacy", "new")
-EXPECTED_TYPES = ("count", "sequence", "balance", "fixed_assignment")
+SETS = ("legacy", "new", "expr")
+PRIOR_SETS = ("legacy", "new")  # 식 이전의 기존 79건
+EXPECTED_TYPES = ("rule", "fixed_assignment")
 
-# 게이트 목표(사용자 결정 ★9). 낮추지 않는다
-GATE_EXACT = {"legacy": 0.95, "new": 0.85}
+# 게이트 목표(사용자 결정 ★8). 낮추지 않는다
+GATE_EXACT = {"legacy": 0.95, "new": 0.95, "expr": 0.85}
+GATE_PRIOR_EXACT = 0.95  # 기존 79건 합산
 GATE_SCHEMA_VALID = 1.0
 
-# 의미 판정: 무작위 근무표 수, 기대 블록마다 대상 칸을 뒤집은 근무표 수, 시드
+# 의미 판정: 무작위 근무표 수, 기대 규칙의 세기마다 세는 칸을 뒤집은 근무표 수, 시드
 K_RANDOM = 50
-FLIPS_PER_BLOCK = 4
+FLIPS_PER_COUNT = 4
 SEED = 20261030
 
 # eval 병동 = 샘플 병동 + 태그(책임 2명, 신규 3명). 샘플의 나이트전담 태그는 그대로 둔다
@@ -156,22 +163,23 @@ def _with_cells(assignments: dict[str, list[str]], cells: list[tuple[str, int]],
     return out
 
 
-def _target(request: ScheduleRequest, spec: Any) -> tuple[list[tuple[str, int]], Shifts]:
-    """블록의 대상 칸(기간 안)과 그 칸을 세는 근무 셀렉터."""
-    p = spec.params
+def _targets(request: ScheduleRequest, spec: Any) -> list[tuple[list[tuple[str, int]], Shifts]]:
+    """규칙이 세는 칸(기간 안)과 그 칸의 근무 셀렉터. 세기마다 하나."""
     if spec.type == "fixed_assignment":
-        return [(p.nurse_id, p.day)], Shifts(in_=[p.shift])
-    if spec.type == "count":
-        cells = [cell for _, _, cs in select.count_groups(request, p) for cell in cs if cell[1] >= 1]
-        return cells, p.shifts
-    if spec.type == "balance":
-        return [(n, d) for n, ds in select.balance_cells(request, p).items() for d in ds], p.shifts
-    sel = p.run or p.after or p.forbid[0][0]
-    return [(n, d) for n in select.people(request, p.people) for d in range(1, request.period.days + 1)], sel
+        p = spec.params
+        return [([(p.nurse_id, p.day)], Shifts(in_=[p.shift]))]
+    body = spec.body
+    if isinstance(body, Balance):
+        return [([(n, d) for n, ds in select.balance_cells(request, body).items() for d in ds], body.shifts)]
+    insts = evaluate.instances(request, spec)
+    return [
+        (sorted({cell for inst in insts for cell in evaluate.count_scope(request, spec, inst, c) if cell[1] >= 1}), c.shifts)
+        for c in rule_counts(body)
+    ]
 
 
 def judge_schedules(case: dict | None, config: WardConfig, expected: list) -> list[tuple[ScheduleRequest, dict]]:
-    """판정 근무표: 무작위 K_RANDOM개(이월 포함) + 기대 블록마다 대상 칸을 뒤집은 FLIPS_PER_BLOCK개. 고정 시드."""
+    """판정 근무표: 무작위 K_RANDOM개(이월 포함) + 기대 규칙의 세기마다 세는 칸을 뒤집은 FLIPS_PER_COUNT개. 고정 시드."""
     ward = _ward()
     period, holidays = _period(case, ward)
     rng = random.Random(SEED)
@@ -187,17 +195,17 @@ def judge_schedules(case: dict | None, config: WardConfig, expected: list) -> li
 
     for i, spec in enumerate(expected):
         request, assignments = out[i % K_RANDOM]
-        cells, sel = _target(request, spec)
-        match = [c for c in codes if select.matches(config, c, sel)]
-        other = [c for c in codes if c not in match]
-        for mode, pool in (("all", match), ("all", other), ("half", match), ("half", other))[:FLIPS_PER_BLOCK]:
-            if cells and pool:
-                out.append((request, _with_cells(assignments, cells, pool, rng, mode)))
+        for cells, sel in _targets(request, spec):
+            match = [c for c in codes if select.matches(config, c, sel)]
+            other = [c for c in codes if c not in match]
+            for mode, pool in (("all", match), ("all", other), ("half", match), ("half", other))[:FLIPS_PER_COUNT]:
+                if cells and pool:
+                    out.append((request, _with_cells(assignments, cells, pool, rng, mode)))
     return out
 
 
 def _as_rules(specs: list) -> list:
-    """블록은 식 규칙으로 바꿔 같은 단위(규칙)로 비교한다. 바꿀 수 없는 블록은 그대로 둔다."""
+    """블록은 식 규칙으로 바꿔 같은 단위(규칙)로 비교한다. 바꿀 수 없는 블록은 그대로 둔다(어떤 것과도 같지 않다)."""
     out = []
     for s in specs:
         try:
@@ -207,30 +215,58 @@ def _as_rules(specs: list) -> list:
     return out
 
 
-def _scope_people(request: ScheduleRequest, spec: Any) -> frozenset:
-    """사람 없는 위반의 사람 묶음: 블록·고르게는 고른 사람, 사람이 묶인 범위는 그 사람들, 날·기간 범위는 세는 사람(who)."""
-    if spec.type != "rule":
-        return frozenset(select.people(request, spec.params.people))
-    body = spec.body
-    if body.kind == "balance":
+def _scope_people(request: ScheduleRequest, rule: Any) -> frozenset:
+    """사람이 묶이지 않은 위반의 사람 묶음: 고르게는 고른 사람, 날·기간 범위는 세는 사람(who)."""
+    body = rule.body
+    if isinstance(body, Balance):
         return frozenset(select.people(request, body.people))
-    if body.for_each.per not in ("day", "period"):
-        return frozenset(select.people(request, body.for_each.people))
     return frozenset(n for c in rule_counts(body) for n in select.people(request, c.who or People()))
 
 
+def _blamed(request: ScheduleRequest, assignments: dict, rule: Any, inst: Any) -> set[tuple[str, int]]:
+    """위반을 만든 기간 안 칸: 어긴 then 비교의 넘친 쪽 세는 칸·모자란 쪽 세지 않은 칸 + when 비교의 세는 칸."""
+    body = rule.body
+    sides: list[tuple[Count, bool]] = []
+    for c in cond_cmps(body.then):
+        if evaluate.cmp_holds(request, assignments, rule, inst, c):
+            continue
+        left, right = evaluate.cmp_sides(request, assignments, rule, inst, c)
+        sides.append((c.left, left > right))
+        if isinstance(c.right, Count):
+            sides.append((c.right, left < right))
+    for c in cond_cmps(body.when):
+        sides += [(c.left, True)] + ([(c.right, True)] if isinstance(c.right, Count) else [])
+    return {
+        (nid, d)
+        for count, counted in sides
+        for nid, d, code in evaluate.count_cells(request, assignments, rule, inst, count)
+        if d >= 1 and select.matches(request.config, code, count.shifts) == counted
+    }
+
+
+def _violation_keys(request: ScheduleRequest, assignments: dict, spec: Any) -> frozenset:
+    """근무표 하나의 위반 집합 {(사람 묶음, 날)}. 사람이 묶인 범위는 그 사람, 아니면 규칙이 세는 사람 전체로 본다."""
+    if spec.type == "fixed_assignment":
+        p = spec.params
+        return frozenset() if assignments[p.nurse_id][p.day - 1] == p.shift else frozenset({(frozenset({p.nurse_id}), p.day)})
+    if spec.type != "rule":
+        raise ValueError(f"식이 아닌 제약 {spec.type}")
+    everyone = _scope_people(request, spec)
+    keys = set()
+    for v in evaluate.evaluate_rule(request, assignments, spec):
+        group = frozenset({v.instance.nurse_id}) if v.instance.nurse_id else everyone
+        if isinstance(spec.body, Balance):
+            keys.add((group, None))
+            continue
+        cells = _blamed(request, assignments, spec, v.instance)
+        keys |= {(group, d) for _, d in cells} if cells else {(group, v.instance.days)}
+    return frozenset(keys)
+
+
 def _signature(spec: Any, schedules: list[tuple[ScheduleRequest, dict]]) -> Any:
-    """근무표마다 위반 집합 {(사람 묶음, 날)}. 사람 없는 위반(날마다·고르게)은 규칙이 고른 사람 전체로 본다."""
+    """근무표마다 위반 집합."""
     try:
-        sig = []
-        for request, assignments in schedules:
-            if spec.type == "fixed_assignment":
-                everyone = frozenset({spec.params.nurse_id})
-            else:
-                everyone = _scope_people(request, spec)
-            found = violations(request, assignments, spec)
-            sig.append(frozenset((frozenset({v.nurse_id}) if v.nurse_id else everyone, v.day) for v in found))
-        return tuple(sig)
+        return tuple(_violation_keys(request, assignments, spec) for request, assignments in schedules)
     except (KeyError, StopIteration, ValueError):  # 판정 근무 형태에 없는 코드 등: 어떤 것과도 같지 않다
         return object()
 
@@ -243,9 +279,8 @@ def _judge_key(spec: Any, schedules: list) -> tuple:
 def score_constraints(expected: list, actual: list, case: dict | None = None, config: WardConfig | None = None) -> tuple[int, int, int]:
     """의미 기준 일대일 매칭(식 규칙 단위). (일치 수, 기대 수, 실제 수)."""
     config = config or judge_config([])
-    exp = [_spec(c) for c in expected]
-    schedules = judge_schedules(case, config, exp)
-    exp_rules, act_rules = _as_rules(exp), _as_rules([_spec(c) for c in actual])
+    exp_rules, act_rules = _as_rules([_spec(c) for c in expected]), _as_rules([_spec(c) for c in actual])
+    schedules = judge_schedules(case, config, exp_rules)
     e = Counter(_judge_key(s, schedules) for s in exp_rules)
     a = Counter(_judge_key(s, schedules) for s in act_rules)
     return sum((e & a).values()), len(exp_rules), len(act_rules)
@@ -263,6 +298,15 @@ def score_config_changes(expected: list, actual: list) -> tuple[int, int, int]:
 
 
 # --- 데이터셋 검증 ---
+
+
+def _people_selectors(spec: Any) -> list[People]:
+    if spec.type != "rule":
+        return []
+    body = spec.body
+    if isinstance(body, Balance):
+        return [body.people]
+    return [body.for_each.people] + [c.who for c in rule_counts(body) if c.who is not None]
 
 
 def validate_dataset(cases: list[dict]) -> list[str]:
@@ -298,7 +342,7 @@ def validate_dataset(cases: list[dict]) -> list[str]:
             errors.append(f"{cid}: {status}인데 constraints나 config_changes가 있음")
         bad_types = [x.get("type") for x in constraints if x.get("type") not in EXPECTED_TYPES]
         if bad_types:
-            errors.append(f"{cid}: 블록이 아닌 type {bad_types}")
+            errors.append(f"{cid}: 식 규칙이 아닌 type {bad_types}")
             continue
 
         try:
@@ -320,8 +364,7 @@ def validate_dataset(cases: list[dict]) -> list[str]:
             errors.append(f"{cid}: {msgs}")
             continue
         for spec in req.constraints:
-            people = getattr(spec.params, "people", None)
-            tags = set(people.tags or []) | set(people.exclude_tags) if people else set()
+            tags = {t for sel in _people_selectors(spec) for t in (*(sel.tags or []), *sel.exclude_tags)}
             if tags - known_tags:
                 errors.append(f"{cid}: eval 병동에 없는 태그 {sorted(tags - known_tags)}")
     return errors
@@ -351,7 +394,7 @@ class CaseResult:
     text: str
     expected: dict
     status: str | None  # 예외면 None
-    actual: list[dict]  # 블록(id·scope·source_text·enabled·weight 제외)
+    actual: list[dict]  # 식 규칙(id·scope·source_text·enabled·weight 제외)
     detail: str | None  # clarify 질문, unsupported 이유
     error: str | None
     retries: int
@@ -484,6 +527,13 @@ def aggregate_by_set(results: list[CaseResult]) -> dict[str, dict[str, Any]]:
     return {s: aggregate([r for r in results if r.set == s]) for s in SETS if any(r.set == s for r in results)}
 
 
+def prior_exact_rate(by_set: dict[str, dict]) -> float | None:
+    """기존 79건(PRIOR_SETS) 합산 완전 일치율."""
+    sets = [by_set[s] for s in PRIOR_SETS if s in by_set]
+    cases = sum(m["cases"] for m in sets)
+    return round(sum(m["exact_match_rate"] * m["cases"] for m in sets), 6) / cases if cases else None
+
+
 def gate_failures(metrics: dict, by_set: dict[str, dict]) -> list[str]:
     """목표 미달 항목. 비어 있으면 통과."""
     out = []
@@ -493,6 +543,9 @@ def gate_failures(metrics: dict, by_set: dict[str, dict]) -> list[str]:
         rate = by_set.get(s, {}).get("exact_match_rate")
         if rate is None or rate < target:
             out.append(f"{s} 완전 일치율 {'-' if rate is None else f'{rate:.1%}'} < {target:.0%}")
+    prior = prior_exact_rate(by_set)
+    if prior is None or prior < GATE_PRIOR_EXACT:
+        out.append(f"기존 {'+'.join(PRIOR_SETS)} 합산 완전 일치율 {_pct(prior)} < {GATE_PRIOR_EXACT:.0%}")
     return out
 
 
@@ -525,15 +578,42 @@ def _pct(v: float | None) -> str:
     return "-" if v is None else f"{v:.1%}"
 
 
+HISTORY = "## 실행 이력"
+_HISTORY_HEAD = [
+    "| 실행 시각 | 모델 | 케이스 | " + " | ".join(SETS) + " | 기존 합산 | 스키마 유효율 | 게이트 |",
+    "|" + "---|" * (len(SETS) + 6),
+]
+
+
+def _history_rows(path: Path) -> list[str]:
+    """지난 결과 파일의 실행 이력 행."""
+    if not path.exists():
+        return []
+    text = path.read_text(encoding="utf-8")
+    if HISTORY not in text:
+        return []
+    section = text.split(HISTORY, 1)[1].split("\n## ", 1)[0]
+    return [line for line in section.splitlines() if line.startswith("| ") and not line.startswith("| 실행 시각")]
+
+
 def write_results(path: Path, metrics: dict, results: list[CaseResult], model: str, by_set: dict | None = None) -> None:
     by_set = by_set if by_set is not None else aggregate_by_set(results)
+    now = datetime.now().astimezone().isoformat(timespec="seconds")
+    gate = "통과" if not gate_failures(metrics, by_set) else "미달"
+    row = (
+        f"| {now} | `{model}` | {metrics['cases']} | "
+        + " | ".join(_pct(by_set[s]["exact_match_rate"]) if s in by_set else "-" for s in SETS)
+        + f" | {_pct(prior_exact_rate(by_set))} | {_pct(metrics['schema_valid_rate'])} | {gate} |"
+    )
+    history = _history_rows(path) + [row]
     lines = [
         "# 번역 eval 결과",
         "",
-        f"- 실행 시각: {datetime.now().astimezone().isoformat(timespec='seconds')}",
+        f"- 실행 시각: {now}",
         f"- 모델: `{model}`",
         f"- 데이터셋: `eval/dataset.jsonl` ({metrics['cases']}개)",
-        f"- 판정: 의미 기준(무작위 근무표 {K_RANDOM}개 + 기대 블록마다 대상 칸을 뒤집은 근무표 {FLIPS_PER_BLOCK}개, 시드 {SEED})",
+        f"- 판정: 의미 기준(무작위 근무표 {K_RANDOM}개 + 기대 규칙의 세기마다 세는 칸을 뒤집은 근무표 {FLIPS_PER_COUNT}개, 시드 {SEED}, "
+        "위반은 evaluate.evaluate_rule)",
         "",
         "## set별 지표",
         "",
@@ -545,6 +625,10 @@ def write_results(path: Path, metrics: dict, results: list[CaseResult], model: s
             f"| {s} | {m['cases']} | {_pct(m['exact_match_rate'])} | ≥ {GATE_EXACT[s]:.0%} | {_pct(m['status_accuracy'])} "
             f"| {_pct(m['f1'])} | {_pct(m['schema_valid_rate'])} |"
         )
+    prior = prior_exact_rate(by_set)
+    if prior is not None:
+        lines.append(f"| 기존 {'+'.join(s for s in PRIOR_SETS if s in by_set)} 합산 | "
+                     f"{sum(by_set[s]['cases'] for s in PRIOR_SETS if s in by_set)} | {_pct(prior)} | ≥ {GATE_PRIOR_EXACT:.0%} | | | |")
     lines += ["", "## 전체 지표", "", "| 지표 | 값 |", "|---|---|"]
     for key, label, fmt in _LABELS:
         value = metrics[key]
@@ -571,6 +655,7 @@ def write_results(path: Path, metrics: dict, results: list[CaseResult], model: s
             lines.append(f"| {r.id} | {r.set} | {_cell(r.text)} | {_cell(expected)} | {_cell(actual)} |")
     else:
         lines.append("없음")
+    lines += ["", HISTORY, "", *_HISTORY_HEAD, *history]
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
