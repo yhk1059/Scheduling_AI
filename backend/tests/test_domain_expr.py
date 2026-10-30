@@ -308,3 +308,38 @@ def test_blocks_no_longer_accepted_beside_rules():
         ScheduleRequest.model_validate(request([blk, EXAMPLES["pair-apart"]]))
     req = ScheduleRequest.model_validate(request([EXAMPLES["pair-apart"]]))
     assert [c.type for c in req.constraints] == ["rule"]
+
+
+# --- 값 바꾸기(제안 set_value·카드 [수정]) ---
+
+from backend.tests import rules as R  # noqa: E402
+from backend.domain.models import with_value  # noqa: E402
+
+
+def test_with_value_changes_only_value():
+    cov = Rule.model_validate(R.coverage("D", "weekday", 3, 3))
+    name = next(iter(cov.values))
+    out = with_value(cov, name, 2)
+    assert out.values[name].value == 2 and out.body == cov.body
+    assert cov.values[name].value == 3  # 원본은 그대로
+
+
+def test_with_value_max_run_moves_window():
+    """최대 연속 k일은 k+1일 창마다 ≤k다. 값만 바꾸면 의미가 어긋나므로 창도 값+1로 바꾼다(클라이언트 withRuleValue와 같음)."""
+    mx = Rule.model_validate(R.max_nights("mx", 3))
+    out = with_value(mx, "max_len", 4)
+    assert out.values["max_len"].value == 4 and out.body.for_each.window == 5
+
+
+def test_with_value_max_run_window_bounds():
+    mx = Rule.model_validate(R.max_nights("mx", 3))
+    assert with_value(mx, "max_len", 13).body.for_each.window == 14
+    with pytest.raises(ValidationError):
+        with_value(mx, "max_len", 14)  # 창 15일은 상한 밖
+
+
+def test_with_value_keeps_window_of_other_window_rules():
+    """창 길이가 값+1이 아닌 창 규칙(7일마다 휴무 2일 이상 등)은 창을 그대로 둔다."""
+    wo = Rule.model_validate(R.window_off("wo", 7, 2))
+    out = with_value(wo, next(iter(wo.values)), 3)
+    assert out.body.for_each.window == 7
