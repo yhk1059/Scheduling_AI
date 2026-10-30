@@ -5,7 +5,10 @@
     {
       "step": 0,
       "name": "availability-lib",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-10-31T00:19:39+0900",
+      "summary": "lib/availability.ts(coversShift, availabilityRules), WorkPeriod.availability와 toScheduleRequest 연결(값이 없으면 규칙 없음, step 3에서 지움), _check_limits에서 avail- 규칙 분리, bench에 '식 + 가능 시간' 변형 추가. 결정: coversShift는 복합 코드의 parts를 찾으려고 셋째 인자 config를 받는다. 가능 시간 규칙은 전용 상한 MAX_AVAILABILITY_RULES(직원 40 × 휴무 뺀 코드 7 = 280)를 둬 avail- 접두사로 200개 상한을 우회하지 못하게 한다. 꺼진 근무 코드와 금지할 날이 없는 코드는 규칙을 만들지 않고, 꺼진 칸 고정은 가능 시간에서 빼지 않는다. 사람당 규칙이 코드별이라 충돌 목록에 같은 '{이름} 가능 시간'이 여러 줄 나올 수 있어 화면에서 묶어야 한다(step 3).",
+      "completed_at": "2026-10-31T00:25:10+0900"
     },
     {
       "step": 1,
@@ -27,5 +30,6 @@
       "name": "samples-e2e",
       "status": "pending"
     }
-  ]
+  ],
+  "created_at": "2026-10-31T00:19:39+0900"
 }
