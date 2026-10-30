@@ -1,4 +1,4 @@
-/** 처음 설정·근무표 작성 화면의 스테퍼. labels[i]가 단계 i + 1이다. */
+/** 근무표 작성 화면의 스테퍼. labels[i]가 단계 i + 1이다. */
 export default function Stepper<S extends number>({
   label: listLabel,
   labels,

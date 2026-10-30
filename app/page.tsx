@@ -87,7 +87,7 @@ export default function Home() {
             </a>
           </div>
           <p className="text-xs font-medium text-[#66665E]">
-            로그인 없이 바로 써 볼 수 있어요. 샘플에서는 직원 12명 매장의 규칙과 4주 근무표를 볼 수 있어요.
+            샘플은 로그인 없이 볼 수 있어요. 샘플에서는 직원 12명 매장의 규칙과 4주 근무표를 볼 수 있어요.
           </p>
         </div>
         <LandingPreview />

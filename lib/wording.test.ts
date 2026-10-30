@@ -5,7 +5,6 @@ import { balance, count, fixedCell, forbid, maxRun, minRun, OFF, offAfter, WORK 
 import { isLeaveRule, type Shop, type WorkPeriod } from "./store";
 import type { ConstraintSpec, Employee, Rule, Shifts, ShopConfig } from "./types.gen";
 import {
-  configSummary,
   describeRule,
   describeShiftChange,
   formatDeviation,
@@ -400,7 +399,6 @@ describe("nextTask", () => {
     pendingRules: [],
     pendingConfig: [],
     unconverted: [],
-    introSeen: true,
   };
   const TODAY = "2026-10-28";
   const result = { assignments: {} } as unknown as NonNullable<WorkPeriod["result"]>;
@@ -500,27 +498,3 @@ describe("taskDoneSteps", () => {
   });
 });
 
-describe("configSummary", () => {
-  const shift = (code: string, name: string, hours: number, extra: object = {}) => ({ code, name, hours, ...extra });
-  const config = (...shifts: ReturnType<typeof shift>[]): ShopConfig =>
-    ({ shifts: [...shifts, shift("O", "휴무", 0)] }) as unknown as ShopConfig;
-
-  it("기본 근무 형태는 UI_GUIDE 문구와 같다", () => {
-    expect(configSummary(DEFAULT_CONFIG)).toBe("오픈·미들·마감, 각 6시간");
-  });
-
-  it("시간이 다르면 근무조마다 적고, 더블과 꺼진 코드를 구분한다", () => {
-    const c = config(
-      shift("A", "오픈", 6),
-      shift("M", "미들", 6),
-      shift("C", "마감", 7),
-      shift("P", "피크", 3, { active: false }),
-      shift("AC", "더블", 13, { parts: ["A", "C"] }),
-    );
-    expect(configSummary(c)).toBe("오픈·미들·마감, 오픈 6시간·미들 6시간·마감 7시간 · 더블 AC");
-  });
-
-  it("근무조가 하나뿐이면 근무를 붙인다", () => {
-    expect(configSummary(config(shift("A", "오픈", 7.5)))).toBe("오픈 근무, 7.5시간");
-  });
-});

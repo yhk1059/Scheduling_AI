@@ -1,6 +1,7 @@
 // 클라이언트의 유일한 저장소. Zustand + persist(localStorage), 쓸 수 없으면 메모리로 동작한다.
 // 상태는 매장 1개 + 기간 목록(ARCHITECTURE "상태 관리"). 이력은 확정된 기간이다.
-// 로그인하면 같은 문서를 remote(shops.data)에도 저장한다(ADR-014). 서버 우선, 마지막 저장이 이긴다.
+// 로그인한 매니저의 문서를 remote(shops.data)에 저장한다(ADR-014, ADR-020). 서버 우선, 마지막 저장이 이긴다.
+// localStorage는 저장 실패 때의 캐시다. 로그아웃하면 비운다.
 import { create } from "zustand";
 import { persist, type PersistStorage, type StorageValue } from "zustand/middleware";
 
@@ -103,8 +104,6 @@ export interface Shop {
   unconverted: { source_text: string }[];
   /** 카드 표시 순서(새 카드가 앞). 적용해도 바뀌지 않는다. 옛 저장본에는 없다 */
   cardOrder?: string[];
-  /** 처음 설정 ② 매장 소개에서 [다음]을 한 번 눌렀다 */
-  introSeen: boolean;
   /** 규칙 카드 id → 예시 판정(translate 응답). 카드에 한 번만 두고 요청 본문에는 넣지 않는다 */
   examples?: Record<string, RuleExample[]>;
 }
@@ -149,13 +148,12 @@ export interface WorkPeriod extends PeriodRange {
   availability?: Record<string, AvailabilitySlots>;
 }
 
-export type SetupStep = 1 | 2 | 3;
 /** 근무표 작성: ① 가능 시간 → ② 매장 조건 → ③ 근무표 */
 export type PeriodStep = 1 | 2 | 3;
 
 export type View =
   | { screen: "home" }
-  | { screen: "setup"; step: SetupStep }
+  | { screen: "setup" }
   | { screen: "settings"; tab: "roster" | "shifts" | "rules" }
   | { screen: "period"; periodId: string; step: PeriodStep }
   | { screen: "confirmed"; periodId: string };
@@ -175,8 +173,7 @@ export interface ShopRemote {
   remove(): Promise<void>;
 }
 
-export type SyncStatus = "guest" | "loading" | "saving" | "saved" | "error";
-export type LoginPrompt = null | { kind: "server-replaced-guest" };
+export type SyncStatus = "idle" | "loading" | "saving" | "saved" | "error";
 
 export interface AppState extends Data {
   storageAvailable: boolean;
@@ -184,11 +181,8 @@ export interface AppState extends Data {
   // 로그인 저장 (persist 대상 아님)
   auth: { userId: string; email: string | null } | null;
   sync: { status: SyncStatus; savedAt: string | null };
-  /** 화면이 대화상자로 보여 줄 것 */
-  loginPrompt: LoginPrompt;
-  /** 로그인 직후(세션 복원 포함) 한 번. 서버 문서가 있으면 서버 우선, 없으면 게스트 상태를 올린다. */
+  /** 로그인 직후(세션 복원 포함) 한 번. 서버 문서가 있으면 서버 우선, 없으면 캐시나 빈 매장을 올린다. */
   signedIn: (user: AuthUser) => Promise<void>;
-  dismissLoginPrompt: () => void;
   retrySave: () => Promise<void>;
   /** 이 브라우저의 상태와 localStorage 키를 지운다. 서버 문서는 그대로 둔다. */
   signedOut: () => void;
@@ -200,8 +194,6 @@ export interface AppState extends Data {
   setUnit: (unit: PeriodUnit) => void;
   /** 필요 인원 기본 규칙(날마다, 평일/주말·공휴일, 그 코드, min 이상·max 이하, 같으면 정확히, max null이면 이상). */
   setCoverage: (code: Code, dayKind: DayKind, min: number, max: number | null) => void;
-  /** 처음 설정 ② 매장 소개에서 [다음]을 눌렀다. */
-  markIntroSeen: () => void;
   // 근무 형태
   /** 코드의 이름·실근무 시간·시작·끝 시각·세는 근무조를 바꾼다. O는 바꾸지 않는다. */
   setShift: (code: Code, patch: Partial<Omit<ShiftDef, "code" | "active">>) => void;
@@ -286,7 +278,6 @@ function emptyShop(): Shop {
     pendingRules: [],
     pendingConfig: [],
     unconverted: [],
-    introSeen: false,
   };
 }
 
@@ -655,22 +646,16 @@ export function isShopReady(shop: Shop): boolean {
   return shop.employees.some((n) => n.active);
 }
 
-/** 처음 설정에서 아직 못 끝낸 첫 단계: 명단 없음 → ①, ② 매장 소개를 한 번도 지나지 않음 → ②, 그 밖 → ③. */
-export function setupStep(shop: Shop): SetupStep {
-  if (!shop.employees.some((n) => n.active)) return 1;
-  return shop.introSeen ? 3 : 2;
-}
-
 /** 근무표를 열 때의 화면: 확정 → 확정 근무표, 결과 있음 → 작성 ③, 그 밖 → 작성 ①. */
 export function viewForPeriod(period: WorkPeriod): View {
   if (period.status === "confirmed") return { screen: "confirmed", periodId: period.id };
   return { screen: "period", periodId: period.id, step: period.result ? 3 : 1 };
 }
 
-/** 불러온 화면 상태를 지금 화면 구성에 맞춘다(ADR-017). 근무표가 없는 매장은 처음 설정으로 연다. */
+/** 불러온 화면 상태를 지금 화면 구성에 맞춘다(ADR-017). 근무표가 없는 매장은 매장 준비로 연다. */
 function normalizeView(d: Data): View {
   const { shop, periods, view } = d;
-  if (shop && periods.length === 0) return { screen: "setup", step: setupStep(shop) };
+  if (shop && periods.length === 0) return { screen: "setup" };
   if (view.screen === "setup") return { screen: "home" };
   if (view.screen === "period" || view.screen === "confirmed") {
     const { periodId } = view;
@@ -899,26 +884,20 @@ export function createAppStore(getStorage: () => Storage, now: () => Date = () =
         /** 상태를 통째로 바꾼다. 진행 중 요청의 응답을 버리도록 inputVersion은 지금보다 크게 한다. */
         const replace = (data: Data, extra: Partial<AppState> = {}) =>
           set((s) => ({ ...data, inputVersion: Math.max(s.inputVersion, data.inputVersion) + 1, ...extra }));
-        const emptyShopData = (): Data => ({ ...initialData(), shop: emptyShop(), view: { screen: "setup", step: 1 } });
-        /** 게스트 상태를 올린다. */
-        const upload = async () => {
-          ready = true;
-          await save();
-        };
+        const emptyShopData = (): Data => ({ ...initialData(), shop: emptyShop(), view: { screen: "setup" } });
 
         return {
           ...initialData(),
           storageAvailable: available,
           resetNotice: false,
           auth: null,
-          sync: { status: "guest", savedAt: null },
-          loginPrompt: null,
+          sync: { status: "idle", savedAt: null },
 
           signedIn: async (user) => {
             if (!remote) return;
             ready = false;
             cancelTimer();
-            set({ auth: { userId: user.id, email: user.email }, sync: { status: "loading", savedAt: null }, loginPrompt: null });
+            set({ auth: { userId: user.id, email: user.email }, sync: { status: "loading", savedAt: null } });
             let row: Awaited<ReturnType<ShopRemote["load"]>>;
             try {
               row = await remote.load();
@@ -927,24 +906,23 @@ export function createAppStore(getStorage: () => Storage, now: () => Date = () =
               return;
             }
             if (get().auth?.userId !== user.id) return;
-            const guest = get().hasInput();
             if (row) {
               // 서버 우선
               const d = row.data as { version?: unknown; state?: unknown } | null;
               const state = d?.version === STORAGE_VERSION ? d.state : null;
               const ok = isData(state);
-              replace(ok ? loaded(state) : initialData(), {
+              replace(ok ? loaded(state) : emptyShopData(), {
                 sync: { status: "saved", savedAt: row.updatedAt },
-                loginPrompt: guest ? { kind: "server-replaced-guest" } : null,
                 ...(!ok && { resetNotice: true }),
               });
               ready = true;
               return;
             }
-            if (!guest) replace(emptyShopData());
-            await upload();
+            // 첫 저장이 실패한 채 다시 열었으면 캐시를 올린다
+            if (!get().hasInput()) replace(emptyShopData());
+            ready = true;
+            await save();
           },
-          dismissLoginPrompt: () => set({ loginPrompt: null }),
           retrySave: async () => {
             const { auth } = get();
             if (!remote || !auth) return;
@@ -956,7 +934,7 @@ export function createAppStore(getStorage: () => Storage, now: () => Date = () =
             ready = false;
             cancelTimer();
             dirty = false;
-            replace(initialData(), { auth: null, sync: { status: "guest", savedAt: null }, loginPrompt: null });
+            replace(initialData(), { auth: null, sync: { status: "idle", savedAt: null } });
             storage.removeItem(STORAGE_KEY);
           },
           deleteShopData: async () => {
@@ -969,7 +947,7 @@ export function createAppStore(getStorage: () => Storage, now: () => Date = () =
             ready = true;
           },
 
-          startShop: () => bump({ shop: emptyShop(), periods: [], view: { screen: "setup", step: 1 } }),
+          startShop: () => bump({ shop: emptyShop(), periods: [], view: { screen: "setup" } }),
           setShopName: (name) => editShop((w) => ({ ...w, name })),
           setUnit: (unit) => editShop((w) => ({ ...w, unit })),
           setCoverage: (code, dayKind, min, max) => {
@@ -1003,7 +981,6 @@ export function createAppStore(getStorage: () => Storage, now: () => Date = () =
               return { ...w, rules: old ? w.rules.map((c) => (c === old ? card : c)) : [...w.rules, card] };
             });
           },
-          markIntroSeen: () => editShop((w) => (w.introSeen ? w : { ...w, introSeen: true }), false),
           setShift: (code, patch) => {
             if (code === OFF_CODE) return;
             editShifts((shifts) => shifts.map((s) => (s.code === code ? { ...s, ...patch } : s)));

@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 
 import { useAppStore } from "@/lib/store";
-import { signInWithGoogle, signOut, supabaseConfigured } from "@/lib/supabase";
+import { signInWithGoogle, signOut } from "@/lib/supabase";
 
 import Dialog from "./Dialog";
 import { ui } from "./ui";
@@ -49,18 +49,6 @@ export function LoginButton({ className = ui.secondary }: { className?: string }
         </span>
       )}
     </span>
-  );
-}
-
-/** 로그인 직후 스토어가 알리는 것: 서버 우선 안내. */
-export function LoginPromptDialog() {
-  const prompt = useAppStore((s) => s.loginPrompt);
-  const dismiss = useAppStore((s) => s.dismissLoginPrompt);
-  if (!prompt) return null;
-  return (
-    <Dialog title="내 매장을 불러왔어요" onClose={dismiss} primary={{ label: "닫기", onClick: dismiss }}>
-      저장된 내 매장을 불러왔어요. 이 브라우저에서 입력한 내용은 지웠어요.
-    </Dialog>
   );
 }
 
@@ -185,10 +173,10 @@ export function AccountBar() {
     setDeleting(true);
   };
 
+  if (auth === null) return null;
+
   const status =
-    auth === null ? (
-      <span>이 브라우저에만 저장</span>
-    ) : sync.status === "loading" ? (
+    sync.status === "loading" ? (
       <span>불러오는 중…</span>
     ) : sync.status === "saving" ? (
       <span>저장 중…</span>
@@ -208,40 +196,35 @@ export function AccountBar() {
   return (
     <div className="flex items-center gap-3 text-xs text-[#66665E]">
       <span role="status">{status}</span>
-      {supabaseConfigured &&
-        (auth === null ? (
-          <LoginButton className={ui.secondarySm} />
-        ) : (
-          <div ref={menuRef} className="relative flex items-center gap-1">
-            <span className="text-xs text-[#3D3D38]">{auth.email}</span>
-            <button
-              ref={menuButtonRef}
-              type="button"
-              aria-label="계정 메뉴"
-              aria-haspopup="menu"
-              aria-expanded={menuOpen}
-              onClick={() => setMenuOpen((o) => !o)}
-              className={ui.textSm}
-            >
-              <svg aria-hidden="true" viewBox="0 0 12 12" className="size-3" fill="none" stroke="currentColor" strokeWidth={1.6}>
-                <path d="M2.5 4.5 6 8l3.5-3.5" />
-              </svg>
+      <div ref={menuRef} className="relative flex items-center gap-1">
+        <span className="text-xs text-[#3D3D38]">{auth.email}</span>
+        <button
+          ref={menuButtonRef}
+          type="button"
+          aria-label="계정 메뉴"
+          aria-haspopup="menu"
+          aria-expanded={menuOpen}
+          onClick={() => setMenuOpen((o) => !o)}
+          className={ui.textSm}
+        >
+          <svg aria-hidden="true" viewBox="0 0 12 12" className="size-3" fill="none" stroke="currentColor" strokeWidth={1.6}>
+            <path d="M2.5 4.5 6 8l3.5-3.5" />
+          </svg>
+        </button>
+        {menuOpen && (
+          <div
+            role="menu"
+            className="absolute top-full right-0 z-10 mt-1 flex min-w-[180px] flex-col rounded-lg border border-[#E2E2DC] bg-white p-1"
+          >
+            <button type="button" role="menuitem" onClick={() => void logout()} className={`${ui.textSm} justify-start`}>
+              로그아웃
             </button>
-            {menuOpen && (
-              <div
-                role="menu"
-                className="absolute top-full right-0 z-10 mt-1 flex min-w-[180px] flex-col rounded-lg border border-[#E2E2DC] bg-white p-1"
-              >
-                <button type="button" role="menuitem" onClick={() => void logout()} className={`${ui.textSm} justify-start`}>
-                  로그아웃
-                </button>
-                <button type="button" role="menuitem" onClick={openDelete} className={`${ui.danger} justify-start`}>
-                  내 매장 데이터 삭제
-                </button>
-              </div>
-            )}
+            <button type="button" role="menuitem" onClick={openDelete} className={`${ui.danger} justify-start`}>
+              내 매장 데이터 삭제
+            </button>
           </div>
-        ))}
+        )}
+      </div>
       {deleting && <DeleteDataDialog onClose={() => setDeleting(false)} />}
     </div>
   );

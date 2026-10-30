@@ -91,13 +91,13 @@ function UnconvertedNotice() {
   );
 }
 
-/** "기본" 영역: 매장 이름, 근무표 주기. 처음 설정 ①에서도 쓴다. */
+/** "기본" 영역: 매장 이름, 근무표 주기. 매장 준비에서도 쓴다. */
 export function BasicSection() {
   const shop = useAppStore((s) => s.shop)!;
   const setShopName = useAppStore((s) => s.setShopName);
   const setUnit = useAppStore((s) => s.setUnit);
   const [unitChanged, setUnitChanged] = useState(false);
-  // 근무표가 아직 없으면(처음 설정) 바뀐 주기가 영향을 줄 근무표도 없다
+  // 근무표가 아직 없으면(매장 준비) 바뀐 주기가 영향을 줄 근무표도 없다
   const hasPeriods = useAppStore((s) => s.periods.length > 0);
 
   return (
@@ -140,7 +140,7 @@ export function BasicSection() {
   );
 }
 
-/** 명단 표. 맨 아래 줄에 적어 한 명씩 더한다. 처음 설정 ①에서도 쓴다. */
+/** 명단 표. 맨 아래 줄에 적어 한 명씩 더한다. 매장 준비에서도 쓴다. */
 export function RosterSection() {
   const shop = useAppStore((s) => s.shop)!;
   const orphanCount = orphanConstraintIds(shop, null).length;
@@ -163,7 +163,7 @@ export function RosterSection() {
   );
 }
 
-/** 근무조별 필요 인원. 처음 설정 ②에서는 접힌 "숫자로 입력하기"로 쓴다(collapsible). */
+/** 근무조별 필요 인원. 근무표 작성 ②에서는 접힌 "숫자로 입력하기"로 쓴다(collapsible). */
 export function CoverageSection({ collapsible = false }: { collapsible?: boolean }) {
   const [coverageDrafts, setCoverageDrafts] = useState<CoverageDrafts>({});
   const [open, setOpen] = useState(false);
