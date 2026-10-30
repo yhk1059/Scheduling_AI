@@ -107,7 +107,7 @@ describe("carryOverFrom", () => {
     expect(carryOverFrom(prev, ["e01"])).toEqual([{ employee_id: "e01", shifts: row("DENOODE") }]);
   });
 
-  it("employeeIds에 없거나 지난 확정본에 없는 간호사는 뺀다", () => {
+  it("employeeIds에 없거나 지난 확정본에 없는 직원은 뺀다", () => {
     const prev = confirmed("2026-11-02", 7, { e01: row("DDDDDDD"), e02: row("NNNOOOO") });
     expect(carryOverFrom(prev, ["e01", "e03"])).toEqual([{ employee_id: "e01", shifts: row("DDDDDDD") }]);
   });
@@ -169,7 +169,7 @@ describe("historyFor / historyLoadFor", () => {
     expect(historyFor([draft, later], target, ["e01"])).toBeNull();
   });
 
-  it("employeeIds 밖 간호사와 확정본에 없는 간호사는 행이 없다", () => {
+  it("employeeIds 밖 직원과 확정본에 없는 직원은 행이 없다", () => {
     const p = confirmed("2026-11-02", 7, { e01: row("DDDDDOO"), e03: row("NNNNNNN") });
     expect(historyFor([p], target, ["e01", "e02"])!.rows).toEqual({ e01: row("DDDDDOO") });
   });
@@ -258,7 +258,7 @@ describe("pastDayLocks", () => {
 });
 
 describe("diffAssignments", () => {
-  it("바뀐 칸만, 새 간호사·빠진 간호사는 무시", () => {
+  it("바뀐 칸만, 새 직원·빠진 직원은 무시", () => {
     const before = { e01: row("DEN"), e02: row("OOO") };
     const after = { e01: row("DON"), e03: row("NNN") };
     expect(diffAssignments(before, after)).toEqual([{ employee_id: "e01", day: 2, before: "E", after: "O" }]);
@@ -273,12 +273,12 @@ describe("sameCarryOver", () => {
   const a = { employee_id: "e01", shifts: row("DDN") };
   const b = { employee_id: "e02", shifts: row("OON") };
 
-  it("간호사 순서와 무관", () => {
+  it("직원 순서와 무관", () => {
     expect(sameCarryOver([a, b], [b, a])).toBe(true);
     expect(sameCarryOver([], [])).toBe(true);
   });
 
-  it("근무·간호사가 다르면 false", () => {
+  it("근무·직원이 다르면 false", () => {
     expect(sameCarryOver([a, b], [a, { employee_id: "e02", shifts: row("OOO") }])).toBe(false);
     expect(sameCarryOver([a, b], [a])).toBe(false);
     expect(sameCarryOver([a], [{ employee_id: "e01", shifts: row("DN") }])).toBe(false);
@@ -291,7 +291,7 @@ describe("rosterChanges", () => {
     snapshot: { employees: [employee("e01", "김철수"), employee("e02", "이영희")], rules: [] },
   });
 
-  it("추가된 활성 간호사와 비활성화된 간호사", () => {
+  it("추가된 활성 직원과 비활성화된 직원", () => {
     const now = [employee("e01", "김철수"), employee("e02", "이영희", false), employee("e03", "박민수"), employee("e04", "최지훈", false)];
     expect(rosterChanges(prev, now)).toEqual({ added: [now[2]], deactivated: [now[1]] });
   });

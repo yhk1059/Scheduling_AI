@@ -98,7 +98,7 @@ function PrepareSummary({ period }: { period: WorkPeriod }) {
           ) : (
             "공휴일 없음"
           )}{" "}
-          · 간호사 <span className="font-mono">{active}</span>명 · {carry}
+          · 직원 <span className="font-mono">{active}</span>명 · {carry}
         </p>
         <button type="button" aria-expanded={open} onClick={() => setOpen((o) => !o)} className={ui.textSm}>
           {open ? "접기" : "바꾸기"}
@@ -129,7 +129,7 @@ function PrepareSummary({ period }: { period: WorkPeriod }) {
             <div className="flex flex-col gap-1">
               <h3 className={ui.cardTitle}>명단 확인</h3>
               <p className="text-sm text-[#3D3D38]">
-                간호사 <span className="font-mono">{active}</span>명
+                직원 <span className="font-mono">{active}</span>명
                 {hasPrevious &&
                   (added.length === 0 && deactivated.length === 0 ? (
                     " · 지난 근무표와 명단이 같아요"
@@ -145,7 +145,7 @@ function PrepareSummary({ period }: { period: WorkPeriod }) {
               {deactivated.length > 0 && <p className={ui.help}>제외: {names(deactivated)}</p>}
             </div>
             <button type="button" onClick={() => go({ screen: "settings", tab: "roster" })} className={ui.text}>
-              병동 설정
+              매장 설정
             </button>
           </section>
 
@@ -266,7 +266,7 @@ function CarryOverTable({ period, prev }: { period: WorkPeriod; prev: WorkPeriod
       <div className="flex flex-col gap-1">
         <h3 className={ui.cardTitle}>지난 근무 마지막 며칠</h3>
         <p className={ui.help}>
-          지난 근무표에서 가져왔어요. 나이트 다음 휴무 같은 규칙이 근무표 사이에서도 지켜지게 써요
+          지난 근무표에서 가져왔어요. 마감 다음 날 오픈 금지 같은 규칙이 근무표 사이에서도 지켜지게 써요
           {rows.length < employees.length && ` · 지난 근무표에 없던 ${employees.length - rows.length}명은 지난 근무 없이 시작해요`}
         </p>
       </div>
@@ -340,7 +340,7 @@ function CarryOverPaste({ period }: { period: WorkPeriod }) {
       <div className="flex flex-col gap-1">
         <h3 className={ui.cardTitle}>지난 근무 마지막 며칠 (선택)</h3>
         <p className={ui.help}>
-          나이트 다음 휴무 같은 규칙이 근무표 사이에서도 지켜지게 써요. 지금 반영된 간호사:{" "}
+          마감 다음 날 오픈 금지 같은 규칙이 근무표 사이에서도 지켜지게 써요. 지금 반영된 직원:{" "}
           <span className="font-mono">{carryOver.length}</span>명
         </p>
       </div>

@@ -58,14 +58,14 @@ export function LoginPromptDialog() {
   const dismiss = useAppStore((s) => s.dismissLoginPrompt);
   if (!prompt) return null;
   return (
-    <Dialog title="내 병동을 불러왔어요" onClose={dismiss} primary={{ label: "닫기", onClick: dismiss }}>
-      저장된 내 병동을 불러왔어요. 이 브라우저에서 입력한 내용은 지웠어요.
+    <Dialog title="내 매장을 불러왔어요" onClose={dismiss} primary={{ label: "닫기", onClick: dismiss }}>
+      저장된 내 매장을 불러왔어요. 이 브라우저에서 입력한 내용은 지웠어요.
     </Dialog>
   );
 }
 
 function shopLabel(name: string | undefined): string {
-  return name || "이름 없는 병동";
+  return name || "이름 없는 매장";
 }
 
 /** [내 매장 데이터 삭제] 2단계 확인. */
@@ -93,12 +93,12 @@ function DeleteDataDialog({ onClose }: { onClose: () => void }) {
     return (
       <Dialog
         key="step1"
-        title="내 병동 데이터 삭제"
+        title="내 매장 데이터 삭제"
         onClose={onClose}
         secondary={{ label: "취소", onClick: onClose }}
         primary={{ label: "계속", onClick: () => setStep(2) }}
       >
-        내 병동 데이터를 모두 지울까요? 되돌릴 수 없어요. Google 계정 연결은 남아요.
+        내 매장 데이터를 모두 지울까요? 되돌릴 수 없어요. Google 계정 연결은 남아요.
       </Dialog>
     );
 
@@ -106,7 +106,7 @@ function DeleteDataDialog({ onClose }: { onClose: () => void }) {
   return (
     <Dialog
       key="step2"
-      title="병동 이름을 입력하세요"
+      title="매장 이름을 입력하세요"
       onClose={() => !busy && onClose()}
       secondary={{ label: "취소", onClick: onClose, disabled: busy }}
       primary={{ label: busy ? "삭제 중…" : "삭제", onClick: () => void remove(), disabled: !matches || busy }}
@@ -114,7 +114,7 @@ function DeleteDataDialog({ onClose }: { onClose: () => void }) {
     >
       <div className="flex flex-col gap-1">
         <label htmlFor="delete-shop-name" className={ui.label}>
-          병동 이름 <span className="font-mono">{shopName}</span>
+          매장 이름 <span className="font-mono">{shopName}</span>
         </label>
         <input
           id="delete-shop-name"
@@ -124,7 +124,7 @@ function DeleteDataDialog({ onClose }: { onClose: () => void }) {
           autoComplete="off"
           className={ui.input}
         />
-        {!matches && <p className={ui.help}>병동 이름을 똑같이 입력하면 삭제할 수 있어요.</p>}
+        {!matches && <p className={ui.help}>매장 이름을 똑같이 입력하면 삭제할 수 있어요.</p>}
       </div>
       {failed && (
         <p role="alert" className={ui.error}>
@@ -236,7 +236,7 @@ export function AccountBar() {
                   로그아웃
                 </button>
                 <button type="button" role="menuitem" onClick={openDelete} className={`${ui.danger} justify-start`}>
-                  내 병동 데이터 삭제
+                  내 매장 데이터 삭제
                 </button>
               </div>
             )}

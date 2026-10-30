@@ -81,7 +81,7 @@ function ExampleStrip({
   range: PeriodRange;
   holidays: number[];
 }) {
-  const nameOf = (id: string) => employees.find((n) => n.id === id)?.name ?? "간호사";
+  const nameOf = (id: string) => employees.find((n) => n.id === id)?.name ?? "직원";
   const marked = (id: string, d: number) => example.marks.some(([m, md]) => m === id && md === d);
   return (
     <div className="flex flex-col gap-1">
@@ -89,7 +89,7 @@ function ExampleStrip({
         <thead>
           <tr>
             <th scope="col" className="sr-only">
-              간호사
+              직원
             </th>
             {example.days.map((d, i) => (
               <th key={d} scope="col" className="w-6 text-center font-mono text-[11px] font-medium whitespace-nowrap text-[#66665E]">
@@ -383,7 +383,7 @@ export default function ConstraintCard({
       {orphan && (
         <p className="flex items-center gap-1.5 text-xs font-medium text-[#A15C07]">
           <WarningIcon />
-          명단에 없는 간호사를 가리켜요. 삭제하거나 명단을 고쳐 주세요.
+          명단에 없는 직원을 가리켜요. 삭제하거나 명단을 고쳐 주세요.
         </p>
       )}
 

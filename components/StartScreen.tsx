@@ -16,7 +16,7 @@ import { ui } from "./ui";
 const SCREEN_LABELS: Record<Exclude<View["screen"], "period" | "confirmed">, string> = {
   home: "근무표 목록",
   setup: "처음 설정",
-  settings: "병동 설정",
+  settings: "매장 설정",
 };
 const SAMPLE_EMPLOYEES = sample.employees.length;
 const SAMPLE_RULES = shopRuleCount(sample.constraints as unknown as ConstraintSpec[]);
@@ -46,7 +46,7 @@ export default function StartScreen({ onDone }: { onDone: () => void }) {
       ? [
           {
             title: "이어서 하기",
-            body: `이 브라우저에 저장된 입력으로 돌아가요. ${screenLabel}${employeeCount > 0 ? ` · 간호사 ${employeeCount}명` : ""}`,
+            body: `이 브라우저에 저장된 입력으로 돌아가요. ${screenLabel}${employeeCount > 0 ? ` · 직원 ${employeeCount}명` : ""}`,
             action: "이어서 하기",
             onClick: onDone,
           },
@@ -54,14 +54,14 @@ export default function StartScreen({ onDone }: { onDone: () => void }) {
       : []),
     {
       title: "샘플로 체험하기",
-      body: `간호사 ${SAMPLE_EMPLOYEES}명과 병동 규칙 ${SAMPLE_RULES}개로 만든 한 달 근무표를 볼 수 있어요. 지금 입력은 그대로 남아요.`,
+      body: `직원 ${SAMPLE_EMPLOYEES}명과 매장 조건 ${SAMPLE_RULES}개로 만든 4주 근무표를 볼 수 있어요. 지금 입력은 그대로 남아요.`,
       action: "샘플로 체험하기",
       href: "/demo",
     },
     {
-      title: "내 병동으로 시작하기",
-      body: "빈 병동에서 명단과 필요 인원부터 입력해요.",
-      action: "내 병동으로 시작하기",
+      title: "내 매장으로 시작하기",
+      body: "빈 매장에서 명단과 필요 인원부터 입력해요.",
+      action: "내 매장으로 시작하기",
       onClick: start,
     },
   ];

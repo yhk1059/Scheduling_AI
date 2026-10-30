@@ -22,7 +22,7 @@ export function unitShort(unit: PeriodUnit): string {
   return `${unit === "month" ? "한 달" : UNIT_NAMES[unit]} 단위`;
 }
 
-/** 근무 형태 요약 한 줄: "데이·이브닝·나이트 3교대, 각 8시간"(활성 코드만, 더블은 뒤에 코드로). */
+/** 근무 형태 요약 한 줄: "오픈·미들·마감, 각 6시간"(활성 코드만, 더블은 뒤에 코드로). */
 export function configSummary(config: ShopConfig): string {
   const live = config.shifts.filter((s) => s.active !== false && s.hours > 0);
   const base = live.filter((s) => !s.parts?.length);
@@ -35,11 +35,11 @@ export function configSummary(config: ShopConfig): string {
       : sameHours
         ? `각 ${base[0]?.hours ?? 0}시간`
         : base.map((s) => `${s.name} ${s.hours}시간`).join("·");
-  const kind = base.length === 1 ? `${names} 근무` : `${names} ${base.length}교대`;
+  const kind = base.length === 1 ? `${names} 근무` : names;
   return `${kind}, ${hours}${doubles.length ? ` · 더블 ${doubles.map((s) => s.code).join(", ")}` : ""}`;
 }
 
-/** 설정 변경 카드 한 줄: "근무 코드 추가 · M 미드 · 11:00부터 8시간", 더블은 세는 근무조를 붙인다. */
+/** 설정 변경 카드 한 줄: "근무 코드 추가 · P 피크 · 11:00~14:00 · 3시간", 더블은 세는 근무조를 붙인다. */
 export function describeShiftChange(change: ShiftChange, config: ShopConfig): string {
   const { code, name, hours, start, end, parts } = change.shift;
   const partNames = (parts ?? []).map((p) => config.shifts.find((s) => s.code === p)?.name ?? p);
@@ -80,7 +80,7 @@ function formatDays(days: number[], period: PeriodRange): string {
 }
 
 function employeeLabel(id: string, employees: Employee[]): string {
-  return employees.find((n) => n.id === id)?.name ?? "(명단에 없는 간호사)";
+  return employees.find((n) => n.id === id)?.name ?? "(명단에 없는 직원)";
 }
 
 // --- 식 규칙 → 카드 제목·문장(ADR-019 설계 §5) ---
@@ -114,7 +114,7 @@ function shiftName(code: string, config: ShopConfig): string {
   return s.parts?.length ? `${s.name}(${s.code})` : s.name;
 }
 
-/** 근무 고르기: in은 이름을 "·"로, not_in [O]는 "근무", not_in [N, O]는 "나이트 말고 다른 근무". */
+/** 근무 고르기: in은 이름을 "·"로, not_in [O]는 "근무", not_in [C, O]는 "마감 말고 다른 근무". */
 function shiftsLabel(s: Selector, config: ShopConfig): string {
   const names = (codes: string[]) => codes.map((c) => shiftName(c, config)).join("·");
   if (s?.in) return names(s.in);
@@ -124,7 +124,7 @@ function shiftsLabel(s: Selector, config: ShopConfig): string {
   return rest.length ? `${names(rest)} 말고 다른 근무` : "근무";
 }
 
-/** 사람 고르기: 이름(3명 넘으면 "김OO 외 2명"), "책임 태그", "신규 빼고". 비어 있으면 "". */
+/** 사람 고르기: 이름(3명 넘으면 "김OO 외 2명"), "리더 태그", "신입 빼고". 비어 있으면 "". */
 function peopleLabel(p: People | null | undefined, employees: Employee[]): string {
   if (!p) return "";
   const parts: string[] = [];
@@ -238,13 +238,13 @@ function shapeName(s: Shape, hardness: string): string {
     case "forbid":
       return "금지 순서";
     case "off_after":
-      return onlyIn(s.after, "N") ? "나이트 다음 휴무" : "순서 규칙";
+      return onlyIn(s.after, "C") ? "마감 다음 휴무" : "순서 규칙";
     case "max_run":
-      return anyWork(s.run) ? "최대 연속 근무" : onlyIn(s.run, "N") ? "최대 연속 나이트" : "순서 규칙";
+      return anyWork(s.run) ? "최대 연속 근무" : onlyIn(s.run, "C") ? "최대 연속 마감" : "순서 규칙";
     case "min_run":
-      return onlyIn(s.run, "N") ? "나이트 블록 길이" : "순서 규칙";
+      return onlyIn(s.run, "C") ? "최소 연속 마감" : "순서 규칙";
     case "balance":
-      if (s.measure === "count" && noDays(s.days) && onlyIn(s.shifts, "N")) return "나이트 고르게";
+      if (s.measure === "count" && noDays(s.days) && onlyIn(s.shifts, "C")) return "마감 고르게";
       if (s.measure === "count" && s.days.kind === "weekend" && !s.days.days && !s.days.weekdays && anyWork(s.shifts)) return "주말·공휴일 고르게";
       return "고르게 규칙";
   }

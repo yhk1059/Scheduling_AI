@@ -8,9 +8,9 @@ type Cond = Cmp | { all: Cmp[] } | { any: Cmp[] };
 /** 코드 이름이 뜻을 갖지 않는 테스트용 근무 형태. N이 가장 늦게 끝난다. */
 export const DEN_CONFIG: ShopConfig = {
   shifts: [
-    { code: "D", name: "데이", hours: 8, start: "07:00", end: "15:00" },
-    { code: "E", name: "이브닝", hours: 8, start: "15:00", end: "23:00" },
-    { code: "N", name: "나이트", hours: 8, start: "16:00", end: "24:00" },
+    { code: "D", name: "주간", hours: 8, start: "07:00", end: "15:00" },
+    { code: "E", name: "저녁", hours: 8, start: "15:00", end: "23:00" },
+    { code: "N", name: "야간", hours: 8, start: "16:00", end: "24:00" },
     { code: "O", name: "휴무", hours: 0 },
   ],
 };
@@ -79,7 +79,7 @@ export function forbid(pattern: Shifts[], people?: People, over: Over = {}): Con
 
 /** 최대 연속: 창 max_len + 1일 안에 max_len번까지. */
 export function maxRun(run: Shifts, max_len: number, people?: People, over: Over = {}): ConstraintSpec {
-  const noun = run.in?.length === 1 && run.in[0] === "N" ? "나이트" : run.not_in?.length === 1 && run.not_in[0] === "O" ? "근무" : "일수";
+  const noun = run.in?.length === 1 && run.in[0] === "C" ? "마감" : run.not_in?.length === 1 && run.not_in[0] === "O" ? "근무" : "일수";
   return rule(require({ per: "person_window", people, window: max_len + 1 }, cmp(cnt(run), "le", { value: "max_len" })), { max_len: { value: max_len, label: `최대 연속 ${noun}` } }, over);
 }
 

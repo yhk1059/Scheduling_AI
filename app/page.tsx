@@ -19,21 +19,21 @@ const PAINS = [
     fix: "함께 지킬 수 없는 규칙을 찾아 이유를 알려 줍니다. 해결책은 실제로 근무표가 만들어지는 것만 보여 드려요.",
   },
   { pain: "확정 후 병가가 생기면 전체를 다시 짠다", fix: "확정한 근무표에서 최소한의 칸만 바꿔 다시 만들고, 바뀐 칸을 표시합니다. 이미 지난 날은 건드리지 않아요." },
-  { pain: "“왜 나만 주말이 많아요?”에 근거를 대기 어렵다", fix: "간호사마다 데이·이브닝·나이트·휴무 수, 주말·공휴일 근무, 평균보다 많은 근무일을 보여 줍니다." },
+  { pain: "“왜 나만 주말이 많아요?”에 근거를 대기 어렵다", fix: "직원마다 오픈·미들·마감·휴무 수, 주말·공휴일 근무, 평균보다 많은 근무일을 보여 줍니다." },
   {
     pain: "매번 명단, 규칙, 지난 근무를 다시 옮겨 적는다",
-    fix: "병동 명단과 규칙은 그대로 남고, 지난 근무표의 마지막 며칠을 다음 근무표가 이어받습니다.",
+    fix: "매장 명단과 규칙은 그대로 남고, 지난 근무표의 마지막 며칠을 다음 근무표가 이어받습니다.",
   },
   {
-    pain: "지난번에 나이트를 많이 한 사람을 배려하기 어렵다",
-    fix: "최근 4주 나이트와 주말 근무를 보고, 많이 한 사람은 이번 근무표에서 줄여 줍니다.",
+    pain: "지난번에 마감을 많이 한 사람을 배려하기 어렵다",
+    fix: "최근 4주 마감과 주말 근무를 보고, 많이 한 사람은 이번 근무표에서 줄여 줍니다.",
   },
 ];
 
 const STEPS = [
   {
     title: "말로 규칙 적기",
-    body: "“나이트 다음 날은 무조건 쉬게”처럼 평소 말투로 적으면 규칙 카드로 정리됩니다. 애매하면 되묻고, 아직 못 하는 규칙이면 그렇다고 알려 드려요.",
+    body: "“마감 다음 날 오픈은 안 되게”처럼 평소 말투로 적으면 규칙 카드로 정리됩니다. 애매하면 되묻고, 아직 못 하는 규칙이면 그렇다고 알려 드려요.",
   },
   {
     title: "근무표 만들기",
@@ -45,7 +45,7 @@ const STEPS = [
   },
   {
     title: "다음 근무표로 이어짐",
-    body: "다음 근무표를 만들면 날짜와 지난 근무 마지막 며칠이 자동으로 채워지고, 최근 4주 나이트를 많이 한 사람을 배려합니다.",
+    body: "다음 근무표를 만들면 날짜와 지난 근무 마지막 며칠이 자동으로 채워지고, 최근 4주 마감을 많이 한 사람을 배려합니다.",
   },
 ];
 
@@ -60,13 +60,13 @@ export default function Home() {
     <main className="mx-auto w-full max-w-[1360px] px-8">
       <section className="grid grid-cols-[minmax(0,5fr)_minmax(0,7fr)] items-center gap-12 py-[72px]">
         <div className="flex flex-col gap-5">
-          <p className={eyebrow}>간호사 근무표</p>
+          <p className={eyebrow}>매장 직원 근무표</p>
           <h1 className="text-[42px] leading-[1.3] font-semibold tracking-[-0.02em] text-[#1B1B18]">
             말로 설명한 규칙으로
             <br />근무표를 짭니다
           </h1>
           <p className="text-[15px] leading-relaxed text-[#3D3D38]">
-            평소 말투로 규칙과 요청을 적으면 3교대 근무표가 나옵니다. 막히면 이유와 해결책을 알려 드리고, 다음 근무표는 지난 근무를
+            평소 말투로 규칙과 요청을 적으면 근무표가 나옵니다. 막히면 이유와 해결책을 알려 드리고, 다음 근무표는 지난 근무를
             이어받아 만들어요.
           </p>
           <div className="flex items-center gap-2">
@@ -80,14 +80,14 @@ export default function Home() {
               href="/app?start=new"
               className="inline-flex h-11 items-center gap-2 rounded-md border border-[#C9C9C1] bg-white px-[18px] text-[15px] font-medium text-[#1B1B18] transition-colors duration-[120ms] hover:bg-[#EFEFEB]"
             >
-              내 병동으로 시작하기
+              내 매장으로 시작하기
             </Link>
             <a href={REPO_URL} className="px-2 text-sm font-medium text-[#155E75] hover:text-[#0E4A5C]">
               GitHub
             </a>
           </div>
           <p className="text-xs font-medium text-[#66665E]">
-            로그인 없이 바로 써 볼 수 있어요. 샘플에서는 간호사 15명 병동의 규칙과 한 달 근무표를 볼 수 있어요.
+            로그인 없이 바로 써 볼 수 있어요. 샘플에서는 직원 12명 매장의 규칙과 4주 근무표를 볼 수 있어요.
           </p>
         </div>
         <LandingPreview />
@@ -158,8 +158,7 @@ export default function Home() {
             직접 배정하지 않고, LLM이 낸 결과는 사람이 [적용]하거나 서버가 다시 계산해 확인한 것만 근무표에 들어갑니다.
           </p>
           <p className={body}>
-            번역 정확도: 수간호사 말투 문장 <span className="font-mono text-[13px]">44</span>개로 측정한 제약 F1{" "}
-            <span className="font-mono text-[13px]">100.0%</span>(3회차 실행).
+            번역 정확도는 매니저 말투 문장으로 측정해요. 측정 방법과 결과는 GitHub에서 볼 수 있어요.
           </p>
           <a href={REPO_URL} className="self-start text-sm font-medium text-[#155E75] hover:text-[#0E4A5C]">
             GitHub에서 자세히 보기
@@ -168,7 +167,7 @@ export default function Home() {
       </section>
 
       <footer className="flex items-center justify-between border-t border-[#E2E2DC] py-8 text-xs font-medium text-[#66665E]">
-        <span>간호사 근무표 · 포트폴리오 프로토타입</span>
+        <span>매장 직원 근무표 · 포트폴리오 프로토타입</span>
         <span className="flex items-center gap-4">
           <Link href="/privacy" className="text-[#155E75] hover:text-[#0E4A5C]">
             개인정보처리방침

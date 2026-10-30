@@ -24,20 +24,20 @@ const MAX_TEXT_CHARS = 1000; // backend/domain/constants.py MAX_TEXT_CHARS
 
 const COPY = {
   shop: {
-    title: "병동 규칙",
+    title: "매장 조건",
     description: "근무표가 바뀌어도 똑같이 지키는 규칙을 말로 적어 주세요. 만든 카드를 확인하고 [적용]해야 반영돼요.",
-    placeholder: "예: 나이트 다음 날은 무조건 쉬게",
+    placeholder: "예: 마감 다음 날 오픈은 안 되게",
     submit: "규칙 만들기",
     empty: "아직 규칙이 없어요.",
-    examples: ["나이트 다음 날은 무조건 쉬게", "책임 태그가 매 근무 1명은 있게", "나이트는 3일 넘게 연속으로 하지 않게"],
+    examples: ["마감 다음 날 오픈은 안 되게", "오픈에는 리더가 꼭 1명 있어야 해", "5일 넘게 연속으로 일하지 않게"],
   },
   intro: {
-    title: "병동 소개",
+    title: "매장 소개",
     description: "근무 형태와 날마다 필요한 인원을 말로 적어 주세요. 만든 카드를 확인하고 [적용]해야 반영돼요.",
-    placeholder: "예: 데이 평일 3명 이상, 주말 2명",
+    placeholder: "예: 평일 오픈 2명, 주말은 3명",
     submit: "규칙 만들기",
     empty: "",
-    examples: ["데이 평일 3명 이상, 주말 2명, 더블도 있어", "나이트는 매일 2~3명"],
+    examples: ["평일 오픈 2명, 주말은 3명", "12시부터 15시까지는 최소 3명"],
   },
   period: {
     title: "요청",
@@ -306,7 +306,7 @@ export default function RulesStep({
         <div className="flex items-center gap-3">
           {blocked && orphanCount > 0 && (
             <p role="alert" className={ui.error}>
-              명단에 없는 간호사를 가리키는 규칙·요청 {orphanCount}개를 삭제하거나 고친 뒤 넘어갈 수 있어요.
+              명단에 없는 직원을 가리키는 규칙·요청 {orphanCount}개를 삭제하거나 고친 뒤 넘어갈 수 있어요.
             </p>
           )}
           {pending.length > 0 && (
@@ -343,7 +343,7 @@ function PeriodRules({ shop, period }: { shop: Shop; period: WorkPeriod }) {
     <section className={`${ui.card} flex flex-col gap-3`}>
       <div className="flex items-center justify-between gap-3">
         <div className="flex flex-col gap-1">
-          <h3 className={ui.cardTitle}>이 근무표에 적용되는 병동 규칙</h3>
+          <h3 className={ui.cardTitle}>이 근무표에 적용되는 매장 조건</h3>
           <p className={ui.help}>
             <span className="font-mono">{shopRuleCount(rules)}</span>개
             {offCount > 0 && (
@@ -352,11 +352,11 @@ function PeriodRules({ shop, period }: { shop: Shop; period: WorkPeriod }) {
                 · 이번 근무표에서 꺼짐 <span className="font-mono">{offCount}</span>개
               </>
             )}{" "}
-            · 규칙 원본은 병동 설정에서 고쳐요.
+            · 규칙 원본은 매장 설정에서 고쳐요.
           </p>
         </div>
         <button type="button" aria-expanded={open} onClick={() => setOpen((o) => !o)} className={ui.textSm}>
-          {open ? "접기" : "병동 규칙 보기"}
+          {open ? "접기" : "매장 조건 보기"}
         </button>
       </div>
       {open && (

@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 export const metadata: Metadata = {
-  title: "개인정보처리방침 · 간호사 근무표",
+  title: "개인정보처리방침 · 매장 직원 근무표",
 };
 
 const EFFECTIVE_DATE = "2026-10-28";
@@ -12,18 +12,18 @@ const SECTIONS: { title: string; items: string[] }[] = [
     title: "1. 수집하는 항목",
     items: [
       "Google 로그인 시: Google 계정 이메일과 고유 식별자",
-      "병동 데이터: 병동 이름, 간호사 이름·태그, 필요 인원, 병동 규칙, 요청, 근무표, 확정 기록",
-      "간호사 이름은 이니셜로 입력해도 됩니다.",
+      "매장 데이터: 매장 이름, 직원 이름·태그, 필요 인원, 매장 조건, 요청, 근무표, 확정 기록",
+      "직원 이름은 이니셜로 입력해도 됩니다.",
     ],
   },
   {
     title: "2. 이용 목적",
-    items: ["근무표 작성과 병동 데이터 저장·불러오기에만 씁니다."],
+    items: ["근무표 작성과 매장 데이터 저장·불러오기에만 씁니다."],
   },
   {
     title: "3. 보관 위치와 기간",
     items: [
-      "로그인하면 병동 데이터를 Supabase(서울 리전)에 저장하고, 사용자가 [내 병동 데이터 삭제]를 할 때까지 보관합니다.",
+      "로그인하면 매장 데이터를 Supabase(서울 리전)에 저장하고, 사용자가 [내 매장 데이터 삭제]를 할 때까지 보관합니다.",
       "로그인하지 않으면 이 브라우저에만 저장됩니다.",
     ],
   },
@@ -32,14 +32,14 @@ const SECTIONS: { title: string; items: string[] }[] = [
     items: [
       "Supabase: 데이터베이스와 인증(서울 리전)",
       "Vercel: 웹 호스팅과 근무표 계산 서버. 계산 서버는 요청을 저장하지 않습니다.",
-      "Anthropic: 자연어로 입력한 병동 규칙·요청의 해석과 충돌 설명. 보낼 때 간호사 이름은 N01 같은 가명으로 바꾸고, 응답을 받은 뒤 되돌립니다.",
+      "Anthropic: 자연어로 입력한 매장 조건·요청의 해석과 충돌 설명. 보낼 때 직원 이름은 E01 같은 가명으로 바꾸고, 응답을 받은 뒤 되돌립니다.",
     ],
   },
   {
     title: "5. 삭제 방법",
     items: [
-      "계정 메뉴의 [내 병동 데이터 삭제]로 서버에 저장된 병동 데이터를 즉시 지웁니다.",
-      "로그아웃하면 이 브라우저에 남은 병동 데이터를 지웁니다.",
+      "계정 메뉴의 [내 매장 데이터 삭제]로 서버에 저장된 매장 데이터를 즉시 지웁니다.",
+      "로그아웃하면 이 브라우저에 남은 매장 데이터를 지웁니다.",
       "Google 계정 연결 정보(이메일)는 남습니다.",
     ],
   },
@@ -55,7 +55,7 @@ export default function PrivacyPage() {
       <div className="flex max-w-[720px] flex-col gap-8">
         <div className="flex flex-col gap-2">
           <Link href="/" className="text-xs font-medium text-[#155E75] hover:text-[#0E4A5C]">
-            ← 간호사 근무표
+            ← 매장 직원 근무표
           </Link>
           <h1 className="text-[22px] font-semibold text-[#1B1B18]">개인정보처리방침</h1>
           <p className="text-xs font-medium text-[#66665E]">

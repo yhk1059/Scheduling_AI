@@ -121,7 +121,7 @@ function withPeriod() {
 }
 
 describe("초기 상태", () => {
-  it("병동과 기간이 없고 홈에서 시작한다", () => {
+  it("매장과 기간이 없고 홈에서 시작한다", () => {
     const s = fresh().getState();
     expect(s.shop).toBeNull();
     expect(s.periods).toEqual([]);
@@ -133,8 +133,8 @@ describe("초기 상태", () => {
   });
 });
 
-describe("병동", () => {
-  it("startShop는 빈 병동을 만들고 처음 설정 ①로 간다", () => {
+describe("매장", () => {
+  it("startShop는 빈 매장을 만들고 처음 설정 ①로 간다", () => {
     const store = fresh();
     store.getState().startShop();
     const s = store.getState();
@@ -150,13 +150,13 @@ describe("병동", () => {
   it("setShopName·setUnit·setCoverage는 inputVersion을 올리고 필요 인원은 shop.rules의 기본 규칙이다", () => {
     const store = fresh();
     startDenShop(store);
-    store.getState().setShopName("내과 5병동");
+    store.getState().setShopName("성수 카페");
     store.getState().setUnit("2w");
     store.getState().setCoverage("D", "weekday", 3, 4);
     store.getState().setCoverage("D", "weekend", 2, 2);
     store.getState().setCoverage("D", "weekday", 4, 5);
     const w = store.getState().shop!;
-    expect(w.name).toBe("내과 5병동");
+    expect(w.name).toBe("성수 카페");
     expect(w.unit).toBe("2w");
     expect(ruleIds(w.rules)).toEqual(["cov-weekday-D", "cov-weekend-D"]);
     expect(coverageRule(w.rules, "D", "weekday")).toMatchObject({
@@ -204,7 +204,7 @@ describe("병동", () => {
   });
 });
 
-describe("병동 규칙 카드", () => {
+describe("매장 규칙 카드", () => {
   it("대기 카드는 inputVersion 없이 쌓이고, 적용하면 rules로 옮긴다", () => {
     const store = fresh();
     startDenShop(store);
@@ -331,7 +331,7 @@ describe("병동 규칙 카드", () => {
 describe("카드 예시", () => {
   const example = (detail: string): RuleExample => ({ employee_ids: ["e01"], days: [1, 2], cells: { e01: ["N", "D"] }, marks: [["e01", 2]], detail });
 
-  it("병동 규칙: 카드별로 한 번 저장하고, 적용해도 남고, 지우거나 교체되면 지운다", () => {
+  it("매장 규칙: 카드별로 한 번 저장하고, 적용해도 남고, 지우거나 교체되면 지운다", () => {
     const store = fresh();
     startDenShop(store);
     store.getState().addPendingRules([forbid("a", "N", "D"), maxWork("b", 5)], [], { a: [example("가")], b: [], x: [example("없는 카드")] });
@@ -380,7 +380,7 @@ describe("카드 예시", () => {
 describe("카드 순서", () => {
   const ids = (list: { card: ConstraintSpec; pending: boolean }[]) => list.map((x) => `${x.card.id}${x.pending ? "?" : ""}`);
 
-  it("병동 규칙: 새 카드는 맨 위에 붙고, 적용해도 제자리에 남는다", () => {
+  it("매장 규칙: 새 카드는 맨 위에 붙고, 적용해도 제자리에 남는다", () => {
     const store = fresh();
     startDenShop(store);
     store.getState().addPendingRules([maxWork("a", 5)]);
@@ -429,7 +429,7 @@ describe("findReplaced", () => {
   });
 });
 
-describe("간호사 id", () => {
+describe("직원 id", () => {
   it("addEmployees는 e{번호}를 부여하고 nextEmployeeNo를 올린다", () => {
     const store = fresh();
     startDenShop(store);
@@ -464,7 +464,7 @@ describe("간호사 id", () => {
     ]);
   });
 
-  it("removeEmployee는 어떤 기간에서도 쓰이지 않은 간호사만 지우고, 아니면 비활성으로 바꾼다", () => {
+  it("removeEmployee는 어떤 기간에서도 쓰이지 않은 직원만 지우고, 아니면 비활성으로 바꾼다", () => {
     const { store, id } = withPeriod();
     store.getState().addPendingRequests(id, [leave("l", "e01", [3])]);
     store.getState().removeEmployee("e01"); // 초안 기간의 대기 요청이 참조
@@ -472,7 +472,7 @@ describe("간호사 id", () => {
     expect(store.getState().shop!.employees.map((n) => [n.id, n.active])).toEqual([["e01", false]]);
   });
 
-  it("isEmployeeUsed는 기간 요청·결과에서 쓰인 간호사만 true다([삭제] 표시 기준)", () => {
+  it("isEmployeeUsed는 기간 요청·결과에서 쓰인 직원만 true다([삭제] 표시 기준)", () => {
     const { store, id } = withPeriod();
     store.getState().setResult(id, result({ e02: ["D"] }), []);
     const { shop, periods } = store.getState();
@@ -480,7 +480,7 @@ describe("간호사 id", () => {
     expect(isEmployeeUsed("e02", shop!, periods)).toBe(true);
   });
 
-  it("결과나 확정본에 있는 간호사도 지우지 않는다", () => {
+  it("결과나 확정본에 있는 직원도 지우지 않는다", () => {
     const { store, id } = withPeriod();
     store.getState().setResult(id, result({ e02: ["D"] }), []);
     store.getState().removeEmployee("e02");
@@ -527,7 +527,7 @@ describe("createPeriod", () => {
     ]);
   });
 
-  it("병동이 없으면 아무것도 하지 않는다", () => {
+  it("매장이 없으면 아무것도 하지 않는다", () => {
     const store = fresh();
     expect(store.getState().createPeriod(TODAY)).toBeNull();
     expect(store.getState().periods).toEqual([]);
@@ -620,7 +620,7 @@ describe("이번 기간만 끄기와 제안 수락", () => {
     expect(store.getState().inputVersion).toBe(v + 3);
   });
 
-  it("applyChanges: disable은 disabledIds, 요청의 값·hardness는 요청을, 병동 규칙의 값·hardness는 ruleOverrides를 바꾼다", () => {
+  it("applyChanges: disable은 disabledIds, 요청의 값·hardness는 요청을, 매장 규칙의 값·hardness는 ruleOverrides를 바꾼다", () => {
     const { store, id, period } = setup();
     store.getState().applyChanges(id, [
       { action: "set_value", constraint_id: "r", name: "max_len", value: 4 },
@@ -646,7 +646,7 @@ describe("이번 기간만 끄기와 제안 수락", () => {
 });
 
 describe("toScheduleRequest", () => {
-  it("현재 병동과 기간으로 요청 본문을 만든다(근무 형태·태그, override 적용, 꺼진 제약 enabled=false)", () => {
+  it("현재 매장과 기간으로 요청 본문을 만든다(근무 형태·태그, override 적용, 꺼진 제약 enabled=false)", () => {
     const { store, id, period } = withPeriod();
     store.getState().setCoverage("D", "weekday", 1, 1);
     store.getState().addPendingRules([maxNights("r", 3)]);
@@ -680,7 +680,7 @@ describe("toScheduleRequest", () => {
     expect(req).not.toHaveProperty("input_version");
   });
 
-  it("비활성 간호사와 그를 참조하는 제약·이월·이전 배정을 뺀다", () => {
+  it("비활성 직원과 그를 참조하는 제약·이월·이전 배정을 뺀다", () => {
     const { store, id, period } = withPeriod();
     store.getState().addPendingRequests(id, [leave("l1", "e01", [3]), leave("l2", "e02", [3]), leave("x", "e99", [3])]);
     for (const c of ["l1", "l2", "x"]) store.getState().applyRequest(id, c);
@@ -698,7 +698,7 @@ describe("toScheduleRequest", () => {
     expect(req.previous).toEqual({ e01: ["D", "E"] });
   });
 
-  it("확정된 기간은 병동이 바뀌어도 확정 시점의 명단과 병동 규칙을 쓴다", () => {
+  it("확정된 기간은 매장이 바뀌어도 확정 시점의 명단과 매장 규칙을 쓴다", () => {
     const { store, id, period } = withPeriod();
     store.getState().setCoverage("D", "weekday", 1, 1);
     store.getState().setResult(id, result({ e01: ["D"], e02: ["O"] }), []);
@@ -715,7 +715,7 @@ describe("toScheduleRequest", () => {
 });
 
 describe("confirm", () => {
-  it("status를 확정으로, versions에 1개, snapshot에 활성 명단과 원본 병동 규칙을 남긴다", () => {
+  it("status를 확정으로, versions에 1개, snapshot에 활성 명단과 원본 매장 규칙을 남긴다", () => {
     const { store, id, period } = withPeriod();
     store.getState().addPendingRules([maxNights("r", 3)]);
     store.getState().applyRule("r");
@@ -867,7 +867,7 @@ describe("기간 연속성: 요청 조립", () => {
     expect(req.carry_over).toEqual([{ employee_id: "e01", shifts: ["N", "N"] }]);
   });
 
-  it("history는 최근 28일 확정본 원본이고 비활성 간호사는 뺀다", () => {
+  it("history는 최근 28일 확정본 원본이고 비활성 직원은 뺀다", () => {
     const { store, id } = withConfirmed(fill(30, "N"), fill(30, "D"));
     store.getState().toggleHoliday(id, 4); // 확정 뒤 공휴일을 바꿔도 그 기간의 공휴일 날짜를 쓴다
     store.getState().setEmployeeActive("e02", false);
@@ -1009,7 +1009,7 @@ describe("homeSummary", () => {
 });
 
 describe("rosterChangesFor", () => {
-  it("지난 확정 기간 snapshot 대비 추가·비활성화된 간호사", () => {
+  it("지난 확정 기간 snapshot 대비 추가·비활성화된 직원", () => {
     const { store, id } = withConfirmed();
     store.getState().addEmployees([{ name: "김철수" }]);
     store.getState().setEmployeeActive("e02", false);
@@ -1032,7 +1032,7 @@ describe("currentPeriod·orphanConstraintIds", () => {
     expect(currentPeriod(fresh().getState())).toBeNull();
   });
 
-  it("활성 명단에 없는 간호사를 가리키는 병동 규칙·요청 id", () => {
+  it("활성 명단에 없는 직원을 가리키는 매장 규칙·요청 id", () => {
     const { store, id, period } = withPeriod();
     store.getState().addPendingRequests(id, [leave("ok", "e01", [3]), fixed("gone", "e09", 2, "D")]);
     store.getState().applyRequest(id, "ok");
@@ -1044,7 +1044,7 @@ describe("currentPeriod·orphanConstraintIds", () => {
 });
 
 describe("reset", () => {
-  it("병동과 기간을 모두 지우고 홈으로, inputVersion은 올린다", () => {
+  it("매장과 기간을 모두 지우고 홈으로, inputVersion은 올린다", () => {
     const store = fresh();
     addInput(store);
     const before = store.getState().inputVersion;
@@ -1193,7 +1193,7 @@ function synced(remote: ShopRemote, storage: Storage = new MemoryStorage()) {
 function serverDoc() {
   const s = fresh();
   startDenShop(s);
-  s.getState().setShopName("서버 병동");
+  s.getState().setShopName("서버 매장");
   s.getState().addEmployees([rows[0]]);
   const { shop, periods, view, inputVersion } = s.getState();
   return { version: STORAGE_VERSION, state: { shop, periods, view, inputVersion } };
@@ -1212,13 +1212,13 @@ describe("로그인 분기", () => {
     expect(s.loginPrompt).toBeNull();
   });
 
-  it("서버에 병동이 있고 게스트 입력도 있으면 서버 문서로 바꾸고 안내한다", async () => {
+  it("서버에 매장이 있고 게스트 입력도 있으면 서버 문서로 바꾸고 안내한다", async () => {
     const f = fakeRemote({ data: serverDoc(), updatedAt: SERVER_AT });
     const store = synced(f.remote);
     addInput(store);
     await store.getState().signedIn(USER);
     const s = store.getState();
-    expect(s.shop!.name).toBe("서버 병동");
+    expect(s.shop!.name).toBe("서버 매장");
     expect(s.periods).toEqual([]);
     expect(s.auth).toEqual({ userId: "u1", email: "employee@example.com" });
     expect(s.sync).toEqual({ status: "saved", savedAt: SERVER_AT });
@@ -1227,13 +1227,13 @@ describe("로그인 분기", () => {
     expect(f.calls.save).toHaveLength(0);
   });
 
-  it("서버에 병동이 있고 게스트 입력이 없으면 안내 없이 서버 문서로 바꾼다", async () => {
+  it("서버에 매장이 있고 게스트 입력이 없으면 안내 없이 서버 문서로 바꾼다", async () => {
     const f = fakeRemote({ data: serverDoc(), updatedAt: SERVER_AT });
     const store = synced(f.remote);
     const v = store.getState().inputVersion;
     await store.getState().signedIn(USER);
     const s = store.getState();
-    expect(s.shop!.name).toBe("서버 병동");
+    expect(s.shop!.name).toBe("서버 매장");
     expect(s.loginPrompt).toBeNull();
     expect(s.inputVersion).toBeGreaterThan(Math.max(v, serverDoc().state.inputVersion));
     expect(f.calls.save).toHaveLength(0);
@@ -1251,7 +1251,7 @@ describe("로그인 분기", () => {
     expect(store.getState().sync).toEqual({ status: "saved", savedAt: "2026-10-28T07:00:00.000Z" });
   });
 
-  it("둘 다 없으면 빈 병동을 올리고 처음 설정 ①로 간다", async () => {
+  it("둘 다 없으면 빈 매장을 올리고 처음 설정 ①로 간다", async () => {
     const f = fakeRemote();
     const store = synced(f.remote);
     await store.getState().signedIn(USER);
@@ -1362,7 +1362,7 @@ describe("옛 pendingAfterLogin 필드", () => {
     await store.getState().signedIn(USER);
     const s = store.getState();
     expect(s.resetNotice).toBe(false);
-    expect(s.shop!.name).toBe("서버 병동");
+    expect(s.shop!.name).toBe("서버 매장");
     expect(s).not.toHaveProperty("pendingAfterLogin");
     expect(s.periods).toEqual([]);
   });
@@ -1469,7 +1469,7 @@ describe("로그아웃과 데이터 삭제", () => {
     expect(f.calls.remove).toBe(0);
   });
 
-  it("deleteShopData는 서버 문서를 지우고 빈 병동 + 처음 설정 ①, 로그인은 유지한다", async () => {
+  it("deleteShopData는 서버 문서를 지우고 빈 매장 + 처음 설정 ①, 로그인은 유지한다", async () => {
     const f = fakeRemote();
     const { store } = withPeriodSynced(f.remote);
     await store.getState().signedIn(USER);
@@ -1494,7 +1494,7 @@ describe("로그아웃과 데이터 삭제", () => {
   });
 });
 
-describe("병동 준비와 처음 설정 단계", () => {
+describe("매장 준비와 처음 설정 단계", () => {
   const COVERAGE = ["D", "E", "N"] as const;
   function fullCoverage(store: ReturnType<typeof createAppStore>) {
     for (const shift of COVERAGE) {
@@ -1503,7 +1503,7 @@ describe("병동 준비와 처음 설정 단계", () => {
     }
   }
 
-  it("명단이 없으면 ①, 병동 소개에서 [다음]을 누르지 않았으면 ②, 그 밖은 ③. 필요 인원은 필수가 아니다", () => {
+  it("명단이 없으면 ①, 매장 소개에서 [다음]을 누르지 않았으면 ②, 그 밖은 ③. 필요 인원은 필수가 아니다", () => {
     const store = fresh();
     startDenShop(store);
     const shop = () => store.getState().shop!;
@@ -1594,7 +1594,7 @@ describe("옛 화면 상태 불러오기", () => {
     expect(reload(store, { screen: "home" }).resetNotice).toBe(false);
   });
 
-  it("근무표가 없는 병동은 설정·홈 화면을 처음 설정의 못 끝낸 첫 단계로 바꾼다", () => {
+  it("근무표가 없는 매장은 설정·홈 화면을 처음 설정의 못 끝낸 첫 단계로 바꾼다", () => {
     const store = fresh();
     startDenShop(store);
     expect(reload(store, { screen: "settings", tab: "roster" }).view).toEqual({ screen: "setup", step: 1 });
@@ -1604,7 +1604,7 @@ describe("옛 화면 상태 불러오기", () => {
     expect(reload(store, { screen: "setup", step: 1 }).view).toEqual({ screen: "setup", step: 2 });
   });
 
-  it("근무표가 있는 병동의 처음 설정, 없는 기간을 가리키는 화면은 홈으로 바꾼다", () => {
+  it("근무표가 있는 매장의 처음 설정, 없는 기간을 가리키는 화면은 홈으로 바꾼다", () => {
     const { store } = withPeriod();
     expect(reload(store, { screen: "setup", step: 3 }).view).toEqual({ screen: "home" });
     expect(reload(store, { screen: "period", periodId: "p-없음", step: 2 }).view).toEqual({ screen: "home" });

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { DEN_CONFIG } from "./test-rules";
+import { DEFAULT_CONFIG } from "./rules";
 import { balance, count, fixedCell, forbid, maxRun, minRun, OFF, offAfter, WORK } from "./test-rules";
 import { isLeaveRule, type Shop, type WorkPeriod } from "./store";
 import type { ConstraintSpec, Employee, Rule, Shifts, ShopConfig } from "./types.gen";
@@ -29,18 +29,18 @@ const EMPLOYEES: Employee[] = [
 ];
 const CONFIG: ShopConfig = {
   shifts: [
-    ...DEN_CONFIG.shifts.slice(0, 3),
-    { code: "M", name: "미드", hours: 8 },
-    { code: "DE", name: "더블", hours: 16, parts: ["D", "E"] },
-    DEN_CONFIG.shifts[3],
+    ...DEFAULT_CONFIG.shifts.slice(0, 3),
+    { code: "P", name: "피크", hours: 3 },
+    { code: "AC", name: "더블", hours: 12, parts: ["A", "C"] },
+    DEFAULT_CONFIG.shifts[3],
   ],
 } as unknown as ShopConfig;
 
-const text = (c: ConstraintSpec, config: ShopConfig = DEN_CONFIG) => describeRule(c, config, EMPLOYEES, NOV).text;
+const text = (c: ConstraintSpec, config: ShopConfig = DEFAULT_CONFIG) => describeRule(c, config, EMPLOYEES, NOV).text;
 
-const D: Shifts = { in: ["D"] };
-const E: Shifts = { in: ["E"] };
-const N: Shifts = { in: ["N"] };
+const A: Shifts = { in: ["A"] };
+const M: Shifts = { in: ["M"] };
+const C: Shifts = { in: ["C"] };
 const person = { people: { ids: ["e02"] }, per: "person" as const };
 type CountSpec = Parameters<typeof count>[0];
 const hard = { hardness: "hard" } as const;
@@ -50,7 +50,7 @@ describe("scheduleName", () => {
   it("달력 월은 'M월 근무표'", () => {
     expect(scheduleName(NOV, "month")).toBe("11월 근무표");
   });
-  it("주 단위는 'M/D~M/D 근무표'", () => {
+  it("주 단위는 'P/A~P/A 근무표'", () => {
     expect(scheduleName({ start_date: "2026-11-02", length: 14 }, "2w")).toBe("11/2~11/15 근무표");
   });
   it("달력 월이 1일에 시작하지 않으면 날짜로 이름을 붙인다", () => {
@@ -65,23 +65,23 @@ describe("scheduleName", () => {
 
 describe("describeShiftChange", () => {
   it("추가: 코드 · 이름 · 시간", () => {
-    expect(describeShiftChange({ action: "add", shift: { code: "M", name: "미드", hours: 8 } }, DEN_CONFIG)).toBe(
-      "근무 코드 추가 · M 미드 · 8시간",
+    expect(describeShiftChange({ action: "add", shift: { code: "P", name: "피크", hours: 3 } }, DEFAULT_CONFIG)).toBe(
+      "근무 코드 추가 · P 피크 · 3시간",
     );
   });
   it("시각이 있으면 함께 쓴다", () => {
     expect(
-      describeShiftChange({ action: "add", shift: { code: "P", name: "피크", hours: 3, start: "11:00", end: "14:00" } }, DEN_CONFIG),
+      describeShiftChange({ action: "add", shift: { code: "P", name: "피크", hours: 3, start: "11:00", end: "14:00" } }, DEFAULT_CONFIG),
     ).toBe("근무 코드 추가 · P 피크 · 11:00~14:00 · 3시간");
   });
   it("더블은 세는 근무조 이름을 붙인다", () => {
     expect(
-      describeShiftChange({ action: "add", shift: { code: "DE", name: "더블", hours: 16, parts: ["D", "E"] } }, DEN_CONFIG),
-    ).toBe("근무 코드 추가 · DE 더블 · 16시간 · 데이와 이브닝으로 세요");
+      describeShiftChange({ action: "add", shift: { code: "AC", name: "더블", hours: 12, parts: ["A", "C"] } }, DEFAULT_CONFIG),
+    ).toBe("근무 코드 추가 · AC 더블 · 12시간 · 오픈과 마감으로 세요");
   });
   it("수정", () => {
-    expect(describeShiftChange({ action: "update", shift: { code: "E", name: "이브닝", hours: 9 } }, DEN_CONFIG)).toBe(
-      "근무 코드 수정 · E 이브닝 · 9시간",
+    expect(describeShiftChange({ action: "update", shift: { code: "M", name: "미들", hours: 9 } }, DEFAULT_CONFIG)).toBe(
+      "근무 코드 수정 · M 미들 · 9시간",
     );
   });
 });
@@ -108,41 +108,41 @@ describe("hardnessLabel", () => {
 
 describe("presetName / describeRule: 프리셋 모양", () => {
   const CASES: [string, ConstraintSpec, string, string][] = [
-    ["평일 필요 인원", count({ days: { kind: "weekday" }, shifts: D, per: "day", min: 3, max: 4 }), "필요 인원", "평일마다 데이 3~4명"],
-    ["주말 필요 인원", count({ days: { kind: "weekend" }, shifts: N, per: "day", min: 2, max: 2 }), "필요 인원", "주말·공휴일마다 나이트 2명"],
-    ["최소만", count({ shifts: D, per: "day", min: 3 }), "필요 인원", "매일 데이 3명 이상"],
-    ["최대만", count({ days: { kind: "weekend" }, shifts: E, per: "day", max: 4 }), "필요 인원", "주말·공휴일마다 이브닝 4명까지"],
-    ["정확히", count({ shifts: N, per: "day", min: 2, max: 2 }), "필요 인원", "매일 나이트 2명"],
-    ["기본 필요 인원", count({ shifts: D, per: "day", min: 3, max: 3 }, { id: "cov-D", default: true }), "필요 인원", "매일 데이 3명"],
+    ["평일 필요 인원", count({ days: { kind: "weekday" }, shifts: A, per: "day", min: 3, max: 4 }), "필요 인원", "평일마다 오픈 3~4명"],
+    ["주말 필요 인원", count({ days: { kind: "weekend" }, shifts: C, per: "day", min: 2, max: 2 }), "필요 인원", "주말·공휴일마다 마감 2명"],
+    ["최소만", count({ shifts: A, per: "day", min: 3 }), "필요 인원", "매일 오픈 3명 이상"],
+    ["최대만", count({ days: { kind: "weekend" }, shifts: M, per: "day", max: 4 }), "필요 인원", "주말·공휴일마다 미들 4명까지"],
+    ["정확히", count({ shifts: C, per: "day", min: 2, max: 2 }), "필요 인원", "매일 마감 2명"],
+    ["기본 필요 인원", count({ shifts: A, per: "day", min: 3, max: 3 }, { id: "cov-A", default: true }), "필요 인원", "매일 오픈 3명"],
     ["하루 근무 시간", count({ shifts: WORK, per: "day", measure: "hours", max: 80 }), "세는 규칙", "매일 근무 시간 80시간 이하"],
-    ["금지 순서", forbid([N, D]), "금지 순서", "나이트 다음 날 데이 금지"],
-    ["금지 순서 다른 쌍", forbid([N, E]), "금지 순서", "나이트 다음 날 이브닝 금지"],
-    ["금지 순서 3일", forbid([N, OFF, D], { tags: ["신규"] }), "금지 순서", "신규 태그 나이트 → 휴무 → 데이 금지"],
+    ["금지 순서", forbid([C, A]), "금지 순서", "마감 다음 날 오픈 금지"],
+    ["금지 순서 다른 쌍", forbid([C, M]), "금지 순서", "마감 다음 날 미들 금지"],
+    ["금지 순서 3일", forbid([C, OFF, A], { tags: ["신입"] }), "금지 순서", "신입 태그 마감 → 휴무 → 오픈 금지"],
     ["최대 연속 근무", maxRun(WORK, 5), "최대 연속 근무", "연속 근무 5일까지"],
-    ["최대 연속 나이트", maxRun(N, 3), "최대 연속 나이트", "나이트 연속 3일까지"],
-    ["블록 길이", minRun(N, 2), "나이트 블록 길이", "나이트는 2일 이상씩 이어서"],
+    ["최대 연속 마감", maxRun(C, 3), "최대 연속 마감", "마감 연속 3일까지"],
+    ["블록 길이", minRun(C, 2), "최소 연속 마감", "마감은 2일 이상씩 이어서"],
     ["최소 휴무", count({ shifts: OFF, per: "person", min: 8 }), "최소 휴무 일수", "모든 사람 근무표마다 휴무 8일 이상"],
     ["꺼진 규칙", count({ shifts: OFF, per: "person", min: 8 }, { enabled: false }), "최소 휴무 일수", "모든 사람 근무표마다 휴무 8일 이상"],
-    ["나이트 다음 휴무 1일", offAfter(N, 1), "나이트 다음 휴무", "나이트 다음 날은 휴무 1일"],
-    ["나이트 다음 휴무 2일", offAfter(N, 2), "나이트 다음 휴무", "나이트 다음 날은 휴무 2일"],
+    ["마감 다음 휴무 1일", offAfter(C, 1), "마감 다음 휴무", "마감 다음 날은 휴무 1일"],
+    ["마감 다음 휴무 2일", offAfter(C, 2), "마감 다음 휴무", "마감 다음 날은 휴무 2일"],
     ["주 근무 시간", count({ shifts: WORK, per: "person_week", measure: "hours", max: 52 }), "근무 시간", "모든 사람 주마다 근무 시간 52시간 이하"],
-    ["휴무 간격", count({ people: { exclude_tags: ["신규"] }, shifts: OFF, per: "person_window", window: 7, min: 1 }), "휴무 간격", "신규 빼고 7일마다 휴무 1일 이상"],
+    ["휴무 간격", count({ people: { exclude_tags: ["신입"] }, shifts: OFF, per: "person_window", window: 7, min: 1 }), "휴무 간격", "신입 빼고 7일마다 휴무 1일 이상"],
     ["휴가", count({ people: { ids: ["e01"] }, days: { days: [3, 4, 5] }, shifts: WORK, per: "person", max: 0 }, hard), "휴가", "이영희 · 11/3~11/5 · 휴무"],
-    ["명단에 없는 휴가", count({ people: { ids: ["n1"] }, days: { days: [3, 4, 5] }, shifts: WORK, per: "person", max: 0 }, hard), "휴가", "(명단에 없는 간호사) · 11/3~11/5 · 휴무"],
-    ["고정 근무", fixedCell("e01", 2, "E"), "고정 근무", "이영희 · 11/2 · 이브닝 고정"],
-    ["명단에 없는 고정", fixedCell("n1", 2, "E"), "고정 근무", "(명단에 없는 간호사) · 11/2 · 이브닝 고정"],
+    ["명단에 없는 휴가", count({ people: { ids: ["n1"] }, days: { days: [3, 4, 5] }, shifts: WORK, per: "person", max: 0 }, hard), "휴가", "(명단에 없는 직원) · 11/3~11/5 · 휴무"],
+    ["고정 근무", fixedCell("e01", 2, "M"), "고정 근무", "이영희 · 11/2 · 미들 고정"],
+    ["명단에 없는 고정", fixedCell("n1", 2, "M"), "고정 근무", "(명단에 없는 직원) · 11/2 · 미들 고정"],
     ["희망 전체", count({ ...person, shifts: OFF, min: 14 }, soft), "희망·기피 근무", "박민수 · 근무표 전체 · 휴무 희망"],
     ["희망 주말", count({ ...person, days: { kind: "weekend" }, shifts: OFF, min: 5 }, soft), "희망·기피 근무", "박민수 · 주말·공휴일 · 휴무 희망"],
-    ["희망 날짜", count({ ...person, days: { days: [2, 3, 7] }, shifts: D, min: 3 }, soft), "희망·기피 근무", "박민수 · 11/2~11/3, 11/7 · 데이 희망"],
-    ["희망 날짜 중 주말", count({ ...person, days: { kind: "weekend", days: [2, 3, 7] }, shifts: D, min: 2 }, soft), "희망·기피 근무", "박민수 · 11/2~11/3, 11/7 중 주말·공휴일 · 데이 희망"],
-    ["기피 전체", count({ ...person, shifts: N, max: 0 }, soft), "희망·기피 근무", "박민수 · 근무표 전체 · 나이트 피하기"],
-    ["기피 주말", count({ ...person, days: { kind: "weekend" }, shifts: N, max: 0 }, soft), "희망·기피 근무", "박민수 · 주말·공휴일 · 나이트 피하기"],
-    ["기피 날짜", count({ ...person, days: { days: [5, 6] }, shifts: E, max: 0 }, soft), "희망·기피 근무", "박민수 · 11/5~11/6 · 이브닝 피하기"],
-    ["중요도 높은 기피", count({ ...person, shifts: N, max: 0 }, { ...soft, priority: "high" }), "희망·기피 근무", "박민수 · 근무표 전체 · 나이트 피하기"],
-    ["명단에 없는 기피", count({ people: { ids: ["n1"] }, per: "person", days: { kind: "weekend" }, shifts: N, max: 0 }, soft), "희망·기피 근무", "(명단에 없는 간호사) · 주말·공휴일 · 나이트 피하기"],
-    ["나이트 고르게", balance({ people: { exclude_tags: ["신규"] }, shifts: N }), "나이트 고르게", "신규 빼고 나이트 수를 고르게(최근 4주 포함)"],
-    ["나이트 고르게 반드시", balance({ people: { exclude_tags: ["신규"] }, shifts: N }, hard), "나이트 고르게", "신규 빼고 나이트 수를 고르게(최근 4주 포함) · 차이 1 이하"],
-    ["차이 0", balance({ shifts: N, max_gap: 0 }, hard), "나이트 고르게", "나이트 수를 고르게(최근 4주 포함) · 차이 0 이하"],
+    ["희망 날짜", count({ ...person, days: { days: [2, 3, 7] }, shifts: A, min: 3 }, soft), "희망·기피 근무", "박민수 · 11/2~11/3, 11/7 · 오픈 희망"],
+    ["희망 날짜 중 주말", count({ ...person, days: { kind: "weekend", days: [2, 3, 7] }, shifts: A, min: 2 }, soft), "희망·기피 근무", "박민수 · 11/2~11/3, 11/7 중 주말·공휴일 · 오픈 희망"],
+    ["기피 전체", count({ ...person, shifts: C, max: 0 }, soft), "희망·기피 근무", "박민수 · 근무표 전체 · 마감 피하기"],
+    ["기피 주말", count({ ...person, days: { kind: "weekend" }, shifts: C, max: 0 }, soft), "희망·기피 근무", "박민수 · 주말·공휴일 · 마감 피하기"],
+    ["기피 날짜", count({ ...person, days: { days: [5, 6] }, shifts: M, max: 0 }, soft), "희망·기피 근무", "박민수 · 11/5~11/6 · 미들 피하기"],
+    ["중요도 높은 기피", count({ ...person, shifts: C, max: 0 }, { ...soft, priority: "high" }), "희망·기피 근무", "박민수 · 근무표 전체 · 마감 피하기"],
+    ["명단에 없는 기피", count({ people: { ids: ["n1"] }, per: "person", days: { kind: "weekend" }, shifts: C, max: 0 }, soft), "희망·기피 근무", "(명단에 없는 직원) · 주말·공휴일 · 마감 피하기"],
+    ["마감 고르게", balance({ people: { exclude_tags: ["신입"] }, shifts: C }), "마감 고르게", "신입 빼고 마감 수를 고르게(최근 4주 포함)"],
+    ["마감 고르게 반드시", balance({ people: { exclude_tags: ["신입"] }, shifts: C }, hard), "마감 고르게", "신입 빼고 마감 수를 고르게(최근 4주 포함) · 차이 1 이하"],
+    ["차이 0", balance({ shifts: C, max_gap: 0 }, hard), "마감 고르게", "마감 수를 고르게(최근 4주 포함) · 차이 0 이하"],
     ["주말 고르게", balance({ days: { kind: "weekend" }, shifts: WORK }), "주말·공휴일 고르게", "주말·공휴일 근무 수를 고르게(최근 4주 포함)"],
     ["주말 고르게 반드시", balance({ days: { kind: "weekend" }, shifts: WORK }, hard), "주말·공휴일 고르게", "주말·공휴일 근무 수를 고르게(최근 4주 포함) · 차이 1 이하"],
     ["시간 고르게(최근 4주 뺌)", balance({ days: { kind: "weekend" }, shifts: WORK, measure: "hours", with_history: false }), "고르게 규칙", "주말·공휴일 근무 시간을 고르게"],
@@ -155,7 +155,7 @@ describe("presetName / describeRule: 프리셋 모양", () => {
   }
 
   it("내부 id·코드만 있는 표기를 쓰지 않는다", () => {
-    for (const [name, r] of CASES) expect(text(r), name).not.toMatch(/n\d\d|\b[DENO]\b|오프|≤|≥|undefined|NaN/);
+    for (const [name, r] of CASES) expect(text(r), name).not.toMatch(/e\d\d|\b[AMCO]\b|오프|≤|≥|undefined|NaN/);
   });
 });
 
@@ -163,24 +163,24 @@ describe("presetName / describeRule: 새 모양", () => {
   const d = (b: ConstraintSpec) => [presetName(b), text(b, CONFIG)];
 
   it("태그·요일·공휴일로 고른 날마다 인원", () => {
-    expect(d(count({ people: { tags: ["책임"] }, shifts: { in: ["D"] }, per: "day", min: 1 }))).toEqual([
+    expect(d(count({ people: { tags: ["리더"] }, shifts: { in: ["A"] }, per: "day", min: 1 }))).toEqual([
       "태그별 배치",
-      "매일 책임 태그 데이 1명 이상",
+      "매일 리더 태그 오픈 1명 이상",
     ]);
-    expect(d(count({ days: { weekdays: [5] }, shifts: { in: ["D"] }, per: "day", min: 2, max: 2 }))).toEqual([
+    expect(d(count({ days: { weekdays: [5] }, shifts: { in: ["A"] }, per: "day", min: 2, max: 2 }))).toEqual([
       "필요 인원",
-      "토요일마다 데이 2명",
+      "토요일마다 오픈 2명",
     ]);
-    expect(d(count({ days: { kind: "weekday", weekdays: [0, 2] }, shifts: { in: ["E"] }, per: "day", max: 2 }))).toEqual([
+    expect(d(count({ days: { kind: "weekday", weekdays: [0, 2] }, shifts: { in: ["M"] }, per: "day", max: 2 }))).toEqual([
       "필요 인원",
-      "평일 중 월·수요일마다 이브닝 2명까지",
+      "평일 중 월·수요일마다 미들 2명까지",
     ]);
     expect(
-      d(count({ people: { tags: ["책임"] }, days: { kind: "holiday" }, shifts: { in: ["N"] }, per: "day", min: 1 })),
-    ).toEqual(["태그별 배치", "공휴일마다 책임 태그 나이트 1명 이상"]);
-    expect(d(count({ days: { kind: "weekday" }, shifts: { in: ["M"] }, per: "day", min: 1, max: 1 }))).toEqual([
+      d(count({ people: { tags: ["리더"] }, days: { kind: "holiday" }, shifts: { in: ["C"] }, per: "day", min: 1 })),
+    ).toEqual(["태그별 배치", "공휴일마다 리더 태그 마감 1명 이상"]);
+    expect(d(count({ days: { kind: "weekday" }, shifts: { in: ["P"] }, per: "day", min: 1, max: 1 }))).toEqual([
       "필요 인원",
-      "평일마다 미드 1명",
+      "평일마다 피크 1명",
     ]);
   });
 
@@ -193,63 +193,63 @@ describe("presetName / describeRule: 새 모양", () => {
       "휴무 간격",
       "모든 사람 7일마다 휴무 1일 이상",
     ]);
-    expect(d(count({ people: { tags: ["신규"] }, shifts: { in: ["N"] }, per: "person", measure: "hours", max: 80 }))).toEqual([
+    expect(d(count({ people: { tags: ["신입"] }, shifts: { in: ["C"] }, per: "person", measure: "hours", max: 80 }))).toEqual([
       "근무 시간",
-      "신규 태그 근무표마다 나이트 근무 시간 80시간 이하",
+      "신입 태그 근무표마다 마감 근무 시간 80시간 이하",
     ]);
   });
 
   it("복합 코드와 여러 사람", () => {
-    expect(d(count({ shifts: { in: ["DE"] }, per: "person", max: 2 }))).toEqual([
+    expect(d(count({ shifts: { in: ["AC"] }, per: "person", max: 2 }))).toEqual([
       "근무 횟수",
-      "모든 사람 근무표마다 더블(DE) 2번까지",
+      "모든 사람 근무표마다 더블(AC) 2번까지",
     ]);
-    expect(d(count({ people: { ids: ["e01", "e02", "e03", "e04"] }, shifts: { in: ["N"] }, per: "person", min: 4, max: 6 }))).toEqual([
+    expect(d(count({ people: { ids: ["e01", "e02", "e03", "e04"] }, shifts: { in: ["C"] }, per: "person", min: 4, max: 6 }))).toEqual([
       "근무 횟수",
-      "이영희 외 3명 근무표마다 나이트 4~6번",
+      "이영희 외 3명 근무표마다 마감 4~6번",
     ]);
-    expect(d(count({ people: { ids: ["e01", "e02"] }, days: { days: [10] }, shifts: { in: ["D", "M"] }, per: "day", min: 1 }))).toEqual([
+    expect(d(count({ people: { ids: ["e01", "e02"] }, days: { days: [10] }, shifts: { in: ["A", "P"] }, per: "day", min: 1 }))).toEqual([
       "세는 규칙",
-      "11/10마다 이영희 박민수 데이·미드 1명 이상",
+      "11/10마다 이영희 박민수 오픈·피크 1명 이상",
     ]);
   });
 
   it("순서: 길이 범위(최대·최소 두 규칙으로 나뉜다), 다른 근무 금지, 사람 대상", () => {
-    const [max, min] = [maxRun(N, 3), minRun(N, 2)];
-    expect(d(max)).toEqual(["최대 연속 나이트", "나이트 연속 3일까지"]);
-    expect(d(min)).toEqual(["나이트 블록 길이", "나이트는 2일 이상씩 이어서"]);
-    expect(d(minRun(E, 2))).toEqual(["순서 규칙", "이브닝은 2일 이상씩 이어서"]);
-    expect(d(forbid([N, { not_in: ["N", "O"] }]))).toEqual([
+    const [max, min] = [maxRun(C, 3), minRun(C, 2)];
+    expect(d(max)).toEqual(["최대 연속 마감", "마감 연속 3일까지"]);
+    expect(d(min)).toEqual(["최소 연속 마감", "마감은 2일 이상씩 이어서"]);
+    expect(d(minRun(M, 2))).toEqual(["순서 규칙", "미들은 2일 이상씩 이어서"]);
+    expect(d(forbid([C, { not_in: ["C", "O"] }]))).toEqual([
       "금지 순서",
-      "나이트 다음 날 나이트 말고 다른 근무 금지",
+      "마감 다음 날 마감 말고 다른 근무 금지",
     ]);
-    expect(d(forbid([E, OFF, D]))).toEqual([
+    expect(d(forbid([M, OFF, A]))).toEqual([
       "금지 순서",
-      "이브닝 → 휴무 → 데이 금지",
+      "미들 → 휴무 → 오픈 금지",
     ]);
-    expect(d(maxRun(WORK, 4, { tags: ["신규"] }))).toEqual([
+    expect(d(maxRun(WORK, 4, { tags: ["신입"] }))).toEqual([
       "최대 연속 근무",
-      "신규 태그 연속 근무 4일까지",
+      "신입 태그 연속 근무 4일까지",
     ]);
   });
 
   it("고르게: 시간, 태그, 최근 4주를 빼면", () => {
-    expect(d(balance({ people: { tags: ["신규"] }, shifts: WORK, measure: "hours" }))).toEqual([
+    expect(d(balance({ people: { tags: ["신입"] }, shifts: WORK, measure: "hours" }))).toEqual([
       "고르게 규칙",
-      "신규 태그 근무 시간을 고르게(최근 4주 포함)",
+      "신입 태그 근무 시간을 고르게(최근 4주 포함)",
     ]);
-    expect(d(balance({ shifts: { in: ["DE"] }, with_history: false }))).toEqual(["고르게 규칙", "더블(DE) 수를 고르게"]);
+    expect(d(balance({ shifts: { in: ["AC"] }, with_history: false }))).toEqual(["고르게 규칙", "더블(AC) 수를 고르게"]);
   });
 
   it("희망·기피는 가능하면인 한 사람 세기, 반드시면 근무 횟수", () => {
-    const want: CountSpec = { people: { ids: ["e03"] }, days: { days: [20] }, shifts: { in: ["M"] }, per: "person", min: 1 };
-    expect(d(count(want, { hardness: "soft", priority: "high" }))).toEqual(["희망·기피 근무", "정유진 · 11/20 · 미드 희망"]);
-    expect(d(count(want, hard))).toEqual(["근무 횟수", "정유진 11/20 미드 1번 이상"]);
+    const want: CountSpec = { people: { ids: ["e03"] }, days: { days: [20] }, shifts: { in: ["P"] }, per: "person", min: 1 };
+    expect(d(count(want, { hardness: "soft", priority: "high" }))).toEqual(["희망·기피 근무", "정유진 · 11/20 · 피크 희망"]);
+    expect(d(count(want, hard))).toEqual(["근무 횟수", "정유진 11/20 피크 1번 이상"]);
   });
 
-  it("명단에 없는 간호사", () => {
+  it("명단에 없는 직원", () => {
     const leave: CountSpec = { people: { ids: ["e99"] }, days: { days: [20] }, shifts: { not_in: ["O"] }, per: "person", max: 0 };
-    expect(d(count(leave))).toEqual(["휴가", "(명단에 없는 간호사) · 11/20 · 휴무"]);
+    expect(d(count(leave))).toEqual(["휴가", "(명단에 없는 직원) · 11/20 · 휴무"]);
   });
 
   it("휴가 모양이어도 가능하면이면 휴무 희망(토글을 숨기지 않는다)", () => {
@@ -263,18 +263,18 @@ describe("presetName / describeRule: 새 모양", () => {
 
 describe("describeRule: 조정 가능한 값의 위치(parts)", () => {
   it("값은 이름과 함께 따로 나오고, 이어 붙이면 text다", () => {
-    const r = count({ days: { kind: "weekday" }, shifts: D, per: "day", min: 3, max: 4 });
-    const s = describeRule(r, DEN_CONFIG, EMPLOYEES, NOV);
-    expect(s.text).toBe("평일마다 데이 3~4명");
-    expect(s.parts).toEqual([{ text: "평일마다 데이 " }, { value: "min", text: "3" }, { text: "~" }, { value: "max", text: "4" }, { text: "명" }]);
+    const r = count({ days: { kind: "weekday" }, shifts: A, per: "day", min: 3, max: 4 });
+    const s = describeRule(r, DEFAULT_CONFIG, EMPLOYEES, NOV);
+    expect(s.text).toBe("평일마다 오픈 3~4명");
+    expect(s.parts).toEqual([{ text: "평일마다 오픈 " }, { value: "min", text: "3" }, { text: "~" }, { value: "max", text: "4" }, { text: "명" }]);
     expect(s.parts.map((p) => p.text).join("")).toBe(s.text);
   });
 
   it("최대 연속·고르게 차이도 값, 구조 숫자(휴무 일수 offset)는 값이 아니다", () => {
-    const values = (r: ConstraintSpec) => describeRule(r, DEN_CONFIG, EMPLOYEES, NOV).parts.filter((p) => "value" in p);
-    expect(values(maxRun(N, 3))).toEqual([{ value: "max_len", text: "3" }]);
-    expect(values(balance({ shifts: N, max_gap: 0 }, hard))).toEqual([{ value: "max_gap", text: "0" }]);
-    expect(values(offAfter(N, 2))).toEqual([]);
+    const values = (r: ConstraintSpec) => describeRule(r, DEFAULT_CONFIG, EMPLOYEES, NOV).parts.filter((p) => "value" in p);
+    expect(values(maxRun(C, 3))).toEqual([{ value: "max_len", text: "3" }]);
+    expect(values(balance({ shifts: C, max_gap: 0 }, hard))).toEqual([{ value: "max_gap", text: "0" }]);
+    expect(values(offAfter(C, 2))).toEqual([]);
   });
 });
 
@@ -284,54 +284,54 @@ describe("describeRule: 새로 표현되는 규칙(설계 §2.6)", () => {
   const count = (shifts: string[], extra: object = {}) => ({ ...extra, shifts: { in: shifts } });
   const d = (r: ConstraintSpec) => [presetName(r), describeRule(r, CONFIG, EMPLOYEES, NOV).text];
 
-  it("신규가 나이트면 책임도 나이트에 1명", () => {
+  it("신입가 마감면 리더도 마감에 1명", () => {
     const r = rule({
       kind: "require",
       for_each: { per: "day" },
-      when: { left: count(["N"], { who: { tags: ["신규"] } }), op: "ge", right: 1 },
-      then: { left: count(["N"], { who: { tags: ["책임"] } }), op: "ge", right: 1 },
+      when: { left: count(["C"], { who: { tags: ["신입"] } }), op: "ge", right: 1 },
+      then: { left: count(["C"], { who: { tags: ["리더"] } }), op: "ge", right: 1 },
     });
-    expect(d(r)).toEqual(["조건 규칙", "매일, 신규 태그 나이트 1명 이상이면 책임 태그 나이트 1명 이상"]);
+    expect(d(r)).toEqual(["조건 규칙", "매일, 신입 태그 마감 1명 이상이면 리더 태그 마감 1명 이상"]);
   });
 
-  it("둘은 같은 날 나이트 금지", () => {
-    const r = rule({ kind: "require", for_each: { per: "day" }, then: { left: count(["N"], { who: { ids: ["e01", "e02"] } }), op: "le", right: 1 } });
-    expect(d(r)).toEqual(["세는 규칙", "매일 이영희 박민수 나이트 1명까지"]);
+  it("둘은 같은 날 마감 금지", () => {
+    const r = rule({ kind: "require", for_each: { per: "day" }, then: { left: count(["C"], { who: { ids: ["e01", "e02"] } }), op: "le", right: 1 } });
+    expect(d(r)).toEqual(["세는 규칙", "매일 이영희 박민수 마감 1명까지"]);
   });
 
-  it("둘은 데이를 같이", () => {
+  it("둘은 오픈을 같이", () => {
     const r = rule({
       kind: "require",
       for_each: { per: "day" },
-      then: { left: count(["D"], { who: { ids: ["e01"] } }), op: "eq", right: count(["D"], { who: { ids: ["e02"] } }) },
+      then: { left: count(["A"], { who: { ids: ["e01"] } }), op: "eq", right: count(["A"], { who: { ids: ["e02"] } }) },
     });
-    expect(d(r)).toEqual(["세는 규칙", "매일 이영희 데이와 박민수 데이가 같음"]);
+    expect(d(r)).toEqual(["세는 규칙", "매일 이영희 오픈과 박민수 오픈이 같음"]);
   });
 
-  it("책임이 신규보다 적으면 안 됨(나이트)", () => {
+  it("리더가 신입보다 적으면 안 됨(마감)", () => {
     const r = rule({
       kind: "require",
       for_each: { per: "day" },
-      then: { left: count(["N"], { who: { tags: ["책임"] } }), op: "ge", right: count(["N"], { who: { tags: ["신규"] } }) },
+      then: { left: count(["C"], { who: { tags: ["리더"] } }), op: "ge", right: count(["C"], { who: { tags: ["신입"] } }) },
     });
-    expect(d(r)).toEqual(["세는 규칙", "매일 책임 태그 나이트가 신규 태그 나이트 이상"]);
+    expect(d(r)).toEqual(["세는 규칙", "매일 리더 태그 마감이 신입 태그 마감 이상"]);
   });
 
-  it("주말 나이트 다음 월요일은 휴무", () => {
+  it("주말 마감 다음 월요일은 휴무", () => {
     const r = rule({
       kind: "require",
       for_each: { per: "person_day", days: { weekdays: [6] } },
-      when: { left: { ...count(["N"]), offset: [0, 0] }, op: "ge", right: 1 },
+      when: { left: { ...count(["C"]), offset: [0, 0] }, op: "ge", right: 1 },
       then: { left: { ...count(["O"]), offset: [1, 1] }, op: "eq", right: 1 },
     });
-    expect(d(r)).toEqual(["조건 규칙", "모든 사람 · 일요일마다, 나이트 1번 이상이면 다음 날 휴무 1일"]);
+    expect(d(r)).toEqual(["조건 규칙", "모든 사람 · 일요일마다, 마감 1번 이상이면 다음 날 휴무 1일"]);
   });
 
-  it("나이트 블록은 2~3일씩(두 규칙)", () => {
-    const rules = [maxRun(N, 3), minRun(N, 2)];
+  it("마감 연속은 2~3일씩(두 규칙)", () => {
+    const rules = [maxRun(C, 3), minRun(C, 2)];
     expect(rules.map(d)).toEqual([
-      ["최대 연속 나이트", "나이트 연속 3일까지"],
-      ["나이트 블록 길이", "나이트는 2일 이상씩 이어서"],
+      ["최대 연속 마감", "마감 연속 3일까지"],
+      ["최소 연속 마감", "마감은 2일 이상씩 이어서"],
     ]);
   });
 
@@ -342,22 +342,22 @@ describe("describeRule: 새로 표현되는 규칙(설계 §2.6)", () => {
         for_each: { per: "period" },
         then: {
           any: [
-            { left: count(["DE"]), op: "le", right: { value: "max" } },
-            { left: { ...count(["N"]), measure: "hours" }, op: "ge", right: 16 },
+            { left: count(["AC"]), op: "le", right: { value: "max" } },
+            { left: { ...count(["C"]), measure: "hours" }, op: "ge", right: 16 },
           ],
         },
       },
       { max: { value: 10, label: "최대 횟수" } },
     );
     const s = describeRule(r, CONFIG, EMPLOYEES, NOV);
-    expect([presetName(r), s.text]).toEqual(["세는 규칙", "근무표 전체 더블(DE) 10번 이하 또는 나이트 근무 시간 16시간 이상"]);
+    expect([presetName(r), s.text]).toEqual(["세는 규칙", "근무표 전체 더블(AC) 10번 이하 또는 마감 근무 시간 16시간 이상"]);
     expect(s.parts.filter((p) => "value" in p)).toEqual([{ value: "max", text: "10" }]);
     const seq = rule({
       kind: "require",
-      for_each: { per: "person_day", people: { tags: ["신규"] } },
-      then: { left: { ...count(["N"]), offset: [-2, -1] }, op: "le", right: 1 },
+      for_each: { per: "person_day", people: { tags: ["신입"] } },
+      then: { left: { ...count(["C"]), offset: [-2, -1] }, op: "le", right: 1 },
     });
-    expect(d(seq)).toEqual(["순서 규칙", "신규 태그 · 날마다 앞 2일 나이트 1번 이하"]);
+    expect(d(seq)).toEqual(["순서 규칙", "신입 태그 · 날마다 앞 2일 마감 1번 이하"]);
   });
 });
 
@@ -366,10 +366,10 @@ describe("shopRuleCount", () => {
     const coverage = (kind: "weekday" | "weekend", code: string) =>
       count({ days: { kind }, shifts: { in: [code] }, per: "day", min: 2, max: 2 });
     const rules = [
-      coverage("weekday", "D"),
-      coverage("weekend", "N"),
-      offAfter(N, 1),
-      balance({ shifts: N }),
+      coverage("weekday", "A"),
+      coverage("weekend", "C"),
+      offAfter(C, 1),
+      balance({ shifts: C }),
     ];
     expect(shopRuleCount(rules)).toBe(2);
     expect(shopRuleCount([])).toBe(0);
@@ -390,9 +390,9 @@ describe("formatDeviation", () => {
 
 describe("nextTask", () => {
   const shop: Shop = {
-    name: "내과 병동",
+    name: "성수 카페",
     unit: "month",
-    config: DEN_CONFIG,
+    config: DEFAULT_CONFIG,
     employees: EMPLOYEES.map((n) => ({ ...n, tags: [], active: true })),
     nextEmployeeNo: 5,
     rules: [],
@@ -439,7 +439,7 @@ describe("nextTask", () => {
     const p = period("2026-11-01", 30, {
       requests: [
         fixedCell("e01", 15, "O"),
-        balance({ shifts: N }, { scope: "period" }),
+        balance({ shifts: C }, { scope: "period" }),
       ],
       pendingRequests: [fixedCell("e02", 3, "O")],
     });
@@ -473,7 +473,7 @@ describe("nextTask", () => {
     });
   });
 
-  it("주 단위 병동은 날짜로 이름을 붙인다", () => {
+  it("주 단위 매장은 날짜로 이름을 붙인다", () => {
     expect(nextTask({ ...shop, unit: "2w" }, [], TODAY)).toEqual({ kind: "none", name: "11/2~11/15 근무표" });
   });
 });
@@ -498,21 +498,21 @@ describe("configSummary", () => {
     ({ shifts: [...shifts, shift("O", "휴무", 0)] }) as unknown as ShopConfig;
 
   it("기본 근무 형태는 UI_GUIDE 문구와 같다", () => {
-    expect(configSummary(DEN_CONFIG)).toBe("데이·이브닝·나이트 3교대, 각 8시간");
+    expect(configSummary(DEFAULT_CONFIG)).toBe("오픈·미들·마감, 각 6시간");
   });
 
   it("시간이 다르면 근무조마다 적고, 더블과 꺼진 코드를 구분한다", () => {
     const c = config(
-      shift("D", "데이", 8),
-      shift("E", "이브닝", 8),
-      shift("N", "나이트", 10),
-      shift("M", "미드", 7.5, { active: false }),
-      shift("DE", "더블", 16, { parts: ["D", "E"] }),
+      shift("A", "오픈", 6),
+      shift("M", "미들", 6),
+      shift("C", "마감", 7),
+      shift("P", "피크", 3, { active: false }),
+      shift("AC", "더블", 13, { parts: ["A", "C"] }),
     );
-    expect(configSummary(c)).toBe("데이·이브닝·나이트 3교대, 데이 8시간·이브닝 8시간·나이트 10시간 · 더블 DE");
+    expect(configSummary(c)).toBe("오픈·미들·마감, 오픈 6시간·미들 6시간·마감 7시간 · 더블 AC");
   });
 
-  it("근무조가 하나뿐이면 교대라고 하지 않는다", () => {
-    expect(configSummary(config(shift("D", "데이", 7.5)))).toBe("데이 근무, 7.5시간");
+  it("근무조가 하나뿐이면 근무를 붙인다", () => {
+    expect(configSummary(config(shift("A", "오픈", 7.5)))).toBe("오픈 근무, 7.5시간");
   });
 });

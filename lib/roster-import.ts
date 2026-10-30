@@ -57,12 +57,10 @@ export function parseDelimited(text: string): string[][] {
     .filter((r) => r.some((c) => c !== ""));
 }
 
-const NAME_HEADERS = ["이름", "성명", "간호사"];
+const NAME_HEADERS = ["이름", "성명", "직원"];
 
 /** 기본 코드의 다른 표기. 그 코드가 근무 형태에 있을 때만 쓴다. */
 const SHIFT_SYNONYMS: Record<string, string> = {
-  이브: "E",
-  나: "N",
   off: "O", 휴: "O", 오프: "O",
 };
 
