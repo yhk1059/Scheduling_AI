@@ -235,6 +235,18 @@ describe("병동 규칙 카드", () => {
     expect(store.getState().inputVersion).toBe(v + 1);
   });
 
+  it("말로 만든 필요 인원 카드(날마다 모든 사람의 개수)는 기본 규칙이 된다", () => {
+    const store = fresh();
+    store.getState().startWard();
+    const sat = card({ id: "sat-D", type: "count", params: { days: { kind: "all", weekdays: [5] }, shifts: { in: ["D"] }, per: "day", min: 2 } });
+    store.getState().addPendingRules([sat, skillMix("s", "D"), minOff("m", 8)]);
+    expect(store.getState().ward!.pendingRules.map((c) => [c.id, (c as Rule).default])).toEqual([
+      ["sat-D", true],
+      ["s", false],
+      ["m", false],
+    ]);
+  });
+
   it("같은 type·scope·대상이면 교체하고, 대상이 다르면 추가한다", () => {
     const store = fresh();
     store.getState().startWard();
@@ -306,6 +318,20 @@ describe("병동 규칙 카드", () => {
       [NIGHT_ONLY_RULE_ID, false],
       ["cov-weekday-D", false],
     ]);
+  });
+
+  it("enableRule: 끈 기본 규칙을 다시 켜고 inputVersion을 올린다", () => {
+    const store = fresh();
+    store.getState().startWard();
+    store.getState().setCoverage("D", "weekday", 3, null);
+    store.getState().removeRule("cov-weekday-D");
+    const v = store.getState().inputVersion;
+    store.getState().enableRule("cov-weekday-D");
+    expect(byId(store.getState().ward!.rules, "cov-weekday-D").enabled).toBe(true);
+    expect(store.getState().inputVersion).toBe(v + 1);
+    store.getState().enableRule("cov-weekday-D"); // 이미 켜져 있으면 그대로
+    store.getState().enableRule("없는규칙");
+    expect(store.getState().inputVersion).toBe(v + 1);
   });
 
   it("removeRule: 대기 카드는 inputVersion 없이, 적용된 규칙은 올리며 지운다", () => {

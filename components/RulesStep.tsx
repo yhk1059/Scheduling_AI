@@ -15,7 +15,7 @@ import {
   type WorkPeriod,
 } from "@/lib/store";
 import type { ConstraintSpec } from "@/lib/types.gen";
-import { wardRuleCount } from "@/lib/wording";
+import { presetName, wardRuleCount } from "@/lib/wording";
 
 import ConstraintCard, { ShiftChangeCardView } from "./ConstraintCard";
 import { ui } from "./ui";
@@ -30,6 +30,14 @@ const COPY = {
     submit: "규칙 만들기",
     empty: "아직 규칙이 없어요.",
     examples: ["나이트 다음 날은 무조건 쉬게", "3년차 이상이 매 근무 1명은 있게", "나이트는 3일 넘게 연속으로 하지 않게"],
+  },
+  intro: {
+    title: "병동 소개",
+    description: "근무 형태와 날마다 필요한 인원을 말로 적어 주세요. 만든 카드를 확인하고 [적용]해야 반영돼요.",
+    placeholder: "예: 데이 평일 3명 이상, 주말 2명",
+    submit: "규칙 만들기",
+    empty: "",
+    examples: ["데이 평일 3명 이상, 주말 2명, 더블도 있어", "나이트는 매일 2~3명"],
   },
   period: {
     title: "요청",
@@ -53,9 +61,20 @@ export function previewRange(unit: PeriodUnit): PeriodRange {
 
 type Notice = { kind: "clarify" | "unsupported"; text: string } | null;
 
-/** pendingNote=false: 처음 설정 ③처럼 화면이 대기 카드 안내를 버튼 옆에 따로 둘 때. */
-export default function RulesStep({ scope, pendingNote = true }: { scope: "ward" | "period"; pendingNote?: boolean }) {
-  const copy = COPY[scope];
+/**
+ * pendingNote=false: 처음 설정 ③처럼 화면이 대기 카드 안내를 버튼 옆에 따로 둘 때.
+ * intro: 처음 설정 ② 병동 소개. 병동 규칙(scope ward)으로 해석하고, 적용된 카드는 필요 인원만 보여 준다.
+ */
+export default function RulesStep({
+  scope,
+  pendingNote = true,
+  intro = false,
+}: {
+  scope: "ward" | "period";
+  pendingNote?: boolean;
+  intro?: boolean;
+}) {
+  const copy = COPY[intro ? "intro" : scope];
   const ward = useAppStore((s) => s.ward);
   const period = useAppStore(currentPeriod);
   const addPendingRules = useAppStore((s) => s.addPendingRules);
@@ -72,8 +91,8 @@ export default function RulesStep({ scope, pendingNote = true }: { scope: "ward"
   if (!ward || (scope === "period" && !period)) return null;
   const orphanCount = orphanConstraintIds(ward, period).length;
   const pending = scope === "ward" ? ward.pendingRules : period!.pendingRequests;
-  // 필요 인원 폼이 만든 제약(cov-*)은 [명단·필요 인원] 탭에서 다룬다
-  const applied = scope === "ward" ? ward.rules.filter((c) => !c.id.startsWith("cov-")) : period!.requests;
+  const applied =
+    scope === "period" ? period!.requests : intro ? ward.rules.filter((c) => presetName(c) === "필요 인원") : ward.rules;
   const cards = cardsInOrder(pending, applied, scope === "ward" ? ward.cardOrder : period!.cardOrder);
   const tooLong = text.length > MAX_TEXT_CHARS;
 
@@ -83,12 +102,19 @@ export default function RulesStep({ scope, pendingNote = true }: { scope: "ward"
   const pendingCount = pending.length + configCards.length;
   const order = ward.cardOrder ?? [];
   const rank = (id: string) => (order.includes(id) ? order.indexOf(id) : order.length);
+  // 기본 규칙(필요 인원·나이트 전담)은 맨 위에 둔다
+  const isDefault = (c: ConstraintSpec | null) => c?.type === "rule" && c.default === true;
   const items = [
     ...configCards.map((cfg) => ({ id: cfg.id, cfg, entry: null })),
     ...cards.filter(({ card }) => !attached.has(card.id)).map((entry) => ({ id: entry.card.id, cfg: null, entry })),
   ]
     .map((x, i) => ({ x, i }))
-    .sort((a, b) => rank(a.x.id) - rank(b.x.id) || a.i - b.i)
+    .sort(
+      (a, b) =>
+        Number(isDefault(b.x.entry?.card ?? null)) - Number(isDefault(a.x.entry?.card ?? null)) ||
+        rank(a.x.id) - rank(b.x.id) ||
+        a.i - b.i,
+    )
     .map(({ x }) => x);
 
   const renderCard = (c: ConstraintSpec, isPending: boolean) =>
@@ -233,7 +259,7 @@ export default function RulesStep({ scope, pendingNote = true }: { scope: "ward"
       </section>
 
       {items.length === 0 ? (
-        <p className="text-sm text-[#66665E]">{copy.empty}</p>
+        copy.empty && <p className="text-sm text-[#66665E]">{copy.empty}</p>
       ) : (
         <div className="flex flex-col gap-3">
           {pendingCount >= 2 && (

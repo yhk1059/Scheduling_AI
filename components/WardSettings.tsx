@@ -164,18 +164,31 @@ export function RosterSection() {
   );
 }
 
-/** 근무조별 필요 인원. 처음 설정 ②에서도 쓴다. */
-export function CoverageSection() {
+/** 근무조별 필요 인원. 처음 설정 ②에서는 접힌 "숫자로 입력하기"로 쓴다(collapsible). */
+export function CoverageSection({ collapsible = false }: { collapsible?: boolean }) {
   const [coverageDrafts, setCoverageDrafts] = useState<CoverageDrafts>({});
-  return (
-    <section className={`${ui.card} flex flex-col gap-3`}>
+  const [open, setOpen] = useState(false);
+  const body = (
+    <>
       <div className="flex flex-col gap-1">
         <h2 className={ui.cardTitle}>근무조별 필요 인원</h2>
-        <p className={ui.help}>하루에 그 근무조에 들어갈 간호사 수예요. 근무표는 날마다 이 인원을 그대로 맞춰요.</p>
+        <p className={ui.help}>하루에 그 근무조에 들어갈 간호사 수예요. 최대를 비우면 그 이상이면 돼요.</p>
       </div>
       <div className="self-start">
         <CoverageForm drafts={coverageDrafts} setDrafts={setCoverageDrafts} />
       </div>
+    </>
+  );
+  if (!collapsible) return <section className={`${ui.card} flex flex-col gap-3`}>{body}</section>;
+  return (
+    <section className={`${ui.card} flex flex-col gap-3`}>
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-sm text-[#3D3D38]">필요 인원을 숫자로 넣을 수도 있어요.</p>
+        <button type="button" aria-expanded={open} onClick={() => setOpen((o) => !o)} className={ui.textSm}>
+          숫자로 입력하기
+        </button>
+      </div>
+      {open && body}
     </section>
   );
 }

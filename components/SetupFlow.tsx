@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 
 import { isWardReady, setupStep, useAppStore, type SetupStep } from "@/lib/store";
-import { configSummary, wardRuleCount } from "@/lib/wording";
+import { configSummary, presetName, wardRuleCount } from "@/lib/wording";
 
 import RulesStep, { today } from "./RulesStep";
 import ShiftTable from "./ShiftTable";
@@ -11,9 +11,9 @@ import Stepper from "./Stepper";
 import { ui } from "./ui";
 import { BasicSection, CoverageSection, RosterSection } from "./WardSettings";
 
-const LABELS = ["병동·명단", "필요 인원", "병동 규칙"];
+const LABELS = ["병동·명단", "병동 소개", "병동 규칙"];
 
-/** 처음 설정: ① 병동·명단 → ② 필요 인원 → ③ 병동 규칙 → [첫 근무표 만들기]. 근무표가 없는 병동에서만 보인다. */
+/** 처음 설정: ① 병동·명단 → ② 병동 소개 → ③ 병동 규칙 → [첫 근무표 만들기]. 근무표가 없는 병동에서만 보인다. */
 export default function SetupFlow() {
   const ward = useAppStore((s) => s.ward);
   const step = useAppStore((s) => (s.view.screen === "setup" ? s.view.step : 1));
@@ -37,6 +37,7 @@ export default function SetupFlow() {
   // ②는 필수 입력이 없다(ADR-019). [다음]을 누르면 병동 소개를 본 것으로 남긴다
   const canNext = step === 1 ? ward.nurses.some((n) => n.active) : true;
   const applied = wardRuleCount(ward.rules);
+  const hasStaffing = ward.rules.some((r) => presetName(r) === "필요 인원" && r.enabled !== false);
   const pending = ward.pendingRules.length + ward.pendingConfig.length;
   const title = (text: string) => (
     <h2 tabIndex={-1} data-step-title className={`${ui.cardTitle} outline-none`}>
@@ -59,9 +60,10 @@ export default function SetupFlow() {
         </>
       ) : step === 2 ? (
         <>
-          {title("필요 인원")}
+          {title("병동 소개")}
           <ShiftSummary />
-          <CoverageSection />
+          <RulesStep key="intro" scope="ward" intro />
+          <CoverageSection collapsible />
         </>
       ) : (
         <>
@@ -82,6 +84,7 @@ export default function SetupFlow() {
           {step < 3 ? (
             <>
               {!canNext && <p className={ui.help}>명단에 간호사를 1명 이상 넣으면 다음으로 넘어갈 수 있어요</p>}
+              {step === 2 && !hasStaffing && <p className={ui.help}>필요 인원 없이 만들면 인원을 맞추지 않아요</p>}
               <button
                 type="button"
                 disabled={!canNext}
@@ -96,7 +99,7 @@ export default function SetupFlow() {
             </>
           ) : (
             <>
-              {applied === 0 && <p className={ui.help}>규칙 없이 만들면 필요 인원만 지켜요</p>}
+              {applied === 0 && <p className={ui.help}>규칙 없이 만들면 기본 규칙만 지켜요</p>}
               {pending > 0 && <p className={ui.help}>적용하지 않은 규칙 {pending}개는 빠져요</p>}
               {!isWardReady(ward) && (
                 <p className={ui.help}>명단에 간호사를 1명 이상 넣으면 만들 수 있어요</p>
