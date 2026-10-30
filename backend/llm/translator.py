@@ -69,7 +69,7 @@ def _context_message(req: TranslateRequest, text: str) -> str:
         "days": days,
         "weekend_and_holiday_days": [d["day"] for d in days if d["weekend"]],
         "holidays": sorted(ctx.holidays),
-        "config": {"shifts": [s.model_dump(include={"code", "name", "hours", "parts", "active"}) for s in ctx.config.shifts]},
+        "config": {"shifts": [s.model_dump(include={"code", "name", "hours", "parts", "start", "end", "active"}) for s in ctx.config.shifts]},
         "employees": [{"id": n.id, "tags": n.tags} for n in ctx.employees],
         "known_tags": _known_tags(ctx),
     }
