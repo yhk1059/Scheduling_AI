@@ -202,6 +202,10 @@ export default function ConstraintCard({
   const setValue = (id: string, name: string, value: number) =>
     isRule ? store.setRuleValue(id, name, value) : store.setRequestValue(period!.id, id, name, value);
   const removeCard = (id: string) => (isRule ? store.removeRule(id) : store.removeRequest(period!.id, id));
+  // 기본 규칙(필요 인원·나이트 전담)은 [삭제] 대신 [끄기]다. 병동 규칙 원본에서 끈 것(enabled=false)
+  const isDefault = card.type === "rule" && card.default === true;
+  const wardOff = isDefault && !pending && !readOnly && card.enabled === false;
+  const dim = off || wardOff;
 
   const orphan = refNurses(card).some((id) => !nurses.some((n) => n.id === id));
   const fields = fieldsOf(card);
@@ -247,7 +251,7 @@ export default function ConstraintCard({
           </div>
         )}
       </div>
-      <p className={`text-sm ${off ? "text-[#66665E]" : "text-[#1B1B18]"}`}>“{card.source_text}”</p>
+      <p className={`text-sm ${dim ? "text-[#66665E]" : "text-[#1B1B18]"}`}>“{card.source_text}”</p>
 
       {draft ? (
         <div className="flex flex-col gap-2.5 rounded-sm bg-[#F6F6F3] px-2.5 py-2">
@@ -259,7 +263,7 @@ export default function ConstraintCard({
           {error && <p className={ui.error}>{error}</p>}
         </div>
       ) : (
-        <p className={`rounded-sm bg-[#F6F6F3] px-2.5 py-2 text-xs ${off ? "text-[#66665E]" : "text-[#3D3D38]"}`}>
+        <p className={`rounded-sm bg-[#F6F6F3] px-2.5 py-2 text-xs ${dim ? "text-[#66665E]" : "text-[#3D3D38]"}`}>
           {describeRule(card, config, nurses, range).text}
         </p>
       )}
@@ -273,8 +277,11 @@ export default function ConstraintCard({
 
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-2">
+          {isDefault && <span className={`${ui.badge} bg-[#EFEFEB] text-[#3D3D38]`}>기본</span>}
           {off ? (
             <span className={`${ui.badge} bg-[#FDF0DC] text-[#7A4506]`}>이번 근무표에서 꺼짐</span>
+          ) : wardOff ? (
+            <span className={`${ui.badge} bg-[#EFEFEB] text-[#66665E]`}>꺼짐</span>
           ) : pending ? (
             <span className={`${ui.badge} bg-[#FDF0DC] text-[#7A4506]`}>적용 대기</span>
           ) : (
@@ -343,9 +350,19 @@ export default function ConstraintCard({
                   수정
                 </button>
               )}
-              <button type="button" onClick={() => removeCard(card.id)} className={ui.danger}>
-                삭제
-              </button>
+              {isDefault ? (
+                <button
+                  type="button"
+                  onClick={() => (wardOff ? store.enableRule(card.id) : removeCard(card.id))}
+                  className={ui.textSm}
+                >
+                  {wardOff ? "다시 켜기" : "끄기"}
+                </button>
+              ) : (
+                <button type="button" onClick={() => removeCard(card.id)} className={ui.danger}>
+                  삭제
+                </button>
+              )}
             </>
           )}
         </div>

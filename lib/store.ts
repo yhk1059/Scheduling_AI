@@ -221,6 +221,8 @@ export interface AppState extends Data {
   setRuleValue: (id: string, name: string, value: number) => void;
   /** 설정 카드를 지우면 딸린 대기 규칙 카드도 지운다. 기본 규칙은 지우지 않고 끈다. */
   removeRule: (id: string) => void;
+  /** 끈 병동 규칙(기본 규칙)을 다시 켠다. */
+  enableRule: (id: string) => void;
   // 명단
   addNurses: (rows: NurseRow[]) => void;
   updateNurse: (id: string, patch: Partial<NurseRow>) => void;
@@ -321,6 +323,14 @@ export function isLeaveRule(c: ConstraintSpec): boolean {
     s.max?.n === 0 &&
     !s.min
   );
+}
+
+/** 필요 인원(기본 규칙) 모양: 병동 규칙, 날마다 모든 사람의 근무 개수. 폼 모양이 아니어도(토요일만 등) 된다. */
+function isStaffingRule(c: ConstraintSpec): boolean {
+  const s = ruleShape(c);
+  if (c.scope !== "ward" || s?.kind !== "count" || s.per !== "day" || s.measure !== "count") return false;
+  const p = s.people;
+  return !p.ids && !p.tags && !p.exclude_tags?.length && p.min_years == null && p.max_years == null;
 }
 
 /** 필요 인원 폼 모양: 병동 규칙, 날마다 모든 사람, 평일 또는 주말·공휴일, 코드 하나의 개수. 그 (코드, 요일 종류). */
@@ -988,7 +998,10 @@ export function createAppStore(getStorage: () => Storage, now: () => Date = () =
             editWard((w) => ({ ...w, unconverted: w.unconverted.filter((_, i) => i !== index) }), false),
           addPendingRules: (cards, changes = [], examples = {}) =>
             editWard((w) => {
-              const blocks = cards.map(normalizeRule);
+              // 말로 만든 필요 인원도 기본 규칙 카드다(ADR-019)
+              const blocks = cards
+                .map(normalizeRule)
+                .map((c) => (c.type === "rule" && !c.default && isStaffingRule(c) ? { ...c, default: true } : c));
               const taken = new Set(w.pendingConfig.map((c) => c.id));
               const configCards = changes.map((change): ShiftChangeCard => {
                 const base = `cfg-${change.shift.code}`;
@@ -1079,6 +1092,11 @@ export function createAppStore(getStorage: () => Storage, now: () => Date = () =
                 editWard((w) => ({ ...w, rules: w.rules.filter((c) => c.id !== id), examples: withoutExamples(w.examples, [id]) }));
               }
             }
+          },
+
+          enableRule: (id) => {
+            if (get().ward?.rules.find((c) => c.id === id)?.enabled !== false) return;
+            editWard((w) => ({ ...w, rules: w.rules.map((c) => (c.id === id ? { ...c, enabled: true } : c)) }));
           },
 
           addNurses: (rows) => editWard((w) => withIds(w, rows)),
