@@ -11,11 +11,11 @@ import {
   orphanConstraintIds,
   toScheduleRequest,
   useAppStore,
-  type Ward,
+  type Shop,
   type WorkPeriod,
 } from "@/lib/store";
 import type { ConstraintSpec } from "@/lib/types.gen";
-import { presetName, wardRuleCount } from "@/lib/wording";
+import { presetName, shopRuleCount } from "@/lib/wording";
 
 import ConstraintCard, { ShiftChangeCardView } from "./ConstraintCard";
 import { ui } from "./ui";
@@ -23,7 +23,7 @@ import { ui } from "./ui";
 const MAX_TEXT_CHARS = 1000; // backend/domain/constants.py MAX_TEXT_CHARS
 
 const COPY = {
-  ward: {
+  shop: {
     title: "병동 규칙",
     description: "근무표가 바뀌어도 똑같이 지키는 규칙을 말로 적어 주세요. 만든 카드를 확인하고 [적용]해야 반영돼요.",
     placeholder: "예: 나이트 다음 날은 무조건 쉬게",
@@ -54,7 +54,7 @@ export function today(): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
-/** 기간이 아직 없을 때 병동 규칙 해석·표시에 쓰는 다음 기간 범위. */
+/** 기간이 아직 없을 때 매장 규칙 해석·표시에 쓰는 다음 기간 범위. */
 export function previewRange(unit: PeriodUnit): PeriodRange {
   return periodFrom(unit, firstPeriodStart(unit, today()));
 }
@@ -63,19 +63,19 @@ type Notice = { kind: "clarify" | "unsupported"; text: string } | null;
 
 /**
  * pendingNote=false: 처음 설정 ③처럼 화면이 대기 카드 안내를 버튼 옆에 따로 둘 때.
- * intro: 처음 설정 ② 병동 소개. 병동 규칙(scope ward)으로 해석하고, 적용된 카드는 필요 인원만 보여 준다.
+ * intro: 처음 설정 ② 매장 소개. 매장 규칙(scope shop)으로 해석하고, 적용된 카드는 필요 인원만 보여 준다.
  */
 export default function RulesStep({
   scope,
   pendingNote = true,
   intro = false,
 }: {
-  scope: "ward" | "period";
+  scope: "shop" | "period";
   pendingNote?: boolean;
   intro?: boolean;
 }) {
   const copy = COPY[intro ? "intro" : scope];
-  const ward = useAppStore((s) => s.ward);
+  const shop = useAppStore((s) => s.shop);
   const period = useAppStore(currentPeriod);
   const addPendingRules = useAppStore((s) => s.addPendingRules);
   const addPendingRequests = useAppStore((s) => s.addPendingRequests);
@@ -88,19 +88,19 @@ export default function RulesStep({
   const [failure, setFailure] = useState<{ message: string; text: string } | null>(null);
   const [blocked, setBlocked] = useState(false);
 
-  if (!ward || (scope === "period" && !period)) return null;
-  const orphanCount = orphanConstraintIds(ward, period).length;
-  const pending = scope === "ward" ? ward.pendingRules : period!.pendingRequests;
+  if (!shop || (scope === "period" && !period)) return null;
+  const orphanCount = orphanConstraintIds(shop, period).length;
+  const pending = scope === "shop" ? shop.pendingRules : period!.pendingRequests;
   const applied =
-    scope === "period" ? period!.requests : intro ? ward.rules.filter((c) => presetName(c) === "필요 인원") : ward.rules;
-  const cards = cardsInOrder(pending, applied, scope === "ward" ? ward.cardOrder : period!.cardOrder);
+    scope === "period" ? period!.requests : intro ? shop.rules.filter((c) => presetName(c) === "필요 인원") : shop.rules;
+  const cards = cardsInOrder(pending, applied, scope === "shop" ? shop.cardOrder : period!.cardOrder);
   const tooLong = text.length > MAX_TEXT_CHARS;
 
-  // 설정 변경 카드와 딸린 카드(병동 규칙에만 있다). 딸린 카드는 설정 카드 바로 아래에 둔다
-  const configCards = scope === "ward" ? ward.pendingConfig : [];
+  // 설정 변경 카드와 딸린 카드(매장 규칙에만 있다). 딸린 카드는 설정 카드 바로 아래에 둔다
+  const configCards = scope === "shop" ? shop.pendingConfig : [];
   const attached = new Map(configCards.flatMap((cfg) => cfg.ruleIds.map((id) => [id, cfg.change.shift.code] as const)));
   const pendingCount = pending.length + configCards.length;
-  const order = ward.cardOrder ?? [];
+  const order = shop.cardOrder ?? [];
   const rank = (id: string) => (order.includes(id) ? order.indexOf(id) : order.length);
   // 기본 규칙(필요 인원)은 맨 위에 둔다
   const isDefault = (c: ConstraintSpec | null) => c?.type === "rule" && c.default === true;
@@ -123,7 +123,7 @@ export default function RulesStep({
         key={c.id}
         card={c}
         pending
-        replaces={findReplaced(scope === "ward" ? ward.rules : period!.requests, c)}
+        replaces={findReplaced(scope === "shop" ? shop.rules : period!.requests, c)}
       />
     ) : scope === "period" ? (
       <ConstraintCard
@@ -143,7 +143,7 @@ export default function RulesStep({
     for (const cfg of configCards) store.applyRule(cfg.id);
     // 표시 순서의 아래(오래된 카드)부터 적용해 교체 규칙이 새 카드를 남기게 한다
     for (const { card } of cards.filter((x) => x.pending).reverse()) {
-      if (scope === "ward") store.applyRule(card.id);
+      if (scope === "shop") store.applyRule(card.id);
       else store.applyRequest(period!.id, card.id);
     }
   };
@@ -153,21 +153,21 @@ export default function RulesStep({
     setNotice(null);
     setFailure(null);
     try {
-      // 기간이 없으면(병동 설정) 활성 명단과 다음 기간 범위로 해석한다
-      const { nurses, period: range, holidays } = period
-        ? toScheduleRequest(ward, period, useAppStore.getState().periods, today())
+      // 기간이 없으면(매장 설정) 활성 명단과 다음 기간 범위로 해석한다
+      const { employees, period: range, holidays } = period
+        ? toScheduleRequest(shop, period, useAppStore.getState().periods, today())
         : {
-            nurses: ward.nurses.filter((n) => n.active).map(({ id, name, tags }) => ({ id, name, tags })),
-            period: previewRange(ward.unit),
+            employees: shop.employees.filter((n) => n.active).map(({ id, name, tags }) => ({ id, name, tags })),
+            period: previewRange(shop.unit),
             holidays: [],
           };
       const res = await translate({
         text: input,
         scope,
-        context: { config: ward.config, nurses, period: range, holidays, today: today() },
+        context: { config: shop.config, employees, period: range, holidays, today: today() },
       });
       if (res.status === "ok") {
-        if (scope === "ward") addPendingRules(res.constraints, res.config_changes ?? [], res.examples);
+        if (scope === "shop") addPendingRules(res.constraints, res.config_changes ?? [], res.examples);
         else addPendingRequests(period!.id, res.constraints, res.examples);
         setText("");
       } else if (res.status === "clarify") {
@@ -194,7 +194,7 @@ export default function RulesStep({
 
   return (
     <div className="flex flex-col gap-5">
-      {/* 병동 규칙은 병동 설정의 탭 안에 놓이므로 페이지 제목을 두지 않는다 */}
+      {/* 매장 규칙은 매장 설정의 탭 안에 놓이므로 페이지 제목을 두지 않는다 */}
       <div className="flex flex-col gap-1">
         {scope === "period" && (
           <h2 tabIndex={-1} data-step-title className={`${ui.cardTitle} outline-none`}>
@@ -274,14 +274,14 @@ export default function RulesStep({
               cfg ? (
                 <div key={id} className="flex flex-col gap-3">
                   <ShiftChangeCardView card={cfg} />
-                  {ward.pendingRules
+                  {shop.pendingRules
                     .filter((c) => cfg.ruleIds.includes(c.id))
                     .map((c) => (
                       <div key={c.id} className="pl-4">
                         <ConstraintCard
                           card={c}
                           pending
-                          replaces={findReplaced(ward.rules, c)}
+                          replaces={findReplaced(shop.rules, c)}
                           withConfig={cfg.change.shift.code}
                         />
                       </div>
@@ -295,9 +295,9 @@ export default function RulesStep({
         </div>
       )}
 
-      {scope === "period" && period && <PeriodRules ward={ward} period={period} />}
+      {scope === "period" && period && <PeriodRules shop={shop} period={period} />}
 
-      {scope === "ward" && pendingNote && pendingCount > 0 && (
+      {scope === "shop" && pendingNote && pendingCount > 0 && (
         <p className={ui.help}>적용하지 않은 카드 {pendingCount}개는 근무표에 반영되지 않아요.</p>
       )}
 
@@ -330,13 +330,13 @@ export function Spinner() {
   );
 }
 
-/** 이 근무표에 적용되는 병동 규칙(접힌 목록). [이번 근무표에서만 끄기]는 이 기간의 disabledIds만 바꾼다. */
-function PeriodRules({ ward, period }: { ward: Ward; period: WorkPeriod }) {
+/** 이 근무표에 적용되는 매장 규칙(접힌 목록). [이번 근무표에서만 끄기]는 이 기간의 disabledIds만 바꾼다. */
+function PeriodRules({ shop, period }: { shop: Shop; period: WorkPeriod }) {
   const setDisabled = useAppStore((s) => s.setDisabled);
   const periods = useAppStore((s) => s.periods);
   const [open, setOpen] = useState(false);
   // 확정 기간의 snapshot, 이 기간의 수정본(ruleOverrides), 꺼짐(enabled=false)이 반영된 목록
-  const rules = (toScheduleRequest(ward, period, periods, today()).constraints ?? []).filter((c) => c.scope === "ward");
+  const rules = (toScheduleRequest(shop, period, periods, today()).constraints ?? []).filter((c) => c.scope === "shop");
   const offCount = rules.filter((c) => c.enabled === false).length;
 
   return (
@@ -345,7 +345,7 @@ function PeriodRules({ ward, period }: { ward: Ward; period: WorkPeriod }) {
         <div className="flex flex-col gap-1">
           <h3 className={ui.cardTitle}>이 근무표에 적용되는 병동 규칙</h3>
           <p className={ui.help}>
-            <span className="font-mono">{wardRuleCount(rules)}</span>개
+            <span className="font-mono">{shopRuleCount(rules)}</span>개
             {offCount > 0 && (
               <>
                 {" "}

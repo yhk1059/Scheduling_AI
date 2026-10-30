@@ -3,9 +3,9 @@
 from backend.domain.constants import EXAMPLES_PER_RULE, EXAMPLES_SAMPLES, EXAMPLES_SEED
 from backend.domain.models import RuleExample
 from backend.solver.evaluate import evaluate_rule, pick_examples, sample_schedules
-from backend.tests.test_evaluate import NURSES, cmp, cnt, req, require, rule
+from backend.tests.test_evaluate import EMPLOYEES, cmp, cnt, req, require, rule
 
-TAGS = {n["id"]: n.get("tags", []) for n in NURSES}
+TAGS = {n["id"]: n.get("tags", []) for n in EMPLOYEES}
 
 
 def examples(r, request=None) -> list[RuleExample]:
@@ -19,12 +19,12 @@ def code(ex: RuleExample, nid: str, day: int) -> str:
 
 
 def assert_shape(ex: RuleExample, length: int = 14) -> None:
-    assert 1 <= len(ex.nurse_ids) <= 3 and len(set(ex.nurse_ids)) == len(ex.nurse_ids)
+    assert 1 <= len(ex.employee_ids) <= 3 and len(set(ex.employee_ids)) == len(ex.employee_ids)
     assert 3 <= len(ex.days) <= 7
     assert ex.days == list(range(ex.days[0], ex.days[-1] + 1)) and 1 <= ex.days[0] and ex.days[-1] <= length
-    assert list(ex.cells) == ex.nurse_ids and all(len(row) == len(ex.days) for row in ex.cells.values())
-    assert ex.marks and all(nid in ex.nurse_ids and d in ex.days for nid, d in ex.marks)
-    assert ex.detail  # 간호사 이름이 없는지는 실명 명단으로 test_routes에서 본다
+    assert list(ex.cells) == ex.employee_ids and all(len(row) == len(ex.days) for row in ex.cells.values())
+    assert ex.marks and all(nid in ex.employee_ids and d in ex.days for nid, d in ex.marks)
+    assert ex.detail  # 직원 이름이 없는지는 실명 명단으로 test_routes에서 본다
 
 
 FORBID_N_D = require(
@@ -55,7 +55,7 @@ def test_leave_marks_working_days_in_leave():
     assert len(exs) == 1  # 인스턴스는 n1 하나
     (ex,) = exs
     assert_shape(ex)
-    assert ex.nurse_ids == ["n1"] and set(ex.days) >= {3, 4, 5}
+    assert ex.employee_ids == ["n1"] and set(ex.days) >= {3, 4, 5}
     assert ex.marks and all(nid == "n1" and d in (3, 4, 5) and code(ex, nid, d) != "O" for nid, d in ex.marks)
 
 
@@ -66,7 +66,7 @@ def test_conditional_marks_charge_and_shows_newbie_night():
         assert_shape(ex)
         (day,) = {d for _, d in ex.marks}
         assert all("책임" in TAGS[nid] and code(ex, nid, day) != "N" for nid, _ in ex.marks)
-        assert any("신규" in TAGS[nid] and code(ex, nid, day) == "N" for nid in ex.nurse_ids)
+        assert any("신규" in TAGS[nid] and code(ex, nid, day) == "N" for nid in ex.employee_ids)
 
 
 def test_pair_marks_both_nights_on_same_day():
@@ -77,7 +77,7 @@ def test_pair_marks_both_nights_on_same_day():
         (day,) = {d for _, d in ex.marks}
         assert sorted(nid for nid, _ in ex.marks) == ["n1", "n2"]
         assert code(ex, "n1", day) == "N" and code(ex, "n2", day) == "N"
-        assert "지정한 간호사" in ex.detail
+        assert "지정한 직원" in ex.detail
 
 
 def test_examples_prefer_disjoint_instances():
@@ -100,10 +100,10 @@ def test_samples_use_active_codes_and_period_length():
     schedules = sample_schedules(request, EXAMPLES_SEED, EXAMPLES_SAMPLES)
     assert len(schedules) > EXAMPLES_SAMPLES  # 무작위 + 대상 칸 뒤집기
     for a in schedules:
-        assert set(a) == {n["id"] for n in NURSES}
+        assert set(a) == {n["id"] for n in EMPLOYEES}
         assert all(len(row) == 10 and set(row) <= {"D", "E", "N", "O"} for row in a.values())
     off = sum(row.count("O") for a in schedules[:EXAMPLES_SAMPLES] for row in a.values())
-    assert 0.2 < off / (EXAMPLES_SAMPLES * len(NURSES) * 10) < 0.4
+    assert 0.2 < off / (EXAMPLES_SAMPLES * len(EMPLOYEES) * 10) < 0.4
 
 
 def test_marks_are_real_violations():
@@ -114,9 +114,9 @@ def test_marks_are_real_violations():
     for ex in pick_examples(request, r, schedules, EXAMPLES_PER_RULE):
         source = next(
             a for a in schedules
-            if all(a[nid][d - 1] == code(ex, nid, d) for nid in ex.nurse_ids for d in ex.days)
+            if all(a[nid][d - 1] == code(ex, nid, d) for nid in ex.employee_ids for d in ex.days)
         )
-        hit = {(v.instance.nurse_id, v.instance.days[0]) for v in evaluate_rule(request, source, r)}
+        hit = {(v.instance.employee_id, v.instance.days[0]) for v in evaluate_rule(request, source, r)}
         nid, first = min(ex.marks, key=lambda m: m[1])
         assert (nid, first) in hit
 

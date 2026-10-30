@@ -9,12 +9,12 @@ import {
   currentPeriod,
   type Hardness,
   isLeaveRule,
-  refNurses,
+  refEmployees,
   type ShiftChangeCard,
   useAppStore,
 } from "@/lib/store";
 import { dayHeader, isWeekendDay, monthDay, type PeriodRange } from "@/lib/period";
-import type { ConstraintSpec, Nurse, RuleExample } from "@/lib/types.gen";
+import type { ConstraintSpec, Employee, RuleExample } from "@/lib/types.gen";
 import { describeRule, describeShiftChange, hardnessLabel, presetName } from "@/lib/wording";
 
 import RuleText from "./RuleText";
@@ -72,16 +72,16 @@ const STRIP_CELL = "inline-flex w-6 h-6 rounded-xs items-center justify-center f
 
 function ExampleStrip({
   example,
-  nurses,
+  employees,
   range,
   holidays,
 }: {
   example: RuleExample;
-  nurses: Nurse[];
+  employees: Employee[];
   range: PeriodRange;
   holidays: number[];
 }) {
-  const nameOf = (id: string) => nurses.find((n) => n.id === id)?.name ?? "간호사";
+  const nameOf = (id: string) => employees.find((n) => n.id === id)?.name ?? "간호사";
   const marked = (id: string, d: number) => example.marks.some(([m, md]) => m === id && md === d);
   return (
     <div className="flex flex-col gap-1">
@@ -99,7 +99,7 @@ function ExampleStrip({
           </tr>
         </thead>
         <tbody>
-          {example.nurse_ids.map((id) => (
+          {example.employee_ids.map((id) => (
             <tr key={id}>
               <th scope="row" className="max-w-[96px] truncate pr-1.5 text-left text-xs font-medium text-[#1B1B18]">
                 {nameOf(id)}
@@ -133,12 +133,12 @@ function ExampleStrip({
 
 function Examples({
   examples,
-  nurses,
+  employees,
   range,
   holidays,
 }: {
   examples: RuleExample[];
-  nurses: Nurse[];
+  employees: Employee[];
   range: PeriodRange;
   holidays: number[];
 }) {
@@ -147,7 +147,7 @@ function Examples({
       <p className={ui.help}>이런 근무면 이 규칙에 어긋나요</p>
       <div className="flex flex-wrap gap-x-5 gap-y-2.5">
         {examples.map((ex, i) => (
-          <ExampleStrip key={i} example={ex} nurses={nurses} range={range} holidays={holidays} />
+          <ExampleStrip key={i} example={ex} employees={employees} range={range} holidays={holidays} />
         ))}
       </div>
     </div>
@@ -220,7 +220,7 @@ function PrioritySelect({ value, disabled, onChange }: { value: Priority; disabl
 
 /** 설정 변경 카드(근무 형태). [적용]하면 근무 형태가 바뀌고, 삭제하면 딸린 규칙 카드도 지운다. */
 export function ShiftChangeCardView({ card }: { card: ShiftChangeCard }) {
-  const config = useAppStore((s) => s.ward?.config);
+  const config = useAppStore((s) => s.shop?.config);
   if (!config) return null;
   const store = useAppStore.getState();
   return (
@@ -269,24 +269,24 @@ export default function ConstraintCard({
   off?: boolean;
   /** 주면 [이번 근무표에서만 끄기]/[다시 켜기]를 둔다. 원본은 바꾸지 않는다 */
   onToggleOff?: (off: boolean) => void;
-  /** 기간 화면의 병동 규칙: 수정·삭제·hard/soft 변경 없이 끄고 켜기만 한다 */
+  /** 기간 화면의 매장 규칙: 수정·삭제·hard/soft 변경 없이 끄고 켜기만 한다 */
   readOnly?: boolean;
   /** 딸린 카드: [적용]하면 함께 적용되는 설정 변경 카드의 근무 코드 */
   withConfig?: string;
 }) {
-  const ward = useAppStore((s) => s.ward);
+  const shop = useAppStore((s) => s.shop);
   const period = useAppStore(currentPeriod);
 
   const [draft, setDraft] = useState<Draft | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [showExamples, setShowExamples] = useState(false);
 
-  // 병동 규칙은 병동에, 요청은 지금 기간에 반영한다
-  const isRule = card.scope === "ward";
-  if (!ward || (!isRule && !period)) return null;
-  // 기간이 아직 없으면(병동 설정) 다음 기간 범위로 날짜를 보여 준다
-  const range = period ?? previewRange(ward.unit);
-  const nurses = ward.nurses.filter((n) => n.active);
+  // 매장 규칙은 매장에, 요청은 지금 기간에 반영한다
+  const isRule = card.scope === "shop";
+  if (!shop || (!isRule && !period)) return null;
+  // 기간이 아직 없으면(매장 설정) 다음 기간 범위로 날짜를 보여 준다
+  const range = period ?? previewRange(shop.unit);
+  const employees = shop.employees.filter((n) => n.active);
   const store = useAppStore.getState();
   const applyCard = (id: string) => (isRule ? store.applyRule(id) : store.applyRequest(period!.id, id));
   const updateCard = (id: string, patch: CardPatch) =>
@@ -294,18 +294,18 @@ export default function ConstraintCard({
   const setValue = (id: string, name: string, value: number) =>
     isRule ? store.setRuleValue(id, name, value) : store.setRequestValue(period!.id, id, name, value);
   const removeCard = (id: string) => (isRule ? store.removeRule(id) : store.removeRequest(period!.id, id));
-  // 기본 규칙(필요 인원)은 [삭제] 대신 [끄기]다. 병동 규칙 원본에서 끈 것(enabled=false)
+  // 기본 규칙(필요 인원)은 [삭제] 대신 [끄기]다. 매장 규칙 원본에서 끈 것(enabled=false)
   const isDefault = card.type === "rule" && card.default === true;
-  const wardOff = isDefault && !pending && !readOnly && card.enabled === false;
-  const dim = off || wardOff;
+  const shopOff = isDefault && !pending && !readOnly && card.enabled === false;
+  const dim = off || shopOff;
 
-  const orphan = refNurses(card).some((id) => !nurses.some((n) => n.id === id));
+  const orphan = refEmployees(card).some((id) => !employees.some((n) => n.id === id));
   const fields = fieldsOf(card);
   const editable = fields.length > 0;
   // 대기 중인 설정 변경(새 코드)도 이름으로 읽히게 합쳐서 문장을 만든다
-  const config = isRule ? ward.pendingConfig.reduce((c, x) => applyShiftChange(c, x.change), ward.config) : ward.config;
+  const config = isRule ? shop.pendingConfig.reduce((c, x) => applyShiftChange(c, x.change), shop.config) : shop.config;
   const isBalance = card.type === "rule" && card.body.kind === "balance";
-  const examples = (isRule ? ward.examples : period?.examples)?.[card.id] ?? [];
+  const examples = (isRule ? shop.examples : period?.examples)?.[card.id] ?? [];
   const holidays = isRule ? [] : (period?.holidays ?? []);
   const hardness: Hardness = alwaysHard(card) ? "hard" : (card.hardness ?? (isBalance ? "soft" : "hard"));
 
@@ -348,7 +348,7 @@ export default function ConstraintCard({
       <p className={`text-sm ${dim ? "text-[#66665E]" : "text-[#1B1B18]"}`}>“{card.source_text}”</p>
 
       <p className={`rounded-sm bg-[#F6F6F3] px-2.5 py-2 text-xs ${dim ? "text-[#66665E]" : "text-[#3D3D38]"}`}>
-        <RuleText sentence={describeRule(card, config, nurses, range)} />
+        <RuleText sentence={describeRule(card, config, employees, range)} />
       </p>
 
       {draft && (
@@ -365,7 +365,7 @@ export default function ConstraintCard({
 
       {examples.length > 0 &&
         (pending ? (
-          <Examples examples={examples} nurses={ward.nurses} range={range} holidays={holidays} />
+          <Examples examples={examples} employees={shop.employees} range={range} holidays={holidays} />
         ) : (
           <div className="flex flex-col gap-2">
             <button
@@ -376,7 +376,7 @@ export default function ConstraintCard({
             >
               예시 보기
             </button>
-            {showExamples && <Examples examples={examples} nurses={ward.nurses} range={range} holidays={holidays} />}
+            {showExamples && <Examples examples={examples} employees={shop.employees} range={range} holidays={holidays} />}
           </div>
         ))}
 
@@ -392,7 +392,7 @@ export default function ConstraintCard({
           {isDefault && <span className={`${ui.badge} bg-[#EFEFEB] text-[#3D3D38]`}>기본</span>}
           {off ? (
             <span className={`${ui.badge} bg-[#FDF0DC] text-[#7A4506]`}>이번 근무표에서 꺼짐</span>
-          ) : wardOff ? (
+          ) : shopOff ? (
             <span className={`${ui.badge} bg-[#EFEFEB] text-[#66665E]`}>꺼짐</span>
           ) : pending ? (
             <span className={`${ui.badge} bg-[#FDF0DC] text-[#7A4506]`}>적용 대기</span>
@@ -465,10 +465,10 @@ export default function ConstraintCard({
               {isDefault ? (
                 <button
                   type="button"
-                  onClick={() => (wardOff ? store.enableRule(card.id) : removeCard(card.id))}
+                  onClick={() => (shopOff ? store.enableRule(card.id) : removeCard(card.id))}
                   className={ui.textSm}
                 >
-                  {wardOff ? "다시 켜기" : "끄기"}
+                  {shopOff ? "다시 켜기" : "끄기"}
                 </button>
               ) : (
                 <button type="button" onClick={() => removeCard(card.id)} className={ui.danger}>

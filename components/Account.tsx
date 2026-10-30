@@ -64,14 +64,14 @@ export function LoginPromptDialog() {
   );
 }
 
-function wardLabel(name: string | undefined): string {
+function shopLabel(name: string | undefined): string {
   return name || "이름 없는 병동";
 }
 
-/** [내 병동 데이터 삭제] 2단계 확인. */
+/** [내 매장 데이터 삭제] 2단계 확인. */
 function DeleteDataDialog({ onClose }: { onClose: () => void }) {
-  const wardName = useAppStore((s) => wardLabel(s.ward?.name));
-  const deleteWardData = useAppStore((s) => s.deleteWardData);
+  const shopName = useAppStore((s) => shopLabel(s.shop?.name));
+  const deleteShopData = useAppStore((s) => s.deleteShopData);
   const [step, setStep] = useState<1 | 2>(1);
   const [typed, setTyped] = useState("");
   const [busy, setBusy] = useState(false);
@@ -81,7 +81,7 @@ function DeleteDataDialog({ onClose }: { onClose: () => void }) {
     setBusy(true);
     setFailed(false);
     try {
-      await deleteWardData();
+      await deleteShopData();
       onClose();
     } catch {
       setBusy(false);
@@ -102,7 +102,7 @@ function DeleteDataDialog({ onClose }: { onClose: () => void }) {
       </Dialog>
     );
 
-  const matches = typed.trim() === wardName;
+  const matches = typed.trim() === shopName;
   return (
     <Dialog
       key="step2"
@@ -113,11 +113,11 @@ function DeleteDataDialog({ onClose }: { onClose: () => void }) {
       danger
     >
       <div className="flex flex-col gap-1">
-        <label htmlFor="delete-ward-name" className={ui.label}>
-          병동 이름 <span className="font-mono">{wardName}</span>
+        <label htmlFor="delete-shop-name" className={ui.label}>
+          병동 이름 <span className="font-mono">{shopName}</span>
         </label>
         <input
-          id="delete-ward-name"
+          id="delete-shop-name"
           value={typed}
           onChange={(e) => setTyped(e.target.value)}
           disabled={busy}

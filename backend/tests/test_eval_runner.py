@@ -17,9 +17,9 @@ _spec.loader.exec_module(run)
 score = run.score_constraints
 
 
-def leave(nurse_id: str, days: list[int], **extra) -> dict:
+def leave(employee_id: str, days: list[int], **extra) -> dict:
     """휴가 규칙(변환표 8번 모양)."""
-    return R.leave("x", nurse_id, days, **extra)
+    return R.leave("x", employee_id, days, **extra)
 
 
 def forbid(*pattern: dict, **extra) -> dict:
@@ -31,7 +31,7 @@ def forbid(*pattern: dict, **extra) -> dict:
 NF = R.night_fair()
 
 # 블록(옛 기대값 모양). 채점기·데이터셋 검증이 거절하는지 볼 때만 쓴다
-LEAVE_BLOCK = {"type": "count", "hardness": "hard", "params": {"people": {"ids": ["n01"]}, "days": {"days": [15]},
+LEAVE_BLOCK = {"type": "count", "hardness": "hard", "params": {"people": {"ids": ["e01"]}, "days": {"days": [15]},
                                                                "shifts": {"not_in": ["O"]}, "per": "person", "max": 0}}
 NF_BLOCK = {"type": "balance", "hardness": "soft", "params": {"shifts": {"in": ["N"]}}}
 RUN_BLOCK = {"type": "sequence", "hardness": "hard", "params": {"run": {"in": ["N"]}, "max_len": 3}}
@@ -41,27 +41,27 @@ RUN_BLOCK = {"type": "sequence", "hardness": "hard", "params": {"run": {"in": ["
 
 
 def test_score_order_independent():
-    a, b = leave("n01", [15]), NF
+    a, b = leave("e01", [15]), NF
     assert score([a, b], [b, a]) == (2, 2, 2)
 
 
 def test_score_sorts_days():
-    assert score([leave("n01", [15, 16, 17])], [leave("n01", [17, 15, 16])]) == (1, 1, 1)
+    assert score([leave("e01", [15, 16, 17])], [leave("e01", [17, 15, 16])]) == (1, 1, 1)
 
 
 def test_score_ignores_id_source_text_weight_scope():
-    actual = leave("n01", [15], id="abc", source_text="이영희 15일 휴가", weight=1, scope="period", enabled=True)
-    assert score([leave("n01", [15])], [actual]) == (1, 1, 1)
+    actual = leave("e01", [15], id="abc", source_text="이영희 15일 휴가", weight=1, scope="period", enabled=True)
+    assert score([leave("e01", [15])], [actual]) == (1, 1, 1)
 
 
 def test_score_compares_hardness_and_params():
     hard = {**NF, "hardness": "hard"}
     assert score([NF], [hard]) == (0, 1, 1)
-    assert score([leave("n01", [15])], [leave("n02", [15])]) == (0, 1, 1)
+    assert score([leave("e01", [15])], [leave("e02", [15])]) == (0, 1, 1)
 
 
 def test_score_multiset():
-    assert score([leave("n01", [1]), leave("n01", [1])], [leave("n01", [1])]) == (1, 2, 1)
+    assert score([leave("e01", [1]), leave("e01", [1])], [leave("e01", [1])]) == (1, 2, 1)
 
 
 def test_score_fills_defaults():
@@ -74,14 +74,14 @@ def test_score_fills_defaults():
 
 def test_score_rejects_template_expected():
     """기대값은 식 규칙만 쓴다(템플릿은 step 5, 블록은 step 7에서 모두 바꿨다)."""
-    template = {"type": "leave", "hardness": "hard", "params": {"nurse_id": "n01", "days": [15, 16]}}
+    template = {"type": "leave", "hardness": "hard", "params": {"employee_id": "e01", "days": [15, 16]}}
     with pytest.raises(ValidationError):
-        run.score_constraints([template], [leave("n01", [16, 15])])
+        run.score_constraints([template], [leave("e01", [16, 15])])
 
 
 @pytest.mark.parametrize(
     "block, rule",
-    [(LEAVE_BLOCK, leave("n01", [15])), (NF_BLOCK, NF), (RUN_BLOCK, R.max_nights("x", 3))],
+    [(LEAVE_BLOCK, leave("e01", [15])), (NF_BLOCK, NF), (RUN_BLOCK, R.max_nights("x", 3))],
     ids=("count", "balance", "sequence"),
 )
 def test_score_rejects_block_specs(block, rule):
@@ -94,13 +94,13 @@ def test_score_rejects_block_specs(block, rule):
 
 
 def test_same_rule_leave_per_person_vs_per_day():
-    per_day = R.count("x", R.WORK, "day", hi=0, people={"ids": ["n01"]}, days={"days": [15, 16, 17]})
-    assert score([leave("n01", [15, 16, 17])], [per_day]) == (1, 1, 1)
+    per_day = R.count("x", R.WORK, "day", hi=0, people={"ids": ["e01"]}, days={"days": [15, 16, 17]})
+    assert score([leave("e01", [15, 16, 17])], [per_day]) == (1, 1, 1)
 
 
 def test_same_rule_leave_as_off_exactly():
-    off = R.count("x", R.O, "person", lo=3, people={"ids": ["n01"]}, days={"days": [15, 16, 17]})
-    assert score([leave("n01", [15, 16, 17])], [off]) == (1, 1, 1)
+    off = R.count("x", R.O, "person", lo=3, people={"ids": ["e01"]}, days={"days": [15, 16, 17]})
+    assert score([leave("e01", [15, 16, 17])], [off]) == (1, 1, 1)
 
 
 def test_same_rule_in_vs_not_in():
@@ -110,14 +110,14 @@ def test_same_rule_in_vs_not_in():
 
 
 def test_same_rule_selector_list_order():
-    a = R.count("x", {"in": ["D", "E"]}, "person", hi=0, people={"ids": ["n01", "n02"]}, days={"weekdays": [0, 4]}, hardness="soft")
-    b = R.count("x", {"in": ["E", "D"]}, "person", hi=0, people={"ids": ["n02", "n01"]}, days={"weekdays": [4, 0]}, hardness="soft")
+    a = R.count("x", {"in": ["D", "E"]}, "person", hi=0, people={"ids": ["e01", "e02"]}, days={"weekdays": [0, 4]}, hardness="soft")
+    b = R.count("x", {"in": ["E", "D"]}, "person", hi=0, people={"ids": ["e02", "e01"]}, days={"weekdays": [4, 0]}, hardness="soft")
     assert score([a], [b]) == (1, 1, 1)
 
 
 def test_same_rule_fixed_vs_count():
-    fixed = {"type": "fixed_assignment", "hardness": "hard", "params": {"nurse_id": "n03", "day": 25, "shift": "N"}}
-    once = R.count("x", R.N, "person", lo=1, people={"ids": ["n03"]}, days={"days": [25]})
+    fixed = {"type": "fixed_assignment", "hardness": "hard", "params": {"employee_id": "e03", "day": 25, "shift": "N"}}
+    once = R.count("x", R.N, "person", lo=1, people={"ids": ["e03"]}, days={"days": [25]})
     assert score([fixed], [once]) == (1, 1, 1)
 
 
@@ -150,11 +150,11 @@ def val(value: float, label: str = "값") -> dict:
     return {"value": value, "label": label}
 
 
-PAIR_LE = rule({"per": "day"}, cmp(cnt(N_, who={"ids": ["n01", "n02"]}), "le", 1))
+PAIR_LE = rule({"per": "day"}, cmp(cnt(N_, who={"ids": ["e01", "e02"]}), "le", 1))
 
 
 def test_same_rule_pair_forbid_le_vs_when():
-    when_form = rule({"per": "day"}, cmp(cnt(N_, who={"ids": ["n02"]}), "eq", 0), when=cmp(cnt(N_, who={"ids": ["n01"]}), "ge", 1))
+    when_form = rule({"per": "day"}, cmp(cnt(N_, who={"ids": ["e02"]}), "eq", 0), when=cmp(cnt(N_, who={"ids": ["e01"]}), "ge", 1))
     assert score([PAIR_LE], [when_form]) == (1, 1, 1)
 
 
@@ -168,12 +168,12 @@ def test_same_rule_window_vs_offset():
 
 def test_same_rule_leave_person_vs_person_day():
     person = rule(
-        {"per": "person", "people": {"ids": ["n01"]}, "days": {"days": [15, 16, 17]}},
+        {"per": "person", "people": {"ids": ["e01"]}, "days": {"days": [15, 16, 17]}},
         cmp(cnt(WORK_), "le", {"value": "max"}),
         values={"max": val(0, "최대 횟수")},
     )
-    person_day = rule({"per": "person_day", "people": {"ids": ["n01"]}, "days": {"days": [15, 16, 17]}}, cmp(cnt(O_), "eq", 1))
-    day = rule({"per": "day", "days": {"days": [15, 16, 17]}}, cmp(cnt(WORK_, who={"ids": ["n01"]}), "le", 0))
+    person_day = rule({"per": "person_day", "people": {"ids": ["e01"]}, "days": {"days": [15, 16, 17]}}, cmp(cnt(O_), "eq", 1))
+    day = rule({"per": "day", "days": {"days": [15, 16, 17]}}, cmp(cnt(WORK_, who={"ids": ["e01"]}), "le", 0))
     assert score([person], [person_day]) == (1, 1, 1)
     assert score([person], [day]) == (1, 1, 1)
 
@@ -202,11 +202,11 @@ def test_same_rule_block_vs_expr():
 @pytest.mark.parametrize(
     "actual",
     [
-        rule({"per": "day"}, cmp(cnt(N_, who={"ids": ["n01", "n03"]}), "le", 1)),  # 대상 하나 다름
-        rule({"per": "day"}, cmp(cnt(N_, who={"ids": ["n01", "n02"]}), "le", 0)),  # 숫자 하나 다름
-        rule({"per": "day"}, cmp(cnt({"in": ["E"]}, who={"ids": ["n01", "n02"]}), "le", 1)),  # 근무 다름
-        rule({"per": "day", "days": {"kind": "weekend"}}, cmp(cnt(N_, who={"ids": ["n01", "n02"]}), "le", 1)),  # 날 다름
-        rule({"per": "day"}, cmp(cnt(N_, who={"ids": ["n01", "n02"]}), "le", 1), hardness="soft"),  # 반드시/가능하면
+        rule({"per": "day"}, cmp(cnt(N_, who={"ids": ["e01", "e03"]}), "le", 1)),  # 대상 하나 다름
+        rule({"per": "day"}, cmp(cnt(N_, who={"ids": ["e01", "e02"]}), "le", 0)),  # 숫자 하나 다름
+        rule({"per": "day"}, cmp(cnt({"in": ["E"]}, who={"ids": ["e01", "e02"]}), "le", 1)),  # 근무 다름
+        rule({"per": "day", "days": {"kind": "weekend"}}, cmp(cnt(N_, who={"ids": ["e01", "e02"]}), "le", 1)),  # 날 다름
+        rule({"per": "day"}, cmp(cnt(N_, who={"ids": ["e01", "e02"]}), "le", 1), hardness="soft"),  # 반드시/가능하면
     ],
 )
 def test_expr_different_rule_mismatch(actual):
@@ -242,8 +242,8 @@ def test_expr_shapes_mismatch(expected, actual):
 @pytest.mark.parametrize(
     "expected, actual",
     [
-        (leave("n01", [15, 16, 17]), leave("n01", [15, 16])),
-        (leave("n01", [15]), leave("n01", [16])),
+        (leave("e01", [15, 16, 17]), leave("e01", [15, 16])),
+        (leave("e01", [15]), leave("e01", [16])),
         (R.min_off("x", 8), R.min_off("x", 9)),
         (R.max_nights("x", 3), R.max_nights("x", 4)),
         (R.off_after_night("x", 2), R.off_after_night("x", 1)),
@@ -269,14 +269,14 @@ def test_score_compares_priority_only_when_soft():
 
 def test_score_rare_violation_distinguished_by_flips():
     # 무작위 근무표에서 한 칸이 정확히 맞기는 드물다. 기대 규칙의 대상 칸을 뒤집은 근무표로 구분한다
-    a = R.count("x", {"in": ["D"]}, "person", lo=1, people={"ids": ["n01"]}, days={"days": [15]}, hardness="soft")
-    b = R.count("x", {"in": ["E"]}, "person", lo=1, people={"ids": ["n01"]}, days={"days": [15]}, hardness="soft")
+    a = R.count("x", {"in": ["D"]}, "person", lo=1, people={"ids": ["e01"]}, days={"days": [15]}, hardness="soft")
+    b = R.count("x", {"in": ["E"]}, "person", lo=1, people={"ids": ["e01"]}, days={"days": [15]}, hardness="soft")
     assert score([a], [b]) == (0, 1, 1)
 
 
 def test_schedules_deterministic():
-    case_ = {"id": "x", "today": "2026-10-26", "scope": "ward", "text": "t", "expected": {"status": "ok", "constraints": [leave("n01", [3])]}}
-    expected = [run._spec(leave("n01", [3]))]
+    case_ = {"id": "x", "today": "2026-10-26", "scope": "shop", "text": "t", "expected": {"status": "ok", "constraints": [leave("e01", [3])]}}
+    expected = [run._spec(leave("e01", [3]))]
     s1 = run.judge_schedules(case_, run.judge_config([]), expected)
     s2 = run.judge_schedules(case_, run.judge_config([]), expected)
     assert len(s1) >= run.K_RANDOM
@@ -319,12 +319,12 @@ def case(id_: str, expected: dict, **extra) -> dict:
 
 def test_validate_dataset_ok():
     cases = [
-        case("a", {"status": "ok", "constraints": [leave("n01", [15])]}, holidays=[5]),
+        case("a", {"status": "ok", "constraints": [leave("e01", [15])]}, holidays=[5]),
         case("b", {"status": "clarify"}),
         case("c", {"status": "ok", "config_changes": [M]}, set="new"),
         case("d", {"status": "ok", "config_changes": [DE], "constraints": [R.count("x", {"in": ["DE"]}, "person", hi=2)]}, set="new"),
         case("e", {"status": "ok", "constraints": [R.count("x", {"in": ["D"]}, "day", lo=1, people={"tags": ["책임"]})]}),
-        case("f", {"status": "ok", "constraints": [{"type": "fixed_assignment", "params": {"nurse_id": "n03", "day": 25, "shift": "N"}}]}),
+        case("f", {"status": "ok", "constraints": [{"type": "fixed_assignment", "params": {"employee_id": "e03", "day": 25, "shift": "N"}}]}),
         case("g", {"status": "ok", "constraints": [PAIR_LE]}, set="expr"),
         case("h", {"status": "ok", "constraints": [rule({"per": "day"}, cmp(cnt(N_, who={"tags": ["책임"]}), "ge", 1), when=cmp(cnt(N_, who={"tags": ["신규"]}), "ge", 1))]}, set="expr"),
     ]
@@ -336,16 +336,16 @@ def test_validate_dataset_ok():
     [
         [case("a", {"status": "clarify"}), case("a", {"status": "clarify"})],  # id 중복
         [case("a", {"status": "maybe"})],  # status 값
-        [case("a", {"status": "ok", "constraints": [leave("n99", [15])]})],  # 명단 밖
-        [case("a", {"status": "ok", "constraints": [leave("n01", [31])]})],  # 11월 31일
+        [case("a", {"status": "ok", "constraints": [leave("e99", [15])]})],  # 명단 밖
+        [case("a", {"status": "ok", "constraints": [leave("e01", [31])]})],  # 11월 31일
         [case("a", {"status": "ok", "constraints": [{"type": "nope", "params": {}}]})],  # 식 밖
-        [case("a", {"status": "ok", "constraints": [{"type": "leave", "hardness": "hard", "params": {"nurse_id": "n01", "days": [15]}}]})],  # 템플릿
+        [case("a", {"status": "ok", "constraints": [{"type": "leave", "hardness": "hard", "params": {"employee_id": "e01", "days": [15]}}]})],  # 템플릿
         [case("a", {"status": "ok", "constraints": [LEAVE_BLOCK]})],  # 블록(식으로 바꾸지 않은 기대값)
         [case("a", {"status": "ok", "constraints": [rule({"per": "day"}, cmp(cnt(N_), "le", 1), values={"max": val(1)})]})],  # 안 쓰는 값
         [case("a", {"status": "ok", "constraints": [rule({"per": "person"}, cmp(cnt(N_, offset=[0, 1]), "le", 1))]})],  # person 범위 offset
         [case("a", {"status": "ok", "constraints": [rule({"per": "day"}, cmp(cnt(N_, who={"tags": ["프리셉터"]}), "ge", 1))]})],  # who에 없는 태그
         [case("a", {"status": "ok", "constraints": []})],  # ok인데 제약·설정 변경 없음
-        [case("a", {"status": "clarify", "constraints": [leave("n01", [15])]})],  # clarify인데 제약 있음
+        [case("a", {"status": "clarify", "constraints": [leave("e01", [15])]})],  # clarify인데 제약 있음
         [case("a", {"status": "unsupported", "config_changes": [M]})],  # unsupported인데 설정 변경 있음
         [case("a", {"status": "clarify"}, holidays=[40])],
         [case("a", {"status": "clarify"}, scope="year")],
@@ -360,9 +360,9 @@ def test_validate_dataset_errors(cases):
     assert run.validate_dataset(cases)
 
 
-def test_eval_ward_tags():
-    ward = run._ward()
-    tags = {n["id"]: n.get("tags", []) for n in ward["nurses"]}
+def test_eval_shop_tags():
+    shop = run._shop()
+    tags = {n["id"]: n.get("tags", []) for n in shop["employees"]}
     assert sum("책임" in t for t in tags.values()) == 2
     assert sum("신규" in t for t in tags.values()) == 3
 
@@ -372,8 +372,8 @@ CROSS = {"start_date": "2026-11-23", "length": 14}
 
 def test_validate_dataset_uses_case_period():
     # 14일 기간에는 15일이 없고, 기본(샘플) 30일 기간에는 있다
-    assert run.validate_dataset([case("a", {"status": "ok", "constraints": [leave("n01", [15])]}, period=CROSS)])
-    assert run.validate_dataset([case("a", {"status": "ok", "constraints": [leave("n01", [9, 10, 11])]}, period=CROSS)]) == []
+    assert run.validate_dataset([case("a", {"status": "ok", "constraints": [leave("e01", [15])]}, period=CROSS)])
+    assert run.validate_dataset([case("a", {"status": "ok", "constraints": [leave("e01", [9, 10, 11])]}, period=CROSS)]) == []
 
 
 @pytest.mark.parametrize("period", [{"start_date": "2026-11-23"}, {"start_date": "x", "length": 14}, {"start_date": "2026-11-23", "length": 40}])
@@ -382,11 +382,11 @@ def test_validate_dataset_bad_period(period):
 
 
 def test_request_period_from_case_or_sample():
-    ward = run._ward()
-    req = run._request(case("a", {"status": "clarify"}, period=CROSS), ward)
+    shop = run._shop()
+    req = run._request(case("a", {"status": "clarify"}, period=CROSS), shop)
     assert (req.context.period.start_date.isoformat(), req.context.period.length) == ("2026-11-23", 14)
-    req = run._request(case("a", {"status": "clarify"}), ward)
-    assert req.context.period.model_dump(mode="json") == ward["period"]
+    req = run._request(case("a", {"status": "clarify"}), shop)
+    assert req.context.period.model_dump(mode="json") == shop["period"]
 
 
 def test_real_dataset_has_cross_month_cases():
@@ -440,8 +440,8 @@ def draft(rule: dict) -> dict:
     return {k: v for k, v in rule.items() if k not in _SERVER_FIELDS}
 
 
-def leave_draft(nurse_id: str, days) -> dict:
-    return draft(leave(nurse_id, days))
+def leave_draft(employee_id: str, days) -> dict:
+    return draft(leave(employee_id, days))
 
 
 _SERVER_FIELDS = {"id", "scope", "enabled", "default", "type", "weight"}
@@ -452,9 +452,9 @@ BAD_RULE = {"body": {"kind": "require", "for_each": {"per": "person"}, "then": "
 
 
 def test_score_compares_expected_with_draft_actual():
-    actual = {**leave_draft("n01", [16, 15]), "type": "rule"}
+    actual = {**leave_draft("e01", [16, 15]), "type": "rule"}
     del actual["source_text"]
-    assert score([leave("n01", [15, 16])], [actual]) == (1, 1, 1)
+    assert score([leave("e01", [15, 16])], [actual]) == (1, 1, 1)
     assert score([NF], [{**NF_DRAFT, "type": "rule", "hardness": "soft"}]) == (1, 1, 1)
     assert score([NF], [{**NF_DRAFT, "type": "rule"}]) == (0, 1, 1)
 
@@ -463,14 +463,14 @@ def test_run_cases_aggregates():
     cases = [
         case(
             "a",
-            {"status": "ok", "constraints": [leave("n01", [15, 16]), NF]},
-            scope="ward",
+            {"status": "ok", "constraints": [leave("e01", [15, 16]), NF]},
+            scope="shop",
         ),
         case("b", {"status": "clarify"}),
     ]
     client = FakeClient(
         ok({"rules": [BAD_RULE]}),  # 스키마 위반 → 재시도
-        ok({"rules": [leave_draft("n01", [16, 15]), NF_DRAFT]}),
+        ok({"rules": [leave_draft("e01", [16, 15]), NF_DRAFT]}),
         ok({"unsupported_reason": "템플릿 없음"}),
     )
     results = run.run_cases(cases, client)
@@ -493,11 +493,11 @@ def test_run_cases_aggregates():
 
 def test_run_cases_exact_and_error():
     cases = [
-        case("a", {"status": "ok", "constraints": [leave("n01", [15])]}),
-        case("b", {"status": "ok", "constraints": [leave("n02", [3])]}),
+        case("a", {"status": "ok", "constraints": [leave("e01", [15])]}),
+        case("b", {"status": "ok", "constraints": [leave("e02", [3])]}),
     ]
     bad = ok({"rules": [BAD_RULE]})
-    client = FakeClient(ok({"rules": [leave_draft("n01", [15])]}), bad, bad, bad)
+    client = FakeClient(ok({"rules": [leave_draft("e01", [15])]}), bad, bad, bad)
     results = run.run_cases(cases, client)
     m = run.aggregate(results)
 
@@ -511,7 +511,7 @@ def test_run_cases_exact_and_error():
 
 def test_write_results(tmp_path):
     cases = [case("a", {"status": "clarify"})]
-    results = run.run_cases(cases, FakeClient(ok({"rules": [leave_draft("n01", [1])]})))
+    results = run.run_cases(cases, FakeClient(ok({"rules": [leave_draft("e01", [1])]})))
     out = tmp_path / "results.md"
     run.write_results(out, run.aggregate(results), results, model="fake-model", by_set=run.aggregate_by_set(results))
     text = out.read_text(encoding="utf-8")
@@ -520,7 +520,7 @@ def test_write_results(tmp_path):
 
 def test_run_case_config_changes():
     de_rule = R.count("x", {"in": ["DE"]}, "person", hi=2)
-    cases = [case("a", {"status": "ok", "config_changes": [DE], "constraints": [de_rule]}, set="new", scope="ward")]
+    cases = [case("a", {"status": "ok", "config_changes": [DE], "constraints": [de_rule]}, set="new", scope="shop")]
     client = FakeClient(ok({"config_changes": [DE], "rules": [draft(de_rule)]}))
     (r,) = run.run_cases(cases, client)
     assert (r.tp, r.n_expected, r.n_actual, r.exact, r.set) == (2, 2, 2, True, "new")
@@ -533,12 +533,12 @@ def test_run_case_config_changes():
 
 def test_aggregate_by_set_and_gate():
     cases = [
-        case("a", {"status": "ok", "constraints": [leave("n01", [15])]}),
+        case("a", {"status": "ok", "constraints": [leave("e01", [15])]}),
         case("b", {"status": "clarify"}),
         case("c", {"status": "unsupported"}, set="new"),
     ]
     client = FakeClient(
-        ok({"rules": [leave_draft("n01", [15])]}),
+        ok({"rules": [leave_draft("e01", [15])]}),
         ok({"clarification_question": "누구?"}),
         ok({"clarification_question": "뭐?"}),
     )

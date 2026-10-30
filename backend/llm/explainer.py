@@ -30,7 +30,7 @@ def fallback_explanation(request: ScheduleRequest, conflicts: list[Conflict]) ->
     return f"다음 규칙들이 동시에 지켜질 수 없습니다: {quoted}."
 
 
-def _conflict_item(c: Conflict, spec: Any, nurses: list) -> dict:
+def _conflict_item(c: Conflict, spec: Any, employees: list) -> dict:
     """충돌 제약 하나. 식 규칙은 식 JSON(기본값 생략) + label 있는 values, 칸 고정은 params."""
     item: dict[str, Any] = {"id": c.constraint_id, "type": c.type, "hardness": spec.hardness if spec else None}
     if isinstance(spec, Rule):
@@ -38,25 +38,25 @@ def _conflict_item(c: Conflict, spec: Any, nurses: list) -> dict:
         item["body"] = spec.body.model_dump(mode="json", exclude_defaults=True)
     else:
         item["params"] = spec.params.model_dump(mode="json") if spec else None
-    item["source_text"] = pseudonymize(c.source_text, nurses)
+    item["source_text"] = pseudonymize(c.source_text, employees)
     return item
 
 
 def _context_message(request: ScheduleRequest, specs: dict[str, Any], conflicts: list[Conflict]) -> str:
-    period, nurses = request.period, request.nurses
+    period, employees = request.period, request.employees
     days = period.days
     weekends = sorted(
         {d for d in range(1, days + 1) if period.weekday(d) >= 5} | set(request.holidays)
     )
     context = {
         "config": {"shifts": [s.model_dump(include={"code", "name", "hours", "parts", "active"}) for s in request.config.shifts]},
-        "nurse_count": len(nurses),
-        "nurses": [{"id": n.id, "tags": n.tags} for n in nurses],
+        "employee_count": len(employees),
+        "employees": [{"id": n.id, "tags": n.tags} for n in employees],
         "period": {"start": period.start_date.isoformat(), "end": period.date_of(days).isoformat(), "length": days},
         "days": [{"day": d, "date": period.date_of(d).isoformat()} for d in range(1, days + 1)],
         "weekend_and_holiday_days": weekends,
     }
-    items = [_conflict_item(c, specs.get(c.constraint_id), nurses) for c in conflicts]
+    items = [_conflict_item(c, specs.get(c.constraint_id), employees) for c in conflicts]
     return (
         f"<context>\n{json.dumps(context, ensure_ascii=False)}\n</context>\n"
         f"<conflicts>\n{json.dumps(items, ensure_ascii=False)}\n</conflicts>"
@@ -113,9 +113,9 @@ def _to_proposal(
         if checked is None:
             return None
         changes.append(checked)
-    nurses = request.nurses
+    employees = request.employees
     return RelaxationProposal(
-        title=restore(draft.title, nurses), description=restore(draft.description, nurses), changes=changes
+        title=restore(draft.title, employees), description=restore(draft.description, employees), changes=changes
     )
 
 
@@ -143,4 +143,4 @@ def explain(
 
     conflict_ids = {c.constraint_id for c in conflicts}
     proposals = [p for d in output.proposals if (p := _to_proposal(d, request, specs, conflict_ids)) is not None]
-    return restore(output.text, request.nurses), proposals[:MAX_PROPOSALS]
+    return restore(output.text, request.employees), proposals[:MAX_PROPOSALS]

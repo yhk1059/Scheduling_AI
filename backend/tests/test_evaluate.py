@@ -8,7 +8,7 @@ from backend.solver import stats
 from backend.solver.evaluate import Instance, RuleViolation, evaluate_rule, instances
 
 START = date(2026, 11, 5)  # 목요일. 1=목 2=금 3=토 4=일 5=월 … 14=수
-NURSES = [
+EMPLOYEES = [
     {"id": "n1", "name": "가"},
     {"id": "n2", "name": "나", "tags": ["신규"]},
     {"id": "n3", "name": "다", "tags": ["책임"]},
@@ -20,10 +20,10 @@ NURSES = [
 
 def req(length: int = 14, carry: dict | None = None, history: dict | None = None, **extra) -> ScheduleRequest:
     raw = {
-        "nurses": NURSES,
+        "employees": EMPLOYEES,
         "period": {"start_date": START.isoformat(), "length": length},
         "holidays": [6],
-        "carry_over": [{"nurse_id": k, "shifts": v} for k, v in (carry or {}).items()],
+        "carry_over": [{"employee_id": k, "shifts": v} for k, v in (carry or {}).items()],
         "input_version": 0,
         **extra,
     }
@@ -34,7 +34,7 @@ def req(length: int = 14, carry: dict | None = None, history: dict | None = None
 
 def rule(body: dict, values: dict | None = None, hardness: str = "hard", cid: str = "r") -> Rule:
     raw = {
-        "id": cid, "type": "rule", "scope": "ward", "hardness": hardness, "source_text": "원문",
+        "id": cid, "type": "rule", "scope": "shop", "hardness": hardness, "source_text": "원문",
         "values": {k: {"value": v, "label": k} for k, v in (values or {}).items()}, "body": body,
     }
     return Rule.model_validate(raw)
@@ -58,11 +58,11 @@ def cmp(left: dict, op: str, right) -> dict:
 def rows(**patterns: str) -> dict[str, list[str]]:
     """사람마다 근무 문자열. 빠진 사람은 모두 O."""
     length = len(next(iter(patterns.values())))
-    return {n["id"]: list(patterns.get(n["id"], "O" * length)) for n in NURSES}
+    return {n["id"]: list(patterns.get(n["id"], "O" * length)) for n in EMPLOYEES}
 
 
 def keys(vs: list[RuleViolation]) -> list[tuple[str | None, tuple[int, ...]]]:
-    return [(v.instance.nurse_id, v.instance.days) for v in vs]
+    return [(v.instance.employee_id, v.instance.days) for v in vs]
 
 
 # --- 범위와 인스턴스 ---
@@ -235,7 +235,7 @@ def test_stats_violations_for_rule_use_evaluate():
     body = require("day", cmp(cnt(["D"]), "ge", {"value": "min"}), days={"days": [1, 2]})
     r = rule(body, {"min": 2}, hardness="soft", cid="cov")
     vs = stats.violations(req(), a, r)
-    assert [(v.constraint_id, v.nurse_id, v.day) for v in vs] == [("cov", None, 1), ("cov", None, 2)]
+    assert [(v.constraint_id, v.employee_id, v.day) for v in vs] == [("cov", None, 1), ("cov", None, 2)]
     assert vs[0].detail == "데이 1명 (기준 2명 이상)"
 
 
@@ -243,7 +243,7 @@ def test_stats_preference_rule_lists_each_day_like_block():
     a = rows(n1="NDNDOOOOOOOOOO")
     avoid = require("person", cmp(cnt(["N"]), "le", {"value": "max"}), people={"ids": ["n1"]}, days={"days": [1, 2, 3]})
     vs = stats.violations(req(), a, rule(avoid, {"max": 0}, hardness="soft"))
-    assert [(v.nurse_id, v.day, v.detail) for v in vs] == [
+    assert [(v.employee_id, v.day, v.detail) for v in vs] == [
         ("n1", 1, "나이트 배정 (기준 배정 안 함)"),
         ("n1", 3, "나이트 배정 (기준 배정 안 함)"),
     ]
@@ -272,5 +272,5 @@ def test_compute_result_lists_soft_rules():
     body = require("person", cmp(cnt(["O"]), "ge", {"value": "min"}), people={"ids": ["n1"]})
     r = req(constraints=[rule(body, {"min": 4}, hardness="soft").model_dump(mode="json")])
     res = stats.compute_result(r, a, optimal=True)
-    assert [(v.constraint_id, v.nurse_id, v.day) for v in res.soft_violations] == [("r", "n1", None)]
+    assert [(v.constraint_id, v.employee_id, v.day) for v in res.soft_violations] == [("r", "n1", None)]
     assert res.soft_violations[0].detail == "휴무 0일 (기준 4일 이상)"

@@ -9,7 +9,7 @@ export const OFF: Shifts = { in: ["O"] };
 export const WORK: Shifts = { not_in: ["O"] };
 
 function rule(body: Body, values: Record<string, Value>, over: Over): ConstraintSpec {
-  return normalizeRule({ id: "r", type: "rule", scope: "ward", source_text: "", ...over, values, body } as ConstraintSpec);
+  return normalizeRule({ id: "r", type: "rule", scope: "shop", source_text: "", ...over, values, body } as ConstraintSpec);
 }
 
 const cnt = (shifts: Shifts, offset?: [number, number], extra: Partial<Count> = {}): Count => ({ ...extra, ...(offset && { offset }), shifts });
@@ -95,7 +95,7 @@ export function balance(
 }
 
 /** 칸 고정. */
-export function fixedCell(nurse_id: string, day: number, shift: string, over: { id?: string; weight?: number } = {}): ConstraintSpec {
-  return normalizeRule({ id: "f", type: "fixed_assignment", scope: "period", source_text: "", ...over, params: { nurse_id, day, shift } } as ConstraintSpec);
+export function fixedCell(employee_id: string, day: number, shift: string, over: { id?: string; weight?: number } = {}): ConstraintSpec {
+  return normalizeRule({ id: "f", type: "fixed_assignment", scope: "period", source_text: "", ...over, params: { employee_id, day, shift } } as ConstraintSpec);
 }
 

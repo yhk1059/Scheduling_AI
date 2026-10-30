@@ -1,103 +1,103 @@
 {
-  "version": 6,
+  "version": 1,
   "state": {
-    "ward": {
+    "shop": {
       "name": "외과 병동",
       "unit": "month",
-      "nurses": [
+      "employees": [
         {
-          "id": "n01",
+          "id": "e01",
           "name": "이영희",
           "years": 12,
           "active": true,
           "tags": []
         },
         {
-          "id": "n02",
+          "id": "e02",
           "name": "박민수",
           "years": 9,
           "active": true,
           "tags": []
         },
         {
-          "id": "n03",
+          "id": "e03",
           "name": "김철수",
           "years": 7,
           "active": true,
           "tags": []
         },
         {
-          "id": "n04",
+          "id": "e04",
           "name": "정유진",
           "years": 5,
           "active": true,
           "tags": []
         },
         {
-          "id": "n05",
+          "id": "e05",
           "name": "최지훈",
           "years": 3,
           "active": true,
           "tags": []
         },
         {
-          "id": "n06",
+          "id": "e06",
           "name": "강서연",
           "years": 15,
           "active": true,
           "tags": []
         },
         {
-          "id": "n07",
+          "id": "e07",
           "name": "윤지민",
           "years": 10,
           "active": true,
           "tags": []
         },
         {
-          "id": "n08",
+          "id": "e08",
           "name": "임하늘",
           "years": 8,
           "active": true,
           "tags": []
         },
         {
-          "id": "n09",
+          "id": "e09",
           "name": "한소율",
           "years": 6,
           "active": true,
           "tags": []
         },
         {
-          "id": "n10",
+          "id": "e10",
           "name": "오민준",
           "years": 4,
           "active": true,
           "tags": []
         },
         {
-          "id": "n11",
+          "id": "e11",
           "name": "서예린",
           "years": 2,
           "active": true,
           "tags": []
         },
         {
-          "id": "n12",
+          "id": "e12",
           "name": "신도윤",
           "years": 1,
           "active": true,
           "tags": []
         },
         {
-          "id": "n13",
+          "id": "e13",
           "name": "조은비",
           "years": 2,
           "active": true,
           "tags": []
         },
         {
-          "id": "n14",
+          "id": "e14",
           "name": "문가람",
           "years": 11,
           "active": true,
@@ -106,7 +106,7 @@
           ]
         },
         {
-          "id": "n15",
+          "id": "e15",
           "name": "배수아",
           "years": 4,
           "active": true,
@@ -115,12 +115,12 @@
           ]
         }
       ],
-      "nextNurseNo": 16,
+      "nextEmployeeNo": 16,
       "rules": [
         {
           "id": "cov-weekday-D",
           "type": "rule",
-          "scope": "ward",
+          "scope": "shop",
           "hardness": "hard",
           "priority": "normal",
           "weight": 10,
@@ -191,7 +191,7 @@
         {
           "id": "cov-weekday-E",
           "type": "rule",
-          "scope": "ward",
+          "scope": "shop",
           "hardness": "hard",
           "priority": "normal",
           "weight": 10,
@@ -237,7 +237,7 @@
         {
           "id": "cov-weekday-N",
           "type": "rule",
-          "scope": "ward",
+          "scope": "shop",
           "hardness": "hard",
           "priority": "normal",
           "weight": 10,
@@ -283,7 +283,7 @@
         {
           "id": "cov-weekend-D",
           "type": "rule",
-          "scope": "ward",
+          "scope": "shop",
           "hardness": "hard",
           "priority": "normal",
           "weight": 10,
@@ -329,7 +329,7 @@
         {
           "id": "cov-weekend-E",
           "type": "rule",
-          "scope": "ward",
+          "scope": "shop",
           "hardness": "hard",
           "priority": "normal",
           "weight": 10,
@@ -375,7 +375,7 @@
         {
           "id": "cov-weekend-N",
           "type": "rule",
-          "scope": "ward",
+          "scope": "shop",
           "hardness": "hard",
           "priority": "normal",
           "weight": 10,
@@ -421,7 +421,7 @@
         {
           "id": "rule-noff",
           "type": "rule",
-          "scope": "ward",
+          "scope": "shop",
           "hardness": "hard",
           "priority": "normal",
           "weight": 10,
@@ -506,7 +506,7 @@
         {
           "id": "rule-max-work",
           "type": "rule",
-          "scope": "ward",
+          "scope": "shop",
           "hardness": "hard",
           "priority": "normal",
           "weight": 10,
@@ -553,7 +553,7 @@
         {
           "id": "rule-max-nights",
           "type": "rule",
-          "scope": "ward",
+          "scope": "shop",
           "hardness": "hard",
           "priority": "normal",
           "weight": 10,
@@ -600,7 +600,7 @@
         {
           "id": "rule-min-off",
           "type": "rule",
-          "scope": "ward",
+          "scope": "shop",
           "hardness": "hard",
           "priority": "normal",
           "weight": 10,
@@ -646,7 +646,7 @@
         {
           "id": "rule-night-fair",
           "type": "rule",
-          "scope": "ward",
+          "scope": "shop",
           "hardness": "soft",
           "priority": "low",
           "weight": 5,
@@ -684,7 +684,7 @@
         {
           "id": "rule-weekend-fair",
           "type": "rule",
-          "scope": "ward",
+          "scope": "shop",
           "hardness": "soft",
           "priority": "low",
           "weight": 5,
@@ -720,7 +720,7 @@
         {
           "id": "night-only",
           "type": "rule",
-          "scope": "ward",
+          "scope": "shop",
           "hardness": "hard",
           "priority": "normal",
           "weight": 10,
@@ -811,7 +811,7 @@
         "carryOverUsed": [],
         "result": {
           "assignments": {
-            "n01": [
+            "e01": [
               "E",
               "E",
               "E",
@@ -844,7 +844,7 @@
               "O",
               "D"
             ],
-            "n02": [
+            "e02": [
               "D",
               "O",
               "O",
@@ -877,7 +877,7 @@
               "E",
               "E"
             ],
-            "n03": [
+            "e03": [
               "O",
               "O",
               "O",
@@ -910,7 +910,7 @@
               "O",
               "E"
             ],
-            "n04": [
+            "e04": [
               "O",
               "E",
               "D",
@@ -943,7 +943,7 @@
               "D",
               "O"
             ],
-            "n05": [
+            "e05": [
               "E",
               "D",
               "O",
@@ -976,7 +976,7 @@
               "O",
               "O"
             ],
-            "n06": [
+            "e06": [
               "D",
               "D",
               "O",
@@ -1009,7 +1009,7 @@
               "D",
               "O"
             ],
-            "n07": [
+            "e07": [
               "O",
               "N",
               "N",
@@ -1042,7 +1042,7 @@
               "O",
               "O"
             ],
-            "n08": [
+            "e08": [
               "N",
               "O",
               "E",
@@ -1075,7 +1075,7 @@
               "D",
               "O"
             ],
-            "n09": [
+            "e09": [
               "O",
               "O",
               "N",
@@ -1108,7 +1108,7 @@
               "E",
               "D"
             ],
-            "n10": [
+            "e10": [
               "N",
               "O",
               "D",
@@ -1141,7 +1141,7 @@
               "E",
               "D"
             ],
-            "n11": [
+            "e11": [
               "E",
               "N",
               "O",
@@ -1174,7 +1174,7 @@
               "N",
               "O"
             ],
-            "n12": [
+            "e12": [
               "O",
               "D",
               "D",
@@ -1207,7 +1207,7 @@
               "O",
               "N"
             ],
-            "n13": [
+            "e13": [
               "D",
               "E",
               "O",
@@ -1240,7 +1240,7 @@
               "N",
               "O"
             ],
-            "n14": [
+            "e14": [
               "O",
               "O",
               "O",
@@ -1273,7 +1273,7 @@
               "O",
               "O"
             ],
-            "n15": [
+            "e15": [
               "O",
               "O",
               "O",
@@ -1313,7 +1313,7 @@
             "soft_violation_count": 0
           },
           "stats": {
-            "n01": {
+            "e01": {
               "D": 11,
               "E": 8,
               "N": 4,
@@ -1323,7 +1323,7 @@
               "preference_rate": null,
               "deviation": 6.87
             },
-            "n02": {
+            "e02": {
               "D": 6,
               "E": 10,
               "N": 4,
@@ -1333,7 +1333,7 @@
               "preference_rate": null,
               "deviation": 3.87
             },
-            "n03": {
+            "e03": {
               "D": 5,
               "E": 7,
               "N": 4,
@@ -1343,7 +1343,7 @@
               "preference_rate": null,
               "deviation": -0.13
             },
-            "n04": {
+            "e04": {
               "D": 11,
               "E": 4,
               "N": 4,
@@ -1353,7 +1353,7 @@
               "preference_rate": null,
               "deviation": 2.87
             },
-            "n05": {
+            "e05": {
               "D": 3,
               "E": 6,
               "N": 4,
@@ -1363,7 +1363,7 @@
               "preference_rate": null,
               "deviation": -3.13
             },
-            "n06": {
+            "e06": {
               "D": 10,
               "E": 4,
               "N": 4,
@@ -1373,7 +1373,7 @@
               "preference_rate": null,
               "deviation": 1.87
             },
-            "n07": {
+            "e07": {
               "D": 8,
               "E": 5,
               "N": 4,
@@ -1383,7 +1383,7 @@
               "preference_rate": null,
               "deviation": 0.87
             },
-            "n08": {
+            "e08": {
               "D": 7,
               "E": 7,
               "N": 4,
@@ -1393,7 +1393,7 @@
               "preference_rate": null,
               "deviation": 1.87
             },
-            "n09": {
+            "e09": {
               "D": 5,
               "E": 4,
               "N": 4,
@@ -1403,7 +1403,7 @@
               "preference_rate": null,
               "deviation": -3.13
             },
-            "n10": {
+            "e10": {
               "D": 11,
               "E": 5,
               "N": 4,
@@ -1413,7 +1413,7 @@
               "preference_rate": null,
               "deviation": 3.87
             },
-            "n11": {
+            "e11": {
               "D": 5,
               "E": 7,
               "N": 4,
@@ -1423,7 +1423,7 @@
               "preference_rate": null,
               "deviation": -0.13
             },
-            "n12": {
+            "e12": {
               "D": 9,
               "E": 6,
               "N": 4,
@@ -1433,7 +1433,7 @@
               "preference_rate": null,
               "deviation": 2.87
             },
-            "n13": {
+            "e13": {
               "D": 5,
               "E": 11,
               "N": 4,
@@ -1443,7 +1443,7 @@
               "preference_rate": null,
               "deviation": 3.87
             },
-            "n14": {
+            "e14": {
               "D": 0,
               "E": 0,
               "N": 5,
@@ -1453,7 +1453,7 @@
               "preference_rate": null,
               "deviation": -11.13
             },
-            "n15": {
+            "e15": {
               "D": 0,
               "E": 0,
               "N": 5,
@@ -1474,7 +1474,7 @@
           {
             "confirmed_at": "2026-09-30T09:00:00.000Z",
             "assignments": {
-              "n01": [
+              "e01": [
                 "E",
                 "E",
                 "E",
@@ -1507,7 +1507,7 @@
                 "O",
                 "D"
               ],
-              "n02": [
+              "e02": [
                 "D",
                 "O",
                 "O",
@@ -1540,7 +1540,7 @@
                 "E",
                 "E"
               ],
-              "n03": [
+              "e03": [
                 "O",
                 "O",
                 "O",
@@ -1573,7 +1573,7 @@
                 "O",
                 "E"
               ],
-              "n04": [
+              "e04": [
                 "O",
                 "E",
                 "D",
@@ -1606,7 +1606,7 @@
                 "D",
                 "O"
               ],
-              "n05": [
+              "e05": [
                 "E",
                 "D",
                 "O",
@@ -1639,7 +1639,7 @@
                 "O",
                 "O"
               ],
-              "n06": [
+              "e06": [
                 "D",
                 "D",
                 "O",
@@ -1672,7 +1672,7 @@
                 "D",
                 "O"
               ],
-              "n07": [
+              "e07": [
                 "O",
                 "N",
                 "N",
@@ -1705,7 +1705,7 @@
                 "O",
                 "O"
               ],
-              "n08": [
+              "e08": [
                 "N",
                 "O",
                 "E",
@@ -1738,7 +1738,7 @@
                 "D",
                 "O"
               ],
-              "n09": [
+              "e09": [
                 "O",
                 "O",
                 "N",
@@ -1771,7 +1771,7 @@
                 "E",
                 "D"
               ],
-              "n10": [
+              "e10": [
                 "N",
                 "O",
                 "D",
@@ -1804,7 +1804,7 @@
                 "E",
                 "D"
               ],
-              "n11": [
+              "e11": [
                 "E",
                 "N",
                 "O",
@@ -1837,7 +1837,7 @@
                 "N",
                 "O"
               ],
-              "n12": [
+              "e12": [
                 "O",
                 "D",
                 "D",
@@ -1870,7 +1870,7 @@
                 "O",
                 "N"
               ],
-              "n13": [
+              "e13": [
                 "D",
                 "E",
                 "O",
@@ -1903,7 +1903,7 @@
                 "N",
                 "O"
               ],
-              "n14": [
+              "e14": [
                 "O",
                 "O",
                 "O",
@@ -1936,7 +1936,7 @@
                 "O",
                 "O"
               ],
-              "n15": [
+              "e15": [
                 "O",
                 "O",
                 "O",
@@ -1974,100 +1974,100 @@
           }
         ],
         "snapshot": {
-          "nurses": [
+          "employees": [
             {
-              "id": "n01",
+              "id": "e01",
               "name": "이영희",
               "years": 12,
               "active": true,
               "tags": []
             },
             {
-              "id": "n02",
+              "id": "e02",
               "name": "박민수",
               "years": 9,
               "active": true,
               "tags": []
             },
             {
-              "id": "n03",
+              "id": "e03",
               "name": "김철수",
               "years": 7,
               "active": true,
               "tags": []
             },
             {
-              "id": "n04",
+              "id": "e04",
               "name": "정유진",
               "years": 5,
               "active": true,
               "tags": []
             },
             {
-              "id": "n05",
+              "id": "e05",
               "name": "최지훈",
               "years": 3,
               "active": true,
               "tags": []
             },
             {
-              "id": "n06",
+              "id": "e06",
               "name": "강서연",
               "years": 15,
               "active": true,
               "tags": []
             },
             {
-              "id": "n07",
+              "id": "e07",
               "name": "윤지민",
               "years": 10,
               "active": true,
               "tags": []
             },
             {
-              "id": "n08",
+              "id": "e08",
               "name": "임하늘",
               "years": 8,
               "active": true,
               "tags": []
             },
             {
-              "id": "n09",
+              "id": "e09",
               "name": "한소율",
               "years": 6,
               "active": true,
               "tags": []
             },
             {
-              "id": "n10",
+              "id": "e10",
               "name": "오민준",
               "years": 4,
               "active": true,
               "tags": []
             },
             {
-              "id": "n11",
+              "id": "e11",
               "name": "서예린",
               "years": 2,
               "active": true,
               "tags": []
             },
             {
-              "id": "n12",
+              "id": "e12",
               "name": "신도윤",
               "years": 1,
               "active": true,
               "tags": []
             },
             {
-              "id": "n13",
+              "id": "e13",
               "name": "조은비",
               "years": 2,
               "active": true,
               "tags": []
             },
             {
-              "id": "n14",
+              "id": "e14",
               "name": "문가람",
               "years": 11,
               "active": true,
@@ -2076,7 +2076,7 @@
               ]
             },
             {
-              "id": "n15",
+              "id": "e15",
               "name": "배수아",
               "years": 4,
               "active": true,
@@ -2089,7 +2089,7 @@
             {
               "id": "cov-weekday-D",
               "type": "rule",
-              "scope": "ward",
+              "scope": "shop",
               "hardness": "hard",
               "priority": "normal",
               "weight": 10,
@@ -2160,7 +2160,7 @@
             {
               "id": "cov-weekday-E",
               "type": "rule",
-              "scope": "ward",
+              "scope": "shop",
               "hardness": "hard",
               "priority": "normal",
               "weight": 10,
@@ -2206,7 +2206,7 @@
             {
               "id": "cov-weekday-N",
               "type": "rule",
-              "scope": "ward",
+              "scope": "shop",
               "hardness": "hard",
               "priority": "normal",
               "weight": 10,
@@ -2252,7 +2252,7 @@
             {
               "id": "cov-weekend-D",
               "type": "rule",
-              "scope": "ward",
+              "scope": "shop",
               "hardness": "hard",
               "priority": "normal",
               "weight": 10,
@@ -2298,7 +2298,7 @@
             {
               "id": "cov-weekend-E",
               "type": "rule",
-              "scope": "ward",
+              "scope": "shop",
               "hardness": "hard",
               "priority": "normal",
               "weight": 10,
@@ -2344,7 +2344,7 @@
             {
               "id": "cov-weekend-N",
               "type": "rule",
-              "scope": "ward",
+              "scope": "shop",
               "hardness": "hard",
               "priority": "normal",
               "weight": 10,
@@ -2390,7 +2390,7 @@
             {
               "id": "rule-noff",
               "type": "rule",
-              "scope": "ward",
+              "scope": "shop",
               "hardness": "hard",
               "priority": "normal",
               "weight": 10,
@@ -2475,7 +2475,7 @@
             {
               "id": "rule-max-work",
               "type": "rule",
-              "scope": "ward",
+              "scope": "shop",
               "hardness": "hard",
               "priority": "normal",
               "weight": 10,
@@ -2522,7 +2522,7 @@
             {
               "id": "rule-max-nights",
               "type": "rule",
-              "scope": "ward",
+              "scope": "shop",
               "hardness": "hard",
               "priority": "normal",
               "weight": 10,
@@ -2569,7 +2569,7 @@
             {
               "id": "rule-min-off",
               "type": "rule",
-              "scope": "ward",
+              "scope": "shop",
               "hardness": "hard",
               "priority": "normal",
               "weight": 10,
@@ -2615,7 +2615,7 @@
             {
               "id": "rule-night-fair",
               "type": "rule",
-              "scope": "ward",
+              "scope": "shop",
               "hardness": "soft",
               "priority": "low",
               "weight": 5,
@@ -2653,7 +2653,7 @@
             {
               "id": "rule-weekend-fair",
               "type": "rule",
-              "scope": "ward",
+              "scope": "shop",
               "hardness": "soft",
               "priority": "low",
               "weight": 5,
@@ -2696,7 +2696,7 @@
         "holidays": [],
         "requests": [
           {
-            "id": "req-leave-n01",
+            "id": "req-leave-e01",
             "type": "rule",
             "scope": "period",
             "hardness": "hard",
@@ -2717,7 +2717,7 @@
                 "per": "person",
                 "people": {
                   "ids": [
-                    "n01"
+                    "e01"
                   ],
                   "exclude_tags": []
                 },
@@ -2750,7 +2750,7 @@
             }
           },
           {
-            "id": "req-avoid-n02",
+            "id": "req-avoid-e02",
             "type": "rule",
             "scope": "period",
             "hardness": "soft",
@@ -2771,7 +2771,7 @@
                 "per": "person",
                 "people": {
                   "ids": [
-                    "n02"
+                    "e02"
                   ],
                   "exclude_tags": []
                 },
@@ -2799,7 +2799,7 @@
             }
           },
           {
-            "id": "req-prefer-n04",
+            "id": "req-prefer-e04",
             "type": "rule",
             "scope": "period",
             "hardness": "soft",
@@ -2820,7 +2820,7 @@
                 "per": "person",
                 "people": {
                   "ids": [
-                    "n04"
+                    "e04"
                   ],
                   "exclude_tags": []
                 },

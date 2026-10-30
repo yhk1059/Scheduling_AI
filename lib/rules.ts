@@ -1,8 +1,8 @@
 // 식 규칙 상수, 기본값 채우기, 블록 모양 되읽기. 순수 함수.
-import type { Cmp, ConstraintSpec, Count, Days, People, Rule, Shifts, ValueRef, WardConfig } from "./types.gen";
+import type { Cmp, ConstraintSpec, Count, Days, People, Rule, Shifts, ValueRef, ShopConfig } from "./types.gen";
 
 /** 저장 문서 버전. 6 = 식 규칙(ADR-019) */
-export const STORAGE_VERSION = 6;
+export const STORAGE_VERSION = 1;
 export const COVERAGE_RULE_PREFIX = "cov-";
 export const OFF_CODE = "O";
 /** 중요도 → 가중치. backend/domain/constants.py PRIORITY_WEIGHTS */
@@ -11,7 +11,7 @@ export type Priority = keyof typeof PRIORITY_WEIGHTS;
 const DEFAULT_WEIGHT = PRIORITY_WEIGHTS.normal;
 
 /** 기본 근무 형태: D/E/N 8시간 + O(backend/domain/constants.py DEFAULT_SHIFTS). */
-export const DEFAULT_CONFIG: WardConfig = {
+export const DEFAULT_CONFIG: ShopConfig = {
   shifts: [
     { code: "D", name: "데이", hours: 8 },
     { code: "E", name: "이브닝", hours: 8 },

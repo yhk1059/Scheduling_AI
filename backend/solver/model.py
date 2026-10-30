@@ -43,31 +43,31 @@ class ModelContext:
     def is_weekend(self, day: int) -> bool:
         return stats.is_weekend(self.request, day)
 
-    def carry_len(self, nurse_id: str) -> int:
-        return len(self._carry().get(nurse_id, []))
+    def carry_len(self, employee_id: str) -> int:
+        return len(self._carry().get(employee_id, []))
 
-    def cell(self, nurse_id: str, day: int, shift: str) -> Cell:
+    def cell(self, employee_id: str, day: int, shift: str) -> Cell:
         """day >= 1이면 변수, day <= 0이면 이월 상수(0이 전월 말일), 이월이 없는 날이면 None."""
         if day >= 1:
-            return self.x[nurse_id, day, shift]
-        carry = self._carry().get(nurse_id, [])
+            return self.x[employee_id, day, shift]
+        carry = self._carry().get(employee_id, [])
         idx = len(carry) - 1 + day
         return carry[idx] == shift if idx >= 0 else None
 
     def _carry(self) -> dict[str, list[str]]:
-        return {r.nurse_id: r.shifts for r in self.request.carry_over}
+        return {r.employee_id: r.shifts for r in self.request.carry_over}
 
-    def _carry_code(self, nurse_id: str, day: int) -> str | None:
-        carry = self._carry().get(nurse_id, [])
+    def _carry_code(self, employee_id: str, day: int) -> str | None:
+        carry = self._carry().get(employee_id, [])
         idx = len(carry) - 1 + day
         return carry[idx] if idx >= 0 else None
 
-    def value(self, nurse_id: str, day: int, sel: Shifts, measure: str):
+    def value(self, employee_id: str, day: int, sel: Shifts, measure: str):
         """칸 하나의 값(개수 또는 분): 변수 합, 이월이면 상수, 이월이 없는 날이면 None."""
         config = self.request.config
         if day >= 1:
-            return sum(k * self.x[nurse_id, day, c] for c, k in self._weights(sel, measure))
-        code = self._carry_code(nurse_id, day)
+            return sum(k * self.x[employee_id, day, c] for c, k in self._weights(sel, measure))
+        code = self._carry_code(employee_id, day)
         return None if code is None else select.value(config, code, sel, measure)
 
     def _weights(self, sel: Shifts, measure: str) -> list[tuple[str, int]]:
@@ -87,18 +87,18 @@ class ModelContext:
             self._weight_cache[key] = select.max_cell_value(self.request.config, sel, measure)
         return self._weight_cache[key]
 
-    def match(self, nurse_id: str, day: int, sel: Shifts):
+    def match(self, employee_id: str, day: int, sel: Shifts):
         """칸이 셀렉터에 맞으면 1: 맞는 코드 변수의 합(하루 하나라 0/1), 이월이면 상수."""
-        return self.value(nurse_id, day, sel, "count")
+        return self.value(employee_id, day, sel, "count")
 
-    def minutes(self, nurse_id: str, day: int, sel: Shifts):
+    def minutes(self, employee_id: str, day: int, sel: Shifts):
         """칸이 셀렉터에 맞으면 그 코드의 근무 시간(분)."""
-        return self.value(nurse_id, day, sel, "hours")
+        return self.value(employee_id, day, sel, "hours")
 
-    def literal(self, nurse_id: str, day: int, sel: Shifts) -> Cell:
+    def literal(self, employee_id: str, day: int, sel: Shifts) -> Cell:
         """match를 리터럴로(절에 쓴다). 코드 하나면 그 변수, 나머지가 하나면 그 부정, 그 밖은 보조 변수."""
         if day < 1:
-            m = self.match(nurse_id, day, sel)
+            m = self.match(employee_id, day, sel)
             return None if m is None else bool(m)
         config = self.request.config
         hit = [c for c in self.codes if select.matches(config, c, sel)]
@@ -108,13 +108,13 @@ class ModelContext:
         if not miss:
             return True
         if len(hit) == 1:
-            return self.x[nurse_id, day, hit[0]]
+            return self.x[employee_id, day, hit[0]]
         if len(miss) == 1:
-            return self.x[nurse_id, day, miss[0]].Not()
-        key = (nurse_id, day, tuple(hit))
+            return self.x[employee_id, day, miss[0]].Not()
+        key = (employee_id, day, tuple(hit))
         if key not in self._literals:
             b = self.model.new_bool_var("")
-            self.model.add(b == sum(self.x[nurse_id, day, c] for c in hit))
+            self.model.add(b == sum(self.x[employee_id, day, c] for c in hit))
             self._literals[key] = b
         return self._literals[key]
 
@@ -129,13 +129,13 @@ def build_model(request: ScheduleRequest) -> ModelContext:
     codes = active_codes(request)
     x = {
         (n.id, d, s): model.new_bool_var(f"x_{n.id}_{d}_{s}")
-        for n in request.nurses
+        for n in request.employees
         for d in range(1, days + 1)
         for s in codes
     }
     ctx = ModelContext(model=model, request=request, x=x)
 
-    for n in request.nurses:
+    for n in request.employees:
         for d in range(1, days + 1):
             model.add_exactly_one(x[n.id, d, s] for s in codes)
 
@@ -180,7 +180,7 @@ def solve(
                 next(s for s in ctx.codes if solver.boolean_value(ctx.x[n.id, d, s]))
                 for d in range(1, ctx.days + 1)
             ]
-            for n in request.nurses
+            for n in request.employees
         }
         result = stats.compute_result(request, assignments, optimal=status == cp_model.OPTIMAL)
         return SolveOk(status="ok", input_version=version, result=result)

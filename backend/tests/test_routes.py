@@ -11,14 +11,14 @@ from backend.domain.constants import (
     EXAMPLES_PER_RULE,
     MAX_CONSTRAINTS,
     MAX_FIXED_ASSIGNMENTS,
-    MAX_NURSES,
+    MAX_EMPLOYEES,
     MAX_OFFSET,
     MAX_OFFSET_SPAN,
     MAX_PROPOSALS,
     MAX_RULE_CMPS,
     MAX_RULE_VALUES,
     MAX_SHIFT_CODES,
-    MAX_TAGS_PER_NURSE,
+    MAX_TAGS_PER_EMPLOYEE,
     MAX_TEXT_CHARS,
     MAX_WINDOW_DAYS,
     MIN_OFFSET,
@@ -69,15 +69,15 @@ def fixed(cid: str, nid: str, day: int, shift: str) -> dict:
         "id": cid,
         "scope": "period",
         "type": "fixed_assignment",
-        "params": {"nurse_id": nid, "day": day, "shift": shift},
+        "params": {"employee_id": nid, "day": day, "shift": shift},
         "source_text": f"{cid} 원문",
     }
 
 
 def infeasible_request() -> dict:
-    """n01을 5일에 D와 N으로 동시에 고정 → 해 없음."""
+    """e01을 5일에 D와 N으로 동시에 고정 → 해 없음."""
     data = sample()
-    data["constraints"] += [fixed("f1", "n01", 5, "D"), fixed("f2", "n01", 5, "N")]
+    data["constraints"] += [fixed("f1", "e01", 5, "D"), fixed("f2", "e01", 5, "N")]
     return data
 
 
@@ -86,7 +86,7 @@ def translate_body(text: str = "이영희 15~17일 휴가") -> dict:
     return {
         "text": text,
         "scope": "period",
-        "context": {"nurses": data["nurses"], "period": data["period"], "holidays": [5], "today": "2026-10-26"},
+        "context": {"employees": data["employees"], "period": data["period"], "holidays": [5], "today": "2026-10-26"},
         "input_version": 9,
     }
 
@@ -139,7 +139,7 @@ def test_solve_ok_returns_input_version():
     assert len(body["result"]["assignments"]) == 15
 
 
-HISTORY = history("2026-11-01", {"n03": ["N"] * 8})
+HISTORY = history("2026-11-01", {"e03": ["N"] * 8})
 
 
 def test_solve_passes_history(monkeypatch):
@@ -148,16 +148,16 @@ def test_solve_passes_history(monkeypatch):
     data = sample()
     data["history"] = HISTORY
     assert client.post("/api/py/solve", json=data).status_code == 200
-    assert seen[0].rows["n03"].count("N") == 8
+    assert seen[0].rows["e03"].count("N") == 8
 
 
-OLD_LEAVE = {"id": "lv", "type": "leave", "scope": "period", "source_text": "x", "params": {"nurse_id": "n01", "days": [3]}}
+OLD_LEAVE = {"id": "lv", "type": "leave", "scope": "period", "source_text": "x", "params": {"employee_id": "e01", "days": [3]}}
 
 
 @pytest.mark.parametrize(
     "make_old",
     [
-        lambda d: d.update(history_load=[{"nurse_id": "n03", "nights": 8, "weekends": 2}]),
+        lambda d: d.update(history_load=[{"employee_id": "e03", "nights": 8, "weekends": 2}]),
         lambda d: d["constraints"].append(OLD_LEAVE),
     ],
     ids=["history_load", "template"],
@@ -170,7 +170,7 @@ def test_solve_rejects_old_format(make_old):
 
 def test_solve_result_stats_use_counts():
     body = client.post("/api/py/solve", json=sample()).json()
-    stats = body["result"]["stats"]["n01"]
+    stats = body["result"]["stats"]["e01"]
     assert set(stats["counts"]) == {"D", "E", "N", "O"} and "D" not in stats
     assert stats["hours"] == 8 * (30 - stats["counts"]["O"])
 
@@ -191,10 +191,10 @@ LEAVE_DRAFT = {
     "values": {"max": {"value": 0, "label": "최대 횟수"}},
     "body": {
         "kind": "require",
-        "for_each": {"per": "person", "people": {"ids": ["n01"]}, "days": {"days": [15, 16, 17]}},
+        "for_each": {"per": "person", "people": {"ids": ["e01"]}, "days": {"days": [15, 16, 17]}},
         "then": {"left": {"shifts": {"not_in": ["O"]}}, "op": "le", "right": {"value": "max"}},
     },
-    "source_text": "n01 15~17일 휴가",
+    "source_text": "e01 15~17일 휴가",
     "hardness": "hard",
 }
 
@@ -211,7 +211,7 @@ def test_translate_ok(llm):
     assert rule["type"] == "rule" and rule["hardness"] == "hard" and rule["scope"] == "period"
     assert rule["default"] is False and rule["values"] == {"max": {"value": 0.0, "label": "최대 횟수"}}
     assert rule["body"]["then"]["left"]["shifts"] == {"in": None, "not_in": ["O"]}
-    assert rule["body"]["for_each"]["people"]["ids"] == ["n01"]
+    assert rule["body"]["for_each"]["people"]["ids"] == ["e01"]
     assert rule["source_text"] == "이영희 15~17일 휴가"
 
 
@@ -220,8 +220,8 @@ def test_translate_conditional_rule(llm):
         "body": {
             "kind": "require",
             "for_each": {"per": "day"},
-            "when": {"left": {"who": {"ids": ["n01"]}, "shifts": {"in": ["N"]}}, "op": "ge", "right": 1},
-            "then": {"left": {"who": {"ids": ["n02"]}, "shifts": {"in": ["N"]}}, "op": "le", "right": 1},
+            "when": {"left": {"who": {"ids": ["e01"]}, "shifts": {"in": ["N"]}}, "op": "ge", "right": 1},
+            "then": {"left": {"who": {"ids": ["e02"]}, "shifts": {"in": ["N"]}}, "op": "le", "right": 1},
         },
         "source_text": "이영희가 나이트면 박민수는 1번까지",
     }
@@ -252,9 +252,9 @@ PAIR_DRAFT = {
     "body": {
         "kind": "require",
         "for_each": {"per": "day"},
-        "then": {"left": {"who": {"ids": ["n01", "n02"]}, "shifts": {"in": ["N"]}}, "op": "le", "right": 1},
+        "then": {"left": {"who": {"ids": ["e01", "e02"]}, "shifts": {"in": ["N"]}}, "op": "le", "right": 1},
     },
-    "source_text": "n01와 n02는 같은 날 나이트 금지",
+    "source_text": "e01와 e02는 같은 날 나이트 금지",
 }
 
 
@@ -266,10 +266,10 @@ def test_translate_examples_keyed_by_rule_id(llm):
     leave, pair = (body["examples"][i] for i in ids)
     assert 1 <= len(leave) <= EXAMPLES_PER_RULE and 1 <= len(pair) <= EXAMPLES_PER_RULE
     ex = leave[0]
-    assert set(ex) == {"nurse_ids", "days", "cells", "marks", "detail"}
-    assert ex["nurse_ids"] == ["n01"] and {15, 16, 17} <= set(ex["days"])
-    assert all(nid == "n01" and d in (15, 16, 17) for nid, d in ex["marks"])
-    names = [n["name"] for n in sample()["nurses"]]
+    assert set(ex) == {"employee_ids", "days", "cells", "marks", "detail"}
+    assert ex["employee_ids"] == ["e01"] and {15, 16, 17} <= set(ex["days"])
+    assert all(nid == "e01" and d in (15, 16, 17) for nid, d in ex["marks"])
+    names = [n["name"] for n in sample()["employees"]]
     assert not any(name in e["detail"] for e in leave + pair for name in names)
 
 
@@ -305,7 +305,7 @@ def test_translate_examples_time_budget(llm, monkeypatch):
 
 
 def test_translate_clarify(llm):
-    llm.responses = [ok({"clarification_question": "n01 휴가는 며칠인가요?"})]
+    llm.responses = [ok({"clarification_question": "e01 휴가는 며칠인가요?"})]
     r = client.post("/api/py/translate", json=translate_body("이영희 휴가"))
     assert r.json() == {"status": "clarify", "input_version": 9, "question": "이영희 휴가는 며칠인가요?"}
 
@@ -341,7 +341,7 @@ BAD = {
 
 
 def test_explain_returns_only_verified_proposals(llm):
-    llm.responses = [ok({"text": "n01이 5일에 두 근무로 고정되어 있습니다.", "proposals": [BAD, GOOD]})]
+    llm.responses = [ok({"text": "e01이 5일에 두 근무로 고정되어 있습니다.", "proposals": [BAD, GOOD]})]
     r = client.post("/api/py/explain", json=explain_body())
     assert r.status_code == 200
     body = r.json()
@@ -355,14 +355,14 @@ def test_explain_returns_only_verified_proposals(llm):
 def rule_explain_body() -> dict:
     """하루 데이 인원 규칙(값 min)이 명단보다 많아 휴가와 부딪친다 → 해 없음."""
     req = sample()
-    nurse_ids = [n["id"] for n in req["nurses"]]
+    employee_ids = [n["id"] for n in req["employees"]]
     req["constraints"] = [
         {
             "id": "cov",
-            "scope": "ward",
+            "scope": "shop",
             "type": "rule",
             "default": True,
-            "values": {"min": {"value": len(nurse_ids) - 1, "label": "최소 인원"}},
+            "values": {"min": {"value": len(employee_ids) - 1, "label": "최소 인원"}},
             "body": {"kind": "require", "for_each": {"per": "day"}, "then": {"left": {"shifts": {"in": ["D"]}}, "op": "ge", "right": {"value": "min"}}},
             "source_text": "데이 많이",
         },
@@ -373,7 +373,7 @@ def rule_explain_body() -> dict:
             "values": {"max": {"value": 0, "label": "최대 횟수"}},
             "body": {
                 "kind": "require",
-                "for_each": {"per": "person", "people": {"ids": nurse_ids[:2]}, "days": {"days": [3]}},
+                "for_each": {"per": "person", "people": {"ids": employee_ids[:2]}, "days": {"days": [3]}},
                 "then": {"left": {"shifts": {"not_in": ["O"]}}, "op": "le", "right": {"value": "max"}},
             },
             "source_text": "3일 휴가 둘",
@@ -391,7 +391,7 @@ def rule_explain_body() -> dict:
 def test_explain_rule_set_value_verified_by_resolve(llm):
     body = rule_explain_body()
     assert client.post("/api/py/solve", json=body["request"]).json()["status"] == "infeasible"
-    n = len(body["request"]["nurses"])
+    n = len(body["request"]["employees"])
 
     def change(title: str, *changes: dict) -> dict:
         return {"title": title, "description": title, "changes": list(changes)}
@@ -423,7 +423,7 @@ def test_apply_set_value_and_set_hardness():
     cov, lv = out.constraints
     assert cov.values["min"].value == 2 and cov.values["min"].label == "최소 인원" and cov.default is True
     assert lv.hardness == "soft" and lv.values["max"].value == 0
-    assert req.constraints[0].values["min"].value == len(req.nurses) - 1  # 원본은 그대로
+    assert req.constraints[0].values["min"].value == len(req.employees) - 1  # 원본은 그대로
 
 
 def test_apply_set_value_max_run_moves_window():
@@ -504,9 +504,9 @@ def test_explain_stops_when_verify_budget_exhausted(llm, monkeypatch):
 # --- 오류 ---
 
 
-def test_413_too_many_nurses():
+def test_413_too_many_employees():
     data = sample()
-    data["nurses"] = [{"id": f"x{i}", "name": f"이름{i}"} for i in range(MAX_NURSES + 1)]
+    data["employees"] = [{"id": f"x{i}", "name": f"이름{i}"} for i in range(MAX_EMPLOYEES + 1)]
     data["constraints"] = []
     assert_error(client.post("/api/py/solve", json=data), 413, "PAYLOAD_TOO_LARGE")
 
@@ -573,20 +573,20 @@ def test_413_too_many_shift_codes_in_translate_context(llm):
     assert llm.calls == []
 
 
-def test_413_too_many_tags_per_nurse():
+def test_413_too_many_tags_per_employee():
     data = sample()
-    data["nurses"][0]["tags"] = [f"t{i}" for i in range(MAX_TAGS_PER_NURSE + 1)]
+    data["employees"][0]["tags"] = [f"t{i}" for i in range(MAX_TAGS_PER_EMPLOYEE + 1)]
     assert_error(client.post("/api/py/solve", json=data), 413, "PAYLOAD_TOO_LARGE")
 
 
 def test_solve_accepts_tags_at_limit():
     data = sample()
-    data["nurses"][0]["tags"] = [f"t{i}" for i in range(MAX_TAGS_PER_NURSE)]
+    data["employees"][0]["tags"] = [f"t{i}" for i in range(MAX_TAGS_PER_EMPLOYEE)]
     assert client.post("/api/py/solve", json=data).status_code == 200
 
 
 def block(type_: str, params: dict) -> dict:
-    return {"id": "b1", "type": type_, "scope": "ward", "hardness": "hard", "source_text": "원문", "params": params}
+    return {"id": "b1", "type": type_, "scope": "shop", "hardness": "hard", "source_text": "원문", "params": params}
 
 
 N_SEL, D_SEL = {"in": ["N"]}, {"in": ["D"]}
@@ -616,7 +616,7 @@ def test_block_types_are_422(spec, endpoint):
 
 
 def rule(body: dict, values: dict | None = None, rid: str = "r1") -> dict:
-    return {"id": rid, "type": "rule", "scope": "ward", "hardness": "hard", "source_text": "원문", "values": values or {}, "body": body}
+    return {"id": rid, "type": "rule", "scope": "shop", "hardness": "hard", "source_text": "원문", "values": values or {}, "body": body}
 
 
 def off_count(offset: tuple[int, int] | None = None) -> dict:
@@ -710,14 +710,14 @@ def test_constraint_cap_counts_rules():
 
 def test_422_pydantic_error_has_field_path():
     data = sample()
-    data["nurses"][0]["name"] = ""
+    data["employees"][0]["name"] = ""
     err = assert_error(client.post("/api/py/solve", json=data), 422, "VALIDATION_ERROR")
-    assert "nurses.0.name" in err["message"]
+    assert "employees.0.name" in err["message"]
 
 
 def test_422_referential_integrity_has_constraint_id():
     data = sample()
-    data["constraints"].append(fixed("ghost", "n99", 3, "D"))
+    data["constraints"].append(fixed("ghost", "e99", 3, "D"))
     err = assert_error(client.post("/api/py/solve", json=data), 422, "VALIDATION_ERROR")
     assert "ghost" in err["message"]
 
@@ -767,7 +767,7 @@ def test_500_internal_hides_stack(monkeypatch, capsys):
 def test_log_line_for_llm_request_without_raw_text(llm, capsys):
     for_each = {**LEAVE_DRAFT["body"]["for_each"], "days": {"days": [40]}}
     bad = ok({"rules": [{**LEAVE_DRAFT, "body": {**LEAVE_DRAFT["body"], "for_each": for_each}, "source_text": "x"}]})
-    good = ok({"rules": [{**LEAVE_DRAFT, "source_text": "n01 15일 휴가"}]})
+    good = ok({"rules": [{**LEAVE_DRAFT, "source_text": "e01 15일 휴가"}]})
     llm.responses = [bad, good]
     capsys.readouterr()
     client.post("/api/py/translate", json=translate_body("이영희 15일 휴가 비밀메모"))

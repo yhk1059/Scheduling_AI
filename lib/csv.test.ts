@@ -2,23 +2,23 @@ import { describe, expect, it } from "vitest";
 
 import { toScheduleCsv } from "./csv";
 import { DEFAULT_CONFIG } from "./rules";
-import type { Nurse, WardConfig } from "./types.gen";
+import type { Employee, ShopConfig } from "./types.gen";
 
 type Code = string;
 const config = DEFAULT_CONFIG;
 
-const nurses: Nurse[] = [
-  { id: "n01", name: "이영희" },
-  { id: "n02", name: "박민수" },
+const employees: Employee[] = [
+  { id: "e01", name: "이영희" },
+  { id: "e02", name: "박민수" },
 ];
 
 /** 2026-02: 28일, 1일이 일요일. */
-function feb(over: { nurses?: Nurse[]; holidays?: number[] } = {}) {
+function feb(over: { employees?: Employee[]; holidays?: number[] } = {}) {
   const a: Code[] = Array.from({ length: 28 }, (_, i) => (["D", "E", "N", "O"] as const)[i % 4]);
   const b: Code[] = Array.from({ length: 28 }, () => "D");
-  const list = over.nurses ?? nurses;
+  const list = over.employees ?? employees;
   return {
-    nurses: list,
+    employees: list,
     period: { start_date: "2026-02-01", length: 28 },
     holidays: over.holidays ?? [],
     assignments: { [list[0].id]: a, [list[1].id]: b },
@@ -74,18 +74,18 @@ describe("toScheduleCsv", () => {
   it("31일 달은 31개 날짜 열을 만든다", () => {
     const row: Code[] = Array.from({ length: 31 }, () => "O");
     const csv = toScheduleCsv({
-      nurses: [nurses[0]],
+      employees: [employees[0]],
       period: { start_date: "2026-12-01", length: 31 },
       holidays: [25],
-      assignments: { n01: row },
+      assignments: { e01: row },
       config,
     });
-    const [head, dates, nurse] = rows(csv);
+    const [head, dates, employee] = rows(csv);
     expect(head).toHaveLength(1 + 31 + 5);
     expect(head[1]).toBe("화"); // 2026-12-01은 화요일
     expect(head[1 + 24]).toBe("금(공휴일)");
     expect(dates[1 + 30]).toBe("31");
-    expect(nurse.slice(1, 32)).toEqual(row);
+    expect(employee.slice(1, 32)).toEqual(row);
   });
 
   it("합계 열은 활성 코드, 하단 합계는 근무조별이고 복합 코드는 세는 근무조마다 더한다", () => {
@@ -95,12 +95,12 @@ describe("toScheduleCsv", () => {
         { code: "M", name: "미드", hours: 8, active: false },
         { code: "DE", name: "더블", hours: 16, parts: ["D", "E"] },
       ],
-    } as WardConfig;
+    } as ShopConfig;
     const csv = toScheduleCsv({
-      nurses,
+      employees,
       period: { start_date: "2026-11-02", length: 3 },
       holidays: [],
-      assignments: { n01: ["DE", "D", "M"], n02: ["E", "O", "DE"] },
+      assignments: { e01: ["DE", "D", "M"], e02: ["E", "O", "DE"] },
       config: withDouble,
     });
     const r = rows(csv);
@@ -116,10 +116,10 @@ describe("toScheduleCsv", () => {
   it("월을 넘는 기간은 날짜 행에 실제 일(日)을 쓰고 요일도 날짜마다 계산한다", () => {
     const row: Code[] = Array.from({ length: 14 }, () => "O");
     const csv = toScheduleCsv({
-      nurses: [nurses[0]],
+      employees: [employees[0]],
       period: { start_date: "2026-11-23", length: 14 },
       holidays: [],
-      assignments: { n01: row },
+      assignments: { e01: row },
       config,
     });
     const [head, dates] = rows(csv);
@@ -130,9 +130,9 @@ describe("toScheduleCsv", () => {
   it("쉼표·따옴표·줄바꿈이 있는 셀은 RFC 4180으로 이스케이프한다", () => {
     const csv = toScheduleCsv(
       feb({
-        nurses: [
-          { id: "n01", name: '김"별"' },
-          { id: "n02", name: "이,영\n희" },
+        employees: [
+          { id: "e01", name: '김"별"' },
+          { id: "e02", name: "이,영\n희" },
         ],
       }),
     );
@@ -143,15 +143,15 @@ describe("toScheduleCsv", () => {
   it("= + - @로 시작하는 셀은 앞에 '를 붙인다", () => {
     const csv = toScheduleCsv(
       feb({
-        nurses: [
-          { id: "n01", name: "=HYPERLINK(1)" },
-          { id: "n02", name: "@SUM" },
+        employees: [
+          { id: "e01", name: "=HYPERLINK(1)" },
+          { id: "e02", name: "@SUM" },
         ],
       }),
     );
     expect(csv).toContain("\r\n'=HYPERLINK(1),D,");
     expect(csv).toContain("\r\n'@SUM,D,");
-    expect(toScheduleCsv(feb({ nurses: [{ id: "n01", name: "+a" }, { id: "n02", name: "-b,c" }] })))
+    expect(toScheduleCsv(feb({ employees: [{ id: "e01", name: "+a" }, { id: "e02", name: "-b,c" }] })))
       .toMatch(/\r\n'\+a,D,[\s\S]*\r\n"'-b,c",D,/);
   });
 });

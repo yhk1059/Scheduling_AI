@@ -35,79 +35,79 @@
       }
     ]
   },
-  "nurses": [
+  "employees": [
     {
-      "id": "n01",
+      "id": "e01",
       "name": "이영희",
       "tags": []
     },
     {
-      "id": "n02",
+      "id": "e02",
       "name": "박민수",
       "tags": []
     },
     {
-      "id": "n03",
+      "id": "e03",
       "name": "김철수",
       "tags": []
     },
     {
-      "id": "n04",
+      "id": "e04",
       "name": "정유진",
       "tags": []
     },
     {
-      "id": "n05",
+      "id": "e05",
       "name": "최지훈",
       "tags": []
     },
     {
-      "id": "n06",
+      "id": "e06",
       "name": "강서연",
       "tags": []
     },
     {
-      "id": "n07",
+      "id": "e07",
       "name": "윤지민",
       "tags": []
     },
     {
-      "id": "n08",
+      "id": "e08",
       "name": "임하늘",
       "tags": []
     },
     {
-      "id": "n09",
+      "id": "e09",
       "name": "한소율",
       "tags": []
     },
     {
-      "id": "n10",
+      "id": "e10",
       "name": "오민준",
       "tags": []
     },
     {
-      "id": "n11",
+      "id": "e11",
       "name": "서예린",
       "tags": []
     },
     {
-      "id": "n12",
+      "id": "e12",
       "name": "신도윤",
       "tags": []
     },
     {
-      "id": "n13",
+      "id": "e13",
       "name": "조은비",
       "tags": []
     },
     {
-      "id": "n14",
+      "id": "e14",
       "name": "문가람",
       "tags": []
     },
     {
-      "id": "n15",
+      "id": "e15",
       "name": "배수아",
       "tags": []
     }
@@ -120,7 +120,7 @@
   "constraints": [
     {
       "id": "cov-weekday-D",
-      "scope": "ward",
+      "scope": "shop",
       "hardness": "hard",
       "weight": 10,
       "source_text": "평일 데이 3명",
@@ -177,7 +177,7 @@
     },
     {
       "id": "cov-weekday-E",
-      "scope": "ward",
+      "scope": "shop",
       "hardness": "hard",
       "weight": 10,
       "source_text": "평일 이브닝 3명",
@@ -234,7 +234,7 @@
     },
     {
       "id": "cov-weekday-N",
-      "scope": "ward",
+      "scope": "shop",
       "hardness": "hard",
       "weight": 10,
       "source_text": "평일 나이트 2명",
@@ -291,7 +291,7 @@
     },
     {
       "id": "cov-weekend-D",
-      "scope": "ward",
+      "scope": "shop",
       "hardness": "hard",
       "weight": 10,
       "source_text": "주말·공휴일 데이 3명",
@@ -348,7 +348,7 @@
     },
     {
       "id": "cov-weekend-E",
-      "scope": "ward",
+      "scope": "shop",
       "hardness": "hard",
       "weight": 10,
       "source_text": "주말·공휴일 이브닝 2명",
@@ -405,7 +405,7 @@
     },
     {
       "id": "cov-weekend-N",
-      "scope": "ward",
+      "scope": "shop",
       "hardness": "hard",
       "weight": 10,
       "source_text": "주말·공휴일 나이트 2명",
@@ -462,7 +462,7 @@
     },
     {
       "id": "rule-noff",
-      "scope": "ward",
+      "scope": "shop",
       "hardness": "hard",
       "weight": 10,
       "source_text": "나이트 끝나면 다음 날은 무조건 쉬게",
@@ -564,7 +564,7 @@
     },
     {
       "id": "rule-max-work",
-      "scope": "ward",
+      "scope": "shop",
       "hardness": "hard",
       "weight": 10,
       "source_text": "6일 연속 근무는 안 돼요",
@@ -621,7 +621,7 @@
     },
     {
       "id": "rule-max-nights",
-      "scope": "ward",
+      "scope": "shop",
       "hardness": "hard",
       "weight": 10,
       "source_text": "나이트는 3번 연속까지만",
@@ -678,7 +678,7 @@
     },
     {
       "id": "rule-min-off",
-      "scope": "ward",
+      "scope": "shop",
       "hardness": "hard",
       "weight": 10,
       "source_text": "한 달에 최소 8일은 쉬게",
@@ -735,7 +735,7 @@
     },
     {
       "id": "rule-night-fair",
-      "scope": "ward",
+      "scope": "shop",
       "hardness": "soft",
       "weight": 5,
       "source_text": "나이트는 골고루",
@@ -776,7 +776,7 @@
     },
     {
       "id": "rule-weekend-fair",
-      "scope": "ward",
+      "scope": "shop",
       "hardness": "soft",
       "weight": 5,
       "source_text": "주말 근무도 골고루",
@@ -822,7 +822,7 @@
   "input_version": 0,
   "next_requests": [
     {
-      "id": "req-leave-n01",
+      "id": "req-leave-e01",
       "scope": "period",
       "hardness": "hard",
       "weight": 10,
@@ -843,7 +843,7 @@
           "per": "person",
           "people": {
             "ids": [
-              "n01"
+              "e01"
             ],
             "tags": null,
             "exclude_tags": []
@@ -885,7 +885,7 @@
       }
     },
     {
-      "id": "req-avoid-n02",
+      "id": "req-avoid-e02",
       "scope": "period",
       "hardness": "soft",
       "weight": 10,
@@ -906,7 +906,7 @@
           "per": "person",
           "people": {
             "ids": [
-              "n02"
+              "e02"
             ],
             "tags": null,
             "exclude_tags": []
@@ -944,7 +944,7 @@
       }
     },
     {
-      "id": "req-prefer-n04",
+      "id": "req-prefer-e04",
       "scope": "period",
       "hardness": "soft",
       "weight": 10,
@@ -965,7 +965,7 @@
           "per": "person",
           "people": {
             "ids": [
-              "n04"
+              "e04"
             ],
             "tags": null,
             "exclude_tags": []

@@ -32,16 +32,16 @@ test("S1. 랜딩 → 샘플 데모 → 내 병동", async ({ page }) => {
     await expect(page.getByRole("button", { name: new RegExp(`^${name} 11월 1일 [DENO]$`) })).toBeVisible();
   }
   expect(apiCalls, "데모는 API를 부르지 않는다").toEqual([]);
-  expect(await page.evaluate(() => localStorage.getItem("nurse-scheduler")), "데모는 저장하지 않는다").toBeNull();
+  expect(await page.evaluate(() => localStorage.getItem("shop-scheduler")), "데모는 저장하지 않는다").toBeNull();
   await expectNoDevTerms(page, "샘플 데모");
 
-  // 데모의 [내 병동으로 시작하기] → 처음 설정 ①
+  // 데모의 [내 매장으로 시작하기] → 처음 설정 ①
   await page.getByRole("link", { name: "내 병동으로 시작하기" }).click();
   await expect(page.getByRole("heading", { name: "처음 설정" })).toBeVisible();
   await expect(page.getByRole("textbox", { name: "새 간호사 이름" })).toBeVisible();
   await expect(page).toHaveURL(/\/app$/);
 
-  // 이미 내 병동이 있으면 그대로 들어간다
+  // 이미 내 매장이 있으면 그대로 들어간다
   await page.goto("/");
   await ownCta.click();
   await expect(page.getByRole("heading", { name: "처음 설정" })).toBeVisible();
@@ -66,7 +66,7 @@ test("S2. 시작 화면과 입력 삭제 확인", async ({ page }) => {
   await page.goto("/app");
   await page.getByRole("button", { name: "내 병동으로 시작하기" }).click();
   await expect(page.getByRole("heading", { name: "처음 설정" })).toBeVisible();
-  // 처음 설정 중에는 탭 줄의 [근무표] [병동 설정]을 숨긴다
+  // 처음 설정 중에는 탭 줄의 [근무표] [매장 설정]을 숨긴다
   await expect(page.getByRole("button", { name: "근무표", exact: true })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "병동 설정", exact: true })).toHaveCount(0);
   await expect(page.getByRole("banner")).toContainText("이름 없는 병동 · 한 달 단위");
@@ -99,7 +99,7 @@ test("S2. 시작 화면과 입력 삭제 확인", async ({ page }) => {
   await expect(page.getByRole("banner")).toContainText("이름 없는 병동 · 한 달 단위");
   await expectNoDevTerms(page, "처음 설정 ①");
 
-  // 근무표를 만들지 않은 병동은 새로 열어도 처음 설정의 못 끝낸 첫 단계(①)부터 연다
+  // 근무표를 만들지 않은 매장은 새로 열어도 처음 설정의 못 끝낸 첫 단계(①)부터 연다
   await page.reload();
   await expect(page.getByRole("heading", { name: "처음 설정" })).toBeVisible();
   await expect(page.getByRole("list", { name: "처음 설정 단계" }).locator('[aria-current="step"]')).toContainText("병동·명단");

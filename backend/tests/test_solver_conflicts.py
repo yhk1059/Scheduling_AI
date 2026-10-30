@@ -20,9 +20,9 @@ def ids(conflicts) -> set[str]:
 
 
 def overloaded_sample() -> tuple[ScheduleRequest, set[str]]:
-    """샘플 병동(주말 7명 필요)에서 토요일 7일에 9명이 휴가 → 6명만 남는다."""
+    """샘플 매장(주말 7명 필요)에서 토요일 7일에 9명이 휴가 → 6명만 남는다."""
     data = sample_data()
-    leaves = [leave(f"lv-n{i:02d}", f"n{i:02d}", [7]) for i in range(1, 10)]
+    leaves = [leave(f"lv-e{i:02d}", f"e{i:02d}", [7]) for i in range(1, 10)]
     data["constraints"] += leaves + [max_nights("mcn", 3)]
     return ScheduleRequest.model_validate(data), {c["id"] for c in leaves}
 
@@ -41,8 +41,8 @@ def test_excess_leave_conflicts_with_weekend_coverage():
 def test_conflict_carries_type_and_source_text():
     req, _ = overloaded_sample()
     by_id = {c.constraint_id: c for c in find_conflicts(req)}
-    assert by_id["lv-n01"].type == "rule"
-    assert by_id["lv-n01"].source_text == "원문"
+    assert by_id["lv-e01"].type == "rule"
+    assert by_id["lv-e01"].source_text == "원문"
 
 
 def test_fixed_cells_same_day_conflict():

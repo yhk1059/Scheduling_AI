@@ -12,7 +12,7 @@ from backend.domain.models import (
     Cmp,
     Count,
     Days,
-    Nurse,
+    Employee,
     People,
     Require,
     Rule,
@@ -23,7 +23,7 @@ from backend.domain.models import (
     TranslateRequest,
     TranslateUnsupported,
     ValueRef,
-    WardConfig,
+    ShopConfig,
     _constraint_codes,
     _constraint_refs,
     _value_refs,
@@ -46,8 +46,8 @@ class _OutputError(Exception):
 
 
 def _known_tags(ctx: TranslateContext) -> list[str]:
-    """병동 태그 목록: 명단의 태그."""
-    return sorted({t for n in ctx.nurses for t in n.tags})
+    """매장 태그 목록: 명단의 태그."""
+    return sorted({t for n in ctx.employees for t in n.tags})
 
 
 def _context_message(req: TranslateRequest, text: str) -> str:
@@ -70,7 +70,7 @@ def _context_message(req: TranslateRequest, text: str) -> str:
         "weekend_and_holiday_days": [d["day"] for d in days if d["weekend"]],
         "holidays": sorted(ctx.holidays),
         "config": {"shifts": [s.model_dump(include={"code", "name", "hours", "parts", "active"}) for s in ctx.config.shifts]},
-        "nurses": [{"id": n.id, "tags": n.tags} for n in ctx.nurses],
+        "employees": [{"id": n.id, "tags": n.tags} for n in ctx.employees],
         "known_tags": _known_tags(ctx),
     }
     return f"<context>\n{json.dumps(context, ensure_ascii=False)}\n</context>\n<input>\n{text}\n</input>"
@@ -80,7 +80,7 @@ def _format_errors(e: ValidationError) -> str:
     return "; ".join(f"{'.'.join(map(str, err['loc']))}: {err['msg']}" for err in e.errors(include_input=False))
 
 
-def _apply_config_changes(changes: list[ShiftChange], config: WardConfig) -> tuple[WardConfig | None, list[str]]:
+def _apply_config_changes(changes: list[ShiftChange], config: ShopConfig) -> tuple[ShopConfig | None, list[str]]:
     """설정 변경을 적용한 근무 형태와 오류. 오류가 있으면 근무 형태는 None."""
     shifts = {s.code: s for s in config.shifts}
     errors = []
@@ -97,15 +97,15 @@ def _apply_config_changes(changes: list[ShiftChange], config: WardConfig) -> tup
     if errors:
         return None, errors
     try:
-        return WardConfig(shifts=list(shifts.values())), []
+        return ShopConfig(shifts=list(shifts.values())), []
     except ValidationError as e:
         return None, [f"config_changes: {_format_errors(e)}"]
 
 
-def _people(nurses: list[Nurse], sel: People) -> list[str]:
-    """셀렉터가 고른 간호사 id. 규칙은 solver/select.py와 같다(llm은 solver를 import하지 않는다)."""
+def _people(employees: list[Employee], sel: People) -> list[str]:
+    """셀렉터가 고른 직원 id. 규칙은 solver/select.py와 같다(llm은 solver를 import하지 않는다)."""
     out = []
-    for n in nurses:
+    for n in employees:
         tags = set(n.tags)
         if sel.ids is not None and n.id not in sel.ids:
             continue
@@ -170,9 +170,9 @@ def _check_targets(i: int, rule: Rule, ctx: TranslateContext) -> tuple[list[str]
     """빈 대상 검사와 싼 모순 검사. (오류, 질문)."""
     people_sels, days_sels = _selectors(rule)
     for loc, sel in people_sels:
-        if not _people(ctx.nurses, sel):
+        if not _people(ctx.employees, sel):
             named = f"{', '.join(sel.tags)} 태그를 가진 " if sel.tags else "고른 조건에 맞는 "
-            return [f"rules.{i}.{loc}: 고른 사람이 0명"], [f"{named}간호사가 없어요. 누구를 말씀하시는 건가요?"]
+            return [f"rules.{i}.{loc}: 고른 사람이 0명"], [f"{named}직원이 없어요. 누구를 말씀하시는 건가요?"]
     for loc, sel in days_sels:
         if not _days(ctx, sel):
             return [f"rules.{i}.{loc}: 이번 기간에서 고른 날이 0일"], [
@@ -185,10 +185,10 @@ def _check_targets(i: int, rule: Rule, ctx: TranslateContext) -> tuple[list[str]
             if c.op == "le" or left.measure != "count" or left.offset not in (None, (0, 0)) or isinstance(c.right, Count):
                 continue
             need = rule.values[c.right.value].value if isinstance(c.right, ValueRef) else c.right
-            people = _people(ctx.nurses, left.who or People())
+            people = _people(ctx.employees, left.who or People())
             if need > len(people):
                 return [f"rules.{i}.body.then: 하루 {need:g}명이 필요한데 대상은 {len(people)}명"], [
-                    f"하루 {need:g}명이 필요한데 해당하는 간호사는 {len(people)}명이에요. 인원이나 대상을 확인해 주세요."
+                    f"하루 {need:g}명이 필요한데 해당하는 직원은 {len(people)}명이에요. 인원이나 대상을 확인해 주세요."
                 ]
     return [], []
 
@@ -196,7 +196,7 @@ def _check_targets(i: int, rule: Rule, ctx: TranslateContext) -> tuple[list[str]
 def _to_specs(output: TranslatorOutput, req: TranslateRequest) -> list[Rule]:
     """검증 순서: (Pydantic은 이미 통과) 설정 변경 → 식(값 이름·offset) → 참조 → 빈 대상 → 싼 모순."""
     ctx = req.context
-    ids = {n.id for n in ctx.nurses}
+    ids = {n.id for n in ctx.employees}
     known_tags = set(_known_tags(ctx))
     days = ctx.period.days
     config, errors = _apply_config_changes(output.config_changes, ctx.config)
@@ -217,10 +217,10 @@ def _to_specs(output: TranslatorOutput, req: TranslateRequest) -> list[Rule]:
             continue
         specs.append(rule)
         before = len(errors)
-        nurse_ids, cdays = _constraint_refs(rule)
-        for nurse_id in sorted({n for n in nurse_ids if n not in ids}):
-            errors.append(f"rules.{i}: 명단에 없는 id {nurse_id}")
-            questions.append(f"명단에 없는 간호사({nurse_id})가 포함되어 있습니다. 이름을 확인해 주세요.")
+        employee_ids, cdays = _constraint_refs(rule)
+        for employee_id in sorted({n for n in employee_ids if n not in ids}):
+            errors.append(f"rules.{i}: 명단에 없는 id {employee_id}")
+            questions.append(f"명단에 없는 직원({employee_id})이 포함되어 있습니다. 이름을 확인해 주세요.")
         tags = sorted({t for _, sel in _selectors(rule)[0] for t in (*(sel.tags or []), *sel.exclude_tags)} - known_tags)
         if tags:
             errors.append(f"rules.{i}: known_tags에 없는 태그 {tags}")
@@ -253,22 +253,22 @@ def _parse(result: ToolCallResult, req: TranslateRequest) -> TranslateResult:
         raise _OutputError(_format_errors(e)) from e
 
     v = req.input_version
-    nurses = req.context.nurses
+    employees = req.context.employees
     if output.unsupported_reason:
-        return TranslateUnsupported(status="unsupported", input_version=v, reason=restore(output.unsupported_reason, nurses))
+        return TranslateUnsupported(status="unsupported", input_version=v, reason=restore(output.unsupported_reason, employees))
     if output.clarification_question:
-        return TranslateClarify(status="clarify", input_version=v, question=restore(output.clarification_question, nurses))
+        return TranslateClarify(status="clarify", input_version=v, question=restore(output.clarification_question, employees))
     if not output.rules and not output.config_changes:
         return TranslateClarify(status="clarify", input_version=v, question=_EMPTY_QUESTION)
 
     specs = _to_specs(output, req)
     for spec in specs:
-        spec.source_text = restore(spec.source_text, nurses)
+        spec.source_text = restore(spec.source_text, employees)
     return TranslateOk(status="ok", input_version=v, constraints=specs, config_changes=output.config_changes)
 
 
 def translate(req: TranslateRequest, client: LLMClient) -> TranslateResult:
-    text = pseudonymize(req.text, req.context.nurses)
+    text = pseudonymize(req.text, req.context.employees)
     messages: list[dict] = [{"role": "user", "content": _context_message(req, text)}]
     error: _OutputError | None = None
     for _ in range(1 + LLM_MAX_RETRIES):

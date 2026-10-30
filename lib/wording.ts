@@ -1,8 +1,8 @@
 // 화면 문구를 만드는 순수 함수(UI_GUIDE "문구"). 데이터 이름(period, hard 등)은 그대로 두고 화면에 보이는 말만 여기서 만든다.
 import { monthDay, type PeriodRange, type PeriodUnit } from "./period";
 import { normalizeRule, ruleShape, type Bound } from "./rules";
-import { homeSummary, upcomingRange, type Ward, type WorkPeriod } from "./store";
-import type { Cmp, ConstraintSpec, Count, Days, Nurse, People, Rule, ShiftChange, Shifts, WardConfig } from "./types.gen";
+import { homeSummary, upcomingRange, type Shop, type WorkPeriod } from "./store";
+import type { Cmp, ConstraintSpec, Count, Days, Employee, People, Rule, ShiftChange, Shifts, ShopConfig } from "./types.gen";
 
 /** "11월 근무표"(1일에 시작하는 달력 월) / "11/2~11/15 근무표"(주 단위, 1일이 아닌 날에 시작하는 달력 월). */
 export function scheduleName(period: PeriodRange, unit: PeriodUnit): string {
@@ -23,7 +23,7 @@ export function unitShort(unit: PeriodUnit): string {
 }
 
 /** 근무 형태 요약 한 줄: "데이·이브닝·나이트 3교대, 각 8시간"(활성 코드만, 더블은 뒤에 코드로). */
-export function configSummary(config: WardConfig): string {
+export function configSummary(config: ShopConfig): string {
   const live = config.shifts.filter((s) => s.active !== false && s.hours > 0);
   const base = live.filter((s) => !s.parts?.length);
   const doubles = live.filter((s) => s.parts?.length);
@@ -40,7 +40,7 @@ export function configSummary(config: WardConfig): string {
 }
 
 /** 설정 변경 카드 한 줄: "근무 코드 추가 · M 미드 · 11:00부터 8시간", 더블은 세는 근무조를 붙인다. */
-export function describeShiftChange(change: ShiftChange, config: WardConfig): string {
+export function describeShiftChange(change: ShiftChange, config: ShopConfig): string {
   const { code, name, hours, start, parts } = change.shift;
   const partNames = (parts ?? []).map((p) => config.shifts.find((s) => s.code === p)?.name ?? p);
   return [
@@ -78,8 +78,8 @@ function formatDays(days: number[], period: PeriodRange): string {
     .join(", ");
 }
 
-function nurseLabel(id: string, nurses: Nurse[]): string {
-  return nurses.find((n) => n.id === id)?.name ?? "(명단에 없는 간호사)";
+function employeeLabel(id: string, employees: Employee[]): string {
+  return employees.find((n) => n.id === id)?.name ?? "(명단에 없는 간호사)";
 }
 
 // --- 식 규칙 → 카드 제목·문장(ADR-019 설계 §5) ---
@@ -107,14 +107,14 @@ const noPeople = (p: People | null | undefined) =>
   !p?.ids && !p?.tags && !p?.exclude_tags?.length;
 const noDays = (d: Days | undefined) => (d?.kind ?? "all") === "all" && !d?.weekdays && !d?.days;
 
-function shiftName(code: string, config: WardConfig): string {
+function shiftName(code: string, config: ShopConfig): string {
   const s = config.shifts.find((x) => x.code === code);
   if (!s) return code;
   return s.parts?.length ? `${s.name}(${s.code})` : s.name;
 }
 
 /** 근무 고르기: in은 이름을 "·"로, not_in [O]는 "근무", not_in [N, O]는 "나이트 말고 다른 근무". */
-function shiftsLabel(s: Selector, config: WardConfig): string {
+function shiftsLabel(s: Selector, config: ShopConfig): string {
   const names = (codes: string[]) => codes.map((c) => shiftName(c, config)).join("·");
   if (s?.in) return names(s.in);
   const out: string[] = s?.not_in ?? [];
@@ -124,11 +124,11 @@ function shiftsLabel(s: Selector, config: WardConfig): string {
 }
 
 /** 사람 고르기: 이름(3명 넘으면 "김OO 외 2명"), "책임 태그", "신규 빼고". 비어 있으면 "". */
-function peopleLabel(p: People | null | undefined, nurses: Nurse[]): string {
+function peopleLabel(p: People | null | undefined, employees: Employee[]): string {
   if (!p) return "";
   const parts: string[] = [];
   if (p.ids?.length) {
-    const names = p.ids.map((id) => nurseLabel(id, nurses));
+    const names = p.ids.map((id) => employeeLabel(id, employees));
     parts.push(names.length > 3 ? `${names[0]} 외 ${names.length - 1}명` : names.join(" "));
   }
   if (p.tags?.length) parts.push(`${p.tags.join("·")} 태그`);
@@ -249,12 +249,12 @@ function shapeName(s: Shape, hardness: string): string {
   }
 }
 
-function describeCount(s: CountShape, hardness: string, config: WardConfig, nurses: Nurse[], period: PeriodRange): Phrase {
-  const who = peopleLabel(s.people, nurses);
+function describeCount(s: CountShape, hardness: string, config: ShopConfig, employees: Employee[], period: PeriodRange): Phrase {
+  const who = peopleLabel(s.people, employees);
   const when = daysLabel(s.days, period);
   const shifts = shiftsLabel(s.shifts, config);
   if (isLeaveShape(s, hardness) || isPreferenceShape(s, hardness)) {
-    const name = nurseLabel(s.people.ids![0], nurses);
+    const name = employeeLabel(s.people.ids![0], employees);
     const what = isLeaveShape(s, hardness) ? "휴무" : isOffWish(s, hardness) ? "휴무 희망" : `${shifts} ${isNone(s) ? "피하기" : "희망"}`;
     return [`${name} · ${when || "근무표 전체"} · ${what}`];
   }
@@ -271,16 +271,16 @@ function describeCount(s: CountShape, hardness: string, config: WardConfig, nurs
       : words(everyone, s.per === "person_week" ? "주마다" : `${s.window}일마다`, when, amount);
 }
 
-function describeShape(s: Shape, hardness: string, config: WardConfig, nurses: Nurse[], period: PeriodRange): Phrase {
+function describeShape(s: Shape, hardness: string, config: ShopConfig, employees: Employee[], period: PeriodRange): Phrase {
   const label = (x: Selector) => shiftsLabel(x, config);
   switch (s.kind) {
     case "count":
-      return describeCount(s, hardness, config, nurses, period);
+      return describeCount(s, hardness, config, employees, period);
     case "balance": {
       const what = s.measure === "hours" ? "근무 시간" : anyWork(s.shifts) ? "근무 수" : `${label(s.shifts)} 수`;
       const history = s.with_history ? "(최근 4주 포함)" : "";
       const gap = hardness === "hard" ? [" · 차이 ", num(s.max_gap), " 이하"] : [];
-      return [...words(peopleLabel(s.people, nurses), daysLabel(s.days, period), `${what}${josa(what, "을", "를")} 고르게`), history, ...gap];
+      return [...words(peopleLabel(s.people, employees), daysLabel(s.days, period), `${what}${josa(what, "을", "를")} 고르게`), history, ...gap];
     }
   }
   let text: Phrase;
@@ -295,7 +295,7 @@ function describeShape(s: Shape, hardness: string, config: WardConfig, nurses: N
     const run = label(s.run);
     text = [`${run}${josa(run, "은", "는")} ${s.min_len}일 이상씩 이어서`];
   }
-  return words(peopleLabel(s.people, nurses), text);
+  return words(peopleLabel(s.people, employees), text);
 }
 
 // --- 일반 틀: "[범위]마다, [when]이면 [then]" ---
@@ -316,17 +316,17 @@ function offsetLabel(offset: Count["offset"]): string {
   return a > 0 ? `${a}~${b}일 뒤` : `${-b}~${-a}일 전`;
 }
 
-function countPhrase(c: Count, config: WardConfig, nurses: Nurse[], period: PeriodRange): string {
+function countPhrase(c: Count, config: ShopConfig, employees: Employee[], period: PeriodRange): string {
   const shifts = shiftsLabel(c.shifts, config);
   const what = c.measure === "hours" ? (anyWork(c.shifts) ? "근무 시간" : `${shifts} 근무 시간`) : shifts;
-  return textOf(words(offsetLabel(c.offset), peopleLabel(c.who, nurses), daysLabel(c.days, period), what));
+  return textOf(words(offsetLabel(c.offset), peopleLabel(c.who, employees), daysLabel(c.days, period), what));
 }
 
-function cmpPhrase(c: Cmp, per: string, values: Rule["values"], config: WardConfig, nurses: Nurse[], period: PeriodRange): Phrase {
-  const left = countPhrase(c.left, config, nurses, period);
+function cmpPhrase(c: Cmp, per: string, values: Rule["values"], config: ShopConfig, employees: Employee[], period: PeriodRange): Phrase {
+  const left = countPhrase(c.left, config, employees, period);
   const OPS = { ge: "이상", le: "이하" } as const;
   if (typeof c.right === "object" && "shifts" in c.right) {
-    const right = countPhrase(c.right, config, nurses, period);
+    const right = countPhrase(c.right, config, employees, period);
     if (c.op === "eq") return [`${left}${josa(left, "과", "와")} ${right}${josa(right, "이", "가")} 같음`];
     return [`${left}${josa(left, "이", "가")} ${right} ${OPS[c.op]}`];
   }
@@ -337,8 +337,8 @@ function cmpPhrase(c: Cmp, per: string, values: Rule["values"], config: WardConf
   return words(left, [num(bound), c.op === "eq" ? unit : `${unit} ${OPS[c.op]}`]);
 }
 
-function condPhrase(c: Cond, per: string, values: Rule["values"], config: WardConfig, nurses: Nurse[], period: PeriodRange): Phrase {
-  const one = (x: Cmp) => cmpPhrase(x, per, values, config, nurses, period);
+function condPhrase(c: Cond, per: string, values: Rule["values"], config: ShopConfig, employees: Employee[], period: PeriodRange): Phrase {
+  const one = (x: Cmp) => cmpPhrase(x, per, values, config, employees, period);
   if ("all" in c) return joined(" 그리고 ", ...c.all.map(one));
   if ("any" in c) return joined(" 또는 ", ...c.any.map(one));
   return one(c);
@@ -351,8 +351,8 @@ function ifPhrase(p: Phrase): Phrase {
   return [...p, "이면"];
 }
 
-function scopeLabel(fe: RequireBody["for_each"], nurses: Nurse[], period: PeriodRange): string {
-  const who = peopleLabel(fe.people, nurses) || "모든 사람";
+function scopeLabel(fe: RequireBody["for_each"], employees: Employee[], period: PeriodRange): string {
+  const who = peopleLabel(fe.people, employees) || "모든 사람";
   const days = daysLabel(fe.days, period);
   switch (fe.per) {
     case "period":
@@ -370,13 +370,13 @@ function scopeLabel(fe: RequireBody["for_each"], nurses: Nurse[], period: Period
   }
 }
 
-function describeGeneric(r: Rule, config: WardConfig, nurses: Nurse[], period: PeriodRange): Phrase {
+function describeGeneric(r: Rule, config: ShopConfig, employees: Employee[], period: PeriodRange): Phrase {
   const b = r.body as RequireBody;
   const per = b.for_each.per;
-  const then = condPhrase(b.then as Cond, per, r.values, config, nurses, period);
-  const scope = scopeLabel(b.for_each, nurses, period);
+  const then = condPhrase(b.then as Cond, per, r.values, config, employees, period);
+  const scope = scopeLabel(b.for_each, employees, period);
   if (!b.when) return words(scope, then);
-  return [`${scope}, `, ...ifPhrase(condPhrase(b.when as Cond, per, r.values, config, nurses, period)), " ", ...then];
+  return [`${scope}, `, ...ifPhrase(condPhrase(b.when as Cond, per, r.values, config, employees, period)), " ", ...then];
 }
 
 const hasOffset = (b: RequireBody) => [b.when, b.then].flatMap((c) => (!c ? [] : "all" in c ? c.all : "any" in c ? c.any : [c])).some((c) => c.left.offset || (typeof c.right === "object" && "shifts" in c.right && c.right.offset));
@@ -396,18 +396,18 @@ export function presetName(c: ConstraintSpec): string {
  * 휴가·희망·기피·고정은 "이름 · 날짜 · 근무" 모양. 근무 이름은 config의 name, 내부 id와 코드만 있는 표기를 쓰지 않는다.
  * 조정 가능한 값은 parts에 이름과 함께 따로 나온다.
  */
-export function describeRule(c: ConstraintSpec, config: WardConfig, nurses: Nurse[], period: PeriodRange): RuleSentence {
+export function describeRule(c: ConstraintSpec, config: ShopConfig, employees: Employee[], period: PeriodRange): RuleSentence {
   if (c.type === "fixed_assignment") {
-    const { nurse_id, day, shift } = c.params;
-    return sentence([`${nurseLabel(nurse_id, nurses)} · ${monthDay(period, day)} · ${shiftName(shift, config)} 고정`]);
+    const { employee_id, day, shift } = c.params;
+    return sentence([`${employeeLabel(employee_id, employees)} · ${monthDay(period, day)} · ${shiftName(shift, config)} 고정`]);
   }
   const s = ruleShape(c);
-  if (s) return sentence(describeShape(s, c.hardness ?? (c.body.kind === "balance" ? "soft" : "hard"), config, nurses, period));
-  return sentence(describeGeneric(normalizeRule(c) as Rule, config, nurses, period));
+  if (s) return sentence(describeShape(s, c.hardness ?? (c.body.kind === "balance" ? "soft" : "hard"), config, employees, period));
+  return sentence(describeGeneric(normalizeRule(c) as Rule, config, employees, period));
 }
 
-/** 병동 규칙 수. 필요 인원은 세지 않는다. */
-export function wardRuleCount(rules: ConstraintSpec[]): number {
+/** 매장 규칙 수. 필요 인원은 세지 않는다. */
+export function shopRuleCount(rules: ConstraintSpec[]): number {
   return rules.filter((r) => presetName(r) !== "필요 인원").length;
 }
 
@@ -425,11 +425,11 @@ export type NextTask =
   | { kind: "generated"; name: string }
   | { kind: "confirmed"; name: string; confirmedAt: string };
 
-export function nextTask(ward: Ward, periods: WorkPeriod[], today: string): NextTask {
+export function nextTask(shop: Shop, periods: WorkPeriod[], today: string): NextTask {
   const { next } = homeSummary(periods, today);
-  if (next.state === "none") return { kind: "none", name: scheduleName(upcomingRange(ward.unit, periods, today), ward.unit) };
+  if (next.state === "none") return { kind: "none", name: scheduleName(upcomingRange(shop.unit, periods, today), shop.unit) };
   const p = next.period;
-  const name = scheduleName(p, ward.unit);
+  const name = scheduleName(p, shop.unit);
   if (next.state === "confirmed") return { kind: "confirmed", name, confirmedAt: p.versions.at(-1)?.confirmed_at ?? "" };
   return p.result ? { kind: "generated", name } : { kind: "drafting", name, requests: p.requests.length };
 }

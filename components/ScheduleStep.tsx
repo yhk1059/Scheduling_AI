@@ -19,13 +19,13 @@ import type {
   Conflict,
   ConstraintSpec,
   ExplainResponse,
-  Nurse,
+  Employee,
   Period,
   RelaxationProposal,
   ScheduleRequest,
   ScheduleResult,
   ShiftDef,
-  WardConfig,
+  ShopConfig,
 } from "@/lib/types.gen";
 import { statsFromAssignments } from "@/lib/stats";
 import { describeRule, formatDeviation, hardnessLabel, presetName } from "@/lib/wording";
@@ -55,7 +55,7 @@ export function codeClass(code: Code, weekend: boolean): string {
 }
 
 /** 열로 보여 줄 근무 코드: 활성 코드 + 결과에 남은 꺼진 코드(config 순서). */
-function shownCodes(config: WardConfig, assignments?: ScheduleResult["assignments"]): ShiftDef[] {
+function shownCodes(config: ShopConfig, assignments?: ScheduleResult["assignments"]): ShiftDef[] {
   const used = new Set(Object.values(assignments ?? {}).flat());
   return config.shifts.filter((s) => s.active !== false || used.has(s.code));
 }
@@ -66,7 +66,7 @@ function isLegacyResult(result: ScheduleResult): boolean {
 }
 
 /** 변환 전에 확정한 근무표처럼 통계가 옛 형식(counts 없음)이면 배정으로 다시 센다(★12). */
-function withStats(result: ScheduleResult, config: WardConfig, period: Period, holidays: number[]): ScheduleResult {
+function withStats(result: ScheduleResult, config: ShopConfig, period: Period, holidays: number[]): ScheduleResult {
   if (!isLegacyResult(result)) return result;
   return { ...result, stats: statsFromAssignments(result.assignments, config, period, holidays) };
 }
@@ -77,19 +77,19 @@ type Outcome =
   | { kind: "infeasible"; version: number; conflicts: Conflict[]; explanation: ExplainResponse | null }
   | { kind: "timeout"; version: number }
   | null;
-type Cell = { nurseId: string; day: number };
+type Cell = { employeeId: string; day: number };
 export type Toast = { message: string; retry: () => void } | null;
 type Load = { nights: number; weekends: number };
 
 /**
- * 누적 부담 근거 한 줄. 최근 4주 나이트가 평균보다 많았던 간호사 중 이번 근무표 N이 평균 이하인 사람.
+ * 누적 부담 근거 한 줄. 최근 4주 나이트가 평균보다 많았던 직원 중 이번 근무표 N이 평균 이하인 사람.
  * 해당자가 없거나 history가 비면 null.
  */
-function historyEvidence(rows: Nurse[], result: ScheduleResult, history: Map<string, Load>): string | null {
+function historyEvidence(rows: Employee[], result: ScheduleResult, history: Map<string, Load>): string | null {
   if (history.size === 0 || rows.length === 0) return null;
-  const past = (n: Nurse) => history.get(n.id)?.nights ?? 0;
-  const now = (n: Nurse) => result.stats[n.id]?.counts?.N ?? result.assignments[n.id].filter((c) => c === "N").length;
-  const avg = (f: (n: Nurse) => number) => rows.reduce((sum, n) => sum + f(n), 0) / rows.length;
+  const past = (n: Employee) => history.get(n.id)?.nights ?? 0;
+  const now = (n: Employee) => result.stats[n.id]?.counts?.N ?? result.assignments[n.id].filter((c) => c === "N").length;
+  const avg = (f: (n: Employee) => number) => rows.reduce((sum, n) => sum + f(n), 0) / rows.length;
   const pastAvg = avg(past);
   const nowAvg = avg(now);
   const eased = rows.filter((n) => past(n) > pastAvg && now(n) <= nowAvg);
@@ -131,10 +131,10 @@ export function useSolve(periodId: string) {
   const buildRequest = (): Req => {
     const s = useAppStore.getState();
     const p = s.periods.find((x) => x.id === periodId)!;
-    const req = toScheduleRequest(s.ward!, p, s.periods, today());
+    const req = toScheduleRequest(s.shop!, p, s.periods, today());
     const base = p.versions.at(-1)?.assignments;
     if (!base) return req;
-    return { ...req, previous: Object.fromEntries(req.nurses.filter((n) => base[n.id]).map((n) => [n.id, base[n.id]])) };
+    return { ...req, previous: Object.fromEntries(req.employees.filter((n) => base[n.id]).map((n) => [n.id, base[n.id]])) };
   };
 
   const run = async () => {
@@ -176,9 +176,9 @@ export function useSolve(periodId: string) {
 
 export type Solve = ReturnType<typeof useSolve>;
 
-export function downloadCsv(period: WorkPeriod, nurses: Nurse[], result: ScheduleResult) {
-  const config = useAppStore.getState().ward?.config ?? DEFAULT_CONFIG;
-  const csv = toScheduleCsv({ nurses, period, holidays: period.holidays, assignments: result.assignments, config });
+export function downloadCsv(period: WorkPeriod, employees: Employee[], result: ScheduleResult) {
+  const config = useAppStore.getState().shop?.config ?? DEFAULT_CONFIG;
+  const csv = toScheduleCsv({ employees, period, holidays: period.holidays, assignments: result.assignments, config });
   const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
   const a = document.createElement("a");
   a.href = url;
@@ -221,7 +221,7 @@ export function ScheduleBody({
   readOnly?: boolean;
   children?: ReactNode;
 }) {
-  const ward = useAppStore((s) => s.ward);
+  const shop = useAppStore((s) => s.shop);
   const periods = useAppStore((s) => s.periods);
   const inputVersion = useAppStore((s) => s.inputVersion);
   const setFixed = useAppStore((s) => s.setFixed);
@@ -230,17 +230,17 @@ export function ScheduleBody({
   const applyChanges = useAppStore((s) => s.applyChanges);
   const [selected, setSelected] = useState<Cell | null>(null);
 
-  if (!ward) return null;
+  if (!shop) return null;
   const periodId = period.id;
   const now = today();
-  const { nurses, holidays = [], constraints = [], history: raw = null } = toScheduleRequest(ward, period, periods, now);
+  const { employees, holidays = [], constraints = [], history: raw = null } = toScheduleRequest(shop, period, periods, now);
   const { resultVersion } = period;
   // 변환 전 결과는 희망 반영률·못 지킨 규칙을 셀 수 없어 숨긴다(★12)
   const legacy = period.result !== null && isLegacyResult(period.result);
-  const result = period.result && withStats(period.result, ward.config, period, holidays);
+  const result = period.result && withStats(period.result, shop.config, period, holidays);
   const { outcome } = sv;
   const confirmed = period.versions.at(-1)?.assignments ?? null;
-  const history = new Map(historyLoadFor(raw, ward.config).map((h) => [h.nurse_id, { nights: h.nights, weekends: h.weekends }]));
+  const history = new Map(historyLoadFor(raw, shop.config).map((h) => [h.employee_id, { nights: h.nights, weekends: h.weekends }]));
   // 운영 중인 기간에서 오늘 이전 날짜는 잠긴다(toScheduleRequest의 pastDayLocks와 같은 범위)
   const todayDay = dayOfDate(period, now);
   const pastDays = isOperating(period, now) && todayDay !== null ? todayDay - 1 : 0;
@@ -248,7 +248,7 @@ export function ScheduleBody({
   const isWeekend = (d: number) => isWeekendDay(period, d, holidays);
   const fixed = new Map<string, Code>();
   for (const c of constraints) {
-    if (c.type === "fixed_assignment" && c.enabled !== false) fixed.set(`${c.params.nurse_id}-${c.params.day}`, c.params.shift);
+    if (c.type === "fixed_assignment" && c.enabled !== false) fixed.set(`${c.params.employee_id}-${c.params.day}`, c.params.shift);
   }
 
   const onSelect = (cell: Cell) => {
@@ -257,14 +257,14 @@ export function ScheduleBody({
 
   const onPick = (cell: Cell, code: Code | null) => {
     setSelected(null);
-    if (code === null) clearFixed(periodId, cell.nurseId, cell.day);
-    else setFixed(periodId, cell.nurseId, cell.day, code);
+    if (code === null) clearFixed(periodId, cell.employeeId, cell.day);
+    else setFixed(periodId, cell.employeeId, cell.day, code);
     sv.run();
   };
 
   const isConfirmed = result !== null && confirmed !== null && JSON.stringify(confirmed) === JSON.stringify(result.assignments);
   const isDraft = result !== null && confirmed !== null && !isConfirmed;
-  const rows = result ? nurses.filter((n) => result.assignments[n.id]) : [];
+  const rows = result ? employees.filter((n) => result.assignments[n.id]) : [];
   const shownVersion = outcome ? outcome.version : resultVersion;
   const stale = !busy && shownVersion !== null && shownVersion !== inputVersion;
   const evidence = result ? historyEvidence(rows, result, history) : null;
@@ -289,7 +289,7 @@ export function ScheduleBody({
           explaining={sv.explaining}
           busy={busy}
           constraints={constraints}
-          nurses={nurses}
+          employees={employees}
           period={period}
           hasResult={result !== null}
           onAccept={(p) => {
@@ -316,16 +316,16 @@ export function ScheduleBody({
               <h2 className={ui.cardTitle}>근무표</h2>
               {selected && (
                 <CellEditor
-                  codes={ward.config.shifts.filter((s) => s.active !== false)}
-                  label={`${nurses.find((n) => n.id === selected.nurseId)?.name ?? selected.nurseId} ${monthDay(period, selected.day)}`}
-                  fixed={fixed.get(`${selected.nurseId}-${selected.day}`)}
+                  codes={shop.config.shifts.filter((s) => s.active !== false)}
+                  label={`${employees.find((n) => n.id === selected.employeeId)?.name ?? selected.employeeId} ${monthDay(period, selected.day)}`}
+                  fixed={fixed.get(`${selected.employeeId}-${selected.day}`)}
                   onPick={(code) => onPick(selected, code)}
                   onCancel={() => setSelected(null)}
                 />
               )}
             </div>
             <ScheduleGrid
-              config={ward.config}
+              config={shop.config}
               rows={rows}
               result={result}
               period={period}
@@ -342,7 +342,7 @@ export function ScheduleBody({
               hideViolations={legacy}
             />
           </section>
-          <StatsTable config={ward.config} rows={rows} result={result} history={history} legacy={legacy} />
+          <StatsTable config={shop.config} rows={rows} result={result} history={history} legacy={legacy} />
         </>
       )}
     </>
@@ -351,7 +351,7 @@ export function ScheduleBody({
 
 /** 근무표 작성 ② 근무표. 만들기 전 [근무표 만들기], 만든 뒤 [확정]. 확정하면 확정 근무표 화면으로 간다. */
 export default function ScheduleStep() {
-  const ward = useAppStore((s) => s.ward);
+  const shop = useAppStore((s) => s.shop);
   const period = useAppStore(currentPeriod);
   const periods = useAppStore((s) => s.periods);
   const confirm = useAppStore((s) => s.confirm);
@@ -359,11 +359,11 @@ export default function ScheduleStep() {
   const guest = useAppStore((s) => s.auth === null);
   const sv = useSolve(period?.id ?? "");
 
-  if (!ward || !period) return null;
+  if (!shop || !period) return null;
   const periodId = period.id;
   const { result } = period;
   const { busy, loading } = sv;
-  const nurses = toScheduleRequest(ward, period, periods, today()).nurses;
+  const employees = toScheduleRequest(shop, period, periods, today()).employees;
 
   const onConfirm = () => {
     // 게스트는 확정 근무표 화면 맨 위에 저장 안내를 본다
@@ -386,16 +386,16 @@ export default function ScheduleStep() {
         </div>
         <div className="flex items-center gap-2">
           {!result ? (
-            <button type="button" onClick={sv.run} disabled={busy || nurses.length === 0} className={ui.primary}>
+            <button type="button" onClick={sv.run} disabled={busy || employees.length === 0} className={ui.primary}>
               {loading && <Spinner />}
               {loading ? "만드는 중…" : "근무표 만들기"}
             </button>
           ) : (
             <>
-              <button type="button" onClick={() => downloadCsv(period, nurses, result)} disabled={busy} className={ui.text}>
+              <button type="button" onClick={() => downloadCsv(period, employees, result)} disabled={busy} className={ui.text}>
                 CSV 받기
               </button>
-              <button type="button" onClick={sv.run} disabled={busy || nurses.length === 0} className={ui.secondary}>
+              <button type="button" onClick={sv.run} disabled={busy || employees.length === 0} className={ui.secondary}>
                 {loading && <Spinner />}
                 {loading ? "만드는 중…" : "다시 만들기"}
               </button>
@@ -434,7 +434,7 @@ export function OutcomePanel({
   explaining,
   busy,
   constraints,
-  nurses,
+  employees,
   period,
   hasResult,
   onAccept,
@@ -445,7 +445,7 @@ export function OutcomePanel({
   explaining: boolean;
   busy: boolean;
   constraints: ConstraintSpec[];
-  nurses: Nurse[];
+  employees: Employee[];
   period: Period;
   hasResult: boolean;
   onAccept: (p: RelaxationProposal) => void;
@@ -453,7 +453,7 @@ export function OutcomePanel({
   onToggle: (id: string, enabled: boolean) => void;
 }) {
   const [dismissed, setDismissed] = useState<RelaxationProposal[]>([]);
-  const config = useAppStore((s) => s.ward?.config) ?? DEFAULT_CONFIG;
+  const config = useAppStore((s) => s.shop?.config) ?? DEFAULT_CONFIG;
   const explanation = outcome.kind === "infeasible" ? outcome.explanation : null;
   // 다시 풀어 검증된 제안만 보여준다(ADR-004)
   const proposals = (explanation?.proposals ?? []).filter((p) => p.verified_summary && !dismissed.includes(p));
@@ -525,7 +525,7 @@ export function OutcomePanel({
                     <span className="text-xs font-medium text-[#66665E]">{found ? presetName(found) : "규칙"}</span>
                     “{c.source_text}”
                     {found && (
-                      <span className="font-mono text-xs text-[#66665E]">{describeRule(found, config, nurses, period).text}</span>
+                      <span className="font-mono text-xs text-[#66665E]">{describeRule(found, config, employees, period).text}</span>
                     )}
                   </span>
                   {found && (
@@ -553,7 +553,7 @@ export function OutcomePanel({
                 <li key={c.id} className="flex items-center justify-between gap-3 border-b border-[#EFEFEB] py-1.5 last:border-b-0">
                   <span className={`flex items-baseline gap-2 text-sm ${on ? "text-[#1B1B18]" : "text-[#66665E]"}`}>
                     <span className="text-xs font-medium text-[#66665E]">{presetName(c)}</span>“{c.source_text}”
-                    <span className="font-mono text-xs text-[#66665E]">{describeRule(c, config, nurses, period).text}</span>
+                    <span className="font-mono text-xs text-[#66665E]">{describeRule(c, config, employees, period).text}</span>
                   </span>
                   <button
                     type="button"
@@ -759,9 +759,9 @@ export function ScheduleGrid({
   todayDay = null,
   hideViolations = false,
 }: {
-  /** 병동 근무 형태. 합계 열과 하단 합계 행이 이 코드를 따른다 */
-  config?: WardConfig;
-  rows: Nurse[];
+  /** 매장 근무 형태. 합계 열과 하단 합계 행이 이 코드를 따른다 */
+  config?: ShopConfig;
+  rows: Employee[];
   result: ScheduleResult;
   period: Period;
   holidays: number[];
@@ -772,7 +772,7 @@ export function ScheduleGrid({
   /** 끝난 근무표: 칸을 편집하지 않는다 */
   readOnly?: boolean;
   onSelect: (cell: Cell) => void;
-  /** 간호사별 최근 4주 나이트·주말. 없으면 0 */
+  /** 직원별 최근 4주 나이트·주말. 없으면 0 */
   history?: Map<string, Load>;
   /** 운영 중 기간의 잠긴 지난 날짜 수(1..pastDays) */
   pastDays?: number;
@@ -796,11 +796,11 @@ export function ScheduleGrid({
   };
   const rowClass = "grid gap-x-0.5";
   const weekendBg = (d: number) => (isWeekend(d) ? "bg-[#F1EEE6]" : "");
-  const changed = new Set((result.diff ?? []).map((c) => `${c.nurse_id}-${c.day}`));
+  const changed = new Set((result.diff ?? []).map((c) => `${c.employee_id}-${c.day}`));
   const violations = new Map<string, string[]>();
   for (const v of hideViolations ? [] : result.soft_violations) {
-    if (!v.nurse_id || !v.day) continue;
-    const key = `${v.nurse_id}-${v.day}`;
+    if (!v.employee_id || !v.day) continue;
+    const key = `${v.employee_id}-${v.day}`;
     violations.set(key, [...(violations.get(key) ?? []), v.detail]);
   }
   const total = "flex h-7 items-center justify-center font-mono text-[13px] font-medium text-[#1B1B18]";
@@ -852,7 +852,7 @@ export function ScheduleGrid({
                 const d = i + 1;
                 const { month: m, dom } = pdays[i];
                 const key = `${n.id}-${d}`;
-                const isSel = selected?.nurseId === n.id && selected.day === d;
+                const isSel = selected?.employeeId === n.id && selected.day === d;
                 const warn = violations.get(key);
                 const past = d <= pastDays;
                 if (readOnly) {
@@ -874,7 +874,7 @@ export function ScheduleGrid({
                     type="button"
                     disabled={disabled}
                     aria-disabled={past || undefined}
-                    onClick={() => !past && onSelect({ nurseId: n.id, day: d })}
+                    onClick={() => !past && onSelect({ employeeId: n.id, day: d })}
                     aria-label={`${n.name} ${m}월 ${dom}일 ${code}`}
                     title={past ? "지난 날짜는 바꿀 수 없어요" : warn ? warn.join(", ") : undefined}
                     className={`${CELL} ${codeClass(code, isWeekend(d))} ${
@@ -927,8 +927,8 @@ export function StatsTable({
   history,
   legacy = false,
 }: {
-  config: WardConfig;
-  rows: Nurse[];
+  config: ShopConfig;
+  rows: Employee[];
   result: ScheduleResult;
   history: Map<string, Load>;
   /** 변환 전 결과: 희망 반영률 열을 숨긴다 */

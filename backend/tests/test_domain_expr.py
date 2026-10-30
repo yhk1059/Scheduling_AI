@@ -9,13 +9,13 @@ from backend.domain.models import ConstraintSpec, Rule, ScheduleRequest
 spec_adapter = TypeAdapter(ConstraintSpec)
 
 
-def nurses(n: int = 3) -> list[dict]:
-    return [{"id": f"n{i:02d}", "name": f"간호사{i}", "tags": []} for i in range(1, n + 1)]
+def employees(n: int = 3) -> list[dict]:
+    return [{"id": f"e{i:02d}", "name": f"직원{i}", "tags": []} for i in range(1, n + 1)]
 
 
 def request(constraints: list[dict], **extra) -> dict:
     return {
-        "nurses": nurses(),
+        "employees": employees(),
         "period": {"start_date": "2026-11-01", "length": 30},
         "constraints": constraints,
         "input_version": 0,
@@ -39,7 +39,7 @@ def require(per: str, then: dict, when: dict | None = None, **for_each) -> dict:
 
 
 def rule(body: dict, values: dict | None = None, cid: str = "r1", **extra) -> dict:
-    return {"id": cid, "type": "rule", "scope": "ward", "source_text": "원문", "values": values or {}, "body": body, **extra}
+    return {"id": cid, "type": "rule", "scope": "shop", "source_text": "원문", "values": values or {}, "body": body, **extra}
 
 
 def val(value: float, label: str = "값") -> dict:
@@ -57,9 +57,9 @@ NEW = count(["N"], who={"tags": ["신규"]})
 CHARGE = count(["N"], who={"tags": ["책임"]})
 EXAMPLES = {
     "conditional": rule(require("day", when=cmp(NEW, "ge", 1), then=cmp(CHARGE, "ge", 1))),
-    "pair-apart": rule(require("day", then=cmp(count(["N"], who={"ids": ["n01", "n02"]}), "le", 1))),
+    "pair-apart": rule(require("day", then=cmp(count(["N"], who={"ids": ["e01", "e02"]}), "le", 1))),
     "pair-together": rule(
-        require("day", then=cmp(count(["D"], who={"ids": ["n01"]}), "eq", count(["D"], who={"ids": ["n02"]})))
+        require("day", then=cmp(count(["D"], who={"ids": ["e01"]}), "eq", count(["D"], who={"ids": ["e02"]})))
     ),
     "count-vs-count": rule(require("day", then=cmp(CHARGE, "ge", NEW))),
     "weekend-night-off": rule(
@@ -260,11 +260,11 @@ def test_invalid_rules_fail_request(raw):
 
 
 def test_rule_refs_checked():
-    bad_id = rule(require("day", then=cmp(count(["N"], who={"ids": ["n01", "n99"]}), "le", 1)), cid="pair")
-    with pytest.raises(ValidationError, match="pair.*n99"):
+    bad_id = rule(require("day", then=cmp(count(["N"], who={"ids": ["e01", "e99"]}), "le", 1)), cid="pair")
+    with pytest.raises(ValidationError, match="pair.*e99"):
         ScheduleRequest.model_validate(request([bad_id]))
-    bad_for_each = rule(require("person", then=cmp(count(["O"]), "ge", 1), people={"ids": ["n77"]}), cid="fe")
-    with pytest.raises(ValidationError, match="fe.*n77"):
+    bad_for_each = rule(require("person", then=cmp(count(["O"]), "ge", 1), people={"ids": ["e77"]}), cid="fe")
+    with pytest.raises(ValidationError, match="fe.*e77"):
         ScheduleRequest.model_validate(request([bad_for_each]))
     bad_day = rule(require("person", then=cmp(count(["O"], days={"days": [31]}), "ge", 1)), cid="dd")
     with pytest.raises(ValidationError, match="dd.*31"):
@@ -289,8 +289,8 @@ def test_rule_codes_checked():
 
 
 def test_balance_refs_checked():
-    bal = rule({"kind": "balance", "people": {"ids": ["n42"]}, "days": {"days": [40]}, "shifts": {"in": ["N"]}}, cid="bb")
-    with pytest.raises(ValidationError, match="bb.*n42") as e:
+    bal = rule({"kind": "balance", "people": {"ids": ["e42"]}, "days": {"days": [40]}, "shifts": {"in": ["N"]}}, cid="bb")
+    with pytest.raises(ValidationError, match="bb.*e42") as e:
         ScheduleRequest.model_validate(request([bal]))
     assert "40" in str(e.value)
 
@@ -302,7 +302,7 @@ def test_unknown_tags_pass():
 
 def test_blocks_no_longer_accepted_beside_rules():
     """블록은 식으로 통일됐다(ADR-019 ★2). 요청은 rule | fixed_assignment만 받는다."""
-    blk = {"id": "b1", "type": "count", "scope": "ward", "source_text": "원문",
+    blk = {"id": "b1", "type": "count", "scope": "shop", "source_text": "원문",
            "params": {"shifts": {"in": ["D"]}, "per": "day", "min": 1}}
     with pytest.raises(ValidationError):
         ScheduleRequest.model_validate(request([blk, EXAMPLES["pair-apart"]]))

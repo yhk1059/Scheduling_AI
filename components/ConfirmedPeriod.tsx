@@ -23,7 +23,7 @@ import ConstraintCard from "./ConstraintCard";
 import { Spinner, today } from "./RulesStep";
 import { downloadCsv, ScheduleBody, toMessage, ToastAlert, useSolve } from "./ScheduleStep";
 import { ui } from "./ui";
-import { confirmedTime } from "./WardHome";
+import { confirmedTime } from "./ShopHome";
 
 const MAX_TEXT_CHARS = 1000; // backend/domain/constants.py MAX_TEXT_CHARS
 
@@ -32,7 +32,7 @@ const MAX_TEXT_CHARS = 1000; // backend/domain/constants.py MAX_TEXT_CHARS
  * [다시 확정]으로 새 확정본을 남기거나 [변경 취소]로 마지막 확정본으로 되돌린다. 끝난 근무표는 보기 전용이다.
  */
 export default function ConfirmedPeriod() {
-  const ward = useAppStore((s) => s.ward);
+  const shop = useAppStore((s) => s.shop);
   const period = useAppStore(currentPeriod);
   const periods = useAppStore((s) => s.periods);
   const confirm = useAppStore((s) => s.confirm);
@@ -55,12 +55,12 @@ export default function ConfirmedPeriod() {
     (entry === "change" ? inputRef.current : titleRef.current)?.focus();
   }, [entry]);
 
-  if (!ward || !period || period.status !== "confirmed") return null;
+  if (!shop || !period || period.status !== "confirmed") return null;
   const periodId = period.id;
   const now = today();
   const ended = periodEnd(period) < now;
   const busy = sv.busy || translating;
-  const { nurses, period: range, holidays = [] } = toScheduleRequest(ward, period, periods, now);
+  const { employees, period: range, holidays = [] } = toScheduleRequest(shop, period, periods, now);
   const { result } = period;
   const lastVersion = period.versions.at(-1);
   const unconfirmed = hasUnconfirmedChanges(period);
@@ -72,7 +72,7 @@ export default function ConfirmedPeriod() {
     setTranslating(true);
     sv.setToast(null);
     try {
-      const res = await translate({ text: input, scope: "period", context: { config: ward.config, nurses, period: range, holidays, today: today() } });
+      const res = await translate({ text: input, scope: "period", context: { config: shop.config, employees, period: range, holidays, today: today() } });
       if (res.status === "ok") {
         addPendingRequests(periodId, res.constraints, res.examples);
         setChangeIds((ids) => [...ids, ...res.constraints.map((c) => c.id)]);
@@ -99,7 +99,7 @@ export default function ConfirmedPeriod() {
     setChangeIds([]);
   };
 
-  const csv = () => result && downloadCsv(period, nurses, result);
+  const csv = () => result && downloadCsv(period, employees, result);
 
   return (
     <div className="flex flex-col gap-5">
@@ -112,7 +112,7 @@ export default function ConfirmedPeriod() {
         <div className="flex items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <h1 ref={titleRef} tabIndex={-1} className="text-[22px] font-semibold text-[#1B1B18] outline-none">
-              {scheduleName(period, ward.unit)}
+              {scheduleName(period, shop.unit)}
             </h1>
             <span className="font-mono text-sm text-[#66665E]">{formatRange(period)}</span>
             {isOperating(period, now) ? (
@@ -195,7 +195,7 @@ export default function ConfirmedPeriod() {
       <ScheduleBody period={period} solve={sv} busy={busy} readOnly={ended}>
         {diff.length > 0 && (
           <p role="status" className="rounded-lg border border-[#F1D3A8] bg-[#FDF0DC] px-4 py-2.5 text-sm text-[#7A4506]">
-            <span className="font-mono font-semibold">{new Set(diff.map((c) => c.nurse_id)).size}</span>명,{" "}
+            <span className="font-mono font-semibold">{new Set(diff.map((c) => c.employee_id)).size}</span>명,{" "}
             <span className="font-mono font-semibold">{diff.length}</span>칸 변경 · 주황 테두리 칸이 바뀐 곳이에요. [다시
             확정]하면 새 확정본으로 남겨요.
           </p>

@@ -1,4 +1,4 @@
-// docs/BROWSER_TEST_SCENARIOS.md S14, S15. 병동이 정하는 근무 형태(M 추가, 더블), 태그 배치 규칙, 근무표 시작일을
+// docs/BROWSER_TEST_SCENARIOS.md S14, S15. 매장이 정하는 근무 형태(M 추가, 더블), 태그 배치 규칙, 근무표 시작일을
 // 처음 설정부터 다음 근무표까지 하나의 흐름으로 돈다. 게스트 모드만 다룬다(ADR-014). LLM은 mock하지 않는다(ADR-013).
 // LLM 해석은 흔들릴 수 있어 카드 문장은 핵심 낱말만 본다.
 import { type BrowserContext, expect, type Page, test } from "@playwright/test";
@@ -107,8 +107,8 @@ test("S14. 근무 형태(미드 추가, 더블)와 태그 배치 규칙", async 
     await expect(newName).toHaveValue("");
   }
   await expect(page.getByRole("button", { name: "6행 태그 책임 빼기" })).toBeVisible();
-  const { ward: afterRoster } = await readState(page);
-  expect(afterRoster.nurses.filter((n) => n.tags.includes("책임")).map((n) => n.name)).toEqual(["이영희", "정유진", "강서연"]);
+  const { shop: afterRoster } = await readState(page);
+  expect(afterRoster.employees.filter((n) => n.tags.includes("책임")).map((n) => n.name)).toEqual(["이영희", "정유진", "강서연"]);
   await page.getByRole("button", { name: "다음", exact: true }).click();
 
   // ② 근무 형태 요약 [바꾸기] → 근무 코드 표에 미드(M) 추가 → 필요 인원 폼에 미드 행이 생긴다
@@ -160,7 +160,7 @@ test("S14. 근무 형태(미드 추가, 더블)와 태그 배치 규칙", async 
   await expect(childCard).toContainText("2");
   await childCard.getByRole("button", { name: "적용", exact: true }).click();
   await expect(pendingCards(page)).toHaveCount(0);
-  const { ward: afterDouble } = await readState(page);
+  const { shop: afterDouble } = await readState(page);
   const added = afterDouble.config.shifts.find((s) => s.code === dCode);
   expect([...(added?.parts ?? [])].sort(), "더블이 데이·이브닝으로 센다").toEqual(["D", "E"]);
   expect(

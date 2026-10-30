@@ -22,7 +22,7 @@ from backend.domain.models import (
 )
 from backend.tests import rules
 
-SAMPLE_PATH = Path(__file__).resolve().parents[2] / "lib" / "samples" / "ward-15.json"
+SAMPLE_PATH = Path(__file__).resolve().parents[2] / "lib" / "samples" / "shop-12.json"
 spec_adapter = TypeAdapter(ConstraintSpec)
 
 # 템플릿 12종이 바뀐 식 규칙 모양(설계 §2.5)
@@ -33,9 +33,9 @@ RULES = [
     rules.max_nights("c4", 3),
     rules.min_off("c5", 8),
     rules.off_after_night("c6", 1),
-    rules.leave("c8", "n01", [15, 16, 17]),
-    rules.fixed("c9", "n02", 3, "E"),
-    rules.preference("c10", "n03", "O", 9, weekends_only=True),
+    rules.leave("c8", "e01", [15, 16, 17]),
+    rules.fixed("c9", "e02", 3, "E"),
+    rules.preference("c10", "e03", "O", 9, weekends_only=True),
     rules.night_fair("c11"),
     rules.weekend_fair("c12"),
 ]
@@ -46,16 +46,16 @@ def _is_balance(raw: dict) -> bool:
 
 
 def _block(cid: str, type_: str, params: dict) -> dict:
-    return {"id": cid, "type": type_, "scope": "ward", "hardness": "hard", "source_text": "원문", "params": params}
+    return {"id": cid, "type": type_, "scope": "shop", "hardness": "hard", "source_text": "원문", "params": params}
 
 
-def nurses(n: int = 3) -> list[dict]:
-    return [{"id": f"n{i:02d}", "name": f"간호사{i}", "tags": []} for i in range(1, n + 1)]
+def employees(n: int = 3) -> list[dict]:
+    return [{"id": f"e{i:02d}", "name": f"직원{i}", "tags": []} for i in range(1, n + 1)]
 
 
 def request(constraints: list[dict], **extra) -> dict:
     return {
-        "nurses": nurses(),
+        "employees": employees(),
         "period": {"start_date": "2026-11-01", "length": 30},
         "holidays": [],
         "constraints": constraints,
@@ -184,8 +184,8 @@ def test_schedule_request_accepts_all_rules():
     assert req.history is None
 
 
-def test_unknown_nurse_id_reports_constraint_id():
-    bad = rules.leave("bad-leave", "n99", [1])
+def test_unknown_employee_id_reports_constraint_id():
+    bad = rules.leave("bad-leave", "e99", [1])
     with pytest.raises(ValidationError, match="bad-leave"):
         ScheduleRequest.model_validate(request([bad]))
 
@@ -193,9 +193,9 @@ def test_unknown_nurse_id_reports_constraint_id():
 @pytest.mark.parametrize(
     "raw",
     [
-        rules.leave("bad-day", "n01", [31]),
-        rules.fixed("bad-day", "n01", 0, "D"),
-        rules.preference("bad-day", "n01", "N", None, [40]),
+        rules.leave("bad-day", "e01", [31]),
+        rules.fixed("bad-day", "e01", 0, "D"),
+        rules.preference("bad-day", "e01", "N", None, [40]),
     ],
 )
 def test_day_out_of_range_reports_constraint_id(raw):
@@ -208,33 +208,33 @@ def test_holiday_out_of_range_rejected():
         ScheduleRequest.model_validate(request([], holidays=[31]))
 
 
-def test_carry_over_unknown_nurse_rejected():
-    with pytest.raises(ValidationError, match="n99"):
-        ScheduleRequest.model_validate(request([], carry_over=[{"nurse_id": "n99", "shifts": ["N"]}]))
+def test_carry_over_unknown_employee_rejected():
+    with pytest.raises(ValidationError, match="e99"):
+        ScheduleRequest.model_validate(request([], carry_over=[{"employee_id": "e99", "shifts": ["N"]}]))
 
 
 def test_carry_over_longer_than_limit_rejected():
     shifts = ["D"] * (constants.CARRY_OVER_DAYS + 1)
     with pytest.raises(ValidationError):
-        ScheduleRequest.model_validate(request([], carry_over=[{"nurse_id": "n01", "shifts": shifts}]))
+        ScheduleRequest.model_validate(request([], carry_over=[{"employee_id": "e01", "shifts": shifts}]))
 
 
 def test_previous_must_match_roster_and_period():
-    good = {n["id"]: ["O"] * 30 for n in nurses()}
+    good = {n["id"]: ["O"] * 30 for n in employees()}
     assert ScheduleRequest.model_validate(request([], previous=good)).previous == good
-    with pytest.raises(ValidationError, match="n99"):
-        ScheduleRequest.model_validate(request([], previous={**good, "n99": ["O"] * 30}))
-    with pytest.raises(ValidationError, match="n01"):
-        ScheduleRequest.model_validate(request([], previous={**good, "n01": ["O"] * 29}))
+    with pytest.raises(ValidationError, match="e99"):
+        ScheduleRequest.model_validate(request([], previous={**good, "e99": ["O"] * 30}))
+    with pytest.raises(ValidationError, match="e01"):
+        ScheduleRequest.model_validate(request([], previous={**good, "e01": ["O"] * 29}))
 
 
-def test_duplicate_nurse_ids_or_names_rejected():
-    dup_id = nurses() + [{"id": "n01", "name": "다른이름"}]
+def test_duplicate_employee_ids_or_names_rejected():
+    dup_id = employees() + [{"id": "e01", "name": "다른이름"}]
     with pytest.raises(ValidationError):
-        ScheduleRequest.model_validate({**request([]), "nurses": dup_id})
-    dup_name = nurses() + [{"id": "n09", "name": "간호사1"}]
+        ScheduleRequest.model_validate({**request([]), "employees": dup_id})
+    dup_name = employees() + [{"id": "e09", "name": "직원1"}]
     with pytest.raises(ValidationError):
-        ScheduleRequest.model_validate({**request([]), "nurses": dup_name})
+        ScheduleRequest.model_validate({**request([]), "employees": dup_name})
 
 
 def test_duplicate_constraint_ids_rejected():
@@ -246,8 +246,8 @@ def test_duplicate_constraint_ids_rejected():
 # --- 샘플 ---
 
 
-def test_sample_ward_is_rule_format():
-    """샘플 병동(lib/samples)은 식 규칙이다. 파일이 그대로 요청이 된다."""
+def test_sample_shop_is_rule_format():
+    """샘플 매장(lib/samples)은 식 규칙이다. 파일이 그대로 요청이 된다."""
     raw = json.loads(SAMPLE_PATH.read_text(encoding="utf-8"))
     next_requests = TypeAdapter(list[ConstraintSpec]).validate_python(raw.pop("next_requests"))
     assert next_requests and all(c.scope == "period" and c.type == "rule" for c in next_requests)
@@ -255,14 +255,14 @@ def test_sample_ward_is_rule_format():
     assert req.model_dump(mode="json", by_alias=True) == raw  # Pydantic dump 그대로(손으로 고친 흔적 없음)
     coverage = [c for c in req.constraints if c.id.startswith("cov-")]
     assert {c.id for c in coverage} == {f"cov-{k}-{s}" for s in "DEN" for k in ("weekday", "weekend")}
-    assert all(c.scope == "ward" and c.hardness == "hard" for c in coverage)
+    assert all(c.scope == "shop" and c.hardness == "hard" for c in coverage)
     assert {c.type for c in req.constraints} == {"rule"}
     assert req.config == DEFAULT_CONFIG
     assert req.input_version == 0
     assert req.period == Period(start_date=date(2026, 11, 1), length=30)
     assert req.holidays == []
-    assert len(req.nurses) == 15
-    names = {n.name for n in req.nurses}
+    assert len(req.employees) == 15
+    names = {n.name for n in req.employees}
     assert {"이영희", "박민수", "김철수", "정유진", "최지훈"} <= names
     assert all(c.default for c in req.constraints if c.id.startswith("cov-"))
 
@@ -290,17 +290,17 @@ def test_solve_response_discriminates_by_status():
         "deviation": 0.0,
     }
     result = {
-        "assignments": {"n01": ["D", "O"]},
+        "assignments": {"e01": ["D", "O"]},
         "summary": {"preferences_total": 1, "preferences_met": 1, "soft_violation_count": 0},
-        "stats": {"n01": stats},
+        "stats": {"e01": stats},
         "soft_violations": [],
         "diff": None,
         "optimal": True,
     }
     ok = adapter.validate_python({"status": "ok", "input_version": 2, "result": result})
     assert ok.result.optimal is True
-    assert ok.result.stats["n01"].counts["D"] == 1
-    old = {**result, "stats": {"n01": {**stats, "D": 1, "E": 0, "N": 0, "O": 1}}}
+    assert ok.result.stats["e01"].counts["D"] == 1
+    old = {**result, "stats": {"e01": {**stats, "D": 1, "E": 0, "N": 0, "O": 1}}}
     with pytest.raises(ValidationError):  # D/E/N/O 필드는 counts로 바뀌었다
         adapter.validate_python({"status": "ok", "input_version": 2, "result": old})
 
@@ -309,8 +309,8 @@ def test_translate_models():
     req = TranslateRequest.model_validate(
         {
             "text": "나이트 다음 날은 무조건 쉬게",
-            "scope": "ward",
-            "context": {"nurses": nurses(), "period": {"start_date": "2026-11-01", "length": 30}, "holidays": [], "today": "2026-10-26"},
+            "scope": "shop",
+            "context": {"employees": employees(), "period": {"start_date": "2026-11-01", "length": 30}, "holidays": [], "today": "2026-10-26"},
             "input_version": 5,
         }
     )
@@ -363,26 +363,26 @@ def test_error_body():
 
 
 def test_history_load_rejected():
-    load = [{"nurse_id": "n01", "nights": 8, "weekends": 3}]
+    load = [{"employee_id": "e01", "nights": 8, "weekends": 3}]
     with pytest.raises(ValidationError):  # 두 숫자 요약은 원본 history로 바뀌었다
         ScheduleRequest.model_validate(request([], history_load=load))
 
 
 def test_history_accepted():
-    history = rules.history("2026-11-01", {"n01": ["N"] * 8})
+    history = rules.history("2026-11-01", {"e01": ["N"] * 8})
     req = ScheduleRequest.model_validate(request([], history=history))
-    assert req.history.rows["n01"].count("N") == 8
+    assert req.history.rows["e01"].count("N") == 8
     assert req.history.start_date == date(2026, 10, 4)
 
 
-def test_history_unknown_nurse_or_code_rejected():
-    with pytest.raises(ValidationError, match="n99"):
-        ScheduleRequest.model_validate(request([], history=rules.history("2026-11-01", {"n99": ["N"]})))
+def test_history_unknown_employee_or_code_rejected():
+    with pytest.raises(ValidationError, match="e99"):
+        ScheduleRequest.model_validate(request([], history=rules.history("2026-11-01", {"e99": ["N"]})))
     with pytest.raises(ValidationError, match="M"):
-        ScheduleRequest.model_validate(request([], history=rules.history("2026-11-01", {"n01": ["M"]})))
+        ScheduleRequest.model_validate(request([], history=rules.history("2026-11-01", {"e01": ["M"]})))
 
 
 def test_history_longer_than_limit_rejected():
-    history = {"start_date": "2026-10-01", "rows": {"n01": ["O"] * (constants.HISTORY_DAYS + 1)}, "holidays": []}
+    history = {"start_date": "2026-10-01", "rows": {"e01": ["O"] * (constants.HISTORY_DAYS + 1)}, "holidays": []}
     with pytest.raises(ValidationError):
         ScheduleRequest.model_validate(request([], history=history))

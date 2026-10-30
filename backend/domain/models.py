@@ -10,7 +10,7 @@ from backend.domain.constants import (
     CARRY_OVER_DAYS,
     DEFAULT_SHIFTS,
     EXAMPLES_MAX_DAYS,
-    EXAMPLES_MAX_NURSES,
+    EXAMPLES_MAX_EMPLOYEES,
     EXAMPLES_PER_RULE,
     HISTORY_DAYS,
     MAX_COND_CMPS,
@@ -21,7 +21,7 @@ from backend.domain.constants import (
     MAX_RULE_VALUES,
     MAX_SHIFT_CODES,
     MAX_TAG_CHARS,
-    MAX_TAGS_PER_NURSE,
+    MAX_TAGS_PER_EMPLOYEE,
     MAX_WINDOW_DAYS,
     MIN_COND_CMPS,
     MIN_OFFSET,
@@ -30,9 +30,9 @@ from backend.domain.constants import (
     PRIORITY_WEIGHTS,
 )
 
-# 근무 코드는 병동 구조(config)가 정한다. 형식만 여기서 보고, 있는 코드인지는 요청 단위로 검사한다.
+# 근무 코드는 매장 구조(config)가 정한다. 형식만 여기서 보고, 있는 코드인지는 요청 단위로 검사한다.
 ShiftCode = Annotated[str, Field(pattern=r"^[A-Z0-9]{1,3}$")]
-Scope = Literal["ward", "period"]
+Scope = Literal["shop", "period"]
 Hardness = Literal["hard", "soft"]
 Priority = Literal["high", "normal", "low"]
 Tag = Annotated[str, Field(min_length=1, max_length=MAX_TAG_CHARS)]
@@ -42,7 +42,7 @@ class _Strict(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
 
-# --- 병동 구조 ---
+# --- 매장 구조 ---
 
 
 class ShiftDef(_Strict):
@@ -54,7 +54,7 @@ class ShiftDef(_Strict):
     active: bool = True  # 한 번이라도 쓰인 코드는 지우지 않고 끈다
 
 
-class WardConfig(_Strict):
+class ShopConfig(_Strict):
     shifts: list[ShiftDef] = Field(min_length=1, max_length=MAX_SHIFT_CODES)
 
     @model_validator(mode="after")
@@ -85,22 +85,22 @@ class WardConfig(_Strict):
         return {s.code for s in self.shifts}
 
 
-DEFAULT_CONFIG = WardConfig(shifts=[ShiftDef(code=c, name=name, hours=h) for c, name, h in DEFAULT_SHIFTS])
+DEFAULT_CONFIG = ShopConfig(shifts=[ShiftDef(code=c, name=name, hours=h) for c, name, h in DEFAULT_SHIFTS])
 
 
-def covers(config: WardConfig, code: str) -> set[str]:
+def covers(config: ShopConfig, code: str) -> set[str]:
     """코드가 세는 근무조: 자신 ∪ parts."""
     shift = next(s for s in config.shifts if s.code == code)
     return {code, *shift.parts}
 
 
-# --- 병동 ---
+# --- 매장 ---
 
 
-class Nurse(_Strict):
+class Employee(_Strict):
     id: str = Field(min_length=1)
     name: str = Field(min_length=1)
-    tags: list[Tag] = Field(default=[], max_length=MAX_TAGS_PER_NURSE)
+    tags: list[Tag] = Field(default=[], max_length=MAX_TAGS_PER_EMPLOYEE)
 
 
 class Period(_Strict):
@@ -125,7 +125,7 @@ class Period(_Strict):
 
 
 class FixedAssignmentParams(_Strict):
-    nurse_id: str
+    employee_id: str
     day: int
     shift: ShiftCode
 
@@ -378,7 +378,7 @@ ConstraintSpec = Annotated[Union[Rule, FixedAssignment], Field(discriminator="ty
 
 
 class CarryOverRow(_Strict):
-    nurse_id: str
+    employee_id: str
     shifts: list[ShiftCode] = Field(max_length=CARRY_OVER_DAYS)
 
 
@@ -393,18 +393,18 @@ class History(_Strict):
 Assignments = dict[str, list[ShiftCode]]
 
 
-def _check_roster(nurses: list[Nurse]) -> None:
+def _check_roster(employees: list[Employee]) -> None:
     for attr in ("id", "name"):
-        values = [getattr(n, attr) for n in nurses]
+        values = [getattr(n, attr) for n in employees]
         dups = sorted({v for v in values if values.count(v) > 1})
         if dups:
             raise ValueError(f"명단의 {attr}가 중복됩니다: {dups}")
 
 
 def _constraint_refs(c: typing.Any) -> tuple[list[str], list[int]]:
-    """제약이 참조하는 (nurse_ids, days)."""
+    """제약이 참조하는 (employee_ids, days)."""
     if isinstance(c, FixedAssignment):
-        return [c.params.nurse_id], [c.params.day]
+        return [c.params.employee_id], [c.params.day]
     b = c.body
     if isinstance(b, Balance):
         people, days = [b.people], [b.days]
@@ -424,8 +424,8 @@ def _constraint_codes(c: typing.Any) -> list[str]:
 
 
 class ScheduleRequest(_Strict):
-    config: WardConfig = DEFAULT_CONFIG
-    nurses: list[Nurse] = Field(min_length=1)
+    config: ShopConfig = DEFAULT_CONFIG
+    employees: list[Employee] = Field(min_length=1)
     period: Period
     holidays: list[int] = []
     constraints: list[ConstraintSpec] = []
@@ -436,8 +436,8 @@ class ScheduleRequest(_Strict):
 
     @model_validator(mode="after")
     def _referential_integrity(self):
-        _check_roster(self.nurses)
-        ids = {n.id for n in self.nurses}
+        _check_roster(self.employees)
+        ids = {n.id for n in self.employees}
         codes = self.config.codes
         days = self.period.days
         errors: list[str] = []
@@ -451,10 +451,10 @@ class ScheduleRequest(_Strict):
             if c.id in seen:
                 errors.append(f"제약 {c.id}: id 중복")
             seen.add(c.id)
-            nurse_ids, cdays = _constraint_refs(c)
-            for nurse_id in nurse_ids:
-                if nurse_id not in ids:
-                    errors.append(f"제약 {c.id}: 명단에 없는 nurse_id {nurse_id}")
+            employee_ids, cdays = _constraint_refs(c)
+            for employee_id in employee_ids:
+                if employee_id not in ids:
+                    errors.append(f"제약 {c.id}: 명단에 없는 employee_id {employee_id}")
             out = [d for d in cdays if not 1 <= d <= days]
             if out:
                 errors.append(f"제약 {c.id}: 1..{days} 범위 밖 day {out}")
@@ -463,27 +463,27 @@ class ScheduleRequest(_Strict):
                 errors.append(f"제약 {c.id}: 근무 형태에 없는 코드 {unknown}")
 
         for row in self.carry_over:
-            if row.nurse_id not in ids:
-                errors.append(f"carry_over: 명단에 없는 nurse_id {row.nurse_id}")
+            if row.employee_id not in ids:
+                errors.append(f"carry_over: 명단에 없는 employee_id {row.employee_id}")
             unknown = sorted(set(row.shifts) - codes)
             if unknown:
-                errors.append(f"carry_over: {row.nurse_id} 근무 형태에 없는 코드 {unknown}")
+                errors.append(f"carry_over: {row.employee_id} 근무 형태에 없는 코드 {unknown}")
 
-        for nurse_id, shifts in (self.previous or {}).items():
-            if nurse_id not in ids:
-                errors.append(f"previous: 명단에 없는 nurse_id {nurse_id}")
+        for employee_id, shifts in (self.previous or {}).items():
+            if employee_id not in ids:
+                errors.append(f"previous: 명단에 없는 employee_id {employee_id}")
             elif len(shifts) != days:
-                errors.append(f"previous: {nurse_id} 근무 {len(shifts)}일, {days}일이어야 함")
+                errors.append(f"previous: {employee_id} 근무 {len(shifts)}일, {days}일이어야 함")
             unknown = sorted(set(shifts) - codes)
             if unknown:
-                errors.append(f"previous: {nurse_id} 근무 형태에 없는 코드 {unknown}")
+                errors.append(f"previous: {employee_id} 근무 형태에 없는 코드 {unknown}")
 
-        for nurse_id, shifts in (self.history.rows if self.history else {}).items():
-            if nurse_id not in ids:
-                errors.append(f"history: 명단에 없는 nurse_id {nurse_id}")
+        for employee_id, shifts in (self.history.rows if self.history else {}).items():
+            if employee_id not in ids:
+                errors.append(f"history: 명단에 없는 employee_id {employee_id}")
             unknown = sorted(set(shifts) - codes)
             if unknown:
-                errors.append(f"history: {nurse_id} 근무 형태에 없는 코드 {unknown}")
+                errors.append(f"history: {employee_id} 근무 형태에 없는 코드 {unknown}")
 
         if errors:
             raise ValueError("; ".join(errors))
@@ -493,7 +493,7 @@ class ScheduleRequest(_Strict):
 # --- 결과 ---
 
 
-class NurseStats(_Strict):
+class EmployeeStats(_Strict):
     counts: dict[str, int]  # 근무 코드별 개수(활성 코드 + 배정된 코드)
     hours: float  # 근무 시간 합
     weekend_holiday_work: int
@@ -510,13 +510,13 @@ class Summary(_Strict):
 
 class SoftViolation(_Strict):
     constraint_id: str
-    nurse_id: str | None = None
+    employee_id: str | None = None
     day: int | None = None
     detail: str
 
 
 class DiffCell(_Strict):
-    nurse_id: str
+    employee_id: str
     day: int
     before: ShiftCode
     after: ShiftCode
@@ -525,7 +525,7 @@ class DiffCell(_Strict):
 class ScheduleResult(_Strict):
     assignments: Assignments
     summary: Summary
-    stats: dict[str, NurseStats]
+    stats: dict[str, EmployeeStats]
     soft_violations: list[SoftViolation]
     diff: list[DiffCell] | None = None
     optimal: bool
@@ -564,15 +564,15 @@ SolveResponse = Annotated[Union[SolveOk, SolveInfeasible, SolveTimeout], Field(d
 
 
 class TranslateContext(_Strict):
-    config: WardConfig = DEFAULT_CONFIG
-    nurses: list[Nurse]
+    config: ShopConfig = DEFAULT_CONFIG
+    employees: list[Employee]
     period: Period
     holidays: list[int] = []
     today: date
 
     @model_validator(mode="after")
     def _roster(self):
-        _check_roster(self.nurses)
+        _check_roster(self.employees)
         return self
 
 
@@ -593,11 +593,11 @@ class ShiftChange(_Strict):
 class RuleExample(_Strict):
     """예시 판정(설계 §4.2): 샘플 근무표에서 규칙을 어긴 사례 하나. 카드가 작은 근무 띠로 그린다."""
 
-    nurse_ids: list[str] = Field(min_length=1, max_length=EXAMPLES_MAX_NURSES)  # 띠에 보일 간호사
+    employee_ids: list[str] = Field(min_length=1, max_length=EXAMPLES_MAX_EMPLOYEES)  # 띠에 보일 직원
     days: list[int] = Field(min_length=1, max_length=EXAMPLES_MAX_DAYS)  # 띠에 보일 날짜(연속, 기간 안)
-    cells: dict[str, list[ShiftCode]]  # nurse_id → days 길이만큼의 코드
-    marks: list[tuple[str, int]]  # 어긋난 칸 (nurse_id, day)
-    detail: str  # 한 줄 설명. 코드 이름은 config에서, 간호사 이름은 넣지 않는다(화면이 그린다)
+    cells: dict[str, list[ShiftCode]]  # employee_id → days 길이만큼의 코드
+    marks: list[tuple[str, int]]  # 어긋난 칸 (employee_id, day)
+    detail: str  # 한 줄 설명. 코드 이름은 config에서, 직원 이름은 넣지 않는다(화면이 그린다)
 
 
 class TranslateOk(_Strict):

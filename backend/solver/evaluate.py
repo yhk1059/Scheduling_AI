@@ -16,7 +16,7 @@ from time import monotonic
 
 from backend.domain.constants import (
     EXAMPLES_MAX_DAYS,
-    EXAMPLES_MAX_NURSES,
+    EXAMPLES_MAX_EMPLOYEES,
     EXAMPLES_MIN_DAYS,
     EXAMPLES_OFF_RATIO,
     FAIRNESS_TOLERANCE,
@@ -45,7 +45,7 @@ _EPS = 1e-9
 
 @dataclass(frozen=True)
 class Instance:
-    nurse_id: str | None  # 사람이 묶인 범위면 그 사람
+    employee_id: str | None  # 사람이 묶인 범위면 그 사람
     days: tuple[int, ...]  # day·person_day는 (d,), week·window는 그 날들, person·period는 비움
 
 
@@ -80,7 +80,7 @@ def instances(request: ScheduleRequest, rule: Rule) -> list[Instance]:
         return [d for d in range(first, length + 1) if select.day_matches(request, fe.days, d) and _touches(request, body, d)]
 
     if fe.per == "day":
-        first = min((select.first_day(request, n.id) for n in request.nurses), default=1)
+        first = min((select.first_day(request, n.id) for n in request.employees), default=1)
         return [Instance(None, (d,)) for d in anchors(first)]
     if fe.per == "person_day":
         return [Instance(nid, (d,)) for nid in ids for d in anchors(select.first_day(request, nid))]
@@ -100,26 +100,26 @@ def instances(request: ScheduleRequest, rule: Rule) -> list[Instance]:
     return out
 
 
-def code_at(request: ScheduleRequest, assignments: Assignments, nurse_id: str, day: int) -> str | None:
+def code_at(request: ScheduleRequest, assignments: Assignments, employee_id: str, day: int) -> str | None:
     """칸 코드. 모르는 날이면 None."""
     if 1 <= day <= request.period.days:
-        return assignments[nurse_id][day - 1]
-    row = select.carry(request).get(nurse_id, [])
+        return assignments[employee_id][day - 1]
+    row = select.carry(request).get(employee_id, [])
     i = len(row) - 1 + day
     return row[i] if day <= 0 and i >= 0 else None
 
 
 def count_scope(request: ScheduleRequest, rule: Rule, inst: Instance, count: Count) -> list[tuple[str, int]]:
-    """세는 칸 (nurse_id, 날): 사람 집합 × 날 집합을 Count.days로 거른 것 중 아는 칸. 컴파일도 이 목록을 쓴다."""
+    """세는 칸 (employee_id, 날): 사람 집합 × 날 집합을 Count.days로 거른 것 중 아는 칸. 컴파일도 이 목록을 쓴다."""
     body = rule.body
     assert isinstance(body, Require)
     fe = body.for_each
     if count.who is not None:
         ids = select.people(request, count.who)
-    elif inst.nurse_id is not None:
-        ids = [inst.nurse_id]
+    elif inst.employee_id is not None:
+        ids = [inst.employee_id]
     else:
-        ids = [n.id for n in request.nurses]
+        ids = [n.id for n in request.employees]
     if fe.per in ("day", "person_day"):
         a, b = _offset(count)
         days = range(inst.days[0] + a, inst.days[0] + b + 1)
@@ -141,7 +141,7 @@ def count_scope(request: ScheduleRequest, rule: Rule, inst: Instance, count: Cou
 def count_cells(
     request: ScheduleRequest, assignments: Assignments, rule: Rule, inst: Instance, count: Count
 ) -> list[tuple[str, int, str]]:
-    """세는 칸 (nurse_id, 날, 코드)."""
+    """세는 칸 (employee_id, 날, 코드)."""
     return [(nid, d, code_at(request, assignments, nid, d)) for nid, d in count_scope(request, rule, inst, count)]
 
 
@@ -252,7 +252,7 @@ def sample_schedules(request: ScheduleRequest, seed: int, count: int) -> list[As
     config = request.config
     active = [s.code for s in config.shifts if s.active]
     work = [c for c in active if c != OFF_CODE]
-    ids = [n.id for n in request.nurses]
+    ids = [n.id for n in request.employees]
     length = request.period.days
 
     def cell() -> str:
@@ -333,8 +333,8 @@ def _example(request: ScheduleRequest, assignments: Assignments, rule: Rule, v: 
         return None
     context = _marks(request, assignments, rule, inst, cond_cmps(body.when), violated=False)
     ordered = [marks[0][0], *(n for n, _ in context[:1]), *(n for n, _ in marks), *(n for n, _ in context)]
-    nurse_ids = list(dict.fromkeys(ordered))[:EXAMPLES_MAX_NURSES]
-    marks = [m for m in marks if m[0] in nurse_ids]
+    employee_ids = list(dict.fromkeys(ordered))[:EXAMPLES_MAX_EMPLOYEES]
+    marks = [m for m in marks if m[0] in employee_ids]
     length = request.period.days
     anchor = [d for d in inst.days if 1 <= d <= length]
     scope = [d for c in failed for count in _sides(c) for _, d in count_scope(request, rule, inst, count) if d >= 1]
@@ -342,19 +342,19 @@ def _example(request: ScheduleRequest, assignments: Assignments, rule: Rule, v: 
     days = _strip_days(
         length,
         mark_days,
-        [anchor + mark_days, [d for n, d in context if n in nurse_ids], sorted(set(scope))],
+        [anchor + mark_days, [d for n, d in context if n in employee_ids], sorted(set(scope))],
     )
     return RuleExample(
-        nurse_ids=nurse_ids,
+        employee_ids=employee_ids,
         days=days,
-        cells={nid: [assignments[nid][d - 1] for d in days] for nid in nurse_ids},
+        cells={nid: [assignments[nid][d - 1] for d in days] for nid in employee_ids},
         marks=[(n, d) for n, d in marks if d in days],
         detail=describe_violation(request, assignments, rule, v, names=False),
     )
 
 
 def _overlaps(a: RuleExample, b: RuleExample) -> bool:
-    return bool(set(a.nurse_ids) & set(b.nurse_ids)) and bool(set(a.days) & set(b.days))
+    return bool(set(a.employee_ids) & set(b.employee_ids)) and bool(set(a.days) & set(b.days))
 
 
 def pick_examples(

@@ -9,7 +9,7 @@ from backend.domain.models import (
     Cmp,
     Count,
     DiffCell,
-    NurseStats,
+    EmployeeStats,
     People,
     Require,
     ScheduleRequest,
@@ -17,7 +17,7 @@ from backend.domain.models import (
     Shifts,
     SoftViolation,
     Summary,
-    WardConfig,
+    ShopConfig,
     cond_cmps,
 )
 from backend.solver import evaluate, select
@@ -25,8 +25,8 @@ from backend.solver.select import is_weekend  # noqa: F401  토·일 ∪ 공휴�
 
 
 def common_cells(request: ScheduleRequest) -> list[tuple[str, int, str]]:
-    """previous와 현재 요청에 공통인 (nurse_id, 날짜, 이전 근무). 새/빠진 간호사, 범위 밖 날짜는 무시."""
-    ids = {n.id for n in request.nurses}
+    """previous와 현재 요청에 공통인 (employee_id, 날짜, 이전 근무). 새/빠진 직원, 범위 밖 날짜는 무시."""
+    ids = {n.id for n in request.employees}
     return [
         (nid, d, before)
         for nid, row in (request.previous or {}).items()
@@ -39,7 +39,7 @@ def _diff(request: ScheduleRequest, assignments: Assignments) -> list[DiffCell] 
     if request.previous is None:
         return None
     return [
-        DiffCell(nurse_id=nid, day=d, before=before, after=assignments[nid][d - 1])
+        DiffCell(employee_id=nid, day=d, before=before, after=assignments[nid][d - 1])
         for nid, d, before in common_cells(request)
         if assignments[nid][d - 1] != before
     ]
@@ -56,7 +56,7 @@ def _runs(seq: list[str], pred, offset: int) -> list[tuple[int, int]]:
     return out
 
 
-def _shift_label(config: WardConfig, sel: Shifts) -> str:
+def _shift_label(config: ShopConfig, sel: Shifts) -> str:
     names = {s.code: s.name for s in config.shifts}
     if sel.in_ is not None:
         return "·".join(names[c] for c in sel.in_)
@@ -88,8 +88,8 @@ def _who_label(request: ScheduleRequest, who: People | None, names: bool = True)
         return ""
     if who.ids is not None:
         if not names:
-            return "지정한 간호사 "
-        names = {n.id: n.name for n in request.nurses}
+            return "지정한 직원 "
+        names = {n.id: n.name for n in request.employees}
         return "·".join(names[i] for i in who.ids) + " "
     parts = list(who.tags or [])
     return " ".join(parts) + " " if parts else ""
@@ -126,7 +126,7 @@ def describe_violation(
     request: ScheduleRequest, assignments: Assignments, rule: Any, v: evaluate.RuleViolation, names: bool = True
 ) -> str:
     """위반 한 줄: "{묶음} {값} (기준 {범위})". 그리고/또는은 어긴 비교를 " · "로 잇는다.
-    names=False면 간호사 이름 대신 "지정한 간호사"를 쓴다(예시 판정, 이름은 화면이 그린다)."""
+    names=False면 직원 이름 대신 "지정한 직원"을 쓴다(예시 판정, 이름은 화면이 그린다)."""
     body = rule.body
     if isinstance(body, Balance):
         values = evaluate.balance_values(request, assignments, body)
@@ -168,7 +168,7 @@ def _rule_violations(request: ScheduleRequest, a: Assignments, rule: Any) -> lis
     out = []
     for v in evaluate.evaluate_rule(request, a, rule):
         out += _cell_violations(request, a, rule, v) or [
-            (describe_violation(request, a, rule, v), v.instance.nurse_id, _rep_day(rule, v.instance))
+            (describe_violation(request, a, rule, v), v.instance.employee_id, _rep_day(rule, v.instance))
         ]
     return out
 
@@ -177,17 +177,17 @@ def violations(request: ScheduleRequest, assignments: Assignments, c: Any) -> li
     """제약 하나의 위반 목록(hardness와 관계없이 센다). 규칙 식은 evaluate.py로 평가한다."""
     if c.type == "fixed_assignment":
         p = c.params
-        if assignments[p.nurse_id][p.day - 1] == p.shift:
+        if assignments[p.employee_id][p.day - 1] == p.shift:
             return []
-        return [SoftViolation(constraint_id=c.id, nurse_id=p.nurse_id, day=p.day, detail=f"고정 {p.shift} 아님")]
+        return [SoftViolation(constraint_id=c.id, employee_id=p.employee_id, day=p.day, detail=f"고정 {p.shift} 아님")]
     return [
-        SoftViolation(constraint_id=c.id, nurse_id=nid, day=day, detail=detail)
+        SoftViolation(constraint_id=c.id, employee_id=nid, day=day, detail=detail)
         for detail, nid, day in _rule_violations(request, assignments, c)
     ]
 
 
 def _preference_cells(request: ScheduleRequest, c: Any) -> list[tuple[str, int, Shifts, bool]]:
-    """희망·기피로 세는 칸 (nurse_id, 날짜, 근무, 희망 여부).
+    """희망·기피로 세는 칸 (employee_id, 날짜, 근무, 희망 여부).
 
     soft·기간 범위 규칙에서 person 범위, when 없음, 한 사람(who.ids 또는 for_each.people.ids)의 개수를 숫자·값과
     비교하는 모양을 센다. 0 이하·0과 같음이면 기피, 아니면 희망.
@@ -213,20 +213,20 @@ def compute_result(request: ScheduleRequest, assignments: Assignments, optimal: 
     days = request.period.days
     active = [c for c in request.constraints if c.enabled]
 
-    pref_total: dict[str, int] = {n.id: 0 for n in request.nurses}
-    pref_met: dict[str, int] = {n.id: 0 for n in request.nurses}
+    pref_total: dict[str, int] = {n.id: 0 for n in request.employees}
+    pref_met: dict[str, int] = {n.id: 0 for n in request.employees}
     for c in active:
         for nid, d, sel, prefer in _preference_cells(request, c):
             pref_total[nid] += 1
             pref_met[nid] += select.matches(request.config, assignments[nid][d - 1], sel) == prefer
 
-    work = {n.id: days - assignments[n.id].count("O") for n in request.nurses}
+    work = {n.id: days - assignments[n.id].count("O") for n in request.employees}
     mean = sum(work.values()) / len(work)
     stats = {}
     hours = {sh.code: sh.hours for sh in request.config.shifts}
-    for n in request.nurses:
+    for n in request.employees:
         row = assignments[n.id]
-        stats[n.id] = NurseStats(
+        stats[n.id] = EmployeeStats(
             counts={sh.code: row.count(sh.code) for sh in request.config.shifts if sh.active or sh.code in row},
             hours=sum(hours[code] for code in row),
             weekend_holiday_work=sum(row[d - 1] != "O" for d in range(1, days + 1) if is_weekend(request, d)),
