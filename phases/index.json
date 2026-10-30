@@ -22,7 +22,8 @@
     },
     {
       "dir": "5-expressions",
-      "status": "pending"
+      "status": "completed",
+      "completed_at": "2026-10-30T15:50:06+0900"
     }
   ]
 }
