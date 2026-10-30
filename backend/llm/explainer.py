@@ -11,6 +11,7 @@ from backend.domain.models import (
     ConstraintChange,
     ConstraintSpec,
     RelaxationProposal,
+    Rule,
     ScheduleRequest,
     _constraint_codes,
     _constraint_refs,
@@ -31,8 +32,24 @@ def fallback_explanation(request: ScheduleRequest, conflicts: list[Conflict]) ->
 
 
 def _is_night_dedicated_rule(spec: Any) -> bool:
-    people = getattr(spec.params, "people", None)
+    if isinstance(spec, Rule):
+        body = spec.body
+        people = body.people if body.kind == "balance" else body.for_each.people
+    else:
+        people = getattr(spec.params, "people", None)
     return people is not None and NIGHT_ONLY_TAG in (people.tags or [])
+
+
+def _conflict_item(c: Conflict, spec: Any, nurses: list) -> dict:
+    """충돌 제약 하나. 식 규칙은 식 JSON(기본값 생략) + label 있는 values, 블록은 params."""
+    item: dict[str, Any] = {"id": c.constraint_id, "type": c.type, "hardness": spec.hardness if spec else None}
+    if isinstance(spec, Rule):
+        item["values"] = {k: v.model_dump(mode="json") for k, v in spec.values.items()}
+        item["body"] = spec.body.model_dump(mode="json", exclude_defaults=True)
+    else:
+        item["params"] = spec.params.model_dump(mode="json") if spec else None
+    item["source_text"] = pseudonymize(c.source_text, nurses)
+    return item
 
 
 def _context_message(request: ScheduleRequest, specs: dict[str, Any], conflicts: list[Conflict]) -> str:
@@ -49,18 +66,7 @@ def _context_message(request: ScheduleRequest, specs: dict[str, Any], conflicts:
         "days": [{"day": d, "date": period.date_of(d).isoformat()} for d in range(1, days + 1)],
         "weekend_and_holiday_days": weekends,
     }
-    items = []
-    for c in conflicts:
-        spec = specs.get(c.constraint_id)
-        items.append(
-            {
-                "id": c.constraint_id,
-                "type": c.type,
-                "hardness": spec.hardness if spec else None,
-                "params": spec.params.model_dump(mode="json") if spec else None,
-                "source_text": pseudonymize(c.source_text, nurses),
-            }
-        )
+    items = [_conflict_item(c, specs.get(c.constraint_id), nurses) for c in conflicts]
     return (
         f"<context>\n{json.dumps(context, ensure_ascii=False)}\n</context>\n"
         f"<conflicts>\n{json.dumps(items, ensure_ascii=False)}\n</conflicts>"
@@ -80,8 +86,33 @@ def _parse(result: ToolCallResult) -> ExplainerOutput:
         ) from e
 
 
+def _check_rule_change(change: ConstraintChange, spec: Rule) -> ConstraintChange | None:
+    """식 규칙은 값·켜기/끄기·반드시/가능하면만 바꾼다(★7). 구조(update)와 나이트 전담 규칙 완화는 거부한다."""
+    if _is_night_dedicated_rule(spec) or change.action == "update":
+        return None
+    if change.action == "disable":
+        return ConstraintChange(action="disable", constraint_id=change.constraint_id)
+    data = spec.model_dump(mode="json")
+    if change.action == "set_value":
+        if change.name not in spec.values or change.value is None or change.value < 0:
+            return None
+        data["values"][change.name]["value"] = change.value
+    else:
+        data["hardness"] = change.hardness
+    try:
+        _spec_adapter.validate_python(data)
+    except ValidationError:
+        return None
+    keep = {"name", "value"} if change.action == "set_value" else {"hardness"}
+    return ConstraintChange.model_validate(change.model_dump(include={"action", "constraint_id", *keep}))
+
+
 def _check_change(change: ConstraintChange, request: ScheduleRequest, spec: Any) -> ConstraintChange | None:
     """유효하면 params를 전체 값으로 채운 change, 아니면 None. params는 최상위 키 단위로 바꾼다(셀렉터는 통째로)."""
+    if isinstance(spec, Rule):
+        return _check_rule_change(change, spec)
+    if change.action in ("set_value", "set_hardness"):  # 블록은 step 8까지 disable·update만
+        return None
     if change.action == "disable":
         if _is_night_dedicated_rule(spec):  # 나이트 전담 규칙은 끄지 않는다
             return None

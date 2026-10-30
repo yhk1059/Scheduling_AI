@@ -236,9 +236,11 @@ def _apply(request: ScheduleRequest, changes: list[ConstraintChange]) -> Schedul
             specs[spec.id] = spec.model_copy(update={"enabled": False})
             continue
         data = spec.model_dump()
+        if change.action == "set_value":
+            data["values"][change.name]["value"] = change.value
         if change.params is not None:
             data["params"] = change.params
-        if change.hardness is not None:
+        if change.hardness is not None:  # update의 hardness, set_hardness
             data["hardness"] = change.hardness
         specs[spec.id] = _spec_adapter.validate_python(data)
     return request.model_copy(update={"constraints": list(specs.values())})

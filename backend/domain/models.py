@@ -699,10 +699,22 @@ TranslateResponse = Annotated[
 
 
 class ConstraintChange(_Strict):
-    action: Literal["disable", "update"]
+    """완화 변경. 식 규칙은 disable·set_value·set_hardness만 받는다(★7). update(params 교체)는 블록용이다."""
+
+    action: Literal["disable", "update", "set_value", "set_hardness"]
     constraint_id: str
     params: dict[str, typing.Any] | None = None
     hardness: Hardness | None = None
+    name: ValueName | None = None  # set_value: 바꿀 값 이름
+    value: float | None = None  # set_value: 새 값
+
+    @model_validator(mode="after")
+    def _fields(self):
+        if self.action == "set_value" and (self.name is None or self.value is None):
+            raise ValueError("set_value에는 name과 value가 있어야 합니다")
+        if self.action == "set_hardness" and self.hardness is None:
+            raise ValueError("set_hardness에는 hardness가 있어야 합니다")
+        return self
 
 
 class RelaxationProposal(_Strict):

@@ -3,35 +3,40 @@
 import calendar
 import json
 import uuid
-from typing import Any
-
-from pydantic import TypeAdapter, ValidationError
+from pydantic import ValidationError
 
 from backend.domain.constants import LLM_MAX_RETRIES, NIGHT_ONLY_TAG, OFF_CODE
 from backend.domain.models import (
-    ConstraintSpec,
-    CountParams,
+    All,
+    Balance,
+    Cmp,
+    Count,
     Days,
     Nurse,
     People,
+    Require,
+    Rule,
     ShiftChange,
     TranslateClarify,
     TranslateContext,
     TranslateOk,
     TranslateRequest,
     TranslateUnsupported,
+    ValueRef,
     WardConfig,
     _constraint_codes,
     _constraint_refs,
+    _value_refs,
+    rule_counts,
 )
 from backend.llm.client import LLMClient, LLMInvalidOutputError, ToolCallResult
-from backend.llm.prompts import TRANSLATE_SYSTEM, TRANSLATE_TOOL, TranslatorOutput
+from backend.llm.prompts import TRANSLATE_SYSTEM, TRANSLATE_TOOL, RuleDraft, TranslatorOutput
 from backend.llm.pseudonym import pseudonymize, restore
 
 TranslateResult = TranslateOk | TranslateClarify | TranslateUnsupported
 
-_spec_adapter = TypeAdapter(ConstraintSpec)
 _EMPTY_QUESTION = "어떤 규칙인지 조금 더 구체적으로 알려 주세요."
+_EXPR_QUESTION = "규칙을 식으로 세우지 못했어요. 무엇을 몇 번(몇 명) 지켜야 하는지 조금 더 구체적으로 적어 주세요."
 
 
 class _OutputError(Exception):
@@ -133,27 +138,67 @@ def _days(ctx: TranslateContext, sel: Days) -> list[int]:
     return out
 
 
-def _check_targets(i: int, spec: Any, ctx: TranslateContext) -> tuple[list[str], list[str]]:
-    """빈 대상 검사와 싼 모순 검사(설계 §5.2). (오류, 질문)."""
-    p = spec.params
-    people = _people(ctx.nurses, p.people)
-    if not people:
-        named = f"{', '.join(p.people.tags)} 태그를 가진 " if p.people.tags else "고른 조건에 맞는 "
-        return [f"constraints.{i}.params.people: 고른 사람이 0명"], [
-            f"{named}간호사가 없어요. 누구를 말씀하시는 건가요?"
-        ]
-    if hasattr(p, "days") and not _days(ctx, p.days):
-        return [f"constraints.{i}.params.days: 이번 기간에서 고른 날이 0일"], [
-            "이번 근무표에는 고른 날짜에 해당하는 날이 없어요. 날짜를 확인해 주세요."
-        ]
-    if isinstance(p, CountParams) and p.per == "day" and p.measure == "count" and p.min is not None and p.min > len(people):
-        return [f"constraints.{i}.params.min: 하루 {p.min:g}명이 필요한데 대상은 {len(people)}명"], [
-            f"하루 {p.min:g}명이 필요한데 해당하는 간호사는 {len(people)}명이에요. 인원이나 대상을 확인해 주세요."
-        ]
+def _selectors(rule: Rule) -> tuple[list[tuple[str, People]], list[tuple[str, Days]]]:
+    """규칙의 (위치, 사람 셀렉터)와 (위치, 범위 날 셀렉터)."""
+    body = rule.body
+    if isinstance(body, Balance):
+        return [("body.people", body.people)], [("body.days", body.days)]
+    people = [("body.for_each.people", body.for_each.people)]
+    people += [("body.who", c.who) for c in rule_counts(body) if c.who is not None]
+    return people, [("body.for_each.days", body.for_each.days)]
+
+
+def _expr_errors(i: int, draft: RuleDraft) -> list[str]:
+    """값 이름 참조와 offset 위치. Rule 검증과 같은 규칙을 LLM이 고칠 수 있는 문장으로 쓴다."""
+    body, errors = draft.body, []
+    refs = set(_value_refs(body))
+    missing = sorted(refs - set(draft.values))
+    if missing:
+        errors.append(f"rules.{i}.values: 식이 참조하는 값 {missing}이 values에 없습니다")
+    unused = sorted(set(draft.values) - refs)
+    if unused:
+        errors.append(f"rules.{i}.values: 식에서 쓰지 않는 값 {unused}. values에서 빼세요")
+    if isinstance(body, Require) and body.for_each.per not in ("day", "person_day") and any(c.offset for c in rule_counts(body)):
+        errors.append(f"rules.{i}.body: offset은 날이 묶인 범위(day, person_day)에서만 씁니다(지금 per {body.for_each.per})")
+    return errors
+
+
+def _then_cmps(body: Require) -> list[Cmp]:
+    """반드시 함께 참이어야 하는 then 비교(또는은 한쪽만 지키면 되니 뺀다)."""
+    if isinstance(body.then, Cmp):
+        return [body.then]
+    return list(body.then.all) if isinstance(body.then, All) else []
+
+
+def _check_targets(i: int, rule: Rule, ctx: TranslateContext) -> tuple[list[str], list[str]]:
+    """빈 대상 검사와 싼 모순 검사. (오류, 질문)."""
+    people_sels, days_sels = _selectors(rule)
+    for loc, sel in people_sels:
+        if not _people(ctx.nurses, sel):
+            named = f"{', '.join(sel.tags)} 태그를 가진 " if sel.tags else "고른 조건에 맞는 "
+            return [f"rules.{i}.{loc}: 고른 사람이 0명"], [f"{named}간호사가 없어요. 누구를 말씀하시는 건가요?"]
+    for loc, sel in days_sels:
+        if not _days(ctx, sel):
+            return [f"rules.{i}.{loc}: 이번 기간에서 고른 날이 0일"], [
+                "이번 근무표에는 고른 날짜에 해당하는 날이 없어요. 날짜를 확인해 주세요."
+            ]
+    body = rule.body
+    if isinstance(body, Require) and body.for_each.per == "day":
+        for c in _then_cmps(body):
+            left = c.left
+            if c.op == "le" or left.measure != "count" or left.offset not in (None, (0, 0)) or isinstance(c.right, Count):
+                continue
+            need = rule.values[c.right.value].value if isinstance(c.right, ValueRef) else c.right
+            people = _people(ctx.nurses, left.who or People())
+            if need > len(people):
+                return [f"rules.{i}.body.then: 하루 {need:g}명이 필요한데 대상은 {len(people)}명"], [
+                    f"하루 {need:g}명이 필요한데 해당하는 간호사는 {len(people)}명이에요. 인원이나 대상을 확인해 주세요."
+                ]
     return [], []
 
 
-def _to_specs(output: TranslatorOutput, req: TranslateRequest) -> list:
+def _to_specs(output: TranslatorOutput, req: TranslateRequest) -> list[Rule]:
+    """검증 순서: (Pydantic은 이미 통과) 설정 변경 → 식(값 이름·offset) → 참조 → 빈 대상 → 싼 모순."""
     ctx = req.context
     ids = {n.id for n in ctx.nurses}
     known_tags = set(_known_tags(ctx))
@@ -162,29 +207,38 @@ def _to_specs(output: TranslatorOutput, req: TranslateRequest) -> list:
     questions = ["근무 형태 변경을 이해하지 못했어요. 근무 이름과 시간을 다시 적어 주세요."] if errors else []
     codes = config.codes if config else ctx.config.codes | {c.shift.code for c in output.config_changes}
     specs = []
-    for i, draft in enumerate(output.constraints):
-        data = {k: v for k, v in draft.model_dump().items() if v is not None or k not in ("hardness", "priority")}
-        spec = _spec_adapter.validate_python({**data, "id": uuid.uuid4().hex[:8], "scope": req.scope, "enabled": True})
-        specs.append(spec)
+    for i, draft in enumerate(output.rules):
+        expr_errors = _expr_errors(i, draft)
+        if not expr_errors:
+            data = draft.model_dump(mode="json", exclude_none=True)
+            try:
+                rule = Rule.model_validate({**data, "type": "rule", "id": uuid.uuid4().hex[:8], "scope": req.scope, "enabled": True})
+            except ValidationError as e:
+                expr_errors = [f"rules.{i}: {_format_errors(e)}"]
+        if expr_errors:
+            errors += expr_errors
+            questions.append(_EXPR_QUESTION)
+            continue
+        specs.append(rule)
         before = len(errors)
-        nurse_ids, cdays = _constraint_refs(spec)
-        for nurse_id in (n for n in nurse_ids if n not in ids):
-            errors.append(f"constraints.{i}.params.people.ids: 명단에 없는 id {nurse_id}")
+        nurse_ids, cdays = _constraint_refs(rule)
+        for nurse_id in sorted({n for n in nurse_ids if n not in ids}):
+            errors.append(f"rules.{i}: 명단에 없는 id {nurse_id}")
             questions.append(f"명단에 없는 간호사({nurse_id})가 포함되어 있습니다. 이름을 확인해 주세요.")
-        tags = sorted({*(spec.params.people.tags or []), *spec.params.people.exclude_tags} - known_tags)
+        tags = sorted({t for _, sel in _selectors(rule)[0] for t in (*(sel.tags or []), *sel.exclude_tags)} - known_tags)
         if tags:
-            errors.append(f"constraints.{i}.params.people: known_tags에 없는 태그 {tags}")
+            errors.append(f"rules.{i}: known_tags에 없는 태그 {tags}")
             questions.append(f"명단에 없는 태그({', '.join(tags)})예요. 태그를 확인해 주세요.")
-        out = [d for d in cdays if not 1 <= d <= days]
+        out = sorted({d for d in cdays if not 1 <= d <= days})
         if out:
-            errors.append(f"constraints.{i}.params: 1..{days} 범위 밖 날짜 {out}")
+            errors.append(f"rules.{i}: 1..{days} 범위 밖 날짜 {out}")
             questions.append(f"{out}일은 이번 기간(1~{days}일) 밖입니다. 날짜를 확인해 주세요.")
-        unknown = sorted(set(_constraint_codes(spec)) - codes)
+        unknown = sorted(set(_constraint_codes(rule)) - codes)
         if unknown:
-            errors.append(f"constraints.{i}.params: 근무 형태에 없는 코드 {unknown}. 새 근무면 config_changes로 추가하세요")
+            errors.append(f"rules.{i}: 근무 형태에 없는 코드 {unknown}. 새 근무면 config_changes로 추가하세요")
             questions.append(f"근무 형태에 없는 근무({', '.join(unknown)})예요. 근무 이름을 확인하거나 근무를 먼저 추가해 주세요.")
         if len(errors) == before:
-            target_errors, target_questions = _check_targets(i, spec, ctx)
+            target_errors, target_questions = _check_targets(i, rule, ctx)
             errors += target_errors
             questions += target_questions
     if errors:
@@ -208,7 +262,7 @@ def _parse(result: ToolCallResult, req: TranslateRequest) -> TranslateResult:
         return TranslateUnsupported(status="unsupported", input_version=v, reason=restore(output.unsupported_reason, nurses))
     if output.clarification_question:
         return TranslateClarify(status="clarify", input_version=v, question=restore(output.clarification_question, nurses))
-    if not output.constraints and not output.config_changes:
+    if not output.rules and not output.config_changes:
         return TranslateClarify(status="clarify", input_version=v, question=_EMPTY_QUESTION)
 
     specs = _to_specs(output, req)

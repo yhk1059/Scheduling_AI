@@ -33,6 +33,7 @@ from backend.domain.models import (  # noqa: E402
     DEFAULT_CONFIG,
     ConstraintSpec,
     Nurse,
+    People,
     Period,
     ScheduleRequest,
     ShiftChange,
@@ -40,7 +41,9 @@ from backend.domain.models import (  # noqa: E402
     TranslateContext,
     TranslateRequest,
     WardConfig,
+    rule_counts,
 )
+from backend.domain.convert import block_to_rules  # noqa: E402
 from backend.env import load_local_env  # noqa: E402
 from backend.llm.client import (  # noqa: E402
     AnthropicClient,
@@ -193,15 +196,38 @@ def judge_schedules(case: dict | None, config: WardConfig, expected: list) -> li
     return out
 
 
+def _as_rules(specs: list) -> list:
+    """블록은 식 규칙으로 바꿔 같은 단위(규칙)로 비교한다. 바꿀 수 없는 블록은 그대로 둔다."""
+    out = []
+    for s in specs:
+        try:
+            out += block_to_rules(s)
+        except ValueError:
+            out.append(s)
+    return out
+
+
+def _scope_people(request: ScheduleRequest, spec: Any) -> frozenset:
+    """사람 없는 위반의 사람 묶음: 블록·고르게는 고른 사람, 사람이 묶인 범위는 그 사람들, 날·기간 범위는 세는 사람(who)."""
+    if spec.type != "rule":
+        return frozenset(select.people(request, spec.params.people))
+    body = spec.body
+    if body.kind == "balance":
+        return frozenset(select.people(request, body.people))
+    if body.for_each.per not in ("day", "period"):
+        return frozenset(select.people(request, body.for_each.people))
+    return frozenset(n for c in rule_counts(body) for n in select.people(request, c.who or People()))
+
+
 def _signature(spec: Any, schedules: list[tuple[ScheduleRequest, dict]]) -> Any:
-    """근무표마다 위반 집합 {(사람 묶음, 날)}. 사람 없는 위반(날마다·고르게)은 블록이 고른 사람 전체로 본다."""
+    """근무표마다 위반 집합 {(사람 묶음, 날)}. 사람 없는 위반(날마다·고르게)은 규칙이 고른 사람 전체로 본다."""
     try:
         sig = []
         for request, assignments in schedules:
             if spec.type == "fixed_assignment":
                 everyone = frozenset({spec.params.nurse_id})
             else:
-                everyone = frozenset(select.people(request, spec.params.people))
+                everyone = _scope_people(request, spec)
             found = violations(request, assignments, spec)
             sig.append(frozenset((frozenset({v.nurse_id}) if v.nurse_id else everyone, v.day) for v in found))
         return tuple(sig)
@@ -215,14 +241,14 @@ def _judge_key(spec: Any, schedules: list) -> tuple:
 
 
 def score_constraints(expected: list, actual: list, case: dict | None = None, config: WardConfig | None = None) -> tuple[int, int, int]:
-    """의미 기준 일대일 매칭. (일치 수, 기대 수, 실제 수)."""
+    """의미 기준 일대일 매칭(식 규칙 단위). (일치 수, 기대 수, 실제 수)."""
     config = config or judge_config([])
     exp = [_spec(c) for c in expected]
-    act = [_spec(c) for c in actual]
     schedules = judge_schedules(case, config, exp)
-    e = Counter(_judge_key(s, schedules) for s in exp)
-    a = Counter(_judge_key(s, schedules) for s in act)
-    return sum((e & a).values()), len(exp), len(act)
+    exp_rules, act_rules = _as_rules(exp), _as_rules([_spec(c) for c in actual])
+    e = Counter(_judge_key(s, schedules) for s in exp_rules)
+    a = Counter(_judge_key(s, schedules) for s in act_rules)
+    return sum((e & a).values()), len(exp_rules), len(act_rules)
 
 
 def _change_key(ch: dict | ShiftChange) -> tuple:

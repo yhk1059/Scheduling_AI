@@ -324,6 +324,154 @@ def test_names_restored_in_text_title_description():
     assert proposals[0].changes[0].params["people"]["ids"] == ["n01"]
 
 
+# --- 식 규칙: 값·끄기·가능하면만 ---
+
+COV_RULE = {
+    "id": "cov-r",
+    "scope": "ward",
+    "type": "rule",
+    "default": True,
+    "values": {"min": {"value": 3, "label": "인원"}},
+    "body": {
+        "kind": "require",
+        "for_each": {"per": "day", "days": {"kind": "weekend"}},
+        "then": {"left": {"shifts": {"in": ["D"]}}, "op": "eq", "right": {"value": "min"}},
+    },
+    "source_text": "주말 데이 3명",
+}
+MAX_NIGHTS = {
+    "id": "mx",
+    "scope": "ward",
+    "type": "rule",
+    "values": {"max_len": {"value": 3, "label": "최대 연속 나이트"}},
+    "body": {
+        "kind": "require",
+        "for_each": {"per": "person_window", "window": 4},
+        "then": {"left": {"shifts": {"in": ["N"]}}, "op": "le", "right": {"value": "max_len"}},
+    },
+    "source_text": "나이트 3연속까지",
+}
+NIGHT_ONLY_RULE = {
+    "id": "night-only",
+    "scope": "ward",
+    "type": "rule",
+    "default": True,
+    "values": {"max": {"value": 0, "label": "최대 횟수"}},
+    "body": {
+        "kind": "require",
+        "for_each": {"per": "person", "people": {"tags": ["나이트전담"]}},
+        "then": {"left": {"shifts": {"not_in": ["N", "O"]}}, "op": "le", "right": {"value": "max"}},
+    },
+    "source_text": "나이트 전담은 나이트와 휴무만",
+}
+RULE_REQUEST = ScheduleRequest(
+    nurses=NURSES,
+    period=Period(start_date=date(2026, 11, 1), length=30),
+    holidays=[5],
+    constraints=[COV_RULE, MAX_NIGHTS, NIGHT_ONLY_RULE, LEAVE, FIXED, UNRELATED],
+    input_version=4,
+)
+RULE_CONFLICTS = [
+    Conflict(constraint_id="cov-r", type="rule", source_text="주말 데이 3명"),
+    Conflict(constraint_id="mx", type="rule", source_text="나이트 3연속까지"),
+    Conflict(constraint_id="night-only", type="rule", source_text="나이트 전담은 나이트와 휴무만"),
+    Conflict(constraint_id="lv1", type="count", source_text="이영희 14~15일 휴가"),
+    Conflict(constraint_id="fx1", type="fixed_assignment", source_text="박민수 14일 N 고정"),
+]
+
+
+def set_value(cid: str, name: str, value: float) -> dict:
+    return {"action": "set_value", "constraint_id": cid, "name": name, "value": value}
+
+
+def set_hardness(cid: str, hardness: str = "soft") -> dict:
+    return {"action": "set_hardness", "constraint_id": cid, "hardness": hardness}
+
+
+def explain_rules(*props: dict) -> list:
+    client = FakeClient(ok({"text": TEXT, "proposals": list(props)}))
+    _, proposals = explain(RULE_REQUEST, RULE_CONFLICTS, client)
+    return proposals
+
+
+def test_rule_context_has_expression_values_and_source_text():
+    client = FakeClient(ok({"text": TEXT, "proposals": []}))
+    explain(RULE_REQUEST, RULE_CONFLICTS, client)
+    body = client.calls[0]["messages"][0]["content"]
+    items = json.loads(body.split("<conflicts>\n")[1].split("\n</conflicts>")[0])
+    cov = next(x for x in items if x["id"] == "cov-r")
+    assert cov["type"] == "rule" and cov["hardness"] == "hard"
+    assert cov["values"] == {"min": {"value": 3, "label": "인원"}}
+    assert cov["body"]["for_each"] == {"per": "day", "days": {"kind": "weekend"}}  # 기본값은 빼고 보낸다
+    assert cov["body"]["then"]["right"] == {"value": "min"}
+    assert cov["source_text"] == "주말 데이 3명"
+    assert "params" not in cov
+    lv = next(x for x in items if x["id"] == "lv1")
+    assert lv["params"]["max"] == 0  # 블록은 그대로 params
+
+
+def test_set_value_kept_with_name_and_value():
+    (p,) = explain_rules(proposal("최대 연속 나이트 3 → 4", set_value("mx", "max_len", 4)))
+    (change,) = p.changes
+    assert (change.action, change.constraint_id, change.name, change.value) == ("set_value", "mx", "max_len", 4)
+    assert change.params is None and change.hardness is None
+
+
+def test_set_hardness_and_disable_on_rule_kept():
+    props = explain_rules(proposal("가능하면으로", set_hardness("mx")), proposal("끄기", disable("cov-r")))
+    assert [p.changes[0].action for p in props] == ["set_hardness", "disable"]
+    assert props[0].changes[0].hardness == "soft"
+
+
+def test_rule_structure_changes_rejected():
+    props = explain_rules(
+        proposal("구조 바꾸기", update("mx", {"for_each": {"per": "person_window", "window": 5}})),
+        proposal("hardness도 update로는 안 됨", update("mx", hardness="soft")),
+        proposal("없는 값 이름", set_value("mx", "min", 2)),
+        proposal("음수 값", set_value("cov-r", "min", -1)),
+        proposal("정상과 함께여도", set_value("mx", "max_len", 4), update("cov-r", {"min": 2})),
+        proposal("정상", set_value("cov-r", "min", 2)),
+    )
+    assert [p.title for p in props] == ["정상"]
+
+
+def test_set_value_and_set_hardness_rejected_for_blocks():
+    props = explain_rules(
+        proposal("블록 값", set_value("lv1", "max", 1)),
+        proposal("고정 칸 가능하면", set_hardness("fx1")),
+        proposal("블록 update는 그대로", update("lv1", {"days": {"days": [15]}})),
+    )
+    assert [p.title for p in props] == ["블록 update는 그대로"]
+
+
+def test_night_only_rule_never_relaxed():
+    props = explain_rules(
+        proposal("끄기", disable("night-only")),
+        proposal("값", set_value("night-only", "max", 3)),
+        proposal("가능하면", set_hardness("night-only")),
+        proposal("정상", disable("fx1")),
+    )
+    assert [p.title for p in props] == ["정상"]
+
+
+def test_set_value_without_name_is_schema_error_and_retried():
+    bad = {"action": "set_value", "constraint_id": "mx", "value": 4}
+    client = FakeClient(
+        ok({"text": TEXT, "proposals": [proposal("이름 없음", bad)]}),
+        ok({"text": TEXT, "proposals": [proposal("정상", set_value("mx", "max_len", 4))]}),
+    )
+    _, proposals = explain(RULE_REQUEST, RULE_CONFLICTS, client)
+    assert len(client.calls) == 2
+    assert "set_value" in client.calls[1]["messages"][-1]["content"]
+    assert [p.title for p in proposals] == ["정상"]
+
+
+def test_prompt_explains_rules_and_relaxation_kinds():
+    for word in ("for_each", "when", "then", "values", "label", "set_value", "set_hardness", "해설자"):
+        assert word in EXPLAIN_SYSTEM
+    assert "구조" in EXPLAIN_SYSTEM and "바꾸지 않는다" in EXPLAIN_SYSTEM
+
+
 # --- 결정적 대체 경로 ---
 
 
