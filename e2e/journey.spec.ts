@@ -50,14 +50,17 @@ const ROSTER: [string, number, boolean][] = [
   ["문가람", 11, true],
   ["배수아", 4, true],
 ];
-const COVERAGE: [string, string, number][] = [
-  ["평일", "데이", 3],
-  ["평일", "이브닝", 3],
-  ["평일", "나이트", 2],
-  ["주말·공휴일", "데이", 3],
-  ["주말·공휴일", "이브닝", 2],
-  ["주말·공휴일", "나이트", 2],
+// [요일 종류, 근무 이름, 최소, 최대] (BROWSER_TEST_SCENARIOS D2). 평일 데이는 범위 3~4명
+const COVERAGE: [string, string, number, number][] = [
+  ["평일", "데이", 3, 4],
+  ["평일", "이브닝", 3, 3],
+  ["평일", "나이트", 2, 2],
+  ["주말·공휴일", "데이", 3, 3],
+  ["주말·공휴일", "이브닝", 2, 2],
+  ["주말·공휴일", "나이트", 2, 2],
 ];
+const SHIFT_CODE: Record<string, string> = { 데이: "D", 이브닝: "E", 나이트: "N" };
+const DEFAULT_CARDS = 7; // 필요 인원 6장 + 나이트 전담
 const HOLIDAY = 18;
 const NOV_WEEKEND_DAYS = [1, 7, 8, 14, 15, 18, 21, 22, 28, 29];
 const RULE_INPUT = "병동 규칙 입력";
@@ -111,7 +114,7 @@ test.afterEach(async () => {
   expect(problems, "콘솔 오류·API 실패").toEqual([]);
 });
 
-test("S5. 처음 설정 ① 병동·명단 → ② 필요 인원", async () => {
+test("S5. 처음 설정 ① 병동·명단 → ② 병동 소개(필요 인원 숫자 폼)", async () => {
   await page.goto("/app");
   await page.getByRole("button", { name: "내 병동으로 시작하기" }).click();
   await expect(page.getByRole("heading", { name: "처음 설정", level: 1 })).toBeVisible();
@@ -183,26 +186,36 @@ test("S5. 처음 설정 ① 병동·명단 → ② 필요 인원", async () => {
   await expectNoDevTerms(page, "처음 설정 ①");
   await next.click();
 
-  // ② 필요 인원
-  await expect(setupStepper().locator('[aria-current="step"]')).toContainText("필요 인원");
-  await expect(page.getByRole("heading", { name: "필요 인원", exact: true })).toBeFocused();
-  await expect(next).toBeDisabled();
-  await expect(page.getByText("필요 인원을 모두 입력하면 다음으로 넘어갈 수 있어요")).toBeVisible();
-  for (const [kind, shift, count] of COVERAGE) {
-    await page.getByRole("textbox", { name: `${kind} ${shift} 인원` }).fill(String(count));
+  // ② 병동 소개: 필요 인원은 필수가 아니다. 접힌 "숫자로 입력하기"로 칸마다 최소·최대를 넣는다
+  await expect(setupStepper().locator('[aria-current="step"]')).toContainText("병동 소개");
+  await expect(page.getByRole("heading", { name: "병동 소개", exact: true }).first()).toBeFocused();
+  await expect(page.getByRole("textbox", { name: "병동 소개 입력" })).toBeVisible();
+  await expect(next).toBeEnabled();
+  await expect(page.getByText("필요 인원 없이 만들면 인원을 맞추지 않아요")).toBeVisible();
+  const numbers = page.getByRole("button", { name: "숫자로 입력하기" });
+  await expect(numbers).toHaveAttribute("aria-expanded", "false");
+  await numbers.click();
+  await expect(numbers).toHaveAttribute("aria-expanded", "true");
+  for (const [kind, shift, min, max] of COVERAGE) {
+    await page.getByRole("textbox", { name: `${kind} ${shift} 최소 인원` }).fill(String(min));
+    await page.getByRole("textbox", { name: `${kind} ${shift} 최대 인원` }).fill(String(max));
   }
-  // 하루 근무·쉬는 사람 수(명단 15명)
-  await expect(page.getByText("8명 근무 · 7명 쉼")).toBeVisible();
-  await expect(page.getByText("7명 근무 · 8명 쉼")).toBeVisible();
-  const weekdayDay = page.getByRole("textbox", { name: "평일 데이 인원" });
+  await expect(page.getByText("필요 인원 없이 만들면 인원을 맞추지 않아요")).toHaveCount(0);
+  const weekdayDay = page.getByRole("textbox", { name: "평일 데이 최소 인원" });
   await weekdayDay.fill("abc");
   await expect(weekdayDay).toHaveAttribute("aria-invalid", "true");
   await expect(page.getByText("인원은 숫자로 적어 주세요.")).toBeVisible();
+  await weekdayDay.fill("5");
+  await expect(page.getByText("최소가 최대보다 커요.")).toBeVisible();
+  // 근무조 합계로 막지 않는다(사람이 모자라면 근무표를 만들 때 알려 준다)
   await weekdayDay.fill("10");
-  await expect(page.getByText("평일에 하루 15명이 일해야 해서 쉴 사람이 없어요. 명단은 15명이에요.")).toBeVisible();
-  await weekdayDay.fill("3");
-  await expect(page.getByText("인원은 숫자로 적어 주세요.")).toHaveCount(0);
+  await page.getByRole("textbox", { name: "평일 데이 최대 인원" }).fill("10");
   await expect(page.getByText("쉴 사람이 없어요", { exact: false })).toHaveCount(0);
+  await expect(page.getByText(/인원은 숫자로|최소가 최대보다/)).toHaveCount(0);
+  await weekdayDay.fill("3");
+  await page.getByRole("textbox", { name: "평일 데이 최대 인원" }).fill("4");
+  await expect(page.getByText(/인원은 숫자로|최소가 최대보다/)).toHaveCount(0);
+  await expect(page.getByText(/명 근무 · \d+명 쉼/)).toHaveCount(0);
 
   const { ward } = await readState(page);
   expect(ward.name).toBe("내과 병동");
@@ -212,14 +225,14 @@ test("S5. 처음 설정 ① 병동·명단 → ② 필요 인원", async () => {
   expect(ward.nurses.filter((n) => n.tags.includes("나이트전담")).map((n) => n.name)).toEqual(["문가람", "배수아"]);
   const coverage = ward.rules.filter((c) => c.id.startsWith("cov-"));
   expect(coverage).toHaveLength(6);
-  expect(
-    coverage.every((c) => {
-      const s = ruleShape(c);
-      return s?.kind === "count" && s.min?.n === s.max?.n;
-    }),
-    "숫자 하나 = 정확히 그 인원",
-  ).toBe(true);
-  await expect(next).toBeEnabled();
+  expect(coverage.every((c) => c.type === "rule" && c.default === true), "필요 인원은 기본 규칙").toBe(true);
+  const ranges = coverage.map((c) => {
+    const s = ruleShape(c);
+    return s?.kind === "count" ? `${s.days.kind}-${s.shifts.in?.join()}:${s.min?.n}~${s.max?.n}` : c.id;
+  });
+  expect(ranges.sort(), "칸마다 최소~최대").toEqual(
+    COVERAGE.map(([kind, shift, min, max]) => `${kind === "평일" ? "weekday" : "weekend"}-${SHIFT_CODE[shift]}:${min}~${max}`).sort(),
+  );
   await expectNoDevTerms(page, "처음 설정 ②");
   // [이전]으로 ①에 돌아가도 입력은 그대로다
   await page.getByRole("button", { name: "이전" }).click();
@@ -232,10 +245,14 @@ test("S6. 처음 설정 ③ 병동 규칙 → 첫 근무표 만들기", async ()
   await expect(setupStepper().locator('[aria-current="step"]')).toContainText("병동 규칙");
   const createFirst = page.getByRole("button", { name: "첫 근무표 만들기" });
   await expect(createFirst).toBeEnabled();
-  // 새 병동에는 기본 규칙 "나이트 전담은 나이트와 휴무만"이 적용돼 있다
-  await expect(appliedCards(page)).toHaveCount(1);
-  await expect(appliedCards(page)).toContainText("나이트 전담은 나이트와 휴무만");
-  await expect(page.getByText("규칙 없이 만들면 필요 인원만 지켜요")).toHaveCount(0);
+  // 기본 규칙 카드(필요 인원 6장 + 나이트 전담)가 맨 위에 `기본` 배지로 적용돼 있고, [삭제] 대신 [끄기]다
+  await expect(appliedCards(page)).toHaveCount(DEFAULT_CARDS);
+  const defaults = appliedCards(page).filter({ has: page.getByText("기본", { exact: true }) });
+  await expect(defaults).toHaveCount(DEFAULT_CARDS);
+  await expect(defaults.filter({ hasText: "나이트전담" })).toHaveCount(1);
+  await expect(defaults.first().getByRole("button", { name: "끄기" })).toBeVisible();
+  await expect(defaults.first().getByRole("button", { name: "삭제" })).toHaveCount(0);
+  await expect(page.getByText("규칙 없이 만들면 기본 규칙만 지켜요")).toHaveCount(0);
   const examples = page.getByRole("button", { name: "나이트는 3일 넘게 연속으로 하지 않게" });
   await examples.click();
   await expect(page.getByRole("textbox", { name: RULE_INPUT })).toHaveValue("나이트는 3일 넘게 연속으로 하지 않게");
@@ -285,13 +302,21 @@ test("S6. 처음 설정 ③ 병동 규칙 → 첫 근무표 만들기", async ()
   await expect(toggle.getByRole("button", { name: "반드시" })).toHaveAttribute("aria-pressed", "true");
 
   await applyAllPending(page);
-  await expect(appliedCards(page)).toHaveCount(total + 1);
+  await expect(appliedCards(page)).toHaveCount(total + DEFAULT_CARDS);
   await expect(page.getByText(/적용하지 않은 규칙/)).toHaveCount(0);
+  // 기본 규칙 [끄기] → 꺼짐 → [다시 켜기]
+  const nightOnly = page.locator("article").filter({ hasText: "나이트전담" }).filter({ has: page.getByText("기본", { exact: true }) });
+  await nightOnly.getByRole("button", { name: "끄기" }).click();
+  await expect(nightOnly.getByText("꺼짐", { exact: true })).toBeVisible();
+  await nightOnly.getByRole("button", { name: "다시 켜기" }).click();
+  await expect(nightOnly.getByText("적용됨", { exact: true })).toBeVisible();
 
-  // S6-b. 적용된 카드 수정
+  // S6-b. 적용된 카드 수정: 조정 가능한 값(밑줄)만 고친다. 값 이름은 LLM이 붙여 입력칸은 카드 안의 하나로 찾는다
+  await expect(r2Card.locator(".decoration-dotted")).toHaveText("3");
   for (const days of ["4", "3"]) {
     await r2Card.getByRole("button", { name: "수정" }).click();
-    await r2Card.getByLabel("일수").fill(days);
+    await expect(r2Card.getByText("바꾸려면 말로 다시 적어 주세요")).toBeVisible();
+    await r2Card.getByRole("textbox").fill(days);
     await r2Card.getByRole("button", { name: "저장" }).click();
     await expect(r2Card).toContainText(`나이트 연속 ${days}일까지`);
   }
@@ -299,7 +324,8 @@ test("S6. 처음 설정 ③ 병동 규칙 → 첫 근무표 만들기", async ()
   // S6-c. 되묻기와 미지원. LLM 판단이 달라도 실패로 보지 않고 기록한 뒤 생긴 카드를 지운다.
   const cases = [
     { text: "주말은 적당히", expected: "clarify" },
-    { text: "사이 안 좋은 간호사끼리는 같은 날 근무 안 넣게", expected: "unsupported" },
+    // 짝 규칙은 지원하지만(ADR-019) 누구인지 없어 되묻는다
+    { text: "사이 안 좋은 간호사끼리는 같은 날 근무 안 넣게", expected: "clarify" },
   ] as const;
   for (const { text, expected } of cases) {
     const body = await interpret(page, RULE_INPUT, "규칙 만들기", text);
@@ -313,8 +339,8 @@ test("S6. 처음 설정 ③ 병동 규칙 → 첫 근무표 만들기", async ()
     }
     await deleteAllPending(page);
   }
-  await expect(page.locator("article")).toHaveCount(total + 1);
-  ruleCount = total + 1; // 기본 규칙 포함
+  await expect(page.locator("article")).toHaveCount(total + DEFAULT_CARDS);
+  ruleCount = total + 1; // 병동 규칙 수: 나이트 전담 기본 규칙 포함, 필요 인원 제외
 
   // S6-d. [첫 근무표 만들기] → 근무표 작성 ① 요청. 처음 설정은 다시 보이지 않는다
   await createFirst.click();
@@ -439,7 +465,13 @@ test("S9. ② 근무표 만들기", async () => {
   await expect(page.getByText(/최근 4주/)).toHaveCount(0);
 
   await expectHardRulesHold(page, NOV, lastSolve);
-  expect((await readGrid(page, NOV))["이영희"].slice(14, 17)).toEqual(["O", "O", "O"]);
+  const grid = await readGrid(page, NOV);
+  expect(grid["이영희"].slice(14, 17)).toEqual(["O", "O", "O"]);
+  // 평일 데이는 범위(3~4명)
+  const weekdayDayCounts = Array.from({ length: NOV.length }, (_, i) => i + 1)
+    .filter((d) => !NOV_WEEKEND_DAYS.includes(d))
+    .map((d) => Object.values(grid).filter((row) => row[d - 1] === "D").length);
+  expect(weekdayDayCounts.every((n) => n >= 3 && n <= 4), `평일 데이 3~4명: ${weekdayDayCounts}`).toBe(true);
   await expectNoDevTerms(page, "② 근무표(첫 근무표)");
 });
 
@@ -477,6 +509,8 @@ test("S10. 근무표 없음 → 설명과 검증된 제안", async () => {
   if ((await proposals.count()) > 0) {
     const first = proposals.first();
     await expect(first).toContainText(/이렇게 바꾸면 근무표를 만들 수 있어요 · 희망 반영 \d+\/\d+/);
+    // 바꾸는 것은 식에서 만든 한 줄: 값 바꾸기("인원 3 → 2"), 반드시 → 가능하면, 이번 근무표에서만 끄기
+    await expect(first).toContainText(/\S+ → \S+|이번 근무표에서만 끄기/);
     test.info().annotations.push({ type: "S10 분기", description: `10-a 제안 수락: ${await first.innerText()}` });
     expect(await solve(() => first.getByRole("button", { name: "수락" }).click())).toBe("ok");
   } else {
@@ -576,5 +610,5 @@ test("S13. 저장과 다시 들어오기", async () => {
   await page.getByRole("button", { name: "병동 설정", exact: true }).click();
   await expect(page.getByRole("button", { name: "첫 근무표 만들기" })).toHaveCount(0);
   await page.getByRole("tab", { name: "병동 규칙" }).click();
-  await expect(appliedCards(page)).toHaveCount(ruleCount);
+  await expect(appliedCards(page)).toHaveCount(ruleCount + COVERAGE.length);
 });

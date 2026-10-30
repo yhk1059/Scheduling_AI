@@ -28,26 +28,26 @@ def _max_run(row: list[str]) -> int:
 
 
 def test_sample_ward_rules():
-    """샘플 병동 파일(lib/samples)은 블록 형식으로 남아 있다(클라이언트 이전은 이후 step)."""
+    """샘플 병동 파일(lib/samples)은 식 규칙이다. 필요 인원·나이트전담은 기본 규칙."""
     rules = {c["id"]: c for c in WARD["constraints"] if not c["id"].startswith("cov-")}
-    assert all(c["scope"] == "ward" for c in WARD["constraints"])
-    assert {cid: (c["type"], c["hardness"]) for cid, c in rules.items()} == {
-        "rule-noff": ("sequence", "hard"),
-        "rule-max-work": ("sequence", "hard"),
-        "rule-max-nights": ("sequence", "hard"),
-        "rule-min-off": ("count", "hard"),
-        "rule-night-fair": ("balance", "soft"),
-        "rule-weekend-fair": ("balance", "soft"),
-        NIGHT_ONLY_RULE_ID: ("count", "hard"),
+    assert all(c["scope"] == "ward" and c["type"] == "rule" for c in WARD["constraints"])
+    assert all(c["default"] for c in WARD["constraints"] if c["id"].startswith("cov-"))
+    assert {cid: (c["hardness"], c["default"]) for cid, c in rules.items()} == {
+        "rule-noff": ("hard", False),
+        "rule-max-work": ("hard", False),
+        "rule-max-nights": ("hard", False),
+        "rule-min-off": ("hard", False),
+        "rule-night-fair": ("soft", False),
+        "rule-weekend-fair": ("soft", False),
+        NIGHT_ONLY_RULE_ID: ("hard", True),
     }
-    assert rules["rule-noff"]["params"]["then_off"] == 1
-    assert rules["rule-max-work"]["params"]["max_len"] == 5
-    assert rules["rule-max-nights"]["params"]["max_len"] == 3
-    assert rules["rule-min-off"]["params"]["min"] == 8
+    assert rules["rule-max-work"]["values"]["max_len"]["value"] == 5
+    assert rules["rule-max-nights"]["values"]["max_len"]["value"] == 3
+    assert rules["rule-min-off"]["values"]["min"]["value"] == 8
 
 
 def test_demo_request_uses_ward_rules_only():
-    """병동 규칙을 식으로 바꿔 쓴다. 샘플 블록은 모두 규칙 하나씩이라 id가 그대로다."""
+    """샘플 병동 규칙을 그대로 쓴다."""
     req = demo_request()
     assert req.period.model_dump(mode="json") == DEMO_PERIOD
     assert req.holidays == [] and req.carry_over == [] and req.previous is None

@@ -3,11 +3,10 @@
 // 샘플 데모(/demo, ADR-016). 모두에게 같은 보기 전용 화면: 샘플 병동과 미리 풀어 둔 근무표를 정적 렌더한다(store·API 없음).
 import Link from "next/link";
 
-import { blockToRules, type BlockSpec } from "@/lib/migrate";
 import { isWeekendDay } from "@/lib/period";
 import demo from "@/lib/samples/demo-schedule.json";
 import ward from "@/lib/samples/ward-15.json";
-import type { Nurse, Period, ScheduleResult, WardConfig } from "@/lib/types.gen";
+import type { ConstraintSpec, Nurse, Period, ScheduleResult, WardConfig } from "@/lib/types.gen";
 import { describeRule, presetName } from "@/lib/wording";
 
 import { PreviewCard } from "./LandingPreview";
@@ -16,8 +15,7 @@ import { ui } from "./ui";
 
 const CONFIG = ward.config as unknown as WardConfig;
 const NURSES: Nurse[] = ward.nurses;
-// 샘플은 아직 블록 형식으로 저장돼 있어 식 규칙으로 바꿔 쓴다
-const RULES = (ward.constraints as unknown as BlockSpec[]).flatMap(blockToRules);
+const RULES = ward.constraints as unknown as ConstraintSpec[];
 const COVERAGE = RULES.filter((r) => presetName(r) === "필요 인원");
 const WARD_RULES = RULES.filter((r) => presetName(r) !== "필요 인원");
 const PERIOD = demo.period as Period;

@@ -8,8 +8,8 @@ import pytest
 from pydantic import TypeAdapter, ValidationError
 
 from backend.domain import constants
-from backend.domain.convert import NIGHT_ONLY_RULE_ID, rules_request
-from backend.domain.legacy import BlockScheduleRequest, BlockSpec
+from backend.domain.convert import NIGHT_ONLY_RULE_ID
+from backend.domain.legacy import BlockSpec
 from backend.domain.models import (
     DEFAULT_CONFIG,
     ConstraintChange,
@@ -257,19 +257,16 @@ def test_negative_years_rejected():
 # --- 샘플 ---
 
 
-def test_sample_ward_is_block_format():
-    """샘플 병동(lib/samples)은 블록 형식으로 남아 있다(클라이언트 이전은 이후 step). 식으로 바꿔야 요청이 된다."""
+def test_sample_ward_is_rule_format():
+    """샘플 병동(lib/samples)은 블록을 convert.block_to_rules로 기계 변환한 식 규칙이다. 파일이 그대로 요청이 된다."""
     raw = json.loads(SAMPLE_PATH.read_text(encoding="utf-8"))
-    next_requests = TypeAdapter(list[BlockSpec]).validate_python(raw.pop("next_requests"))
-    assert next_requests and all(c.scope == "period" for c in next_requests)
-    with pytest.raises(ValidationError):
-        ScheduleRequest.model_validate(raw)
-    blocks = BlockScheduleRequest.model_validate(raw)
-    coverage = [c for c in blocks.constraints if c.id.startswith("cov-")]
-    assert coverage and all(c.type == "count" and c.scope == "ward" and c.hardness == "hard" for c in coverage)
-    kinds = {(c.params.shifts.in_[0], c.params.days.kind) for c in coverage}
-    assert kinds == {(s, k) for s in "DEN" for k in ("weekday", "weekend")}
-    req = rules_request(blocks)
+    next_requests = TypeAdapter(list[ConstraintSpec]).validate_python(raw.pop("next_requests"))
+    assert next_requests and all(c.scope == "period" and c.type == "rule" for c in next_requests)
+    req = ScheduleRequest.model_validate(raw)
+    assert req.model_dump(mode="json", by_alias=True) == raw  # Pydantic dump 그대로(손으로 고친 흔적 없음)
+    coverage = [c for c in req.constraints if c.id.startswith("cov-")]
+    assert {c.id for c in coverage} == {f"cov-{k}-{s}" for s in "DEN" for k in ("weekday", "weekend")}
+    assert all(c.scope == "ward" and c.hardness == "hard" for c in coverage)
     assert {c.type for c in req.constraints} == {"rule"}
     assert req.config == DEFAULT_CONFIG
     assert req.constraints[-1].id == NIGHT_ONLY_RULE_ID

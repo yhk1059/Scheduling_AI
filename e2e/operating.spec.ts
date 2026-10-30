@@ -95,14 +95,18 @@ test("S3. 운영 중인 병동: 다음 근무표 만들기와 게스트 확정",
   // 병동 홈
   await expect(page.getByRole("heading", { name: "외과 병동", level: 1 })).toBeVisible();
 
-  // D3은 옛 저장본(v4)이다. 열면 v5로 바뀐다: 옛 규칙이 모두 같은 id의 블록이 되고, 바꾸지 못한 규칙이 없다
+  // D3은 옛 저장본(v4)이다. 열면 v5를 거쳐 v6으로 바뀐다: 옛 규칙이 모두 같은 id의 식 규칙이 되고, 바꾸지 못한 규칙이 없다
   const stored = await page.evaluate(() => JSON.parse(localStorage.getItem("nurse-scheduler")!));
   expect(wardOct.version, "fixture는 v4").toBe(4);
-  expect(stored.version, "저장본 버전").toBe(5);
+  expect(stored.version, "저장본 버전").toBe(6);
   const oldRules = wardOct.state.ward.rules;
   const rules = (stored.state as { ward: Ward }).ward.rules;
   expect(rules.map((r) => r.id), "옛 규칙 + 기본 규칙").toEqual([...oldRules.map((r) => r.id), "night-only"]);
-  expect(rules.every((r) => ["count", "sequence", "balance"].includes(r.type)), "모두 블록").toBe(true);
+  expect(rules.every((r) => r.type === "rule"), "모두 식 규칙").toBe(true);
+  expect(rules.filter((r) => r.type === "rule" && r.default).map((r) => r.id), "기본 규칙").toEqual([
+    ...oldRules.filter((r) => r.id.startsWith("cov-")).map((r) => r.id),
+    "night-only",
+  ]);
   expect(stored.state.ward.unconverted ?? [], "바꾸지 못한 규칙").toEqual([]);
   expect(stored.state.ward.config).toEqual(DEFAULT_CONFIG);
   expect(

@@ -145,31 +145,55 @@
       "source_text": "평일 데이 3명",
       "enabled": true,
       "priority": "normal",
-      "type": "count",
-      "params": {
-        "people": {
-          "ids": null,
-          "tags": null,
-          "exclude_tags": [],
-          "min_years": null,
-          "max_years": null
+      "type": "rule",
+      "default": true,
+      "values": {
+        "min": {
+          "value": 3.0,
+          "label": "인원"
+        }
+      },
+      "body": {
+        "kind": "require",
+        "for_each": {
+          "per": "day",
+          "people": {
+            "ids": null,
+            "tags": null,
+            "exclude_tags": [],
+            "min_years": null,
+            "max_years": null
+          },
+          "days": {
+            "kind": "weekday",
+            "weekdays": null,
+            "days": null
+          },
+          "window": null
         },
-        "days": {
-          "kind": "weekday",
-          "weekdays": null,
-          "days": null
-        },
-        "shifts": {
-          "in": [
-            "D"
-          ],
-          "not_in": null
-        },
-        "per": "day",
-        "window": null,
-        "measure": "count",
-        "min": 3.0,
-        "max": 3.0
+        "when": null,
+        "then": {
+          "left": {
+            "who": null,
+            "days": {
+              "kind": "all",
+              "weekdays": null,
+              "days": null
+            },
+            "offset": null,
+            "shifts": {
+              "in": [
+                "D"
+              ],
+              "not_in": null
+            },
+            "measure": "count"
+          },
+          "op": "eq",
+          "right": {
+            "value": "min"
+          }
+        }
       }
     },
     {
@@ -180,31 +204,55 @@
       "source_text": "평일 이브닝 3명",
       "enabled": true,
       "priority": "normal",
-      "type": "count",
-      "params": {
-        "people": {
-          "ids": null,
-          "tags": null,
-          "exclude_tags": [],
-          "min_years": null,
-          "max_years": null
+      "type": "rule",
+      "default": true,
+      "values": {
+        "min": {
+          "value": 3.0,
+          "label": "인원"
+        }
+      },
+      "body": {
+        "kind": "require",
+        "for_each": {
+          "per": "day",
+          "people": {
+            "ids": null,
+            "tags": null,
+            "exclude_tags": [],
+            "min_years": null,
+            "max_years": null
+          },
+          "days": {
+            "kind": "weekday",
+            "weekdays": null,
+            "days": null
+          },
+          "window": null
         },
-        "days": {
-          "kind": "weekday",
-          "weekdays": null,
-          "days": null
-        },
-        "shifts": {
-          "in": [
-            "E"
-          ],
-          "not_in": null
-        },
-        "per": "day",
-        "window": null,
-        "measure": "count",
-        "min": 3.0,
-        "max": 3.0
+        "when": null,
+        "then": {
+          "left": {
+            "who": null,
+            "days": {
+              "kind": "all",
+              "weekdays": null,
+              "days": null
+            },
+            "offset": null,
+            "shifts": {
+              "in": [
+                "E"
+              ],
+              "not_in": null
+            },
+            "measure": "count"
+          },
+          "op": "eq",
+          "right": {
+            "value": "min"
+          }
+        }
       }
     },
     {
@@ -215,31 +263,55 @@
       "source_text": "평일 나이트 2명",
       "enabled": true,
       "priority": "normal",
-      "type": "count",
-      "params": {
-        "people": {
-          "ids": null,
-          "tags": null,
-          "exclude_tags": [],
-          "min_years": null,
-          "max_years": null
+      "type": "rule",
+      "default": true,
+      "values": {
+        "min": {
+          "value": 2.0,
+          "label": "인원"
+        }
+      },
+      "body": {
+        "kind": "require",
+        "for_each": {
+          "per": "day",
+          "people": {
+            "ids": null,
+            "tags": null,
+            "exclude_tags": [],
+            "min_years": null,
+            "max_years": null
+          },
+          "days": {
+            "kind": "weekday",
+            "weekdays": null,
+            "days": null
+          },
+          "window": null
         },
-        "days": {
-          "kind": "weekday",
-          "weekdays": null,
-          "days": null
-        },
-        "shifts": {
-          "in": [
-            "N"
-          ],
-          "not_in": null
-        },
-        "per": "day",
-        "window": null,
-        "measure": "count",
-        "min": 2.0,
-        "max": 2.0
+        "when": null,
+        "then": {
+          "left": {
+            "who": null,
+            "days": {
+              "kind": "all",
+              "weekdays": null,
+              "days": null
+            },
+            "offset": null,
+            "shifts": {
+              "in": [
+                "N"
+              ],
+              "not_in": null
+            },
+            "measure": "count"
+          },
+          "op": "eq",
+          "right": {
+            "value": "min"
+          }
+        }
       }
     },
     {
@@ -250,31 +322,55 @@
       "source_text": "주말·공휴일 데이 3명",
       "enabled": true,
       "priority": "normal",
-      "type": "count",
-      "params": {
-        "people": {
-          "ids": null,
-          "tags": null,
-          "exclude_tags": [],
-          "min_years": null,
-          "max_years": null
+      "type": "rule",
+      "default": true,
+      "values": {
+        "min": {
+          "value": 3.0,
+          "label": "인원"
+        }
+      },
+      "body": {
+        "kind": "require",
+        "for_each": {
+          "per": "day",
+          "people": {
+            "ids": null,
+            "tags": null,
+            "exclude_tags": [],
+            "min_years": null,
+            "max_years": null
+          },
+          "days": {
+            "kind": "weekend",
+            "weekdays": null,
+            "days": null
+          },
+          "window": null
         },
-        "days": {
-          "kind": "weekend",
-          "weekdays": null,
-          "days": null
-        },
-        "shifts": {
-          "in": [
-            "D"
-          ],
-          "not_in": null
-        },
-        "per": "day",
-        "window": null,
-        "measure": "count",
-        "min": 3.0,
-        "max": 3.0
+        "when": null,
+        "then": {
+          "left": {
+            "who": null,
+            "days": {
+              "kind": "all",
+              "weekdays": null,
+              "days": null
+            },
+            "offset": null,
+            "shifts": {
+              "in": [
+                "D"
+              ],
+              "not_in": null
+            },
+            "measure": "count"
+          },
+          "op": "eq",
+          "right": {
+            "value": "min"
+          }
+        }
       }
     },
     {
@@ -285,31 +381,55 @@
       "source_text": "주말·공휴일 이브닝 2명",
       "enabled": true,
       "priority": "normal",
-      "type": "count",
-      "params": {
-        "people": {
-          "ids": null,
-          "tags": null,
-          "exclude_tags": [],
-          "min_years": null,
-          "max_years": null
+      "type": "rule",
+      "default": true,
+      "values": {
+        "min": {
+          "value": 2.0,
+          "label": "인원"
+        }
+      },
+      "body": {
+        "kind": "require",
+        "for_each": {
+          "per": "day",
+          "people": {
+            "ids": null,
+            "tags": null,
+            "exclude_tags": [],
+            "min_years": null,
+            "max_years": null
+          },
+          "days": {
+            "kind": "weekend",
+            "weekdays": null,
+            "days": null
+          },
+          "window": null
         },
-        "days": {
-          "kind": "weekend",
-          "weekdays": null,
-          "days": null
-        },
-        "shifts": {
-          "in": [
-            "E"
-          ],
-          "not_in": null
-        },
-        "per": "day",
-        "window": null,
-        "measure": "count",
-        "min": 2.0,
-        "max": 2.0
+        "when": null,
+        "then": {
+          "left": {
+            "who": null,
+            "days": {
+              "kind": "all",
+              "weekdays": null,
+              "days": null
+            },
+            "offset": null,
+            "shifts": {
+              "in": [
+                "E"
+              ],
+              "not_in": null
+            },
+            "measure": "count"
+          },
+          "op": "eq",
+          "right": {
+            "value": "min"
+          }
+        }
       }
     },
     {
@@ -320,31 +440,55 @@
       "source_text": "주말·공휴일 나이트 2명",
       "enabled": true,
       "priority": "normal",
-      "type": "count",
-      "params": {
-        "people": {
-          "ids": null,
-          "tags": null,
-          "exclude_tags": [],
-          "min_years": null,
-          "max_years": null
+      "type": "rule",
+      "default": true,
+      "values": {
+        "min": {
+          "value": 2.0,
+          "label": "인원"
+        }
+      },
+      "body": {
+        "kind": "require",
+        "for_each": {
+          "per": "day",
+          "people": {
+            "ids": null,
+            "tags": null,
+            "exclude_tags": [],
+            "min_years": null,
+            "max_years": null
+          },
+          "days": {
+            "kind": "weekend",
+            "weekdays": null,
+            "days": null
+          },
+          "window": null
         },
-        "days": {
-          "kind": "weekend",
-          "weekdays": null,
-          "days": null
-        },
-        "shifts": {
-          "in": [
-            "N"
-          ],
-          "not_in": null
-        },
-        "per": "day",
-        "window": null,
-        "measure": "count",
-        "min": 2.0,
-        "max": 2.0
+        "when": null,
+        "then": {
+          "left": {
+            "who": null,
+            "days": {
+              "kind": "all",
+              "weekdays": null,
+              "days": null
+            },
+            "offset": null,
+            "shifts": {
+              "in": [
+                "N"
+              ],
+              "not_in": null
+            },
+            "measure": "count"
+          },
+          "op": "eq",
+          "right": {
+            "value": "min"
+          }
+        }
       }
     },
     {
@@ -355,26 +499,100 @@
       "source_text": "나이트 끝나면 다음 날은 무조건 쉬게",
       "enabled": true,
       "priority": "normal",
-      "type": "sequence",
-      "params": {
-        "people": {
-          "ids": null,
-          "tags": null,
-          "exclude_tags": [],
-          "min_years": null,
-          "max_years": null
+      "type": "rule",
+      "default": false,
+      "values": {},
+      "body": {
+        "kind": "require",
+        "for_each": {
+          "per": "person_day",
+          "people": {
+            "ids": null,
+            "tags": null,
+            "exclude_tags": [],
+            "min_years": null,
+            "max_years": null
+          },
+          "days": {
+            "kind": "all",
+            "weekdays": null,
+            "days": null
+          },
+          "window": null
         },
-        "forbid": null,
-        "run": null,
-        "min_len": null,
-        "max_len": null,
-        "after": {
-          "in": [
-            "N"
-          ],
-          "not_in": null
+        "when": {
+          "all": [
+            {
+              "left": {
+                "who": null,
+                "days": {
+                  "kind": "all",
+                  "weekdays": null,
+                  "days": null
+                },
+                "offset": [
+                  0,
+                  0
+                ],
+                "shifts": {
+                  "in": [
+                    "N"
+                  ],
+                  "not_in": null
+                },
+                "measure": "count"
+              },
+              "op": "ge",
+              "right": 1.0
+            },
+            {
+              "left": {
+                "who": null,
+                "days": {
+                  "kind": "all",
+                  "weekdays": null,
+                  "days": null
+                },
+                "offset": [
+                  1,
+                  1
+                ],
+                "shifts": {
+                  "in": null,
+                  "not_in": [
+                    "N"
+                  ]
+                },
+                "measure": "count"
+              },
+              "op": "ge",
+              "right": 1.0
+            }
+          ]
         },
-        "then_off": 1
+        "then": {
+          "left": {
+            "who": null,
+            "days": {
+              "kind": "all",
+              "weekdays": null,
+              "days": null
+            },
+            "offset": [
+              1,
+              1
+            ],
+            "shifts": {
+              "in": null,
+              "not_in": [
+                "O"
+              ]
+            },
+            "measure": "count"
+          },
+          "op": "eq",
+          "right": 0.0
+        }
       }
     },
     {
@@ -385,26 +603,55 @@
       "source_text": "6일 연속 근무는 안 돼요",
       "enabled": true,
       "priority": "normal",
-      "type": "sequence",
-      "params": {
-        "people": {
-          "ids": null,
-          "tags": null,
-          "exclude_tags": [],
-          "min_years": null,
-          "max_years": null
+      "type": "rule",
+      "default": false,
+      "values": {
+        "max_len": {
+          "value": 5.0,
+          "label": "최대 연속 근무"
+        }
+      },
+      "body": {
+        "kind": "require",
+        "for_each": {
+          "per": "person_window",
+          "people": {
+            "ids": null,
+            "tags": null,
+            "exclude_tags": [],
+            "min_years": null,
+            "max_years": null
+          },
+          "days": {
+            "kind": "all",
+            "weekdays": null,
+            "days": null
+          },
+          "window": 6
         },
-        "forbid": null,
-        "run": {
-          "in": null,
-          "not_in": [
-            "O"
-          ]
-        },
-        "min_len": null,
-        "max_len": 5,
-        "after": null,
-        "then_off": null
+        "when": null,
+        "then": {
+          "left": {
+            "who": null,
+            "days": {
+              "kind": "all",
+              "weekdays": null,
+              "days": null
+            },
+            "offset": null,
+            "shifts": {
+              "in": null,
+              "not_in": [
+                "O"
+              ]
+            },
+            "measure": "count"
+          },
+          "op": "le",
+          "right": {
+            "value": "max_len"
+          }
+        }
       }
     },
     {
@@ -415,26 +662,55 @@
       "source_text": "나이트는 3번 연속까지만",
       "enabled": true,
       "priority": "normal",
-      "type": "sequence",
-      "params": {
-        "people": {
-          "ids": null,
-          "tags": null,
-          "exclude_tags": [],
-          "min_years": null,
-          "max_years": null
+      "type": "rule",
+      "default": false,
+      "values": {
+        "max_len": {
+          "value": 3.0,
+          "label": "최대 연속 나이트"
+        }
+      },
+      "body": {
+        "kind": "require",
+        "for_each": {
+          "per": "person_window",
+          "people": {
+            "ids": null,
+            "tags": null,
+            "exclude_tags": [],
+            "min_years": null,
+            "max_years": null
+          },
+          "days": {
+            "kind": "all",
+            "weekdays": null,
+            "days": null
+          },
+          "window": 4
         },
-        "forbid": null,
-        "run": {
-          "in": [
-            "N"
-          ],
-          "not_in": null
-        },
-        "min_len": null,
-        "max_len": 3,
-        "after": null,
-        "then_off": null
+        "when": null,
+        "then": {
+          "left": {
+            "who": null,
+            "days": {
+              "kind": "all",
+              "weekdays": null,
+              "days": null
+            },
+            "offset": null,
+            "shifts": {
+              "in": [
+                "N"
+              ],
+              "not_in": null
+            },
+            "measure": "count"
+          },
+          "op": "le",
+          "right": {
+            "value": "max_len"
+          }
+        }
       }
     },
     {
@@ -445,31 +721,55 @@
       "source_text": "한 달에 최소 8일은 쉬게",
       "enabled": true,
       "priority": "normal",
-      "type": "count",
-      "params": {
-        "people": {
-          "ids": null,
-          "tags": null,
-          "exclude_tags": [],
-          "min_years": null,
-          "max_years": null
+      "type": "rule",
+      "default": false,
+      "values": {
+        "min": {
+          "value": 8.0,
+          "label": "최소 휴무 일수"
+        }
+      },
+      "body": {
+        "kind": "require",
+        "for_each": {
+          "per": "person",
+          "people": {
+            "ids": null,
+            "tags": null,
+            "exclude_tags": [],
+            "min_years": null,
+            "max_years": null
+          },
+          "days": {
+            "kind": "all",
+            "weekdays": null,
+            "days": null
+          },
+          "window": null
         },
-        "days": {
-          "kind": "all",
-          "weekdays": null,
-          "days": null
-        },
-        "shifts": {
-          "in": [
-            "O"
-          ],
-          "not_in": null
-        },
-        "per": "person",
-        "window": null,
-        "measure": "count",
-        "min": 8.0,
-        "max": null
+        "when": null,
+        "then": {
+          "left": {
+            "who": null,
+            "days": {
+              "kind": "all",
+              "weekdays": null,
+              "days": null
+            },
+            "offset": null,
+            "shifts": {
+              "in": [
+                "O"
+              ],
+              "not_in": null
+            },
+            "measure": "count"
+          },
+          "op": "ge",
+          "right": {
+            "value": "min"
+          }
+        }
       }
     },
     {
@@ -480,8 +780,16 @@
       "source_text": "나이트는 골고루",
       "enabled": true,
       "priority": "low",
-      "type": "balance",
-      "params": {
+      "type": "rule",
+      "default": false,
+      "values": {
+        "max_gap": {
+          "value": 1.0,
+          "label": "최대 차이"
+        }
+      },
+      "body": {
+        "kind": "balance",
         "people": {
           "ids": null,
           "tags": null,
@@ -504,7 +812,9 @@
         },
         "measure": "count",
         "with_history": true,
-        "max_gap": 1
+        "max_gap": {
+          "value": "max_gap"
+        }
       }
     },
     {
@@ -515,8 +825,16 @@
       "source_text": "주말 근무도 골고루",
       "enabled": true,
       "priority": "low",
-      "type": "balance",
-      "params": {
+      "type": "rule",
+      "default": false,
+      "values": {
+        "max_gap": {
+          "value": 1.0,
+          "label": "최대 차이"
+        }
+      },
+      "body": {
+        "kind": "balance",
         "people": {
           "ids": null,
           "tags": null,
@@ -537,7 +855,9 @@
         },
         "measure": "count",
         "with_history": true,
-        "max_gap": 1
+        "max_gap": {
+          "value": "max_gap"
+        }
       }
     },
     {
@@ -548,34 +868,58 @@
       "source_text": "나이트 전담은 나이트와 휴무만",
       "enabled": true,
       "priority": "normal",
-      "type": "count",
-      "params": {
-        "people": {
-          "ids": null,
-          "tags": [
-            "나이트전담"
-          ],
-          "exclude_tags": [],
-          "min_years": null,
-          "max_years": null
+      "type": "rule",
+      "default": true,
+      "values": {
+        "max": {
+          "value": 0.0,
+          "label": "최대 횟수"
+        }
+      },
+      "body": {
+        "kind": "require",
+        "for_each": {
+          "per": "person",
+          "people": {
+            "ids": null,
+            "tags": [
+              "나이트전담"
+            ],
+            "exclude_tags": [],
+            "min_years": null,
+            "max_years": null
+          },
+          "days": {
+            "kind": "all",
+            "weekdays": null,
+            "days": null
+          },
+          "window": null
         },
-        "days": {
-          "kind": "all",
-          "weekdays": null,
-          "days": null
-        },
-        "shifts": {
-          "in": null,
-          "not_in": [
-            "N",
-            "O"
-          ]
-        },
-        "per": "person",
-        "window": null,
-        "measure": "count",
-        "min": null,
-        "max": 0.0
+        "when": null,
+        "then": {
+          "left": {
+            "who": null,
+            "days": {
+              "kind": "all",
+              "weekdays": null,
+              "days": null
+            },
+            "offset": null,
+            "shifts": {
+              "in": null,
+              "not_in": [
+                "N",
+                "O"
+              ]
+            },
+            "measure": "count"
+          },
+          "op": "le",
+          "right": {
+            "value": "max"
+          }
+        }
       }
     }
   ],
@@ -592,37 +936,61 @@
       "source_text": "이영희 10~12일 휴가",
       "enabled": true,
       "priority": "normal",
-      "type": "count",
-      "params": {
-        "people": {
-          "ids": [
-            "n01"
-          ],
-          "tags": null,
-          "exclude_tags": [],
-          "min_years": null,
-          "max_years": null
+      "type": "rule",
+      "default": false,
+      "values": {
+        "max": {
+          "value": 0.0,
+          "label": "최대 횟수"
+        }
+      },
+      "body": {
+        "kind": "require",
+        "for_each": {
+          "per": "person",
+          "people": {
+            "ids": [
+              "n01"
+            ],
+            "tags": null,
+            "exclude_tags": [],
+            "min_years": null,
+            "max_years": null
+          },
+          "days": {
+            "kind": "all",
+            "weekdays": null,
+            "days": [
+              10,
+              11,
+              12
+            ]
+          },
+          "window": null
         },
-        "days": {
-          "kind": "all",
-          "weekdays": null,
-          "days": [
-            10,
-            11,
-            12
-          ]
-        },
-        "shifts": {
-          "in": null,
-          "not_in": [
-            "O"
-          ]
-        },
-        "per": "person",
-        "window": null,
-        "measure": "count",
-        "min": null,
-        "max": 0.0
+        "when": null,
+        "then": {
+          "left": {
+            "who": null,
+            "days": {
+              "kind": "all",
+              "weekdays": null,
+              "days": null
+            },
+            "offset": null,
+            "shifts": {
+              "in": null,
+              "not_in": [
+                "O"
+              ]
+            },
+            "measure": "count"
+          },
+          "op": "le",
+          "right": {
+            "value": "max"
+          }
+        }
       }
     },
     {
@@ -633,33 +1001,57 @@
       "source_text": "박민수는 주말엔 나이트 빼 주세요",
       "enabled": true,
       "priority": "normal",
-      "type": "count",
-      "params": {
-        "people": {
-          "ids": [
-            "n02"
-          ],
-          "tags": null,
-          "exclude_tags": [],
-          "min_years": null,
-          "max_years": null
+      "type": "rule",
+      "default": false,
+      "values": {
+        "max": {
+          "value": 0.0,
+          "label": "최대 횟수"
+        }
+      },
+      "body": {
+        "kind": "require",
+        "for_each": {
+          "per": "person",
+          "people": {
+            "ids": [
+              "n02"
+            ],
+            "tags": null,
+            "exclude_tags": [],
+            "min_years": null,
+            "max_years": null
+          },
+          "days": {
+            "kind": "weekend",
+            "weekdays": null,
+            "days": null
+          },
+          "window": null
         },
-        "days": {
-          "kind": "weekend",
-          "weekdays": null,
-          "days": null
-        },
-        "shifts": {
-          "in": [
-            "N"
-          ],
-          "not_in": null
-        },
-        "per": "person",
-        "window": null,
-        "measure": "count",
-        "min": null,
-        "max": 0.0
+        "when": null,
+        "then": {
+          "left": {
+            "who": null,
+            "days": {
+              "kind": "all",
+              "weekdays": null,
+              "days": null
+            },
+            "offset": null,
+            "shifts": {
+              "in": [
+                "N"
+              ],
+              "not_in": null
+            },
+            "measure": "count"
+          },
+          "op": "le",
+          "right": {
+            "value": "max"
+          }
+        }
       }
     },
     {
@@ -670,35 +1062,59 @@
       "source_text": "정유진 20일은 데이로 해 주세요",
       "enabled": true,
       "priority": "normal",
-      "type": "count",
-      "params": {
-        "people": {
-          "ids": [
-            "n04"
-          ],
-          "tags": null,
-          "exclude_tags": [],
-          "min_years": null,
-          "max_years": null
+      "type": "rule",
+      "default": false,
+      "values": {
+        "min": {
+          "value": 1.0,
+          "label": "최소 횟수"
+        }
+      },
+      "body": {
+        "kind": "require",
+        "for_each": {
+          "per": "person",
+          "people": {
+            "ids": [
+              "n04"
+            ],
+            "tags": null,
+            "exclude_tags": [],
+            "min_years": null,
+            "max_years": null
+          },
+          "days": {
+            "kind": "all",
+            "weekdays": null,
+            "days": [
+              20
+            ]
+          },
+          "window": null
         },
-        "days": {
-          "kind": "all",
-          "weekdays": null,
-          "days": [
-            20
-          ]
-        },
-        "shifts": {
-          "in": [
-            "D"
-          ],
-          "not_in": null
-        },
-        "per": "person",
-        "window": null,
-        "measure": "count",
-        "min": 1.0,
-        "max": null
+        "when": null,
+        "then": {
+          "left": {
+            "who": null,
+            "days": {
+              "kind": "all",
+              "weekdays": null,
+              "days": null
+            },
+            "offset": null,
+            "shifts": {
+              "in": [
+                "D"
+              ],
+              "not_in": null
+            },
+            "measure": "count"
+          },
+          "op": "ge",
+          "right": {
+            "value": "min"
+          }
+        }
       }
     }
   ]

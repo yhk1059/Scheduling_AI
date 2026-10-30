@@ -112,13 +112,14 @@ test("S14. 근무 형태(미드 추가, 더블)와 태그 배치 규칙", async 
   await page.getByRole("button", { name: "다음", exact: true }).click();
 
   // ② 근무 형태 요약 [바꾸기] → 근무 코드 표에 미드(M) 추가 → 필요 인원 폼에 미드 행이 생긴다
-  await expect(setupStepper().locator('[aria-current="step"]')).toContainText("필요 인원");
+  await expect(setupStepper().locator('[aria-current="step"]')).toContainText("병동 소개");
   await expect(page.getByRole("main")).toContainText("데이·이브닝·나이트 3교대, 각 8시간");
+  await page.getByRole("button", { name: "숫자로 입력하기" }).click();
   const change = page.getByRole("button", { name: "바꾸기" });
   await expect(change).toHaveAttribute("aria-expanded", "false");
   await change.click();
   await expect(page.getByRole("button", { name: "접기" })).toHaveAttribute("aria-expanded", "true");
-  await expect(page.getByRole("textbox", { name: "평일 미드 인원" })).toHaveCount(0);
+  await expect(page.getByRole("textbox", { name: "평일 미드 최소 인원" })).toHaveCount(0);
   await page.getByRole("textbox", { name: "새 근무 코드" }).fill("M");
   await page.getByRole("textbox", { name: "새 근무 이름" }).fill("미드");
   await page.getByLabel("새 근무 시작 시각").fill("11:00");
@@ -127,7 +128,8 @@ test("S14. 근무 형태(미드 추가, 더블)와 태그 배치 규칙", async 
   await expect(page.getByRole("textbox", { name: "M 이름" })).toHaveValue("미드");
   await expect(page.getByRole("main")).toContainText("미드");
   for (const [kind, shift, count] of COVERAGE) {
-    await page.getByRole("textbox", { name: `${kind} ${shift} 인원` }).fill(String(count));
+    await page.getByRole("textbox", { name: `${kind} ${shift} 최소 인원` }).fill(String(count));
+    await page.getByRole("textbox", { name: `${kind} ${shift} 최대 인원` }).fill(String(count));
   }
   await expectNoDevTerms(page, "처음 설정 ②(근무 형태 펼침)");
   await page.getByRole("button", { name: "다음", exact: true }).click();

@@ -1,0 +1,2210 @@
+{
+  "state": {
+    "ward": {
+      "name": "외과 병동",
+      "unit": "month",
+      "nurses": [
+        {
+          "id": "n01",
+          "name": "이영희",
+          "years": 12,
+          "active": true,
+          "tags": [
+            "책임"
+          ]
+        },
+        {
+          "id": "n02",
+          "name": "박민수",
+          "years": 9,
+          "active": true,
+          "tags": []
+        },
+        {
+          "id": "n03",
+          "name": "김철수",
+          "years": 7,
+          "active": true,
+          "tags": []
+        },
+        {
+          "id": "n04",
+          "name": "정유진",
+          "years": 5,
+          "active": true,
+          "tags": []
+        },
+        {
+          "id": "n05",
+          "name": "최지훈",
+          "years": 3,
+          "active": true,
+          "tags": []
+        },
+        {
+          "id": "n06",
+          "name": "강서연",
+          "years": 15,
+          "active": true,
+          "tags": [
+            "책임"
+          ]
+        },
+        {
+          "id": "n07",
+          "name": "윤지민",
+          "years": 10,
+          "active": true,
+          "tags": [
+            "책임"
+          ]
+        },
+        {
+          "id": "n08",
+          "name": "임하늘",
+          "years": 8,
+          "active": true,
+          "tags": []
+        },
+        {
+          "id": "n09",
+          "name": "한소율",
+          "years": 6,
+          "active": true,
+          "tags": []
+        },
+        {
+          "id": "n10",
+          "name": "오민준",
+          "years": 4,
+          "active": true,
+          "tags": []
+        },
+        {
+          "id": "n11",
+          "name": "서예린",
+          "years": 2,
+          "active": true,
+          "tags": [
+            "신규"
+          ]
+        },
+        {
+          "id": "n12",
+          "name": "신도윤",
+          "years": 1,
+          "active": true,
+          "tags": [
+            "신규"
+          ]
+        },
+        {
+          "id": "n13",
+          "name": "조은비",
+          "years": 2,
+          "active": true,
+          "tags": []
+        },
+        {
+          "id": "n14",
+          "name": "문가람",
+          "years": 11,
+          "active": true,
+          "tags": [
+            "나이트전담"
+          ]
+        },
+        {
+          "id": "n15",
+          "name": "배수아",
+          "years": 4,
+          "active": true,
+          "tags": [
+            "나이트전담"
+          ]
+        }
+      ],
+      "nextNurseNo": 16,
+      "rules": [
+        {
+          "id": "cov-weekday-D",
+          "scope": "ward",
+          "hardness": "hard",
+          "weight": 10,
+          "source_text": "평일 데이 3~4명",
+          "enabled": true,
+          "priority": "normal",
+          "type": "count",
+          "params": {
+            "people": {
+              "exclude_tags": []
+            },
+            "days": {
+              "kind": "weekday"
+            },
+            "shifts": {
+              "in": [
+                "D"
+              ]
+            },
+            "per": "day",
+            "measure": "count",
+            "min": 3,
+            "max": 4
+          }
+        },
+        {
+          "id": "cov-weekday-E",
+          "scope": "ward",
+          "hardness": "hard",
+          "weight": 10,
+          "source_text": "평일 이브닝 3명",
+          "enabled": true,
+          "priority": "normal",
+          "type": "count",
+          "params": {
+            "people": {
+              "exclude_tags": []
+            },
+            "days": {
+              "kind": "weekday"
+            },
+            "shifts": {
+              "in": [
+                "E"
+              ]
+            },
+            "per": "day",
+            "measure": "count",
+            "min": 3,
+            "max": 3
+          }
+        },
+        {
+          "id": "cov-weekday-N",
+          "scope": "ward",
+          "hardness": "hard",
+          "weight": 10,
+          "source_text": "평일 나이트 2명",
+          "enabled": true,
+          "priority": "normal",
+          "type": "count",
+          "params": {
+            "people": {
+              "exclude_tags": []
+            },
+            "days": {
+              "kind": "weekday"
+            },
+            "shifts": {
+              "in": [
+                "N"
+              ]
+            },
+            "per": "day",
+            "measure": "count",
+            "min": 2,
+            "max": 2
+          }
+        },
+        {
+          "id": "cov-weekend-D",
+          "scope": "ward",
+          "hardness": "hard",
+          "weight": 10,
+          "source_text": "주말·공휴일 데이 3명",
+          "enabled": true,
+          "priority": "normal",
+          "type": "count",
+          "params": {
+            "people": {
+              "exclude_tags": []
+            },
+            "days": {
+              "kind": "weekend"
+            },
+            "shifts": {
+              "in": [
+                "D"
+              ]
+            },
+            "per": "day",
+            "measure": "count",
+            "min": 3,
+            "max": 3
+          }
+        },
+        {
+          "id": "cov-weekend-E",
+          "scope": "ward",
+          "hardness": "hard",
+          "weight": 10,
+          "source_text": "주말·공휴일 이브닝 2명",
+          "enabled": true,
+          "priority": "normal",
+          "type": "count",
+          "params": {
+            "people": {
+              "exclude_tags": []
+            },
+            "days": {
+              "kind": "weekend"
+            },
+            "shifts": {
+              "in": [
+                "E"
+              ]
+            },
+            "per": "day",
+            "measure": "count",
+            "min": 2,
+            "max": 2
+          }
+        },
+        {
+          "id": "cov-weekend-N",
+          "scope": "ward",
+          "hardness": "hard",
+          "weight": 10,
+          "source_text": "주말·공휴일 나이트 2명",
+          "enabled": true,
+          "priority": "normal",
+          "type": "count",
+          "params": {
+            "people": {
+              "exclude_tags": []
+            },
+            "days": {
+              "kind": "weekend"
+            },
+            "shifts": {
+              "in": [
+                "N"
+              ]
+            },
+            "per": "day",
+            "measure": "count",
+            "min": 2,
+            "max": 2
+          }
+        },
+        {
+          "id": "rule-noff",
+          "scope": "ward",
+          "hardness": "hard",
+          "weight": 10,
+          "source_text": "나이트 끝나면 다음 날은 무조건 쉬게",
+          "enabled": true,
+          "priority": "normal",
+          "type": "sequence",
+          "params": {
+            "people": {
+              "exclude_tags": []
+            },
+            "after": {
+              "in": [
+                "N"
+              ]
+            },
+            "then_off": 1
+          }
+        },
+        {
+          "id": "rule-max-work",
+          "scope": "ward",
+          "hardness": "hard",
+          "weight": 10,
+          "source_text": "6일 연속 근무는 안 돼요",
+          "enabled": true,
+          "priority": "normal",
+          "type": "sequence",
+          "params": {
+            "people": {
+              "exclude_tags": []
+            },
+            "run": {
+              "not_in": [
+                "O"
+              ]
+            },
+            "max_len": 5
+          }
+        },
+        {
+          "id": "rule-max-nights",
+          "scope": "ward",
+          "hardness": "hard",
+          "weight": 10,
+          "source_text": "나이트는 3번 연속까지만",
+          "enabled": true,
+          "priority": "normal",
+          "type": "sequence",
+          "params": {
+            "people": {
+              "exclude_tags": []
+            },
+            "run": {
+              "in": [
+                "N"
+              ]
+            },
+            "max_len": 3
+          }
+        },
+        {
+          "id": "rule-min-off",
+          "scope": "ward",
+          "hardness": "hard",
+          "weight": 10,
+          "source_text": "한 달에 최소 8일은 쉬게",
+          "enabled": true,
+          "priority": "normal",
+          "type": "count",
+          "params": {
+            "people": {
+              "exclude_tags": []
+            },
+            "days": {
+              "kind": "all"
+            },
+            "shifts": {
+              "in": [
+                "O"
+              ]
+            },
+            "per": "person",
+            "measure": "count",
+            "min": 8
+          }
+        },
+        {
+          "id": "rule-night-fair",
+          "scope": "ward",
+          "hardness": "soft",
+          "weight": 5,
+          "source_text": "나이트는 골고루",
+          "enabled": true,
+          "priority": "low",
+          "type": "balance",
+          "params": {
+            "people": {
+              "exclude_tags": [
+                "나이트전담"
+              ]
+            },
+            "days": {
+              "kind": "all"
+            },
+            "shifts": {
+              "in": [
+                "N"
+              ]
+            },
+            "measure": "count",
+            "with_history": true,
+            "max_gap": 1
+          }
+        },
+        {
+          "id": "rule-weekend-fair",
+          "scope": "ward",
+          "hardness": "soft",
+          "weight": 5,
+          "source_text": "주말 근무도 골고루",
+          "enabled": true,
+          "priority": "low",
+          "type": "balance",
+          "params": {
+            "people": {
+              "exclude_tags": []
+            },
+            "days": {
+              "kind": "weekend"
+            },
+            "shifts": {
+              "not_in": [
+                "O"
+              ]
+            },
+            "measure": "count",
+            "with_history": true,
+            "max_gap": 1
+          }
+        },
+        {
+          "id": "night-only",
+          "scope": "ward",
+          "hardness": "hard",
+          "weight": 10,
+          "source_text": "나이트 전담은 나이트와 휴무만",
+          "enabled": true,
+          "priority": "normal",
+          "type": "count",
+          "params": {
+            "people": {
+              "tags": [
+                "나이트전담"
+              ],
+              "exclude_tags": []
+            },
+            "days": {
+              "kind": "all"
+            },
+            "shifts": {
+              "not_in": [
+                "N",
+                "O"
+              ]
+            },
+            "per": "person",
+            "measure": "count",
+            "max": 0
+          }
+        }
+      ],
+      "pendingRules": [],
+      "config": {
+        "shifts": [
+          {
+            "code": "D",
+            "name": "데이",
+            "hours": 8
+          },
+          {
+            "code": "E",
+            "name": "이브닝",
+            "hours": 8
+          },
+          {
+            "code": "N",
+            "name": "나이트",
+            "hours": 8
+          },
+          {
+            "code": "O",
+            "name": "휴무",
+            "hours": 0
+          }
+        ]
+      },
+      "pendingConfig": [],
+      "unconverted": []
+    },
+    "periods": [
+      {
+        "start_date": "2026-10-01",
+        "length": 31,
+        "id": "p-1",
+        "holidays": [],
+        "requests": [],
+        "pendingRequests": [],
+        "disabledIds": [],
+        "ruleOverrides": {},
+        "carryOver": [],
+        "carryOverUsed": [],
+        "result": {
+          "assignments": {
+            "n01": [
+              "E",
+              "E",
+              "E",
+              "O",
+              "D",
+              "D",
+              "D",
+              "O",
+              "N",
+              "O",
+              "O",
+              "D",
+              "D",
+              "E",
+              "E",
+              "O",
+              "E",
+              "D",
+              "D",
+              "E",
+              "O",
+              "D",
+              "E",
+              "D",
+              "O",
+              "D",
+              "N",
+              "N",
+              "N",
+              "O",
+              "D"
+            ],
+            "n02": [
+              "D",
+              "O",
+              "O",
+              "E",
+              "E",
+              "E",
+              "N",
+              "O",
+              "D",
+              "O",
+              "E",
+              "O",
+              "D",
+              "E",
+              "E",
+              "N",
+              "O",
+              "O",
+              "D",
+              "O",
+              "N",
+              "O",
+              "N",
+              "O",
+              "E",
+              "O",
+              "D",
+              "D",
+              "E",
+              "E",
+              "E"
+            ],
+            "n03": [
+              "O",
+              "O",
+              "O",
+              "D",
+              "D",
+              "O",
+              "D",
+              "O",
+              "E",
+              "O",
+              "O",
+              "E",
+              "E",
+              "O",
+              "E",
+              "D",
+              "O",
+              "N",
+              "N",
+              "O",
+              "O",
+              "N",
+              "O",
+              "O",
+              "D",
+              "N",
+              "O",
+              "E",
+              "E",
+              "O",
+              "E"
+            ],
+            "n04": [
+              "O",
+              "E",
+              "D",
+              "N",
+              "N",
+              "O",
+              "E",
+              "D",
+              "D",
+              "D",
+              "O",
+              "O",
+              "N",
+              "O",
+              "D",
+              "E",
+              "O",
+              "O",
+              "O",
+              "E",
+              "O",
+              "D",
+              "D",
+              "O",
+              "D",
+              "N",
+              "O",
+              "D",
+              "D",
+              "D",
+              "O"
+            ],
+            "n05": [
+              "E",
+              "D",
+              "O",
+              "O",
+              "E",
+              "O",
+              "O",
+              "O",
+              "O",
+              "E",
+              "O",
+              "O",
+              "O",
+              "O",
+              "N",
+              "O",
+              "D",
+              "N",
+              "O",
+              "N",
+              "N",
+              "O",
+              "O",
+              "E",
+              "E",
+              "D",
+              "O",
+              "E",
+              "O",
+              "O",
+              "O"
+            ],
+            "n06": [
+              "D",
+              "D",
+              "O",
+              "O",
+              "O",
+              "N",
+              "O",
+              "O",
+              "D",
+              "D",
+              "D",
+              "O",
+              "N",
+              "N",
+              "O",
+              "D",
+              "O",
+              "D",
+              "E",
+              "D",
+              "E",
+              "E",
+              "O",
+              "O",
+              "N",
+              "O",
+              "E",
+              "D",
+              "O",
+              "D",
+              "O"
+            ],
+            "n07": [
+              "O",
+              "N",
+              "N",
+              "O",
+              "O",
+              "D",
+              "N",
+              "O",
+              "E",
+              "D",
+              "O",
+              "D",
+              "E",
+              "O",
+              "O",
+              "E",
+              "D",
+              "O",
+              "D",
+              "E",
+              "O",
+              "D",
+              "E",
+              "D",
+              "O",
+              "O",
+              "N",
+              "O",
+              "D",
+              "O",
+              "O"
+            ],
+            "n08": [
+              "N",
+              "O",
+              "E",
+              "D",
+              "D",
+              "O",
+              "O",
+              "E",
+              "E",
+              "O",
+              "D",
+              "E",
+              "O",
+              "D",
+              "N",
+              "N",
+              "O",
+              "D",
+              "O",
+              "N",
+              "O",
+              "E",
+              "D",
+              "O",
+              "O",
+              "E",
+              "E",
+              "O",
+              "O",
+              "D",
+              "O"
+            ],
+            "n09": [
+              "O",
+              "O",
+              "N",
+              "O",
+              "O",
+              "O",
+              "E",
+              "D",
+              "O",
+              "O",
+              "O",
+              "O",
+              "O",
+              "N",
+              "O",
+              "O",
+              "N",
+              "O",
+              "E",
+              "O",
+              "D",
+              "O",
+              "D",
+              "D",
+              "O",
+              "E",
+              "O",
+              "N",
+              "O",
+              "E",
+              "D"
+            ],
+            "n10": [
+              "N",
+              "O",
+              "D",
+              "D",
+              "D",
+              "E",
+              "O",
+              "D",
+              "N",
+              "O",
+              "O",
+              "E",
+              "O",
+              "O",
+              "D",
+              "D",
+              "O",
+              "O",
+              "D",
+              "D",
+              "E",
+              "N",
+              "O",
+              "O",
+              "N",
+              "O",
+              "D",
+              "E",
+              "D",
+              "E",
+              "D"
+            ],
+            "n11": [
+              "E",
+              "N",
+              "O",
+              "O",
+              "N",
+              "N",
+              "O",
+              "E",
+              "O",
+              "E",
+              "O",
+              "O",
+              "D",
+              "D",
+              "O",
+              "O",
+              "D",
+              "E",
+              "E",
+              "D",
+              "D",
+              "O",
+              "O",
+              "E",
+              "O",
+              "O",
+              "O",
+              "O",
+              "E",
+              "N",
+              "O"
+            ],
+            "n12": [
+              "O",
+              "D",
+              "D",
+              "O",
+              "E",
+              "D",
+              "D",
+              "E",
+              "O",
+              "O",
+              "E",
+              "D",
+              "E",
+              "D",
+              "O",
+              "O",
+              "O",
+              "E",
+              "N",
+              "O",
+              "E",
+              "O",
+              "N",
+              "O",
+              "D",
+              "D",
+              "D",
+              "O",
+              "N",
+              "O",
+              "N"
+            ],
+            "n13": [
+              "D",
+              "E",
+              "O",
+              "E",
+              "O",
+              "E",
+              "E",
+              "N",
+              "O",
+              "O",
+              "D",
+              "N",
+              "O",
+              "E",
+              "D",
+              "E",
+              "E",
+              "O",
+              "O",
+              "D",
+              "D",
+              "E",
+              "E",
+              "N",
+              "O",
+              "E",
+              "E",
+              "O",
+              "O",
+              "N",
+              "O"
+            ],
+            "n14": [
+              "O",
+              "O",
+              "O",
+              "N",
+              "O",
+              "O",
+              "O",
+              "O",
+              "O",
+              "N",
+              "N",
+              "N",
+              "O",
+              "O",
+              "O",
+              "O",
+              "O",
+              "O",
+              "O",
+              "O",
+              "O",
+              "O",
+              "O",
+              "N",
+              "O",
+              "O",
+              "O",
+              "O",
+              "O",
+              "O",
+              "O"
+            ],
+            "n15": [
+              "O",
+              "O",
+              "O",
+              "O",
+              "O",
+              "O",
+              "O",
+              "N",
+              "O",
+              "N",
+              "N",
+              "O",
+              "O",
+              "O",
+              "O",
+              "O",
+              "N",
+              "O",
+              "O",
+              "O",
+              "O",
+              "O",
+              "O",
+              "O",
+              "O",
+              "O",
+              "O",
+              "O",
+              "O",
+              "O",
+              "N"
+            ]
+          },
+          "summary": {
+            "preferences_total": 0,
+            "preferences_met": 0,
+            "soft_violation_count": 0
+          },
+          "stats": {
+            "n01": {
+              "D": 11,
+              "E": 8,
+              "N": 4,
+              "O": 8,
+              "weekend_holiday_work": 5,
+              "max_consecutive_work": 4,
+              "preference_rate": null,
+              "deviation": 6.87
+            },
+            "n02": {
+              "D": 6,
+              "E": 10,
+              "N": 4,
+              "O": 11,
+              "weekend_holiday_work": 4,
+              "max_consecutive_work": 5,
+              "preference_rate": null,
+              "deviation": 3.87
+            },
+            "n03": {
+              "D": 5,
+              "E": 7,
+              "N": 4,
+              "O": 15,
+              "weekend_holiday_work": 4,
+              "max_consecutive_work": 2,
+              "preference_rate": null,
+              "deviation": -0.13
+            },
+            "n04": {
+              "D": 11,
+              "E": 4,
+              "N": 4,
+              "O": 12,
+              "weekend_holiday_work": 4,
+              "max_consecutive_work": 4,
+              "preference_rate": null,
+              "deviation": 2.87
+            },
+            "n05": {
+              "D": 3,
+              "E": 6,
+              "N": 4,
+              "O": 18,
+              "weekend_holiday_work": 5,
+              "max_consecutive_work": 3,
+              "preference_rate": null,
+              "deviation": -3.13
+            },
+            "n06": {
+              "D": 10,
+              "E": 4,
+              "N": 4,
+              "O": 13,
+              "weekend_holiday_work": 4,
+              "max_consecutive_work": 5,
+              "preference_rate": null,
+              "deviation": 1.87
+            },
+            "n07": {
+              "D": 8,
+              "E": 5,
+              "N": 4,
+              "O": 14,
+              "weekend_holiday_work": 4,
+              "max_consecutive_work": 3,
+              "preference_rate": null,
+              "deviation": 0.87
+            },
+            "n08": {
+              "D": 7,
+              "E": 7,
+              "N": 4,
+              "O": 13,
+              "weekend_holiday_work": 4,
+              "max_consecutive_work": 3,
+              "preference_rate": null,
+              "deviation": 1.87
+            },
+            "n09": {
+              "D": 5,
+              "E": 4,
+              "N": 4,
+              "O": 18,
+              "weekend_holiday_work": 4,
+              "max_consecutive_work": 2,
+              "preference_rate": null,
+              "deviation": -3.13
+            },
+            "n10": {
+              "D": 11,
+              "E": 5,
+              "N": 4,
+              "O": 11,
+              "weekend_holiday_work": 4,
+              "max_consecutive_work": 5,
+              "preference_rate": null,
+              "deviation": 3.87
+            },
+            "n11": {
+              "D": 5,
+              "E": 7,
+              "N": 4,
+              "O": 15,
+              "weekend_holiday_work": 4,
+              "max_consecutive_work": 5,
+              "preference_rate": null,
+              "deviation": -0.13
+            },
+            "n12": {
+              "D": 9,
+              "E": 6,
+              "N": 4,
+              "O": 12,
+              "weekend_holiday_work": 5,
+              "max_consecutive_work": 4,
+              "preference_rate": null,
+              "deviation": 2.87
+            },
+            "n13": {
+              "D": 5,
+              "E": 11,
+              "N": 4,
+              "O": 11,
+              "weekend_holiday_work": 4,
+              "max_consecutive_work": 5,
+              "preference_rate": null,
+              "deviation": 3.87
+            },
+            "n14": {
+              "D": 0,
+              "E": 0,
+              "N": 5,
+              "O": 26,
+              "weekend_holiday_work": 4,
+              "max_consecutive_work": 3,
+              "preference_rate": null,
+              "deviation": -11.13
+            },
+            "n15": {
+              "D": 0,
+              "E": 0,
+              "N": 5,
+              "O": 26,
+              "weekend_holiday_work": 4,
+              "max_consecutive_work": 2,
+              "preference_rate": null,
+              "deviation": -11.13
+            }
+          },
+          "soft_violations": [],
+          "diff": null,
+          "optimal": true
+        },
+        "resultVersion": -1,
+        "status": "confirmed",
+        "versions": [
+          {
+            "confirmed_at": "2026-09-30T09:00:00.000Z",
+            "assignments": {
+              "n01": [
+                "E",
+                "E",
+                "E",
+                "O",
+                "D",
+                "D",
+                "D",
+                "O",
+                "N",
+                "O",
+                "O",
+                "D",
+                "D",
+                "E",
+                "E",
+                "O",
+                "E",
+                "D",
+                "D",
+                "E",
+                "O",
+                "D",
+                "E",
+                "D",
+                "O",
+                "D",
+                "N",
+                "N",
+                "N",
+                "O",
+                "D"
+              ],
+              "n02": [
+                "D",
+                "O",
+                "O",
+                "E",
+                "E",
+                "E",
+                "N",
+                "O",
+                "D",
+                "O",
+                "E",
+                "O",
+                "D",
+                "E",
+                "E",
+                "N",
+                "O",
+                "O",
+                "D",
+                "O",
+                "N",
+                "O",
+                "N",
+                "O",
+                "E",
+                "O",
+                "D",
+                "D",
+                "E",
+                "E",
+                "E"
+              ],
+              "n03": [
+                "O",
+                "O",
+                "O",
+                "D",
+                "D",
+                "O",
+                "D",
+                "O",
+                "E",
+                "O",
+                "O",
+                "E",
+                "E",
+                "O",
+                "E",
+                "D",
+                "O",
+                "N",
+                "N",
+                "O",
+                "O",
+                "N",
+                "O",
+                "O",
+                "D",
+                "N",
+                "O",
+                "E",
+                "E",
+                "O",
+                "E"
+              ],
+              "n04": [
+                "O",
+                "E",
+                "D",
+                "N",
+                "N",
+                "O",
+                "E",
+                "D",
+                "D",
+                "D",
+                "O",
+                "O",
+                "N",
+                "O",
+                "D",
+                "E",
+                "O",
+                "O",
+                "O",
+                "E",
+                "O",
+                "D",
+                "D",
+                "O",
+                "D",
+                "N",
+                "O",
+                "D",
+                "D",
+                "D",
+                "O"
+              ],
+              "n05": [
+                "E",
+                "D",
+                "O",
+                "O",
+                "E",
+                "O",
+                "O",
+                "O",
+                "O",
+                "E",
+                "O",
+                "O",
+                "O",
+                "O",
+                "N",
+                "O",
+                "D",
+                "N",
+                "O",
+                "N",
+                "N",
+                "O",
+                "O",
+                "E",
+                "E",
+                "D",
+                "O",
+                "E",
+                "O",
+                "O",
+                "O"
+              ],
+              "n06": [
+                "D",
+                "D",
+                "O",
+                "O",
+                "O",
+                "N",
+                "O",
+                "O",
+                "D",
+                "D",
+                "D",
+                "O",
+                "N",
+                "N",
+                "O",
+                "D",
+                "O",
+                "D",
+                "E",
+                "D",
+                "E",
+                "E",
+                "O",
+                "O",
+                "N",
+                "O",
+                "E",
+                "D",
+                "O",
+                "D",
+                "O"
+              ],
+              "n07": [
+                "O",
+                "N",
+                "N",
+                "O",
+                "O",
+                "D",
+                "N",
+                "O",
+                "E",
+                "D",
+                "O",
+                "D",
+                "E",
+                "O",
+                "O",
+                "E",
+                "D",
+                "O",
+                "D",
+                "E",
+                "O",
+                "D",
+                "E",
+                "D",
+                "O",
+                "O",
+                "N",
+                "O",
+                "D",
+                "O",
+                "O"
+              ],
+              "n08": [
+                "N",
+                "O",
+                "E",
+                "D",
+                "D",
+                "O",
+                "O",
+                "E",
+                "E",
+                "O",
+                "D",
+                "E",
+                "O",
+                "D",
+                "N",
+                "N",
+                "O",
+                "D",
+                "O",
+                "N",
+                "O",
+                "E",
+                "D",
+                "O",
+                "O",
+                "E",
+                "E",
+                "O",
+                "O",
+                "D",
+                "O"
+              ],
+              "n09": [
+                "O",
+                "O",
+                "N",
+                "O",
+                "O",
+                "O",
+                "E",
+                "D",
+                "O",
+                "O",
+                "O",
+                "O",
+                "O",
+                "N",
+                "O",
+                "O",
+                "N",
+                "O",
+                "E",
+                "O",
+                "D",
+                "O",
+                "D",
+                "D",
+                "O",
+                "E",
+                "O",
+                "N",
+                "O",
+                "E",
+                "D"
+              ],
+              "n10": [
+                "N",
+                "O",
+                "D",
+                "D",
+                "D",
+                "E",
+                "O",
+                "D",
+                "N",
+                "O",
+                "O",
+                "E",
+                "O",
+                "O",
+                "D",
+                "D",
+                "O",
+                "O",
+                "D",
+                "D",
+                "E",
+                "N",
+                "O",
+                "O",
+                "N",
+                "O",
+                "D",
+                "E",
+                "D",
+                "E",
+                "D"
+              ],
+              "n11": [
+                "E",
+                "N",
+                "O",
+                "O",
+                "N",
+                "N",
+                "O",
+                "E",
+                "O",
+                "E",
+                "O",
+                "O",
+                "D",
+                "D",
+                "O",
+                "O",
+                "D",
+                "E",
+                "E",
+                "D",
+                "D",
+                "O",
+                "O",
+                "E",
+                "O",
+                "O",
+                "O",
+                "O",
+                "E",
+                "N",
+                "O"
+              ],
+              "n12": [
+                "O",
+                "D",
+                "D",
+                "O",
+                "E",
+                "D",
+                "D",
+                "E",
+                "O",
+                "O",
+                "E",
+                "D",
+                "E",
+                "D",
+                "O",
+                "O",
+                "O",
+                "E",
+                "N",
+                "O",
+                "E",
+                "O",
+                "N",
+                "O",
+                "D",
+                "D",
+                "D",
+                "O",
+                "N",
+                "O",
+                "N"
+              ],
+              "n13": [
+                "D",
+                "E",
+                "O",
+                "E",
+                "O",
+                "E",
+                "E",
+                "N",
+                "O",
+                "O",
+                "D",
+                "N",
+                "O",
+                "E",
+                "D",
+                "E",
+                "E",
+                "O",
+                "O",
+                "D",
+                "D",
+                "E",
+                "E",
+                "N",
+                "O",
+                "E",
+                "E",
+                "O",
+                "O",
+                "N",
+                "O"
+              ],
+              "n14": [
+                "O",
+                "O",
+                "O",
+                "N",
+                "O",
+                "O",
+                "O",
+                "O",
+                "O",
+                "N",
+                "N",
+                "N",
+                "O",
+                "O",
+                "O",
+                "O",
+                "O",
+                "O",
+                "O",
+                "O",
+                "O",
+                "O",
+                "O",
+                "N",
+                "O",
+                "O",
+                "O",
+                "O",
+                "O",
+                "O",
+                "O"
+              ],
+              "n15": [
+                "O",
+                "O",
+                "O",
+                "O",
+                "O",
+                "O",
+                "O",
+                "N",
+                "O",
+                "N",
+                "N",
+                "O",
+                "O",
+                "O",
+                "O",
+                "O",
+                "N",
+                "O",
+                "O",
+                "O",
+                "O",
+                "O",
+                "O",
+                "O",
+                "O",
+                "O",
+                "O",
+                "O",
+                "O",
+                "O",
+                "N"
+              ]
+            },
+            "changed": []
+          }
+        ],
+        "snapshot": {
+          "nurses": [
+            {
+              "id": "n01",
+              "name": "이영희",
+              "years": 12,
+              "active": true,
+              "tags": []
+            },
+            {
+              "id": "n02",
+              "name": "박민수",
+              "years": 9,
+              "active": true,
+              "tags": []
+            },
+            {
+              "id": "n03",
+              "name": "김철수",
+              "years": 7,
+              "active": true,
+              "tags": []
+            },
+            {
+              "id": "n04",
+              "name": "정유진",
+              "years": 5,
+              "active": true,
+              "tags": []
+            },
+            {
+              "id": "n05",
+              "name": "최지훈",
+              "years": 3,
+              "active": true,
+              "tags": []
+            },
+            {
+              "id": "n06",
+              "name": "강서연",
+              "years": 15,
+              "active": true,
+              "tags": []
+            },
+            {
+              "id": "n07",
+              "name": "윤지민",
+              "years": 10,
+              "active": true,
+              "tags": []
+            },
+            {
+              "id": "n08",
+              "name": "임하늘",
+              "years": 8,
+              "active": true,
+              "tags": []
+            },
+            {
+              "id": "n09",
+              "name": "한소율",
+              "years": 6,
+              "active": true,
+              "tags": []
+            },
+            {
+              "id": "n10",
+              "name": "오민준",
+              "years": 4,
+              "active": true,
+              "tags": []
+            },
+            {
+              "id": "n11",
+              "name": "서예린",
+              "years": 2,
+              "active": true,
+              "tags": []
+            },
+            {
+              "id": "n12",
+              "name": "신도윤",
+              "years": 1,
+              "active": true,
+              "tags": []
+            },
+            {
+              "id": "n13",
+              "name": "조은비",
+              "years": 2,
+              "active": true,
+              "tags": []
+            },
+            {
+              "id": "n14",
+              "name": "문가람",
+              "years": 11,
+              "active": true,
+              "tags": [
+                "나이트전담"
+              ]
+            },
+            {
+              "id": "n15",
+              "name": "배수아",
+              "years": 4,
+              "active": true,
+              "tags": [
+                "나이트전담"
+              ]
+            }
+          ],
+          "rules": [
+            {
+              "id": "cov-weekday-D",
+              "scope": "ward",
+              "hardness": "hard",
+              "weight": 10,
+              "source_text": "평일 데이 3~4명",
+              "enabled": true,
+              "priority": "normal",
+              "type": "count",
+              "params": {
+                "people": {
+                  "exclude_tags": []
+                },
+                "days": {
+                  "kind": "weekday"
+                },
+                "shifts": {
+                  "in": [
+                    "D"
+                  ]
+                },
+                "per": "day",
+                "measure": "count",
+                "min": 3,
+                "max": 4
+              }
+            },
+            {
+              "id": "cov-weekday-E",
+              "scope": "ward",
+              "hardness": "hard",
+              "weight": 10,
+              "source_text": "평일 이브닝 3명",
+              "enabled": true,
+              "priority": "normal",
+              "type": "count",
+              "params": {
+                "people": {
+                  "exclude_tags": []
+                },
+                "days": {
+                  "kind": "weekday"
+                },
+                "shifts": {
+                  "in": [
+                    "E"
+                  ]
+                },
+                "per": "day",
+                "measure": "count",
+                "min": 3,
+                "max": 3
+              }
+            },
+            {
+              "id": "cov-weekday-N",
+              "scope": "ward",
+              "hardness": "hard",
+              "weight": 10,
+              "source_text": "평일 나이트 2명",
+              "enabled": true,
+              "priority": "normal",
+              "type": "count",
+              "params": {
+                "people": {
+                  "exclude_tags": []
+                },
+                "days": {
+                  "kind": "weekday"
+                },
+                "shifts": {
+                  "in": [
+                    "N"
+                  ]
+                },
+                "per": "day",
+                "measure": "count",
+                "min": 2,
+                "max": 2
+              }
+            },
+            {
+              "id": "cov-weekend-D",
+              "scope": "ward",
+              "hardness": "hard",
+              "weight": 10,
+              "source_text": "주말·공휴일 데이 3명",
+              "enabled": true,
+              "priority": "normal",
+              "type": "count",
+              "params": {
+                "people": {
+                  "exclude_tags": []
+                },
+                "days": {
+                  "kind": "weekend"
+                },
+                "shifts": {
+                  "in": [
+                    "D"
+                  ]
+                },
+                "per": "day",
+                "measure": "count",
+                "min": 3,
+                "max": 3
+              }
+            },
+            {
+              "id": "cov-weekend-E",
+              "scope": "ward",
+              "hardness": "hard",
+              "weight": 10,
+              "source_text": "주말·공휴일 이브닝 2명",
+              "enabled": true,
+              "priority": "normal",
+              "type": "count",
+              "params": {
+                "people": {
+                  "exclude_tags": []
+                },
+                "days": {
+                  "kind": "weekend"
+                },
+                "shifts": {
+                  "in": [
+                    "E"
+                  ]
+                },
+                "per": "day",
+                "measure": "count",
+                "min": 2,
+                "max": 2
+              }
+            },
+            {
+              "id": "cov-weekend-N",
+              "scope": "ward",
+              "hardness": "hard",
+              "weight": 10,
+              "source_text": "주말·공휴일 나이트 2명",
+              "enabled": true,
+              "priority": "normal",
+              "type": "count",
+              "params": {
+                "people": {
+                  "exclude_tags": []
+                },
+                "days": {
+                  "kind": "weekend"
+                },
+                "shifts": {
+                  "in": [
+                    "N"
+                  ]
+                },
+                "per": "day",
+                "measure": "count",
+                "min": 2,
+                "max": 2
+              }
+            },
+            {
+              "id": "rule-noff",
+              "scope": "ward",
+              "hardness": "hard",
+              "weight": 10,
+              "source_text": "나이트 끝나면 다음 날은 무조건 쉬게",
+              "enabled": true,
+              "priority": "normal",
+              "type": "sequence",
+              "params": {
+                "people": {
+                  "exclude_tags": []
+                },
+                "after": {
+                  "in": [
+                    "N"
+                  ]
+                },
+                "then_off": 1
+              }
+            },
+            {
+              "id": "rule-max-work",
+              "scope": "ward",
+              "hardness": "hard",
+              "weight": 10,
+              "source_text": "6일 연속 근무는 안 돼요",
+              "enabled": true,
+              "priority": "normal",
+              "type": "sequence",
+              "params": {
+                "people": {
+                  "exclude_tags": []
+                },
+                "run": {
+                  "not_in": [
+                    "O"
+                  ]
+                },
+                "max_len": 5
+              }
+            },
+            {
+              "id": "rule-max-nights",
+              "scope": "ward",
+              "hardness": "hard",
+              "weight": 10,
+              "source_text": "나이트는 3번 연속까지만",
+              "enabled": true,
+              "priority": "normal",
+              "type": "sequence",
+              "params": {
+                "people": {
+                  "exclude_tags": []
+                },
+                "run": {
+                  "in": [
+                    "N"
+                  ]
+                },
+                "max_len": 3
+              }
+            },
+            {
+              "id": "rule-min-off",
+              "scope": "ward",
+              "hardness": "hard",
+              "weight": 10,
+              "source_text": "한 달에 최소 8일은 쉬게",
+              "enabled": true,
+              "priority": "normal",
+              "type": "count",
+              "params": {
+                "people": {
+                  "exclude_tags": []
+                },
+                "days": {
+                  "kind": "all"
+                },
+                "shifts": {
+                  "in": [
+                    "O"
+                  ]
+                },
+                "per": "person",
+                "measure": "count",
+                "min": 8
+              }
+            },
+            {
+              "id": "rule-night-fair",
+              "scope": "ward",
+              "hardness": "soft",
+              "weight": 5,
+              "source_text": "나이트는 골고루",
+              "enabled": true,
+              "priority": "low",
+              "type": "balance",
+              "params": {
+                "people": {
+                  "exclude_tags": [
+                    "나이트전담"
+                  ]
+                },
+                "days": {
+                  "kind": "all"
+                },
+                "shifts": {
+                  "in": [
+                    "N"
+                  ]
+                },
+                "measure": "count",
+                "with_history": true,
+                "max_gap": 1
+              }
+            },
+            {
+              "id": "rule-weekend-fair",
+              "scope": "ward",
+              "hardness": "soft",
+              "weight": 5,
+              "source_text": "주말 근무도 골고루",
+              "enabled": true,
+              "priority": "low",
+              "type": "balance",
+              "params": {
+                "people": {
+                  "exclude_tags": []
+                },
+                "days": {
+                  "kind": "weekend"
+                },
+                "shifts": {
+                  "not_in": [
+                    "O"
+                  ]
+                },
+                "measure": "count",
+                "with_history": true,
+                "max_gap": 1
+              }
+            }
+          ]
+        }
+      },
+      {
+        "start_date": "2026-11-01",
+        "length": 30,
+        "id": "p-2",
+        "holidays": [],
+        "requests": [
+          {
+            "id": "req-leave-n01",
+            "scope": "period",
+            "hardness": "hard",
+            "weight": 10,
+            "source_text": "이영희 10~12일 휴가",
+            "enabled": true,
+            "priority": "normal",
+            "type": "count",
+            "params": {
+              "people": {
+                "ids": [
+                  "n01"
+                ],
+                "exclude_tags": []
+              },
+              "days": {
+                "days": [
+                  10,
+                  11,
+                  12
+                ],
+                "kind": "all"
+              },
+              "shifts": {
+                "not_in": [
+                  "O"
+                ]
+              },
+              "per": "person",
+              "measure": "count",
+              "max": 0
+            }
+          },
+          {
+            "id": "req-avoid-n02",
+            "scope": "period",
+            "hardness": "soft",
+            "weight": 10,
+            "source_text": "박민수는 주말엔 나이트 빼 주세요",
+            "enabled": true,
+            "priority": "normal",
+            "type": "count",
+            "params": {
+              "people": {
+                "ids": [
+                  "n02"
+                ],
+                "exclude_tags": []
+              },
+              "days": {
+                "kind": "weekend"
+              },
+              "shifts": {
+                "in": [
+                  "N"
+                ]
+              },
+              "per": "person",
+              "measure": "count",
+              "max": 0
+            }
+          },
+          {
+            "id": "req-prefer-n04",
+            "scope": "period",
+            "hardness": "soft",
+            "weight": 10,
+            "source_text": "정유진 20일은 데이로 해 주세요",
+            "enabled": true,
+            "priority": "normal",
+            "type": "count",
+            "params": {
+              "people": {
+                "ids": [
+                  "n04"
+                ],
+                "exclude_tags": []
+              },
+              "days": {
+                "days": [
+                  20
+                ],
+                "kind": "all"
+              },
+              "shifts": {
+                "in": [
+                  "D"
+                ]
+              },
+              "per": "person",
+              "measure": "count",
+              "min": 1
+            }
+          }
+        ],
+        "pendingRequests": [],
+        "disabledIds": [],
+        "ruleOverrides": {},
+        "carryOver": [],
+        "carryOverUsed": null,
+        "result": null,
+        "resultVersion": null,
+        "status": "draft",
+        "versions": [],
+        "snapshot": null
+      }
+    ],
+    "view": {
+      "screen": "home"
+    },
+    "inputVersion": 1
+  },
+  "version": 5
+}
