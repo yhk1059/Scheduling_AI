@@ -1,7 +1,7 @@
 // 가능 시간 → 근무조 판정 → 반드시 규칙. 순수 함수. LLM을 거치지 않는다(ADR-020).
 import { dateOfDay, type PeriodRange } from "./period";
 import { normalizeRule, OFF_CODE } from "./rules";
-import type { Rule, ShiftDef, ShopConfig } from "./types.gen";
+import type { Conflict, Rule, ShiftDef, ShopConfig } from "./types.gen";
 
 /** 시각 구간 ["09:00", "15:00"]. 시각은 "HH:MM"이라 문자열로 비교한다(lib/rules.ts shiftTimesError와 같다). */
 export type TimeRange = [string, string];
@@ -9,6 +9,22 @@ export type TimeRange = [string, string];
 export type AvailabilitySlots = Record<string, TimeRange[]>;
 /** backend/domain/constants.py AVAILABILITY_RULE_PREFIX */
 export const AVAILABILITY_RULE_PREFIX = "avail-";
+
+/** 가능 시간 규칙인지. 끄거나 완화할 수 없다. */
+export function isAvailabilityRule(id: string): boolean {
+  return id.startsWith(AVAILABILITY_RULE_PREFIX);
+}
+
+/** 충돌 목록의 가능 시간은 근무 코드마다 규칙이 달라도 직원마다 한 줄로 묶는다. */
+export function mergeAvailabilityConflicts(conflicts: Conflict[]): Conflict[] {
+  const seen = new Set<string>();
+  return conflicts.filter((c) => {
+    if (!isAvailabilityRule(c.constraint_id)) return true;
+    if (seen.has(c.source_text)) return false;
+    seen.add(c.source_text);
+    return true;
+  });
+}
 
 /** 구간들이 start~end를 빈틈없이 덮는지. 이어지거나 겹치는 구간은 합쳐서 본다. */
 function coversTime(ranges: TimeRange[], start: string, end: string): boolean {

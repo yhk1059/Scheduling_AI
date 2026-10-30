@@ -24,7 +24,7 @@ function partsText(s: ShiftDef): string {
   return s.parts?.length ? s.parts.join(" + ") : s.code;
 }
 
-/** 근무 형태(근무 코드 표). 맨 아래 줄에 적어 하나씩 더한다. 매장 설정 [근무 형태] 탭과 처음 설정 ②에서 쓴다. */
+/** 근무 형태(근무 코드 표). 맨 아래 줄에 적어 하나씩 더한다. 매장 설정 [근무 형태] 탭과 근무표 작성 ②에서 쓴다. */
 export default function ShiftTable() {
   const shifts = useAppStore((s) => s.shop?.config.shifts ?? []);
 

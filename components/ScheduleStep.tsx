@@ -4,6 +4,7 @@ import { useState, type ReactNode } from "react";
 
 import { ApiError, errorMessage, explain, solve } from "@/lib/api";
 import { toScheduleCsv } from "@/lib/csv";
+import { isAvailabilityRule, mergeAvailabilityConflicts } from "@/lib/availability";
 import { historyLoadFor, isOperating } from "@/lib/continuity";
 import { closingShift, DEFAULT_CONFIG } from "@/lib/rules";
 import { dayHeader, dayOfDate, isWeekendDay, monthDay, periodDays, periodEnd } from "@/lib/period";
@@ -11,6 +12,7 @@ import {
   carryOverChanged,
   type Code,
   currentPeriod,
+  orphanConstraintIds,
   toScheduleRequest,
   useAppStore,
   type WorkPeriod,
@@ -31,7 +33,7 @@ import { statsFromAssignments } from "@/lib/stats";
 import { describeRule, formatDeviation, hardnessLabel, josa, presetName } from "@/lib/wording";
 
 import { markConfirmedEntry } from "./confirmedEntry";
-import { Spinner, today } from "./RulesStep";
+import RulesStep, { Spinner, today } from "./RulesStep";
 import { ui } from "./ui";
 
 const WEEKDAYS = ["일", "월", "화", "수", "목", "금", "토"];
@@ -104,7 +106,7 @@ export function toMessage(e: unknown): string {
 }
 
 /**
- * 근무표 만들기(/solve)와 해 없음 설명(/explain). 근무표 작성 ②와 확정 근무표가 함께 쓴다.
+ * 근무표 만들기(/solve)와 해 없음 설명(/explain). 근무표 작성 ③과 확정 근무표가 함께 쓴다.
  * 확정본이 있으면 확정본에서 최소한으로 바꾼다.
  */
 export function useSolve(periodId: string) {
@@ -350,7 +352,7 @@ export function ScheduleBody({
   );
 }
 
-/** 근무표 작성 ② 근무표. 만들기 전 [근무표 만들기], 만든 뒤 [확정]. 확정하면 확정 근무표 화면으로 간다. */
+/** 근무표 작성 ③ 근무표. 접힌 예외 입력 아래에 버튼을 둔다. 만들기 전 [근무표 만들기], 만든 뒤 [확정]. 확정하면 확정 근무표 화면으로 간다. */
 export default function ScheduleStep() {
   const shop = useAppStore((s) => s.shop);
   const period = useAppStore(currentPeriod);
@@ -374,38 +376,39 @@ export default function ScheduleStep() {
 
   return (
     <div className="flex flex-col gap-5">
-      <div className="flex items-end justify-between gap-4">
-        <div className="flex flex-col gap-1">
-          <h2 tabIndex={-1} data-step-title className={`${ui.cardTitle} outline-none`}>
-            근무표
-          </h2>
-          <p className="text-sm leading-relaxed text-[#3D3D38]">
-            {result
-              ? "칸을 눌러 근무를 고정하면 나머지를 최소한으로 바꿔 다시 만들어요."
-              : "적용한 규칙과 요청으로 근무표를 만들어요."}
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          {!result ? (
-            <button type="button" onClick={sv.run} disabled={busy || employees.length === 0} className={ui.primary}>
-              {loading && <Spinner />}
-              {loading ? "만드는 중…" : "근무표 만들기"}
+      <div className="flex flex-col gap-1">
+        <h2 tabIndex={-1} data-step-title className={`${ui.cardTitle} outline-none`}>
+          근무표
+        </h2>
+        <p className="text-sm leading-relaxed text-[#3D3D38]">
+          {result
+            ? "칸을 눌러 근무를 고정하면 나머지를 최소한으로 바꿔 다시 만들어요."
+            : "가능 시간과 매장 조건으로 근무표를 만들어요"}
+        </p>
+      </div>
+
+      <ExceptionSection period={period} />
+
+      <div className="flex items-center justify-end gap-2">
+        {!result ? (
+          <button type="button" onClick={sv.run} disabled={busy || employees.length === 0} className={ui.primary}>
+            {loading && <Spinner />}
+            {loading ? "만드는 중…" : "근무표 만들기"}
+          </button>
+        ) : (
+          <>
+            <button type="button" onClick={() => downloadCsv(period, employees, result)} disabled={busy} className={ui.text}>
+              CSV 받기
             </button>
-          ) : (
-            <>
-              <button type="button" onClick={() => downloadCsv(period, employees, result)} disabled={busy} className={ui.text}>
-                CSV 받기
-              </button>
-              <button type="button" onClick={sv.run} disabled={busy || employees.length === 0} className={ui.secondary}>
-                {loading && <Spinner />}
-                {loading ? "만드는 중…" : "다시 만들기"}
-              </button>
-              <button type="button" onClick={onConfirm} disabled={busy} className={ui.primary}>
-                확정
-              </button>
-            </>
-          )}
-        </div>
+            <button type="button" onClick={sv.run} disabled={busy || employees.length === 0} className={ui.secondary}>
+              {loading && <Spinner />}
+              {loading ? "만드는 중…" : "다시 만들기"}
+            </button>
+            <button type="button" onClick={onConfirm} disabled={busy} className={ui.primary}>
+              확정
+            </button>
+          </>
+        )}
       </div>
 
       {carryOverChanged(period, periods) && (
@@ -422,11 +425,29 @@ export default function ScheduleStep() {
       <ScheduleBody period={period} solve={sv} busy={busy} />
 
       <div>
-        <button type="button" onClick={() => go({ screen: "period", periodId, step: 1 })} className={ui.secondary}>
+        <button type="button" onClick={() => go({ screen: "period", periodId, step: 2 })} className={ui.secondary}>
           이전
         </button>
       </div>
     </div>
+  );
+}
+
+/** 접힌 "이번 근무표 예외 입력". 확인할 카드(적용 대기, 명단에 없는 직원)가 있으면 펼쳐서 시작한다. */
+function ExceptionSection({ period }: { period: WorkPeriod }) {
+  const shop = useAppStore((s) => s.shop);
+  const [open, setOpen] = useState(
+    () => period.pendingRequests.length > 0 || (shop !== null && orphanConstraintIds({ ...shop, rules: [] }, period).length > 0),
+  );
+  return (
+    <section className={`${ui.card} flex flex-col gap-3`}>
+      <div>
+        <button type="button" aria-expanded={open} onClick={() => setOpen((o) => !o)} className={ui.textSm}>
+          이번 근무표 예외 입력
+        </button>
+      </div>
+      {open && <RulesStep scope="period" />}
+    </section>
   );
 }
 
@@ -458,9 +479,10 @@ export function OutcomePanel({
   const explanation = outcome.kind === "infeasible" ? outcome.explanation : null;
   // 다시 풀어 검증된 제안만 보여준다(ADR-004)
   const proposals = (explanation?.proposals ?? []).filter((p) => p.verified_summary && !dismissed.includes(p));
-  const conflicts = outcome.kind === "infeasible" ? outcome.conflicts : [];
+  const conflicts = outcome.kind === "infeasible" ? mergeAvailabilityConflicts(outcome.conflicts) : [];
   const unknownCause = outcome.kind === "timeout" || conflicts.length === 0;
-  const hardList = constraints.filter((c) => (c.hardness ?? "hard") === "hard");
+  // 가능 시간은 직원이 정한 것이라 끌 수 없다
+  const hardList = constraints.filter((c) => (c.hardness ?? "hard") === "hard" && !isAvailabilityRule(c.id));
 
   return (
     <section className="flex flex-col gap-3.5 rounded-lg border border-[#E8B4AE] bg-white px-[18px] py-4">
@@ -519,6 +541,13 @@ export function OutcomePanel({
           <h3 className="text-[13px] font-semibold text-[#1B1B18]">함께 지킬 수 없는 규칙</h3>
           <ul className="flex flex-col">
             {conflicts.map((c) => {
+              if (isAvailabilityRule(c.constraint_id)) {
+                return (
+                  <li key={c.constraint_id} className="border-b border-[#EFEFEB] py-1.5 text-sm text-[#1B1B18] last:border-b-0">
+                    {c.source_text}
+                  </li>
+                );
+              }
               const found = constraints.find((x) => x.id === c.constraint_id);
               return (
                 <li key={c.constraint_id} className="flex items-center justify-between gap-3 border-b border-[#EFEFEB] py-1.5 last:border-b-0">

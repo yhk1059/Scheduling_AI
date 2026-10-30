@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { availabilityRules, coversShift, type AvailabilitySlots } from "./availability";
+import { availabilityRules, coversShift, isAvailabilityRule, mergeAvailabilityConflicts, type AvailabilitySlots } from "./availability";
 import { DEFAULT_CONFIG } from "./rules";
 import type { Rule, ShopConfig } from "./types.gen";
 
@@ -18,6 +18,27 @@ const forbiddenDays = (rules: Rule[], id: string) => {
   const body = rules.find((r) => r.id === id)?.body;
   return body?.kind === "require" ? body.for_each.days?.days : undefined;
 };
+
+describe("isAvailabilityRule", () => {
+  it("avail- 접두사로 가른다", () => {
+    expect(isAvailabilityRule("avail-e01-A")).toBe(true);
+    expect(isAvailabilityRule("rule-max-run")).toBe(false);
+  });
+});
+
+describe("mergeAvailabilityConflicts", () => {
+  const conflict = (constraint_id: string, source_text: string) => ({ constraint_id, type: "rule", source_text });
+  it("같은 직원의 가능 시간은 한 줄로 묶고 다른 규칙은 그대로 둔다", () => {
+    const merged = mergeAvailabilityConflicts([
+      conflict("avail-e01-A", "이영희 가능 시간"),
+      conflict("r1", "같은 문장"),
+      conflict("avail-e01-C", "이영희 가능 시간"),
+      conflict("r2", "같은 문장"),
+      conflict("avail-e02-A", "박민수 가능 시간"),
+    ]);
+    expect(merged.map((c) => c.constraint_id)).toEqual(["avail-e01-A", "r1", "r2", "avail-e02-A"]);
+  });
+});
 
 describe("coversShift", () => {
   it("근무조 시각을 완전히 덮어야 한다", () => {

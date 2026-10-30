@@ -22,6 +22,7 @@ import {
   STORAGE_KEY,
   setupStep,
   toScheduleRequest,
+  summarizedCoverageIds,
   viewForPeriod,
   type ShopRemote,
 } from "./store";
@@ -1562,22 +1563,36 @@ describe("매장 준비와 처음 설정 단계", () => {
   });
 });
 
+describe("summarizedCoverageIds", () => {
+  it("요약표에 든 필요 인원만 고르고, 꺼졌거나 폼 모양이 아니면 카드로 남긴다", () => {
+    const { store, id, period } = withPeriod();
+    store.getState().setCoverage("D", "weekday", 2, 2);
+    store.getState().setCoverage("E", "weekday", 1, null);
+    const shop = () => store.getState().shop!;
+    const [d, e] = ["D", "E"].map((code) => coverageRule(shop().rules, code, "weekday")!.id);
+    expect(summarizedCoverageIds(shop(), period()).sort()).toEqual([d, e].sort());
+    store.getState().setDisabled(id, d, true);
+    expect(summarizedCoverageIds(shop(), period())).toEqual([e]);
+    expect(summarizedCoverageIds(shop(), null).sort()).toEqual([d, e].sort());
+  });
+});
+
 describe("viewForPeriod", () => {
-  it("확정 → 확정 근무표, 결과 있음 → 작성 ②, 그 밖 → 작성 ①", () => {
+  it("확정 → 확정 근무표, 결과 있음 → 작성 ③, 그 밖 → 작성 ①", () => {
     const { store, id, period } = withPeriod();
     expect(viewForPeriod(period())).toEqual({ screen: "period", periodId: id, step: 1 });
     store.getState().setResult(id, result({ e01: ["D"], e02: ["O"] }), []);
-    expect(viewForPeriod(period())).toEqual({ screen: "period", periodId: id, step: 2 });
+    expect(viewForPeriod(period())).toEqual({ screen: "period", periodId: id, step: 3 });
     store.getState().confirm(id);
     expect(viewForPeriod(period())).toEqual({ screen: "confirmed", periodId: id });
   });
 
-  it("createPeriod는 결과가 있는 초안을 작성 ②로 연다", () => {
+  it("createPeriod는 결과가 있는 초안을 작성 ③으로 연다", () => {
     const { store, id } = withPeriod();
     store.getState().setResult(id, result({ e01: ["D"], e02: ["O"] }), []);
     store.getState().go({ screen: "home" });
     store.getState().createPeriod(TODAY);
-    expect(store.getState().view).toEqual({ screen: "period", periodId: id, step: 2 });
+    expect(store.getState().view).toEqual({ screen: "period", periodId: id, step: 3 });
   });
 
   it("currentPeriod는 확정 근무표 화면의 기간도 고른다", () => {
@@ -1621,10 +1636,11 @@ describe("옛 화면 상태 불러오기", () => {
     return fresh(storage).getState();
   }
 
-  it("작성 ③은 ②로, 확정된 기간은 확정 근무표로 바꾼다", () => {
+  it("작성 단계는 그대로 두고, 없는 단계는 근무표 상태로, 확정된 기간은 확정 근무표로 바꾼다", () => {
     const { store, id } = withConfirmed();
     const nextId = store.getState().createPeriod(TODAY)!;
-    expect(reload(store, { screen: "period", periodId: nextId, step: 3 }).view).toEqual({ screen: "period", periodId: nextId, step: 2 });
+    expect(reload(store, { screen: "period", periodId: nextId, step: 3 }).view).toEqual({ screen: "period", periodId: nextId, step: 3 });
+    expect(reload(store, { screen: "period", periodId: nextId, step: 9 }).view).toEqual({ screen: "period", periodId: nextId, step: 1 });
     expect(reload(store, { screen: "period", periodId: nextId, step: 2 }).view).toEqual({ screen: "period", periodId: nextId, step: 2 });
     expect(reload(store, { screen: "period", periodId: id, step: 3 }).view).toEqual({ screen: "confirmed", periodId: id });
     expect(reload(store, { screen: "period", periodId: id, step: 1 }).view).toEqual({ screen: "confirmed", periodId: id });
