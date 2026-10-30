@@ -61,7 +61,10 @@
     {
       "step": 7,
       "name": "eval-expr",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-10-30T14:16:32+0900",
+      "completed_at": "2026-10-30T14:31:51+0900",
+      "summary": "eval을 식 기준으로 옮김. 실제 API --gate 1회차 통과(claude-sonnet-5-5, 105건): legacy 49건 100%·new 30건 96.7%(기존 79건 합산 98.7%)·expr 26건 100%, 스키마 유효율 100%, status 정확도 100%, 제약 F1 99.1%, 평균 재시도 0.02. 남은 실패 b10 1건('신규 선생님들은 나이트 하지 않게' 병동 규칙을 LLM이 soft로 냄). 게이트를 통과해서 프롬프트(backend/llm/prompts.py)는 보강하지 않음. 판정기(eval/run.py): 위반을 evaluate.evaluate_rule로 셈. 위반 하나는 그 위반을 만든 칸(어긴 then 비교의 넘친 쪽 세는 칸/모자란 쪽 세지 않은 칸 + when 비교의 세는 칸, 기간 안)의 (사람 묶음, 날)로 펼침(사람이 묶인 범위는 그 사람, 아니면 세기 who 사람 전체, 고르게는 (고른 사람, 없음)). 그래서 window↔offset(−3,0)/(0,3), 휴가 person↔person_day↔day, 짝 ≤1↔when, in↔not_in, 블록↔식이 일치하고 values 이름·label은 무시함. 판정 근무표 = 무작위 50 + 기대 규칙의 세기마다 세는 칸을 뒤집은 4개(FLIPS_PER_BLOCK→FLIPS_PER_COUNT). 판정에 LLM을 쓰지 않음. 블록은 _as_rules로 바꿔 비교함(테스트용). validate_dataset은 type rule|fixed_assignment만 받고, Rule 검증(ScheduleRequest)과 for_each·who·balance 사람 셀렉터의 태그를 검사함. set은 legacy|new|expr. 게이트 상수 GATE_EXACT {legacy .95, new .95, expr .85}, GATE_PRIOR_EXACT .95(PRIOR_SETS legacy+new 합산, prior_exact_rate), GATE_SCHEMA_VALID 1.0. results.md에 set별 표 + 기존 합산 행 + '## 실행 이력' 표(실행마다 한 줄씩 쌓임). 데이터셋: convert_dataset.py에 blocks_to_rules(block_to_rules, 여러 번 실행해도 같음)를 더해 기존 79건을 기계 변환함(b15 min_len+max_len은 규칙 2개). 변환 전 블록 기대값과 의미 판정으로 79/79 일치. 칸 고정 기대값은 그대로 둠. ADR-019에 따라 기대값을 바꾼 3건: u01 '김철수랑 박민수는 같은 조 금지' unsupported→근무조 D·E·N마다 Count{who n03,n02}≤1 규칙 3개, b29 '이영희랑 강서연은 같은 날 같이 근무 안 하게' unsupported→day Count{who n01,n06, not_in O}≤1, u02 '신규는 프리셉터랑 같은 근무조로' unsupported→clarify(짝은 지원하지만 eval 병동에 프리셉터 태그가 없어 빈 대상). 새 expr 26건(x01~x26): 조건부 태그·연차(x01~x03, x20), 짝 따로·같이·둘 다 휴무 금지(x04~x06), 세기끼리 비교(x07·x08), 요일 조건부 순서(x09 일→월, x10 토→일), 범위 필요 인원(x11·x12), 병동 소개(x13 M+3, x14 DE+3), soft 조건부·짝(x15·x16), 값 이름(x17·x18·x19 person_week), unsupported 시각 겹침·세 근무·교육 시간(x21~x23), clarify 없는 태그·없는 이름(x24·x25), 인젝션(x26). 확인: 기대값을 mock 출력으로 넣으면 105/105가 translator 검증을 통과하고 자기 자신과 일치함. test_eval_runner 92개(식 모양 쌍 일치 6 + 불일치 10, 검증, 게이트·합산, 이력, convert). pytest 1309·vitest 292, build·lint(기존 경고 1)·dry-run 통과."
     },
     {
       "step": 8,
