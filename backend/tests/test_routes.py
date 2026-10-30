@@ -27,7 +27,7 @@ from backend.domain.constants import (
 from backend.llm.client import LLMConfigError, LLMUnavailableError, ToolCallResult
 from backend.routes import app, get_llm_client
 from backend.solver.model import solve as real_solve
-from backend.tests.rules import history, sample_data
+from backend.tests.rules import DEN_CONFIG, DEN_SHIFTS, history, sample_data
 
 client = TestClient(app)
 
@@ -86,7 +86,7 @@ def translate_body(text: str = "이영희 15~17일 휴가") -> dict:
     return {
         "text": text,
         "scope": "period",
-        "context": {"employees": data["employees"], "period": data["period"], "holidays": [5], "today": "2026-10-26"},
+        "context": {"config": DEN_CONFIG, "employees": data["employees"], "period": data["period"], "holidays": [5], "today": "2026-10-26"},
         "input_version": 9,
     }
 
@@ -232,7 +232,7 @@ def test_translate_conditional_rule(llm):
 
 
 def test_translate_ok_with_config_changes(llm):
-    mid = {"code": "M", "name": "미드", "hours": 8, "start": "11:00"}
+    mid = {"code": "M", "name": "미드", "hours": 8, "start": "11:00", "end": "19:00"}
     rule = {
         "values": {"min": {"value": 1, "label": "최소 인원"}},
         "body": {"kind": "require", "for_each": {"per": "day"}, "then": {"left": {"shifts": {"in": ["M"]}}, "op": "ge", "right": {"value": "min"}}},
@@ -243,7 +243,7 @@ def test_translate_ok_with_config_changes(llm):
     assert r.status_code == 200
     body = r.json()
     assert body["config_changes"] == [
-        {"action": "add", "shift": {"code": "M", "name": "미드", "hours": 8.0, "parts": [], "start": "11:00", "active": True}}
+        {"action": "add", "shift": {"code": "M", "name": "미드", "hours": 8.0, "parts": [], "start": "11:00", "end": "19:00", "active": True}}
     ]
     assert body["constraints"][0]["body"]["then"]["left"]["shifts"]["in"] == ["M"]
 
@@ -281,7 +281,7 @@ def test_translate_examples_are_deterministic(llm):
 
 
 def test_translate_examples_use_config_changes(llm):
-    mid = {"code": "M", "name": "미드", "hours": 8}
+    mid = {"code": "M", "name": "미드", "hours": 8, "start": "11:00", "end": "19:00"}
     rule = {
         "body": {
             "kind": "require",
@@ -549,8 +549,8 @@ def test_413_explain_nested_request():
 
 def shift_codes(n: int) -> dict:
     """D/E/N/O + 추가 코드로 근무 코드 n개인 config."""
-    base = [{"code": c, "name": c, "hours": h} for c, h in (("D", 8), ("E", 8), ("N", 8), ("O", 0))]
-    return {"shifts": base + [{"code": f"X{i}", "name": f"X{i}", "hours": 8} for i in range(n - 4)]}
+    extra = [{"code": f"X{i}", "name": f"X{i}", "hours": 8, "start": "09:00", "end": "17:00"} for i in range(n - 4)]
+    return {"shifts": DEN_SHIFTS + extra}
 
 
 def test_413_too_many_shift_codes():

@@ -45,6 +45,7 @@ export interface ShiftDef {
   hours: number;
   parts?: string[];
   start?: string | null;
+  end?: string | null;
   active?: boolean;
 }
 export interface Employee {

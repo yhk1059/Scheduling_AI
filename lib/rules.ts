@@ -1,5 +1,5 @@
 // 식 규칙 상수, 기본값 채우기, 블록 모양 되읽기. 순수 함수.
-import type { Cmp, ConstraintSpec, Count, Days, People, Rule, Shifts, ValueRef, ShopConfig } from "./types.gen";
+import type { Cmp, ConstraintSpec, Count, Days, People, Rule, ShiftDef, Shifts, ValueRef, ShopConfig } from "./types.gen";
 
 /** 저장 문서 버전. 6 = 식 규칙(ADR-019) */
 export const STORAGE_VERSION = 1;
@@ -10,15 +10,31 @@ export const PRIORITY_WEIGHTS = { high: 30, normal: 10, low: 5 } as const;
 export type Priority = keyof typeof PRIORITY_WEIGHTS;
 const DEFAULT_WEIGHT = PRIORITY_WEIGHTS.normal;
 
-/** 기본 근무 형태: D/E/N 8시간 + O(backend/domain/constants.py DEFAULT_SHIFTS). */
+/** 기본 근무 형태: 오픈·미들·마감 + O(backend/domain/constants.py DEFAULT_SHIFTS). */
 export const DEFAULT_CONFIG: ShopConfig = {
   shifts: [
-    { code: "D", name: "데이", hours: 8 },
-    { code: "E", name: "이브닝", hours: 8 },
-    { code: "N", name: "나이트", hours: 8 },
+    { code: "A", name: "오픈", hours: 6, start: "09:00", end: "15:00" },
+    { code: "M", name: "미들", hours: 6, start: "12:00", end: "18:00" },
+    { code: "C", name: "마감", hours: 6, start: "17:00", end: "23:00" },
     { code: OFF_CODE, name: "휴무", hours: 0 },
   ],
 };
+
+const SHIFT_TIME_RE = /^(([01][0-9]|2[0-3]):(00|30)|24:00)$/; // backend/domain/models.py ShiftTime
+
+/** 근무조 시각 입력의 오류 문구. 맞으면 null. "HH:MM" 30분 단위, 끝은 시작보다 늦고 24:00까지(자정을 넘기지 않는다). */
+export function shiftTimesError(start: string, end: string): string | null {
+  if (!SHIFT_TIME_RE.test(start) || !SHIFT_TIME_RE.test(end)) return "시각은 09:00, 17:30처럼 30분 단위로 적어 주세요";
+  return start < end ? null : "끝 시각은 시작 시각보다 늦어야 해요. 자정을 넘길 수 없어요";
+}
+
+/** 최근 4주 부담에서 세는 근무조: 활성 기본 코드 중 가장 늦게 끝나는 것(같으면 늦게 시작하는 것). 기본은 마감. */
+export function closingShift(config: ShopConfig): ShiftDef | null {
+  const late = (s: ShiftDef) => `${s.end ?? ""} ${s.start ?? ""}`;
+  return config.shifts
+    .filter((s) => s.code !== OFF_CODE && s.active !== false && !s.parts?.length)
+    .reduce<ShiftDef | null>((best, s) => (!best || late(s) > late(best) ? s : best), null);
+}
 
 /** null·undefined 값을 지운다. */
 function compact<T extends object>(o: T): T {

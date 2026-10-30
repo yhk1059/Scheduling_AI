@@ -5,6 +5,7 @@ from pydantic import TypeAdapter, ValidationError
 
 from backend.domain import constants
 from backend.domain.models import ConstraintSpec, Rule, ScheduleRequest
+from backend.tests.rules import DEN_CONFIG
 
 spec_adapter = TypeAdapter(ConstraintSpec)
 
@@ -15,6 +16,7 @@ def employees(n: int = 3) -> list[dict]:
 
 def request(constraints: list[dict], **extra) -> dict:
     return {
+        "config": DEN_CONFIG,
         "employees": employees(),
         "period": {"start_date": "2026-11-01", "length": 30},
         "constraints": constraints,
@@ -284,7 +286,7 @@ def test_rule_codes_checked():
     bal = rule({"kind": "balance", "shifts": {"not_in": ["M"]}}, cid="bm")
     with pytest.raises(ValidationError, match="bm.*M"):
         ScheduleRequest.model_validate(request([bal]))
-    cfg = {"shifts": [{"code": c, "name": c, "hours": 8} for c in "DENM"] + [{"code": "O", "name": "휴무", "hours": 0}]}
+    cfg = {"shifts": [{"code": c, "name": c, "hours": 8, "start": "09:00", "end": "17:00"} for c in "DENM"] + [{"code": "O", "name": "휴무", "hours": 0}]}
     assert ScheduleRequest.model_validate(request([when_m, right_m, bal], config=cfg))
 
 

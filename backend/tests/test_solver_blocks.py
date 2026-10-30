@@ -12,7 +12,8 @@ MONDAY = "2026-11-02"  # 11/2 월요일: 7일이면 6, 7일이 토·일
 
 
 def shift(code: str, name: str, hours: float = 8, parts: list[str] | None = None, active: bool = True) -> dict:
-    return {"code": code, "name": name, "hours": hours, "parts": parts or [], "active": active}
+    times = {} if parts or code == "O" else {"start": "09:00", "end": "17:00"}
+    return {"code": code, "name": name, "hours": hours, "parts": parts or [], "active": active, **times}
 
 
 BASE_SHIFTS = [shift("D", "데이"), shift("E", "이브닝"), shift("N", "나이트"), shift("O", "휴무", 0)]
@@ -32,6 +33,7 @@ def daily(code: str, n: int, **params) -> dict:
 
 def request(employees: list[dict], constraints: list[dict], length: int = 7, start: str = MONDAY, **extra) -> ScheduleRequest:
     return ScheduleRequest.model_validate({
+        "config": config(),
         "employees": employees,
         "period": {"start_date": start, "length": length},
         "constraints": constraints,

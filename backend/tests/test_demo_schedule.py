@@ -30,16 +30,33 @@ def test_sample_shop_rules():
     assert all(c["scope"] == "shop" and c["type"] == "rule" for c in SHOP["constraints"])
     assert all(c["default"] for c in SHOP["constraints"] if c["id"].startswith("cov-"))
     assert {cid: (c["hardness"], c["default"]) for cid, c in rules.items()} == {
-        "rule-noff": ("hard", False),
-        "rule-max-work": ("hard", False),
-        "rule-max-nights": ("hard", False),
-        "rule-min-off": ("hard", False),
-        "rule-night-fair": ("soft", False),
+        "rule-no-close-open": ("hard", False),
+        "rule-max-run": ("hard", False),
+        "rule-week-hours": ("hard", False),
+        "rule-week-off": ("hard", False),
+        "rule-leader-open": ("hard", False),
+        "rule-close-fair": ("soft", False),
         "rule-weekend-fair": ("soft", False),
     }
-    assert rules["rule-max-work"]["values"]["max_len"]["value"] == 5
-    assert rules["rule-max-nights"]["values"]["max_len"]["value"] == 3
-    assert rules["rule-min-off"]["values"]["min"]["value"] == 8
+    assert rules["rule-max-run"]["values"]["max_len"]["value"] == 5
+    assert rules["rule-week-hours"]["values"]["max"]["value"] == 40
+    assert rules["rule-week-off"]["values"]["min"]["value"] == 2
+
+
+def test_sample_shop_roster_and_coverage():
+    """D1 명단(12명, 리더 3명, 신입 2명)과 D2 필요 인원."""
+    tagged = {t: [n["name"] for n in SHOP["employees"] if t in n["tags"]] for t in ("리더", "신입")}
+    assert len(SHOP["employees"]) == 12
+    assert tagged == {"리더": ["이영희", "강서연", "윤지민"], "신입": ["서예린", "신도윤"]}
+    cov = {c["id"]: {k: v["value"] for k, v in c["values"].items()} for c in SHOP["constraints"] if c["id"].startswith("cov-")}
+    assert cov == {
+        "cov-weekday-A": {"min": 1, "max": 2},
+        "cov-weekday-M": {"min": 1, "max": 2},
+        "cov-weekday-C": {"min": 3},
+        "cov-weekend-A": {"min": 2},
+        "cov-weekend-M": {"min": 2},
+        "cov-weekend-C": {"min": 3},
+    }
 
 
 def test_demo_request_uses_shop_rules_only():
@@ -64,7 +81,7 @@ def test_schedule_shape():
 def test_everyone_gets_days_off():
     a = _assignments()
     for nid, row in a.items():
-        assert row.count("O") >= 8, nid
+        assert row.count("O") >= 8, nid  # 4주 × 주 2일
         assert _max_run(row) <= 5, nid
 
 
@@ -79,6 +96,19 @@ def test_schedule_satisfies_shop_rules():
     data = demo_request().model_dump(mode="json")
     data["constraints"] += fixed
     assert isinstance(solve(ScheduleRequest.model_validate(data), analyze_conflicts=False), SolveOk)
+
+
+def test_schedule_is_within_coverage_and_rules():
+    a = _assignments()
+    for d in range(DEMO_PERIOD["length"]):
+        day = [row[d] for row in a.values()]
+        weekend = d % 7 >= 5  # 월요일 시작
+        assert day.count("C") == 3
+        assert (day.count("A"), day.count("M")) == (2, 2) if weekend else 1 <= day.count("A") <= 2 and 1 <= day.count("M") <= 2
+    for nid, row in a.items():
+        assert all(not (x == "C" and y == "A") for x, y in zip(row, row[1:])), nid
+    leaders = [n["id"] for n in SHOP["employees"] if "리더" in n["tags"]]
+    assert all(any(a[nid][d] == "A" for nid in leaders) for d in range(DEMO_PERIOD["length"]))
 
 
 def test_stats_match_assignments():

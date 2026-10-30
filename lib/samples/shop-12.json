@@ -1,28 +1,32 @@
 {
+  "name": "샘플 매장",
   "config": {
     "shifts": [
       {
-        "code": "D",
-        "name": "데이",
-        "hours": 8.0,
+        "code": "A",
+        "name": "오픈",
+        "hours": 6.0,
         "parts": [],
-        "start": null,
+        "start": "09:00",
+        "end": "15:00",
         "active": true
       },
       {
-        "code": "E",
-        "name": "이브닝",
-        "hours": 8.0,
+        "code": "M",
+        "name": "미들",
+        "hours": 6.0,
         "parts": [],
-        "start": null,
+        "start": "12:00",
+        "end": "18:00",
         "active": true
       },
       {
-        "code": "N",
-        "name": "나이트",
-        "hours": 8.0,
+        "code": "C",
+        "name": "마감",
+        "hours": 6.0,
         "parts": [],
-        "start": null,
+        "start": "17:00",
+        "end": "23:00",
         "active": true
       },
       {
@@ -31,6 +35,7 @@
         "hours": 0.0,
         "parts": [],
         "start": null,
+        "end": null,
         "active": true
       }
     ]
@@ -39,7 +44,9 @@
     {
       "id": "e01",
       "name": "이영희",
-      "tags": []
+      "tags": [
+        "리더"
+      ]
     },
     {
       "id": "e02",
@@ -64,12 +71,16 @@
     {
       "id": "e06",
       "name": "강서연",
-      "tags": []
+      "tags": [
+        "리더"
+      ]
     },
     {
       "id": "e07",
       "name": "윤지민",
-      "tags": []
+      "tags": [
+        "리더"
+      ]
     },
     {
       "id": "e08",
@@ -89,41 +100,204 @@
     {
       "id": "e11",
       "name": "서예린",
-      "tags": []
+      "tags": [
+        "신입"
+      ]
     },
     {
       "id": "e12",
       "name": "신도윤",
-      "tags": []
-    },
-    {
-      "id": "e13",
-      "name": "조은비",
-      "tags": []
-    },
-    {
-      "id": "e14",
-      "name": "문가람",
-      "tags": []
-    },
-    {
-      "id": "e15",
-      "name": "배수아",
-      "tags": []
+      "tags": [
+        "신입"
+      ]
     }
   ],
   "period": {
-    "start_date": "2026-11-01",
-    "length": 30
+    "start_date": "2026-11-02",
+    "length": 28
   },
   "holidays": [],
   "constraints": [
     {
-      "id": "cov-weekday-D",
+      "id": "cov-weekday-A",
       "scope": "shop",
       "hardness": "hard",
       "weight": 10,
-      "source_text": "평일 데이 3명",
+      "source_text": "평일 오픈은 1~2명",
+      "enabled": true,
+      "priority": "normal",
+      "type": "rule",
+      "default": true,
+      "values": {
+        "min": {
+          "value": 1.0,
+          "label": "최소 인원"
+        },
+        "max": {
+          "value": 2.0,
+          "label": "최대 인원"
+        }
+      },
+      "body": {
+        "kind": "require",
+        "for_each": {
+          "per": "day",
+          "people": {
+            "ids": null,
+            "tags": null,
+            "exclude_tags": []
+          },
+          "days": {
+            "kind": "weekday",
+            "weekdays": null,
+            "days": null
+          },
+          "window": null
+        },
+        "when": null,
+        "then": {
+          "all": [
+            {
+              "left": {
+                "who": null,
+                "days": {
+                  "kind": "all",
+                  "weekdays": null,
+                  "days": null
+                },
+                "offset": null,
+                "shifts": {
+                  "in": [
+                    "A"
+                  ],
+                  "not_in": null
+                },
+                "measure": "count"
+              },
+              "op": "ge",
+              "right": {
+                "value": "min"
+              }
+            },
+            {
+              "left": {
+                "who": null,
+                "days": {
+                  "kind": "all",
+                  "weekdays": null,
+                  "days": null
+                },
+                "offset": null,
+                "shifts": {
+                  "in": [
+                    "A"
+                  ],
+                  "not_in": null
+                },
+                "measure": "count"
+              },
+              "op": "le",
+              "right": {
+                "value": "max"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "cov-weekday-M",
+      "scope": "shop",
+      "hardness": "hard",
+      "weight": 10,
+      "source_text": "평일 미들은 1~2명",
+      "enabled": true,
+      "priority": "normal",
+      "type": "rule",
+      "default": true,
+      "values": {
+        "min": {
+          "value": 1.0,
+          "label": "최소 인원"
+        },
+        "max": {
+          "value": 2.0,
+          "label": "최대 인원"
+        }
+      },
+      "body": {
+        "kind": "require",
+        "for_each": {
+          "per": "day",
+          "people": {
+            "ids": null,
+            "tags": null,
+            "exclude_tags": []
+          },
+          "days": {
+            "kind": "weekday",
+            "weekdays": null,
+            "days": null
+          },
+          "window": null
+        },
+        "when": null,
+        "then": {
+          "all": [
+            {
+              "left": {
+                "who": null,
+                "days": {
+                  "kind": "all",
+                  "weekdays": null,
+                  "days": null
+                },
+                "offset": null,
+                "shifts": {
+                  "in": [
+                    "M"
+                  ],
+                  "not_in": null
+                },
+                "measure": "count"
+              },
+              "op": "ge",
+              "right": {
+                "value": "min"
+              }
+            },
+            {
+              "left": {
+                "who": null,
+                "days": {
+                  "kind": "all",
+                  "weekdays": null,
+                  "days": null
+                },
+                "offset": null,
+                "shifts": {
+                  "in": [
+                    "M"
+                  ],
+                  "not_in": null
+                },
+                "measure": "count"
+              },
+              "op": "le",
+              "right": {
+                "value": "max"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "cov-weekday-C",
+      "scope": "shop",
+      "hardness": "hard",
+      "weight": 10,
+      "source_text": "평일 마감은 3명",
       "enabled": true,
       "priority": "normal",
       "type": "rule",
@@ -162,7 +336,7 @@
             "offset": null,
             "shifts": {
               "in": [
-                "D"
+                "C"
               ],
               "not_in": null
             },
@@ -176,11 +350,125 @@
       }
     },
     {
-      "id": "cov-weekday-E",
+      "id": "cov-weekend-A",
       "scope": "shop",
       "hardness": "hard",
       "weight": 10,
-      "source_text": "평일 이브닝 3명",
+      "source_text": "주말 오픈은 2명",
+      "enabled": true,
+      "priority": "normal",
+      "type": "rule",
+      "default": true,
+      "values": {
+        "min": {
+          "value": 2.0,
+          "label": "인원"
+        }
+      },
+      "body": {
+        "kind": "require",
+        "for_each": {
+          "per": "day",
+          "people": {
+            "ids": null,
+            "tags": null,
+            "exclude_tags": []
+          },
+          "days": {
+            "kind": "weekend",
+            "weekdays": null,
+            "days": null
+          },
+          "window": null
+        },
+        "when": null,
+        "then": {
+          "left": {
+            "who": null,
+            "days": {
+              "kind": "all",
+              "weekdays": null,
+              "days": null
+            },
+            "offset": null,
+            "shifts": {
+              "in": [
+                "A"
+              ],
+              "not_in": null
+            },
+            "measure": "count"
+          },
+          "op": "eq",
+          "right": {
+            "value": "min"
+          }
+        }
+      }
+    },
+    {
+      "id": "cov-weekend-M",
+      "scope": "shop",
+      "hardness": "hard",
+      "weight": 10,
+      "source_text": "주말 미들은 2명",
+      "enabled": true,
+      "priority": "normal",
+      "type": "rule",
+      "default": true,
+      "values": {
+        "min": {
+          "value": 2.0,
+          "label": "인원"
+        }
+      },
+      "body": {
+        "kind": "require",
+        "for_each": {
+          "per": "day",
+          "people": {
+            "ids": null,
+            "tags": null,
+            "exclude_tags": []
+          },
+          "days": {
+            "kind": "weekend",
+            "weekdays": null,
+            "days": null
+          },
+          "window": null
+        },
+        "when": null,
+        "then": {
+          "left": {
+            "who": null,
+            "days": {
+              "kind": "all",
+              "weekdays": null,
+              "days": null
+            },
+            "offset": null,
+            "shifts": {
+              "in": [
+                "M"
+              ],
+              "not_in": null
+            },
+            "measure": "count"
+          },
+          "op": "eq",
+          "right": {
+            "value": "min"
+          }
+        }
+      }
+    },
+    {
+      "id": "cov-weekend-C",
+      "scope": "shop",
+      "hardness": "hard",
+      "weight": 10,
+      "source_text": "주말 마감은 3명",
       "enabled": true,
       "priority": "normal",
       "type": "rule",
@@ -201,120 +489,6 @@
             "exclude_tags": []
           },
           "days": {
-            "kind": "weekday",
-            "weekdays": null,
-            "days": null
-          },
-          "window": null
-        },
-        "when": null,
-        "then": {
-          "left": {
-            "who": null,
-            "days": {
-              "kind": "all",
-              "weekdays": null,
-              "days": null
-            },
-            "offset": null,
-            "shifts": {
-              "in": [
-                "E"
-              ],
-              "not_in": null
-            },
-            "measure": "count"
-          },
-          "op": "eq",
-          "right": {
-            "value": "min"
-          }
-        }
-      }
-    },
-    {
-      "id": "cov-weekday-N",
-      "scope": "shop",
-      "hardness": "hard",
-      "weight": 10,
-      "source_text": "평일 나이트 2명",
-      "enabled": true,
-      "priority": "normal",
-      "type": "rule",
-      "default": true,
-      "values": {
-        "min": {
-          "value": 2.0,
-          "label": "인원"
-        }
-      },
-      "body": {
-        "kind": "require",
-        "for_each": {
-          "per": "day",
-          "people": {
-            "ids": null,
-            "tags": null,
-            "exclude_tags": []
-          },
-          "days": {
-            "kind": "weekday",
-            "weekdays": null,
-            "days": null
-          },
-          "window": null
-        },
-        "when": null,
-        "then": {
-          "left": {
-            "who": null,
-            "days": {
-              "kind": "all",
-              "weekdays": null,
-              "days": null
-            },
-            "offset": null,
-            "shifts": {
-              "in": [
-                "N"
-              ],
-              "not_in": null
-            },
-            "measure": "count"
-          },
-          "op": "eq",
-          "right": {
-            "value": "min"
-          }
-        }
-      }
-    },
-    {
-      "id": "cov-weekend-D",
-      "scope": "shop",
-      "hardness": "hard",
-      "weight": 10,
-      "source_text": "주말·공휴일 데이 3명",
-      "enabled": true,
-      "priority": "normal",
-      "type": "rule",
-      "default": true,
-      "values": {
-        "min": {
-          "value": 3.0,
-          "label": "인원"
-        }
-      },
-      "body": {
-        "kind": "require",
-        "for_each": {
-          "per": "day",
-          "people": {
-            "ids": null,
-            "tags": null,
-            "exclude_tags": []
-          },
-          "days": {
             "kind": "weekend",
             "weekdays": null,
             "days": null
@@ -333,7 +507,7 @@
             "offset": null,
             "shifts": {
               "in": [
-                "D"
+                "C"
               ],
               "not_in": null
             },
@@ -347,125 +521,11 @@
       }
     },
     {
-      "id": "cov-weekend-E",
+      "id": "rule-no-close-open",
       "scope": "shop",
       "hardness": "hard",
       "weight": 10,
-      "source_text": "주말·공휴일 이브닝 2명",
-      "enabled": true,
-      "priority": "normal",
-      "type": "rule",
-      "default": true,
-      "values": {
-        "min": {
-          "value": 2.0,
-          "label": "인원"
-        }
-      },
-      "body": {
-        "kind": "require",
-        "for_each": {
-          "per": "day",
-          "people": {
-            "ids": null,
-            "tags": null,
-            "exclude_tags": []
-          },
-          "days": {
-            "kind": "weekend",
-            "weekdays": null,
-            "days": null
-          },
-          "window": null
-        },
-        "when": null,
-        "then": {
-          "left": {
-            "who": null,
-            "days": {
-              "kind": "all",
-              "weekdays": null,
-              "days": null
-            },
-            "offset": null,
-            "shifts": {
-              "in": [
-                "E"
-              ],
-              "not_in": null
-            },
-            "measure": "count"
-          },
-          "op": "eq",
-          "right": {
-            "value": "min"
-          }
-        }
-      }
-    },
-    {
-      "id": "cov-weekend-N",
-      "scope": "shop",
-      "hardness": "hard",
-      "weight": 10,
-      "source_text": "주말·공휴일 나이트 2명",
-      "enabled": true,
-      "priority": "normal",
-      "type": "rule",
-      "default": true,
-      "values": {
-        "min": {
-          "value": 2.0,
-          "label": "인원"
-        }
-      },
-      "body": {
-        "kind": "require",
-        "for_each": {
-          "per": "day",
-          "people": {
-            "ids": null,
-            "tags": null,
-            "exclude_tags": []
-          },
-          "days": {
-            "kind": "weekend",
-            "weekdays": null,
-            "days": null
-          },
-          "window": null
-        },
-        "when": null,
-        "then": {
-          "left": {
-            "who": null,
-            "days": {
-              "kind": "all",
-              "weekdays": null,
-              "days": null
-            },
-            "offset": null,
-            "shifts": {
-              "in": [
-                "N"
-              ],
-              "not_in": null
-            },
-            "measure": "count"
-          },
-          "op": "eq",
-          "right": {
-            "value": "min"
-          }
-        }
-      }
-    },
-    {
-      "id": "rule-noff",
-      "scope": "shop",
-      "hardness": "hard",
-      "weight": 10,
-      "source_text": "나이트 끝나면 다음 날은 무조건 쉬게",
+      "source_text": "마감 다음 날 오픈은 안 되게",
       "enabled": true,
       "priority": "normal",
       "type": "rule",
@@ -487,8 +547,9 @@
           },
           "window": null
         },
-        "when": {
-          "all": [
+        "when": null,
+        "then": {
+          "any": [
             {
               "left": {
                 "who": null,
@@ -503,14 +564,14 @@
                 ],
                 "shifts": {
                   "in": [
-                    "N"
+                    "C"
                   ],
                   "not_in": null
                 },
                 "measure": "count"
               },
-              "op": "ge",
-              "right": 1.0
+              "op": "eq",
+              "right": 0.0
             },
             {
               "left": {
@@ -525,49 +586,26 @@
                   1
                 ],
                 "shifts": {
-                  "in": null,
-                  "not_in": [
-                    "N"
-                  ]
+                  "in": [
+                    "A"
+                  ],
+                  "not_in": null
                 },
                 "measure": "count"
               },
-              "op": "ge",
-              "right": 1.0
+              "op": "eq",
+              "right": 0.0
             }
           ]
-        },
-        "then": {
-          "left": {
-            "who": null,
-            "days": {
-              "kind": "all",
-              "weekdays": null,
-              "days": null
-            },
-            "offset": [
-              1,
-              1
-            ],
-            "shifts": {
-              "in": null,
-              "not_in": [
-                "O"
-              ]
-            },
-            "measure": "count"
-          },
-          "op": "eq",
-          "right": 0.0
         }
       }
     },
     {
-      "id": "rule-max-work",
+      "id": "rule-max-run",
       "scope": "shop",
       "hardness": "hard",
       "weight": 10,
-      "source_text": "6일 연속 근무는 안 돼요",
+      "source_text": "5일 넘게 연속으로 일하지 않게",
       "enabled": true,
       "priority": "normal",
       "type": "rule",
@@ -620,25 +658,25 @@
       }
     },
     {
-      "id": "rule-max-nights",
+      "id": "rule-week-hours",
       "scope": "shop",
       "hardness": "hard",
       "weight": 10,
-      "source_text": "나이트는 3번 연속까지만",
+      "source_text": "일주일에 40시간 넘게 일하지 않게",
       "enabled": true,
       "priority": "normal",
       "type": "rule",
       "default": false,
       "values": {
-        "max_len": {
-          "value": 3.0,
-          "label": "최대 연속 나이트"
+        "max": {
+          "value": 40.0,
+          "label": "최대 근무 시간"
         }
       },
       "body": {
         "kind": "require",
         "for_each": {
-          "per": "person_window",
+          "per": "person_week",
           "people": {
             "ids": null,
             "tags": null,
@@ -649,7 +687,7 @@
             "weekdays": null,
             "days": null
           },
-          "window": 4
+          "window": null
         },
         "when": null,
         "then": {
@@ -662,40 +700,40 @@
             },
             "offset": null,
             "shifts": {
-              "in": [
-                "N"
-              ],
-              "not_in": null
+              "in": null,
+              "not_in": [
+                "O"
+              ]
             },
-            "measure": "count"
+            "measure": "hours"
           },
           "op": "le",
           "right": {
-            "value": "max_len"
+            "value": "max"
           }
         }
       }
     },
     {
-      "id": "rule-min-off",
+      "id": "rule-week-off",
       "scope": "shop",
       "hardness": "hard",
       "weight": 10,
-      "source_text": "한 달에 최소 8일은 쉬게",
+      "source_text": "일주일에 이틀은 꼭 쉬게",
       "enabled": true,
       "priority": "normal",
       "type": "rule",
       "default": false,
       "values": {
         "min": {
-          "value": 8.0,
+          "value": 2.0,
           "label": "최소 휴무 일수"
         }
       },
       "body": {
         "kind": "require",
         "for_each": {
-          "per": "person",
+          "per": "person_week",
           "people": {
             "ids": null,
             "tags": null,
@@ -734,11 +772,74 @@
       }
     },
     {
-      "id": "rule-night-fair",
+      "id": "rule-leader-open",
+      "scope": "shop",
+      "hardness": "hard",
+      "weight": 10,
+      "source_text": "오픈에는 리더가 꼭 1명 있어야 해",
+      "enabled": true,
+      "priority": "normal",
+      "type": "rule",
+      "default": false,
+      "values": {
+        "min": {
+          "value": 1.0,
+          "label": "최소 인원"
+        }
+      },
+      "body": {
+        "kind": "require",
+        "for_each": {
+          "per": "day",
+          "people": {
+            "ids": null,
+            "tags": null,
+            "exclude_tags": []
+          },
+          "days": {
+            "kind": "all",
+            "weekdays": null,
+            "days": null
+          },
+          "window": null
+        },
+        "when": null,
+        "then": {
+          "left": {
+            "who": {
+              "ids": null,
+              "tags": [
+                "리더"
+              ],
+              "exclude_tags": []
+            },
+            "days": {
+              "kind": "all",
+              "weekdays": null,
+              "days": null
+            },
+            "offset": null,
+            "shifts": {
+              "in": [
+                "A"
+              ],
+              "not_in": null
+            },
+            "measure": "count"
+          },
+          "op": "ge",
+          "right": {
+            "value": "min"
+          }
+        }
+      }
+    },
+    {
+      "id": "rule-close-fair",
       "scope": "shop",
       "hardness": "soft",
       "weight": 5,
-      "source_text": "나이트는 골고루",
+      "source_text": "마감은 돌아가면서 고르게",
       "enabled": true,
       "priority": "low",
       "type": "rule",
@@ -763,7 +864,7 @@
         },
         "shifts": {
           "in": [
-            "N"
+            "C"
           ],
           "not_in": null
         },
@@ -779,7 +880,7 @@
       "scope": "shop",
       "hardness": "soft",
       "weight": 5,
-      "source_text": "주말 근무도 골고루",
+      "source_text": "주말 근무도 고르게 돌아가게",
       "enabled": true,
       "priority": "low",
       "type": "rule",
@@ -889,7 +990,7 @@
       "scope": "period",
       "hardness": "soft",
       "weight": 10,
-      "source_text": "박민수는 주말엔 나이트 빼 주세요",
+      "source_text": "박민수는 주말 마감은 피하고 싶대요",
       "enabled": true,
       "priority": "normal",
       "type": "rule",
@@ -930,7 +1031,7 @@
             "offset": null,
             "shifts": {
               "in": [
-                "N"
+                "C"
               ],
               "not_in": null
             },
@@ -948,7 +1049,7 @@
       "scope": "period",
       "hardness": "soft",
       "weight": 10,
-      "source_text": "정유진 20일은 데이로 해 주세요",
+      "source_text": "정유진 20일에 오픈하고 싶대요",
       "enabled": true,
       "priority": "normal",
       "type": "rule",
@@ -991,7 +1092,7 @@
             "offset": null,
             "shifts": {
               "in": [
-                "D"
+                "A"
               ],
               "not_in": null
             },

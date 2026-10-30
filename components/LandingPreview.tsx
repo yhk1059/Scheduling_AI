@@ -13,8 +13,8 @@ import RuleText from "./RuleText";
 import { ScheduleGrid } from "./ScheduleStep";
 import { ui } from "./ui";
 
-// 샘플 데모(/demo)와 같은 데이터: 매장 규칙 두 장과 근무표 첫 주(2026년 11월 1~7일, 일~토)의 앞 5명.
-const CARDS = (shop.constraints as unknown as ConstraintSpec[]).filter((c) => ["rule-noff", "rule-max-nights"].includes(c.id));
+// 샘플 데모(/demo)와 같은 데이터: 매장 규칙 두 장과 근무표 첫 주(2026년 11월 2~8일, 월~일)의 앞 5명.
+const CARDS = (shop.constraints as unknown as ConstraintSpec[]).filter((c) => ["rule-no-close-open", "rule-max-run"].includes(c.id));
 const EMPLOYEES: Employee[] = shop.employees.slice(0, 5);
 const ROWS: Record<string, Code[]> = Object.fromEntries(
   EMPLOYEES.map((n) => [n.id, (demo.result.assignments as Record<string, Code[]>)[n.id].slice(0, 7)]),
@@ -27,7 +27,7 @@ const RESULT: ScheduleResult = {
   diff: null,
   optimal: true,
 };
-const PERIOD = { start_date: "2026-11-01", length: 7 };
+const PERIOD = { start_date: "2026-11-02", length: 7 };
 const isWeekend = (d: number) => isWeekendDay(PERIOD, d, []);
 const FIXED = new Map<string, Code>([["e04-2", ROWS.e04[1]]]);
 

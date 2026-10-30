@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { DEFAULT_CONFIG } from "./rules";
+import { DEN_CONFIG } from "./test-rules";
 import { statsFromAssignments } from "./stats";
 import type { ShopConfig } from "./types.gen";
 
@@ -10,7 +10,7 @@ const row = (s: string) => s.split("");
 
 describe("statsFromAssignments", () => {
   it("코드별 수, 근무 시간, 주말·공휴일 근무, 최대 연속 근무, 편차(근무일 - 평균)", () => {
-    const stats = statsFromAssignments({ e01: row("DDENOON"), e02: row("OOOOOOD") }, DEFAULT_CONFIG, WEEK, [3]);
+    const stats = statsFromAssignments({ e01: row("DDENOON"), e02: row("OOOOOOD") }, DEN_CONFIG, WEEK, [3]);
     expect(stats.e01).toEqual({
       counts: { D: 2, E: 1, N: 2, O: 2 },
       hours: 40,
@@ -25,7 +25,7 @@ describe("statsFromAssignments", () => {
   it("꺼진 코드는 배정에 있을 때만 세고, 복합 코드 시간은 그 코드의 시간이다", () => {
     const config: ShopConfig = {
       shifts: [
-        ...DEFAULT_CONFIG.shifts,
+        ...DEN_CONFIG.shifts,
         { code: "M", name: "미드", hours: 8, active: false },
         { code: "DE", name: "더블", hours: 16, parts: ["D", "E"] },
       ],
@@ -38,7 +38,7 @@ describe("statsFromAssignments", () => {
   });
 
   it("평균이 정수가 아니면 소수 둘째 자리로 반올림한다", () => {
-    const stats = statsFromAssignments({ a: row("DOOOOOO"), b: row("OOOOOOO"), c: row("OOOOOOO") }, DEFAULT_CONFIG, WEEK, []);
+    const stats = statsFromAssignments({ a: row("DOOOOOO"), b: row("OOOOOOO"), c: row("OOOOOOO") }, DEN_CONFIG, WEEK, []);
     expect(stats.a.deviation).toBe(0.67);
     expect(stats.b.deviation).toBe(-0.33);
   });

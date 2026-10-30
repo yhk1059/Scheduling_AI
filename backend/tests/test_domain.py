@@ -16,6 +16,7 @@ from backend.domain.models import (
     ExplainRequest,
     Period,
     ScheduleRequest,
+    ShiftDef,
     SolveResponse,
     TranslateRequest,
     TranslateResponse,
@@ -55,6 +56,7 @@ def employees(n: int = 3) -> list[dict]:
 
 def request(constraints: list[dict], **extra) -> dict:
     return {
+        "config": rules.DEN_CONFIG,
         "employees": employees(),
         "period": {"start_date": "2026-11-01", "length": 30},
         "holidays": [],
@@ -243,25 +245,78 @@ def test_duplicate_constraint_ids_rejected():
         ScheduleRequest.model_validate(request([raw, raw]))
 
 
+# --- 근무조 시각 ---
+
+
+def _shift(**over) -> dict:
+    return {"code": "A", "name": "오픈", "hours": 6, "start": "09:00", "end": "15:00", **over}
+
+
+@pytest.mark.parametrize("start,end", [("09:00", "15:00"), ("00:00", "00:30"), ("17:30", "24:00")])
+def test_shift_times_accept_half_hours_up_to_midnight(start, end):
+    assert ShiftDef.model_validate(_shift(start=start, end=end)).end == end
+
+
+@pytest.mark.parametrize(
+    "start,end",
+    [
+        ("09:15", "15:00"),  # 30분 단위가 아님
+        ("9:00", "15:00"),
+        ("09:00", "24:30"),
+        ("09:00", "25:00"),
+        ("22:00", "02:00"),  # 자정을 넘김
+        ("09:00", "09:00"),
+        ("24:00", "24:00"),
+        (None, "15:00"),  # 둘 다 필수
+        ("09:00", None),
+        (None, None),
+    ],
+)
+def test_shift_times_rejected(start, end):
+    with pytest.raises(ValidationError):
+        ShiftDef.model_validate(_shift(start=start, end=end))
+
+
+def test_off_and_double_have_no_times():
+    assert ShiftDef(code="O", name="휴무", hours=0).start is None
+    assert ShiftDef(code="AC", name="더블", hours=12, parts=["A", "C"]).end is None
+    for bad in ({"code": "O", "name": "휴무", "hours": 0}, {"code": "AC", "name": "더블", "hours": 12, "parts": ["A", "C"]}):
+        with pytest.raises(ValidationError):
+            ShiftDef.model_validate({**bad, "start": "09:00", "end": "15:00"})
+        with pytest.raises(ValidationError):
+            ShiftDef.model_validate({**bad, "end": "15:00"})
+
+
+def test_default_config_is_shop_shifts():
+    assert [(s.code, s.name, s.start, s.end, s.hours) for s in DEFAULT_CONFIG.shifts] == [
+        ("A", "오픈", "09:00", "15:00", 6),
+        ("M", "미들", "12:00", "18:00", 6),
+        ("C", "마감", "17:00", "23:00", 6),
+        ("O", "휴무", None, None, 0),
+    ]
+    assert constants.OFF_CODE == "O"
+
+
 # --- 샘플 ---
 
 
 def test_sample_shop_is_rule_format():
     """샘플 매장(lib/samples)은 식 규칙이다. 파일이 그대로 요청이 된다."""
     raw = json.loads(SAMPLE_PATH.read_text(encoding="utf-8"))
+    assert raw.pop("name") == "샘플 매장"
     next_requests = TypeAdapter(list[ConstraintSpec]).validate_python(raw.pop("next_requests"))
     assert next_requests and all(c.scope == "period" and c.type == "rule" for c in next_requests)
     req = ScheduleRequest.model_validate(raw)
     assert req.model_dump(mode="json", by_alias=True) == raw  # Pydantic dump 그대로(손으로 고친 흔적 없음)
     coverage = [c for c in req.constraints if c.id.startswith("cov-")]
-    assert {c.id for c in coverage} == {f"cov-{k}-{s}" for s in "DEN" for k in ("weekday", "weekend")}
+    assert {c.id for c in coverage} == {f"cov-{k}-{s}" for s in "AMC" for k in ("weekday", "weekend")}
     assert all(c.scope == "shop" and c.hardness == "hard" for c in coverage)
     assert {c.type for c in req.constraints} == {"rule"}
     assert req.config == DEFAULT_CONFIG
     assert req.input_version == 0
-    assert req.period == Period(start_date=date(2026, 11, 1), length=30)
+    assert req.period == Period(start_date=date(2026, 11, 2), length=28)
     assert req.holidays == []
-    assert len(req.employees) == 15
+    assert len(req.employees) == 12
     names = {n.name for n in req.employees}
     assert {"이영희", "박민수", "김철수", "정유진", "최지훈"} <= names
     assert all(c.default for c in req.constraints if c.id.startswith("cov-"))

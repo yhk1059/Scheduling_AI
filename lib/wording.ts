@@ -41,12 +41,13 @@ export function configSummary(config: ShopConfig): string {
 
 /** 설정 변경 카드 한 줄: "근무 코드 추가 · M 미드 · 11:00부터 8시간", 더블은 세는 근무조를 붙인다. */
 export function describeShiftChange(change: ShiftChange, config: ShopConfig): string {
-  const { code, name, hours, start, parts } = change.shift;
+  const { code, name, hours, start, end, parts } = change.shift;
   const partNames = (parts ?? []).map((p) => config.shifts.find((s) => s.code === p)?.name ?? p);
   return [
     `근무 코드 ${change.action === "add" ? "추가" : "수정"}`,
     `${code} ${name}`,
-    start ? `${start}부터 ${hours}시간` : `${hours}시간`,
+    ...(start && end ? [`${start}~${end}`] : []),
+    `${hours}시간`,
     ...(partNames.length
       ? [`${partNames.map((n, i) => (i < partNames.length - 1 ? n + josa(n, "과", "와") : n)).join(" ")}${josa(partNames.at(-1)!, "으로", "로")} 세요`]
       : []),
@@ -94,7 +95,7 @@ const WEEKDAY_NAMES = ["월", "화", "수", "목", "금", "토", "일"]; // 0=�
 const KIND_NAMES: Record<NonNullable<Days["kind"]>, string> = { all: "", weekday: "평일", weekend: "주말·공휴일", holiday: "공휴일" };
 
 /** 받침이 있으면 a, 없으면 b(은/는, 을/를). */
-function josa(word: string, a: string, b: string): string {
+export function josa(word: string, a: string, b: string): string {
   const ch = word.charCodeAt(word.length - 1);
   return ch >= 0xac00 && ch <= 0xd7a3 && (ch - 0xac00) % 28 !== 0 ? a : b;
 }

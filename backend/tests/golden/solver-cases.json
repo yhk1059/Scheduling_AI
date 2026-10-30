@@ -10,6 +10,8 @@
       "name": "데이",
       "hours": 8.0,
       "parts": [],
+      "start": "07:00",
+      "end": "15:00",
       "active": true
      },
      {
@@ -17,6 +19,8 @@
       "name": "이브닝",
       "hours": 8.0,
       "parts": [],
+      "start": "15:00",
+      "end": "23:00",
       "active": true
      },
      {
@@ -24,6 +28,8 @@
       "name": "나이트",
       "hours": 8.0,
       "parts": [],
+      "start": "00:00",
+      "end": "08:00",
       "active": true
      },
      {
@@ -1595,6 +1601,8 @@
       "name": "데이",
       "hours": 8.0,
       "parts": [],
+      "start": "07:00",
+      "end": "15:00",
       "active": true
      },
      {
@@ -1602,6 +1610,8 @@
       "name": "이브닝",
       "hours": 8.0,
       "parts": [],
+      "start": "15:00",
+      "end": "23:00",
       "active": true
      },
      {
@@ -1609,6 +1619,8 @@
       "name": "나이트",
       "hours": 8.0,
       "parts": [],
+      "start": "00:00",
+      "end": "08:00",
       "active": true
      },
      {
@@ -2602,6 +2614,8 @@
       "name": "데이",
       "hours": 8.0,
       "parts": [],
+      "start": "07:00",
+      "end": "15:00",
       "active": true
      },
      {
@@ -2609,6 +2623,8 @@
       "name": "이브닝",
       "hours": 8.0,
       "parts": [],
+      "start": "15:00",
+      "end": "23:00",
       "active": true
      },
      {
@@ -2616,6 +2632,8 @@
       "name": "나이트",
       "hours": 8.0,
       "parts": [],
+      "start": "00:00",
+      "end": "08:00",
       "active": true
      },
      {
@@ -3192,6 +3210,8 @@
       "name": "데이",
       "hours": 8.0,
       "parts": [],
+      "start": "07:00",
+      "end": "15:00",
       "active": true
      },
      {
@@ -3199,6 +3219,8 @@
       "name": "이브닝",
       "hours": 8.0,
       "parts": [],
+      "start": "15:00",
+      "end": "23:00",
       "active": true
      },
      {
@@ -3206,6 +3228,8 @@
       "name": "나이트",
       "hours": 8.0,
       "parts": [],
+      "start": "00:00",
+      "end": "08:00",
       "active": true
      },
      {
@@ -3739,6 +3763,8 @@
       "name": "데이",
       "hours": 8.0,
       "parts": [],
+      "start": "07:00",
+      "end": "15:00",
       "active": true
      },
      {
@@ -3746,6 +3772,8 @@
       "name": "이브닝",
       "hours": 8.0,
       "parts": [],
+      "start": "15:00",
+      "end": "23:00",
       "active": true
      },
      {
@@ -3753,6 +3781,8 @@
       "name": "나이트",
       "hours": 8.0,
       "parts": [],
+      "start": "00:00",
+      "end": "08:00",
       "active": true
      },
      {
@@ -4534,6 +4564,8 @@
       "name": "데이",
       "hours": 8.0,
       "parts": [],
+      "start": "07:00",
+      "end": "15:00",
       "active": true
      },
      {
@@ -4541,6 +4573,8 @@
       "name": "이브닝",
       "hours": 8.0,
       "parts": [],
+      "start": "15:00",
+      "end": "23:00",
       "active": true
      },
      {
@@ -4548,6 +4582,8 @@
       "name": "나이트",
       "hours": 8.0,
       "parts": [],
+      "start": "00:00",
+      "end": "08:00",
       "active": true
      },
      {
@@ -5051,6 +5087,8 @@
       "name": "데이",
       "hours": 8.0,
       "parts": [],
+      "start": "07:00",
+      "end": "15:00",
       "active": true
      },
      {
@@ -5058,6 +5096,8 @@
       "name": "이브닝",
       "hours": 8.0,
       "parts": [],
+      "start": "15:00",
+      "end": "23:00",
       "active": true
      },
      {
@@ -5065,6 +5105,8 @@
       "name": "나이트",
       "hours": 8.0,
       "parts": [],
+      "start": "00:00",
+      "end": "08:00",
       "active": true
      },
      {
@@ -5647,6 +5689,8 @@
       "name": "데이",
       "hours": 8.0,
       "parts": [],
+      "start": "07:00",
+      "end": "15:00",
       "active": true
      },
      {
@@ -5654,6 +5698,8 @@
       "name": "이브닝",
       "hours": 8.0,
       "parts": [],
+      "start": "15:00",
+      "end": "23:00",
       "active": true
      },
      {
@@ -5661,6 +5707,8 @@
       "name": "나이트",
       "hours": 8.0,
       "parts": [],
+      "start": "00:00",
+      "end": "08:00",
       "active": true
      },
      {
@@ -6116,6 +6164,8 @@
       "name": "데이",
       "hours": 8.0,
       "parts": [],
+      "start": "07:00",
+      "end": "15:00",
       "active": true
      },
      {
@@ -6123,6 +6173,8 @@
       "name": "이브닝",
       "hours": 8.0,
       "parts": [],
+      "start": "15:00",
+      "end": "23:00",
       "active": true
      },
      {
@@ -6130,6 +6182,8 @@
       "name": "나이트",
       "hours": 8.0,
       "parts": [],
+      "start": "00:00",
+      "end": "08:00",
       "active": true
      },
      {
@@ -6138,6 +6192,7 @@
       "hours": 8.0,
       "parts": [],
       "start": "11:00",
+      "end": "19:00",
       "active": true
      },
      {
@@ -6509,6 +6564,8 @@
       "name": "데이",
       "hours": 8.0,
       "parts": [],
+      "start": "07:00",
+      "end": "15:00",
       "active": true
      },
      {
@@ -6516,6 +6573,8 @@
       "name": "이브닝",
       "hours": 8.0,
       "parts": [],
+      "start": "15:00",
+      "end": "23:00",
       "active": true
      },
      {
@@ -6523,6 +6582,8 @@
       "name": "나이트",
       "hours": 8.0,
       "parts": [],
+      "start": "00:00",
+      "end": "08:00",
       "active": true
      },
      {
@@ -6749,6 +6810,8 @@
       "name": "데이",
       "hours": 8.0,
       "parts": [],
+      "start": "07:00",
+      "end": "15:00",
       "active": true
      },
      {
@@ -6756,6 +6819,8 @@
       "name": "이브닝",
       "hours": 8.0,
       "parts": [],
+      "start": "15:00",
+      "end": "23:00",
       "active": true
      },
      {
@@ -6763,6 +6828,8 @@
       "name": "나이트",
       "hours": 8.0,
       "parts": [],
+      "start": "00:00",
+      "end": "08:00",
       "active": true
      },
      {
@@ -6920,6 +6987,8 @@
       "name": "데이",
       "hours": 8.0,
       "parts": [],
+      "start": "07:00",
+      "end": "15:00",
       "active": true
      },
      {
@@ -6927,6 +6996,8 @@
       "name": "이브닝",
       "hours": 8.0,
       "parts": [],
+      "start": "15:00",
+      "end": "23:00",
       "active": true
      },
      {
@@ -6934,6 +7005,8 @@
       "name": "나이트",
       "hours": 8.0,
       "parts": [],
+      "start": "00:00",
+      "end": "08:00",
       "active": true
      },
      {
@@ -7098,6 +7171,8 @@
       "name": "데이",
       "hours": 8.0,
       "parts": [],
+      "start": "07:00",
+      "end": "15:00",
       "active": true
      },
      {
@@ -7105,6 +7180,8 @@
       "name": "이브닝",
       "hours": 8.0,
       "parts": [],
+      "start": "15:00",
+      "end": "23:00",
       "active": true
      },
      {
@@ -7112,6 +7189,8 @@
       "name": "나이트",
       "hours": 8.0,
       "parts": [],
+      "start": "00:00",
+      "end": "08:00",
       "active": true
      },
      {
@@ -7402,6 +7481,8 @@
       "name": "데이",
       "hours": 8.0,
       "parts": [],
+      "start": "07:00",
+      "end": "15:00",
       "active": true
      },
      {
@@ -7409,6 +7490,8 @@
       "name": "이브닝",
       "hours": 8.0,
       "parts": [],
+      "start": "15:00",
+      "end": "23:00",
       "active": true
      },
      {
@@ -7416,6 +7499,8 @@
       "name": "나이트",
       "hours": 8.0,
       "parts": [],
+      "start": "00:00",
+      "end": "08:00",
       "active": true
      },
      {
@@ -7720,6 +7805,8 @@
       "name": "데이",
       "hours": 8.0,
       "parts": [],
+      "start": "07:00",
+      "end": "15:00",
       "active": true
      },
      {
@@ -7727,6 +7814,8 @@
       "name": "이브닝",
       "hours": 8.0,
       "parts": [],
+      "start": "15:00",
+      "end": "23:00",
       "active": true
      },
      {
@@ -7734,6 +7823,8 @@
       "name": "나이트",
       "hours": 8.0,
       "parts": [],
+      "start": "00:00",
+      "end": "08:00",
       "active": true
      },
      {
@@ -8189,6 +8280,8 @@
       "name": "데이",
       "hours": 8.0,
       "parts": [],
+      "start": "07:00",
+      "end": "15:00",
       "active": true
      },
      {
@@ -8196,6 +8289,8 @@
       "name": "이브닝",
       "hours": 8.0,
       "parts": [],
+      "start": "15:00",
+      "end": "23:00",
       "active": true
      },
      {
@@ -8203,6 +8298,8 @@
       "name": "나이트",
       "hours": 8.0,
       "parts": [],
+      "start": "00:00",
+      "end": "08:00",
       "active": true
      },
      {
@@ -8366,6 +8463,8 @@
       "name": "데이",
       "hours": 8.0,
       "parts": [],
+      "start": "07:00",
+      "end": "15:00",
       "active": true
      },
      {
@@ -8373,6 +8472,8 @@
       "name": "이브닝",
       "hours": 8.0,
       "parts": [],
+      "start": "15:00",
+      "end": "23:00",
       "active": true
      },
      {
@@ -8380,6 +8481,8 @@
       "name": "나이트",
       "hours": 8.0,
       "parts": [],
+      "start": "00:00",
+      "end": "08:00",
       "active": true
      },
      {
@@ -8888,6 +8991,8 @@
       "name": "데이",
       "hours": 8.0,
       "parts": [],
+      "start": "07:00",
+      "end": "15:00",
       "active": true
      },
      {
@@ -8895,6 +9000,8 @@
       "name": "이브닝",
       "hours": 8.0,
       "parts": [],
+      "start": "15:00",
+      "end": "23:00",
       "active": true
      },
      {
@@ -8902,6 +9009,8 @@
       "name": "나이트",
       "hours": 8.0,
       "parts": [],
+      "start": "00:00",
+      "end": "08:00",
       "active": true
      },
      {
@@ -9303,6 +9412,8 @@
       "name": "데이",
       "hours": 8.0,
       "parts": [],
+      "start": "07:00",
+      "end": "15:00",
       "active": true
      },
      {
@@ -9310,6 +9421,8 @@
       "name": "이브닝",
       "hours": 8.0,
       "parts": [],
+      "start": "15:00",
+      "end": "23:00",
       "active": true
      },
      {
@@ -9317,6 +9430,8 @@
       "name": "나이트",
       "hours": 8.0,
       "parts": [],
+      "start": "00:00",
+      "end": "08:00",
       "active": true
      },
      {
@@ -9625,6 +9740,8 @@
       "name": "데이",
       "hours": 8.0,
       "parts": [],
+      "start": "07:00",
+      "end": "15:00",
       "active": true
      },
      {
@@ -9632,6 +9749,8 @@
       "name": "이브닝",
       "hours": 8.0,
       "parts": [],
+      "start": "15:00",
+      "end": "23:00",
       "active": true
      },
      {
@@ -9639,6 +9758,8 @@
       "name": "나이트",
       "hours": 8.0,
       "parts": [],
+      "start": "00:00",
+      "end": "08:00",
       "active": true
      },
      {

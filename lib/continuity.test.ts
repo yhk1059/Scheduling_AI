@@ -14,6 +14,7 @@ import {
   sameCarryOver,
 } from "./continuity";
 import { DEFAULT_CONFIG } from "./rules";
+import { DEN_CONFIG } from "./test-rules";
 import type { Assignments, Code, ShopEmployee, WorkPeriod } from "./store";
 
 // 기준: 2026-11-02 월요일, 2026-11-01 일요일
@@ -173,24 +174,29 @@ describe("historyFor / historyLoadFor", () => {
     expect(historyFor([p], target, ["e01", "e02"])!.rows).toEqual({ e01: row("DDDDDOO") });
   });
 
-  it("historyLoadFor: 원본에서 나이트(세는 근무조 N)와 주말·공휴일 근무를 센다, 둘 다 0이면 뺀다", () => {
-    expect(historyLoadFor(historyFor([A, B, C], target, ["e01", "e02"]), DEFAULT_CONFIG)).toEqual([
-      { employee_id: "e01", nights: 3, weekends: 0 },
-      { employee_id: "e02", nights: 0, weekends: 2 + 4 + 1 }, // A 10-17·18 D, B 4회, C 공휴일 D
+  it("historyLoadFor: 원본에서 가장 늦게 끝나는 근무조와 주말·공휴일 근무를 센다, 둘 다 0이면 뺀다", () => {
+    expect(historyLoadFor(historyFor([A, B, C], target, ["e01", "e02"]), DEN_CONFIG)).toEqual([
+      { employee_id: "e01", closings: 3, weekends: 0 },
+      { employee_id: "e02", closings: 0, weekends: 2 + 4 + 1 }, // A 10-17·18 D, B 4회, C 공휴일 D
     ]);
     const p = confirmed("2026-11-02", 7, { e01: row("DDDDDOO"), e02: row("NOOOOOO") });
-    expect(historyLoadFor(historyFor([p], target, ["e01", "e02"]), DEFAULT_CONFIG)).toEqual([
-      { employee_id: "e02", nights: 1, weekends: 0 },
+    expect(historyLoadFor(historyFor([p], target, ["e01", "e02"]), DEN_CONFIG)).toEqual([
+      { employee_id: "e02", closings: 1, weekends: 0 },
     ]);
-    expect(historyLoadFor(null, DEFAULT_CONFIG)).toEqual([]);
+    expect(historyLoadFor(null, DEN_CONFIG)).toEqual([]);
   });
 
-  it("historyLoadFor: 복합 코드는 세는 근무조로 나이트를 센다", () => {
+  it("historyLoadFor: 복합 코드는 세는 근무조로 센다", () => {
     const config = {
-      shifts: [...DEFAULT_CONFIG.shifts, { code: "EN", name: "더블", hours: 16, parts: ["E", "N"] }],
-    } as typeof DEFAULT_CONFIG;
+      shifts: [...DEN_CONFIG.shifts, { code: "EN", name: "더블", hours: 16, parts: ["E", "N"] }],
+    } as typeof DEN_CONFIG;
     const history = { start_date: "2026-11-02", rows: { e01: ["EN", "N", "D", "O", "O", "EN", "O"] }, holidays: [] };
-    expect(historyLoadFor(history, config)).toEqual([{ employee_id: "e01", nights: 3, weekends: 1 }]);
+    expect(historyLoadFor(history, config)).toEqual([{ employee_id: "e01", closings: 3, weekends: 1 }]);
+  });
+
+  it("historyLoadFor: 기본 근무 형태에서는 마감을 센다", () => {
+    const history = { start_date: "2026-11-02", rows: { e01: ["C", "C", "A", "O", "O", "M", "O"] }, holidays: [] };
+    expect(historyLoadFor(history, DEFAULT_CONFIG)).toEqual([{ employee_id: "e01", closings: 2, weekends: 1 }]);
   });
 });
 
