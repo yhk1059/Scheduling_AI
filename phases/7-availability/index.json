@@ -37,7 +37,10 @@
     {
       "step": 4,
       "name": "samples-e2e",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-10-31T00:47:15+0900",
+      "summary": "e2e를 매장 기준으로 다시 씀(entry·operating·journey·structure·expressions + test-helpers, S1~S18 19개 통과, 실제 Anthropic·테스트 Supabase), e2e/fixtures/shop-oct.json(D3) 재생성, lib/supabase.ts의 window.__e2eSignIn과 loginAsTestUser. 결정: NEXT_PUBLIC_E2E_LOGIN은 문서와 달리 .env.local에 두지 않고 playwright.config.ts의 Next 서버 env로만 켠다(로컬 프로덕션 빌드에 들어가지 않게). next.config.ts env로 값이 없어도 항상 치환해 프로덕션 번들에서 코드가 빠진다(grep 0건 확인). 점검 중 앱 수정: store.replace가 불러올 때 inputVersion을 올려 새로고침마다 '입력이 바뀌었어요'가 뜨던 것(저장 때 최신이던 결과의 resultVersion을 함께 올림, 테스트 추가), 근무 코드 색이 D/E/N 기준이던 것, 끝 날짜 2026.11.08 표기, 지난 근무 붙여넣기 예시의 D/E/N. 문서 수정(BROWSER_TEST_SCENARIOS): S3은 모두 전일이라 avail- 규칙이 요청에 없을 수 있어 존재 확인은 S9에서 함, 로그아웃은 menuitem, S18은 캐시도 함께 비움(서버 문서가 없으면 캐시를 올리므로). D3 10/5~11/1 배정은 일회성 스크립트로 공정성 규칙을 빼고 풀어 최근 4주 마감을 고르지 않게 만들었다(근거 한 줄이 나오게). 저장소에 스크립트는 남기지 않았다.",
+      "completed_at": "2026-10-31T01:10:13+0900"
     }
   ],
   "created_at": "2026-10-31T00:19:39+0900"
