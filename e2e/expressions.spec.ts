@@ -3,7 +3,7 @@
 // LLM은 mock하지 않는다(ADR-013). LLM 해석은 흔들릴 수 있어 카드 문장은 핵심 낱말만 본다.
 import { type BrowserContext, expect, type Page, test } from "@playwright/test";
 
-import wardV5 from "./fixtures/ward-oct-v5.json";
+import wardOct from "./fixtures/ward-oct.json";
 
 import type { PeriodRange } from "../lib/period";
 import type { Ward } from "../lib/store";
@@ -85,35 +85,29 @@ test.afterEach(async () => {
   expect(problems, "콘솔 오류·API 실패").toEqual([]);
 });
 
-test("S16. v5 저장본 열기 → v6 변환 → 다시 만들기", async () => {
+test("S16. 저장된 병동 열기 → 다시 만들기", async () => {
   await page.goto("/app");
-  await page.evaluate((doc) => localStorage.setItem("nurse-scheduler", JSON.stringify(doc)), wardV5);
+  await page.evaluate((doc) => localStorage.setItem("nurse-scheduler", JSON.stringify(doc)), wardOct);
   await page.reload();
   await expect(page.getByRole("heading", { name: "외과 병동", level: 1 })).toBeVisible();
 
-  // v5(블록) → v6(식 규칙). 블록마다 같은 id의 규칙 하나다(금지 패턴이 여럿인 블록이 없어 나뉘는 규칙이 없다)
   const stored = await page.evaluate(() => JSON.parse(localStorage.getItem("nurse-scheduler")!));
-  expect(wardV5.version, "fixture는 v5").toBe(5);
-  expect(stored.version, "저장본 버전").toBe(6);
   const ward = stored.state.ward as Ward;
-  const oldRules = wardV5.state.ward!.rules;
-  expect(ward.rules.map((r) => r.id), "규칙 수와 id가 같다").toEqual(oldRules.map((r) => r.id));
-  expect(ward.rules.every((r) => r.type === "rule"), "모두 식 규칙").toBe(true);
-  expect(ward.unconverted ?? [], "바꾸지 못한 규칙").toEqual([]);
-  const oldNov = wardV5.state.periods.find((p) => p.start_date === NOV.start_date)!;
+  const savedRules = wardOct.state.ward.rules;
+  expect(ward.rules.map((r) => r.id), "규칙 수와 id가 같다").toEqual(savedRules.map((r) => r.id));
+  const savedNov = wardOct.state.periods.find((p) => p.start_date === NOV.start_date)!;
   const nov = await periodByStart(page, NOV.start_date);
-  expect(nov.requests.map((r) => r.id), "요청도 같은 id").toEqual(oldNov.requests.map((r) => r.id));
-  expect(nov.requests.every((r) => r.type === "rule" || r.type === "fixed_assignment")).toBe(true);
+  expect(nov.requests.map((r) => r.id), "요청도 같은 id").toEqual(savedNov.requests.map((r) => r.id));
   await expect(page.getByRole("main")).toContainText("간호사 15명 · 병동 규칙 7개 · 한 달 단위");
-  await expectNoDevTerms(page, "병동 홈(v5 저장본)");
+  await expectNoDevTerms(page, "병동 홈");
 
-  // 변환한 규칙으로 11월 근무표를 만들 수 있다
+  // 저장된 규칙으로 11월 근무표를 만들 수 있다
   await sectionWith("11월 근무표").getByRole("button", { name: "이어서 하기" }).click();
   await page.getByRole("button", { name: "다음" }).click();
   await expect(scheduleTitle(page)).toBeVisible();
   expect(await solve(() => page.getByRole("button", { name: "근무표 만들기" }).click())).toBe("ok");
   await expect(page.getByText("규칙을 모두 지켰어요", { exact: true })).toBeVisible();
-  expect(lastSolve!.constraints!.filter((c) => c.type === "rule").length).toBeGreaterThanOrEqual(oldRules.length);
+  expect(lastSolve!.constraints!.filter((c) => c.type === "rule").length).toBeGreaterThanOrEqual(savedRules.length);
   await expectHardRulesHold(page, NOV, lastSolve);
 });
 

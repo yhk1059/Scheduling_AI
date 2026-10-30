@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { toScheduleCsv } from "./csv";
-import { DEFAULT_CONFIG } from "./migrate";
+import { DEFAULT_CONFIG } from "./rules";
 import type { Nurse, WardConfig } from "./types.gen";
 
 type Code = string;

@@ -2,7 +2,7 @@
 // 페이지 하나를 공유하며 순서대로 돈다. 게스트 모드만 다룬다(ADR-014). LLM은 mock하지 않는다(ADR-013).
 import { type BrowserContext, expect, type Page, test } from "@playwright/test";
 
-import { ruleShape } from "../lib/migrate";
+import { ruleShape } from "../lib/rules";
 import type { PeriodRange } from "../lib/period";
 import type { ConstraintSpec, ScheduleRequest } from "../lib/types.gen";
 import {

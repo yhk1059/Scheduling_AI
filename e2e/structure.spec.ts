@@ -3,7 +3,7 @@
 // LLM 해석은 흔들릴 수 있어 카드 문장은 핵심 낱말만 본다.
 import { type BrowserContext, expect, type Page, test } from "@playwright/test";
 
-import { ruleShape } from "../lib/migrate";
+import { ruleShape } from "../lib/rules";
 import type { PeriodRange } from "../lib/period";
 import type { ScheduleRequest } from "../lib/types.gen";
 import {

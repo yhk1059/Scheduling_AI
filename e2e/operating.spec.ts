@@ -6,7 +6,7 @@ import wardOct from "./fixtures/ward-oct.json";
 
 import type { PeriodRange } from "../lib/period";
 import { historyLoadFor, type HistoryLoad } from "../lib/continuity";
-import { DEFAULT_CONFIG } from "../lib/migrate";
+import { DEFAULT_CONFIG } from "../lib/rules";
 import type { Ward } from "../lib/store";
 import type { ScheduleRequest } from "../lib/types.gen";
 import {
@@ -95,24 +95,13 @@ test("S3. 운영 중인 병동: 다음 근무표 만들기와 게스트 확정",
   // 병동 홈
   await expect(page.getByRole("heading", { name: "외과 병동", level: 1 })).toBeVisible();
 
-  // D3은 옛 저장본(v4)이다. 열면 v5를 거쳐 v6으로 바뀐다: 옛 규칙이 모두 같은 id의 식 규칙이 되고, 바꾸지 못한 규칙이 없다
+  // 저장본을 변환 없이 그대로 연다
   const stored = await page.evaluate(() => JSON.parse(localStorage.getItem("nurse-scheduler")!));
-  expect(wardOct.version, "fixture는 v4").toBe(4);
-  expect(stored.version, "저장본 버전").toBe(6);
-  const oldRules = wardOct.state.ward.rules;
-  const rules = (stored.state as { ward: Ward }).ward.rules;
-  expect(rules.map((r) => r.id), "옛 규칙 + 기본 규칙").toEqual([...oldRules.map((r) => r.id), "night-only"]);
-  expect(rules.every((r) => r.type === "rule"), "모두 식 규칙").toBe(true);
-  expect(rules.filter((r) => r.type === "rule" && r.default).map((r) => r.id), "기본 규칙").toEqual([
-    ...oldRules.filter((r) => r.id.startsWith("cov-")).map((r) => r.id),
-    "night-only",
-  ]);
-  expect(stored.state.ward.unconverted ?? [], "바꾸지 못한 규칙").toEqual([]);
+  expect(stored.version, "저장본 버전").toBe(wardOct.version);
+  const savedRules = (stored.state as { ward: Ward }).ward.rules;
+  expect(savedRules.map((r) => r.id), "규칙 id").toEqual(wardOct.state.ward.rules.map((r) => r.id));
   expect(stored.state.ward.config).toEqual(DEFAULT_CONFIG);
-  expect(
-    stored.state.ward.nurses.filter((n: { tags: string[] }) => n.tags.includes("나이트전담")).map((n: { name: string }) => n.name),
-  ).toEqual(["문가람", "배수아"]);
-  // 옛 규칙 6개가 모두 변환되고 기본 규칙(나이트 전담은 나이트와 휴무만)이 더해진다
+  // 규칙 6개 + 기본 규칙(나이트 전담은 나이트와 휴무만)
   await expect(page.getByRole("main")).toContainText("간호사 15명 · 병동 규칙 7개 · 한 달 단위");
   const operating = sectionWith("10월 근무표");
   await expect(operating.getByText("운영 중", { exact: true })).toBeVisible();

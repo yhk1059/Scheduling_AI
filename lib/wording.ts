@@ -1,6 +1,6 @@
 // 화면 문구를 만드는 순수 함수(UI_GUIDE "문구"). 데이터 이름(period, hard 등)은 그대로 두고 화면에 보이는 말만 여기서 만든다.
 import { monthDay, type PeriodRange, type PeriodUnit } from "./period";
-import { NIGHT_ONLY_TAG, normalizeRule, ruleShape, type Bound } from "./migrate";
+import { NIGHT_ONLY_TAG, normalizeRule, ruleShape, type Bound } from "./rules";
 import { homeSummary, upcomingRange, type Ward, type WorkPeriod } from "./store";
 import type { Cmp, ConstraintSpec, Count, Days, Nurse, People, Rule, ShiftChange, Shifts, WardConfig } from "./types.gen";
 

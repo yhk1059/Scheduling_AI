@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { DEFAULT_CONFIG } from "./migrate";
+import { DEFAULT_CONFIG } from "./rules";
 import type { Nurse, WardConfig } from "./types.gen";
 import { parseCarryOver, parseDelimited } from "./roster-import";
 

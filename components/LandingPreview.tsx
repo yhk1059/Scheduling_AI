@@ -3,7 +3,7 @@
 // 랜딩 첫 화면의 실제 제품 화면 조각. 앱의 그리드 컴포넌트와 카드 문구(lib/wording)를 샘플 데이터로 정적 렌더한다(조작 불가).
 import { isWeekendDay } from "@/lib/period";
 import type { Code } from "@/lib/store";
-import { DEFAULT_CONFIG } from "@/lib/migrate";
+import { DEFAULT_CONFIG } from "@/lib/rules";
 import demo from "@/lib/samples/demo-schedule.json";
 import ward from "@/lib/samples/ward-15.json";
 import type { ConstraintSpec, Nurse, Period, ScheduleResult } from "@/lib/types.gen";

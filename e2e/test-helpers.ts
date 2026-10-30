@@ -3,7 +3,7 @@ import { expect, type Locator, type Page, test } from "@playwright/test";
 
 import { isWeekendDay, type PeriodRange, periodDays } from "../lib/period";
 import type { Ward, WorkPeriod } from "../lib/store";
-import { DEFAULT_CONFIG, ruleShape } from "../lib/migrate";
+import { DEFAULT_CONFIG, ruleShape } from "../lib/rules";
 import type { ConstraintSpec, Days, People, ScheduleRequest, ScheduleResult, Shifts, TranslateResponse } from "../lib/types.gen";
 
 /** 근무 코드. 기본은 D/E/N/O이고 병동이 더한 코드(M, DE 등)도 온다. */
