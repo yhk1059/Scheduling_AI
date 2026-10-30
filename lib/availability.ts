@@ -1,6 +1,6 @@
 // 가능 시간 → 근무조 판정 → 반드시 규칙. 순수 함수. LLM을 거치지 않는다(ADR-020).
 import { dateOfDay, type PeriodRange } from "./period";
-import { normalizeRule, OFF_CODE } from "./rules";
+import { normalizeRule, OFF_CODE, stableJson } from "./rules";
 import type { Conflict, Rule, ShiftDef, ShopConfig } from "./types.gen";
 
 /** 시각 구간 ["09:00", "15:00"]. 시각은 "HH:MM"이라 문자열로 비교한다(lib/rules.ts shiftTimesError와 같다). */
@@ -24,6 +24,82 @@ export function mergeAvailabilityConflicts(conflicts: Conflict[]): Conflict[] {
     seen.add(c.source_text);
     return true;
   });
+}
+
+/** 직원 화면 캘린더의 하루: 06:00~24:00, 30분 칸. */
+export const SLOT_COUNT = 36;
+const FIRST_SLOT_MINUTES = 6 * 60;
+
+function clock(minutes: number): string {
+  return `${String(Math.floor(minutes / 60)).padStart(2, "0")}:${String(minutes % 60).padStart(2, "0")}`;
+}
+
+/** 칸 번호(0~35)의 시작·끝 시각. */
+export function slotLabel(slot: number): TimeRange {
+  const start = FIRST_SLOT_MINUTES + slot * 30;
+  return [clock(start), clock(start + 30)];
+}
+
+function slotOf(time: string): number {
+  const [h, m] = time.split(":").map(Number);
+  return (h * 60 + m - FIRST_SLOT_MINUTES) / 30;
+}
+
+/** 칠한 칸 집합의 키. */
+export function cellKey(date: string, slot: number): string {
+  return `${date}@${slot}`;
+}
+
+/** slots(제출 형식) → 칠한 칸 집합. */
+export function cellsFromSlots(slots: AvailabilitySlots): Set<string> {
+  const cells = new Set<string>();
+  for (const [date, ranges] of Object.entries(slots)) {
+    for (const [from, to] of ranges) {
+      for (let slot = slotOf(from); slot < slotOf(to); slot++) cells.add(cellKey(date, slot));
+    }
+  }
+  return cells;
+}
+
+/** 칠한 칸 집합 → slots(제출 형식). 이어진 칸은 구간 하나로 합치고, 칸이 없는 날은 넣지 않는다. */
+export function slotsFromCells(cells: Set<string>): AvailabilitySlots {
+  const byDate = new Map<string, number[]>();
+  for (const key of cells) {
+    const [date, slot] = key.split("@");
+    byDate.set(date, [...(byDate.get(date) ?? []), Number(slot)]);
+  }
+  const slots: AvailabilitySlots = {};
+  for (const date of [...byDate.keys()].sort()) {
+    const ranges: TimeRange[] = [];
+    for (const slot of byDate.get(date)!.sort((a, b) => a - b)) {
+      const [from, to] = slotLabel(slot);
+      const last = ranges.at(-1);
+      if (last?.[1] === from) last[1] = to;
+      else ranges.push([from, to]);
+    }
+    slots[date] = ranges;
+  }
+  return slots;
+}
+
+/** 드래그 한 번의 결과. 시작 칸이 비어 있으면 범위를 칠하고, 칠해져 있으면 지운다. base는 드래그를 시작할 때의 칸이다. */
+export function applyDrag(base: Set<string>, date: string, start: number, end: number): Set<string> {
+  const erase = base.has(cellKey(date, start));
+  const next = new Set(base);
+  for (let slot = Math.min(start, end); slot <= Math.max(start, end); slot++) {
+    if (erase) next.delete(cellKey(date, slot));
+    else next.add(cellKey(date, slot));
+  }
+  return next;
+}
+
+/** 링크 행들 → 직원 id별 가능 시간. 아직 비어 있는 행은 뺀다. */
+export function availabilityFromLinks(rows: { employee_id: string; slots: AvailabilitySlots }[]): Record<string, AvailabilitySlots> {
+  return Object.fromEntries(rows.filter((r) => Object.keys(r.slots).length > 0).map((r) => [r.employee_id, r.slots]));
+}
+
+export function sameAvailability(a: Record<string, AvailabilitySlots>, b: Record<string, AvailabilitySlots>): boolean {
+  return stableJson(a) === stableJson(b);
 }
 
 /** 구간들이 start~end를 빈틈없이 덮는지. 이어지거나 겹치는 구간은 합쳐서 본다. */

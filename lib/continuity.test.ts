@@ -24,6 +24,8 @@ function period(start_date: string, length: number, extra: Partial<WorkPeriod> =
     start_date,
     length,
     id: `p-${start_date}`,
+    availability: {},
+    availabilityUsed: null,
     holidays: [],
     requests: [],
     pendingRequests: [],

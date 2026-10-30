@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import { carryOverFrom, previousConfirmedPeriod } from "@/lib/continuity";
 import { dateOfDay, formatRange, isWeekendDay, MAX_MONTH_START_DAY, monthDay, periodEnd, validStart } from "@/lib/period";
 import { parseCarryOver, type CellError } from "@/lib/roster-import";
+import { syncAvailabilityLinks, type AvailabilityLink } from "@/lib/supabase";
 import {
   carryOverChanged,
   coverageCodes,
@@ -69,7 +70,7 @@ export default function PeriodWork() {
             가능 시간
           </h2>
           <PrepareSummary key={`prep-${period.id}`} period={period} />
-          <LinksSection />
+          <LinksSection period={period} />
           <div className="flex justify-end">
             <button type="button" onClick={() => toStep(2)} className={ui.primary}>
               다음
@@ -85,12 +86,95 @@ export default function PeriodWork() {
   );
 }
 
-/** ① 직원 링크 표 자리. 행과 [링크 복사]는 링크를 저장할 때 함께 들어온다. */
-function LinksSection() {
+/** ① 직원 링크 표. 행마다 [링크 복사]. 근무표 시작일이나 명단이 바뀌면 행을 맞춘다. */
+function LinksSection({ period }: { period: WorkPeriod }) {
+  const shop = useAppStore((s) => s.shop);
+  const shopName = shop?.name ?? "";
+  const employees = (shop?.employees ?? []).filter((n) => n.active);
+  const roster = JSON.stringify(employees.map(({ id, name }) => ({ id, name })));
+  const { start_date: start, length } = period;
+  const [links, setLinks] = useState<{ key: string; rows: AvailabilityLink[] } | null>(null);
+  const [failed, setFailed] = useState<string | null>(null);
+  const [attempt, setAttempt] = useState(0);
+  const [copied, setCopied] = useState<string | null>(null);
+  const [copyFailed, setCopyFailed] = useState(false);
+  const key = `${start}|${length}|${shopName}|${roster}`;
+
+  useEffect(() => {
+    let live = true;
+    syncAvailabilityLinks({ start_date: start, length }, JSON.parse(roster), shopName)
+      .then((rows) => {
+        if (live) setLinks({ key, rows });
+      })
+      .catch(() => {
+        if (live) setFailed(key);
+      });
+    return () => {
+      live = false;
+    };
+  }, [key, start, length, roster, shopName, attempt]);
+
+  const rows = links?.key === key ? links.rows : null;
+  const urlOf = (employeeId: string) => {
+    const token = rows?.find((r) => r.employee_id === employeeId)?.token;
+    return token ? `${location.origin}/a/${token}` : "";
+  };
+  const copy = async (employeeId: string) => {
+    try {
+      await navigator.clipboard.writeText(urlOf(employeeId));
+      setCopied(employeeId);
+      setCopyFailed(false);
+    } catch {
+      setCopyFailed(true);
+    }
+  };
+
   return (
-    <section className={`${ui.card} flex flex-col gap-1`}>
-      <h3 className={ui.cardTitle}>직원 링크</h3>
-      <p className={ui.help}>직원마다 자기 링크를 보내 주세요. 링크를 연 사람은 그 직원의 가능 시간만 입력할 수 있어요</p>
+    <section className={`${ui.card} flex flex-col gap-3`}>
+      <div className="flex flex-col gap-1">
+        <h3 className={ui.cardTitle}>직원 링크</h3>
+        <p className={ui.help}>직원마다 자기 링크를 보내 주세요. 링크를 연 사람은 그 직원의 가능 시간만 입력할 수 있어요</p>
+      </div>
+      {rows ? (
+        <table className="w-full table-fixed border-collapse">
+          <tbody>
+            {employees.map((n) => (
+              <tr key={n.id} className="border-b border-[#EFEFEB] last:border-b-0">
+                <td className="w-[150px] truncate py-1.5 pr-4 text-sm text-[#1B1B18]">{n.name}</td>
+                <td className="truncate py-1.5 pr-4 font-mono text-[13px] text-[#3D3D38]">{urlOf(n.id)}</td>
+                <td className="w-[120px] py-1.5 text-right">
+                  <button type="button" onClick={() => void copy(n.id)} className={ui.secondarySm}>
+                    {copied === n.id ? "복사했어요" : "링크 복사"}
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      ) : failed === key ? (
+        <div role="alert" className="flex items-center gap-2 text-sm text-[#B42318]">
+          링크를 만들지 못했어요. 네트워크를 확인하고 다시 시도해 주세요
+          <button
+            type="button"
+            onClick={() => {
+              setFailed(null);
+              setAttempt((n) => n + 1);
+            }}
+            className={ui.textSm}
+          >
+            다시 시도
+          </button>
+        </div>
+      ) : (
+        <p role="status" className={ui.help}>
+          링크를 만드는 중…
+        </p>
+      )}
+      {copyFailed && (
+        <p role="alert" className={ui.error}>
+          복사하지 못했어요. 표의 링크를 직접 복사해 주세요
+        </p>
+      )}
     </section>
   );
 }

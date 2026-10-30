@@ -11,7 +11,7 @@ components/           # UI 컴포넌트
 lib/
 ├── store.ts          # Zustand. 로그인한 매니저의 매장 문서와 동기화하고 localStorage는 캐시로만 쓴다
 ├── availability.ts   # 가능 시간 → 근무조 판정 → 반드시 규칙 (순수 함수)
-├── supabase.ts       # (예정) Google 로그인, 매장 문서 load/save/delete — 얇은 래퍼
+├── supabase.ts       # Google 로그인, 매장 문서 load/save/delete, 직원 링크 — 얇은 래퍼
 ├── api.ts            # /api/py/* fetch 래퍼
 ├── roster-import.ts  # 지난 근무(이월) 붙여넣기 파싱 (순수 함수)
 ├── csv.ts            # CSV 직렬화 (순수 함수)
@@ -151,5 +151,5 @@ POST /api/py/explain
   - `.vercelignore`로 docs, phases, scripts, eval, tests, e2e를 제외한다.
 - env
   - 서버: `ANTHROPIC_API_KEY`, `ANTHROPIC_MODEL`(기본값 `claude-sonnet-5-5`)
-  - 클라이언트(예정): `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`. anon 키는 공개되어도 되고, 접근은 RLS로 막는다.
-- Google OAuth(예정): Supabase 대시보드의 Auth Providers에서 켠다. 리디렉트 URL에 로컬(`http://localhost:3000/app`)과 배포 도메인을 등록한다.
+  - 클라이언트: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`. anon 키는 공개되어도 되고, 접근은 RLS로 막는다.
+- Google OAuth: Supabase 대시보드의 Auth Providers에서 켠다. 리디렉트 URL에 로컬(`http://localhost:3000/app`)과 배포 도메인을 등록한다.

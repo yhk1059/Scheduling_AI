@@ -1,14 +1,15 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 
 import { ApiError, errorMessage, explain, solve } from "@/lib/api";
 import { toScheduleCsv } from "@/lib/csv";
-import { isAvailabilityRule, mergeAvailabilityConflicts } from "@/lib/availability";
+import { availabilityFromLinks, isAvailabilityRule, mergeAvailabilityConflicts } from "@/lib/availability";
 import { historyLoadFor, isOperating } from "@/lib/continuity";
 import { closingShift, DEFAULT_CONFIG } from "@/lib/rules";
 import { dayHeader, dayOfDate, isWeekendDay, monthDay, periodDays, periodEnd } from "@/lib/period";
 import {
+  availabilityChanged,
   carryOverChanged,
   type Code,
   currentPeriod,
@@ -17,6 +18,7 @@ import {
   useAppStore,
   type WorkPeriod,
 } from "@/lib/store";
+import { loadAvailabilityLinks, lockAvailabilityLinks } from "@/lib/supabase";
 import type {
   Conflict,
   ConstraintSpec,
@@ -104,6 +106,18 @@ export function toMessage(e: unknown): string {
   return errorMessage(e instanceof ApiError ? e : new ApiError("INTERNAL", String(e)));
 }
 
+/** 작성 중 근무표의 가능 시간을 링크 행에서 다시 읽어 store에 넣는다. 달라졌으면 true. 확정한 근무표는 링크가 잠겨 읽지 않는다. */
+async function readAvailability(periodId: string): Promise<boolean> {
+  const s = useAppStore.getState();
+  const period = s.periods.find((p) => p.id === periodId);
+  if (period?.status !== "draft") return false;
+  try {
+    return s.setAvailability(periodId, availabilityFromLinks(await loadAvailabilityLinks(period.start_date)));
+  } catch (e) {
+    throw new ApiError("NETWORK", String(e));
+  }
+}
+
 /**
  * 근무표 만들기(/solve)와 해 없음 설명(/explain). 근무표 작성 ③과 확정 근무표가 함께 쓴다.
  * 확정본이 있으면 확정본에서 최소한으로 바꾼다.
@@ -142,13 +156,15 @@ export function useSolve(periodId: string) {
   const run = async () => {
     setLoading(true);
     setToast(null);
-    const req = buildRequest();
     try {
+      await readAvailability(periodId);
+      const req = buildRequest();
+      const usedAvailability = useAppStore.getState().periods.find((p) => p.id === periodId)!.availability;
       const res = await solve(req);
       // 풀이 중 입력이 바뀌면 버린다(남은 결과에는 stale 배지가 뜬다)
       if (res.input_version !== useAppStore.getState().inputVersion) return;
       if (res.status === "ok") {
-        setResult(periodId, res.result, req.carry_over ?? []);
+        setResult(periodId, res.result, req.carry_over ?? [], usedAvailability);
         setOutcome(null);
       } else if (res.status === "timeout") {
         setOutcome({ kind: "timeout", version: res.input_version });
@@ -359,11 +375,50 @@ export default function ScheduleStep() {
   const confirm = useAppStore((s) => s.confirm);
   const go = useAppStore((s) => s.go);
   const sv = useSolve(period?.id ?? "");
+  const { setToast } = sv;
+  const [confirming, setConfirming] = useState(false);
+  const stepPeriodId = period?.id ?? "";
+
+  // ③에 들어오면 가능 시간을 다시 읽는다. 달라졌으면 아래 배너가 뜬다
+  useEffect(() => {
+    const read = () => {
+      readAvailability(stepPeriodId).catch((e) =>
+        setToast({
+          message: toMessage(e),
+          retry: () => {
+            setToast(null);
+            read();
+          },
+        }),
+      );
+    };
+    read();
+  }, [stepPeriodId, setToast]);
 
   if (!shop || !period) return null;
   const periodId = period.id;
   const { result } = period;
-  const { busy, loading } = sv;
+  const busy = sv.busy || confirming;
+  const { loading } = sv;
+
+  // 마지막으로 읽은 뒤 들어온 제출이 있으면 확정하지 않고 배너로 알린다. 링크를 잠근 뒤에 확정한다
+  const onConfirm = async () => {
+    setConfirming(true);
+    setToast(null);
+    try {
+      if (await readAvailability(periodId)) return;
+      try {
+        await lockAvailabilityLinks(period.start_date);
+      } catch (e) {
+        throw new ApiError("NETWORK", String(e));
+      }
+      confirm(periodId);
+    } catch (e) {
+      setToast({ message: toMessage(e), retry: () => void onConfirm() });
+    } finally {
+      setConfirming(false);
+    }
+  };
   const employees = toScheduleRequest(shop, period, periods, today()).employees;
 
   return (
@@ -396,7 +451,7 @@ export default function ScheduleStep() {
               {loading && <Spinner />}
               {loading ? "만드는 중…" : "다시 만들기"}
             </button>
-            <button type="button" onClick={() => confirm(periodId)} disabled={busy} className={ui.primary}>
+            <button type="button" onClick={() => void onConfirm()} disabled={busy} className={ui.primary}>
               확정
             </button>
           </>
@@ -406,6 +461,15 @@ export default function ScheduleStep() {
       {carryOverChanged(period, periods) && (
         <div role="status" className={ui.banner}>
           지난 근무표가 바뀌어 이어지는 근무가 달라졌어요. 다시 만들면 반영돼요
+          <button type="button" onClick={sv.run} disabled={busy} className={ui.textSm}>
+            다시 만들기
+          </button>
+        </div>
+      )}
+
+      {availabilityChanged(period) && result && (
+        <div role="status" className={ui.banner}>
+          가능 시간이 바뀌었어요. 다시 만들어 주세요
           <button type="button" onClick={sv.run} disabled={busy} className={ui.textSm}>
             다시 만들기
           </button>

@@ -408,6 +408,8 @@ describe("nextTask", () => {
       start_date,
       length,
       id: `p-${start_date}`,
+      availability: {},
+      availabilityUsed: null,
       holidays: [],
       requests: [],
       pendingRequests: [],

@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
+  availabilityChanged,
   canRevertToConfirmed,
   carryOverChanged,
   cardsInOrder,
@@ -25,6 +26,8 @@ import {
   viewForPeriod,
   type ShopRemote,
 } from "./store";
+import type { AvailabilitySlots } from "./availability";
+import { dateOfDay } from "./period";
 import { DEFAULT_CONFIG, STORAGE_VERSION } from "./rules";
 import { balance, count, DEN_CONFIG, fixedCell, forbid as forbidRule, maxRun, OFF, WORK } from "./test-rules";
 import type { ConstraintSpec, Rule, RuleExample, ScheduleResult } from "./types.gen";
@@ -645,11 +648,61 @@ describe("이번 기간만 끄기와 제안 수락", () => {
   });
 });
 
+describe("가능 시간", () => {
+  const SLOTS = { e01: { "2026-11-02": [["09:00", "15:00"]] } } as Record<string, AvailabilitySlots>;
+  const OTHER = { e01: { "2026-11-02": [["09:00", "15:30"]] } } as Record<string, AvailabilitySlots>;
+
+  it("새 근무표는 가능 시간이 비어 있다", () => {
+    const { period } = withPeriod();
+    expect(period().availability).toEqual({});
+    expect(period().availabilityUsed).toBeNull();
+  });
+
+  it("setAvailability는 달라졌을 때만 true이고 inputVersion을 올리지 않는다", () => {
+    const { store, id, period } = withPeriod();
+    const v = store.getState().inputVersion;
+    expect(store.getState().setAvailability(id, SLOTS)).toBe(true);
+    expect(period().availability).toEqual(SLOTS);
+    expect(store.getState().setAvailability(id, SLOTS)).toBe(false);
+    expect(store.getState().inputVersion).toBe(v);
+  });
+
+  it("근무표를 만든 뒤 가능 시간이 바뀌면 availabilityChanged가 true이고, 다시 만들면 false다", () => {
+    const { store, id, period } = withPeriod();
+    store.getState().setAvailability(id, SLOTS);
+    expect(availabilityChanged(period())).toBe(false); // 만들기 전
+    store.getState().setResult(id, result({ e01: ["D"] }), []);
+    expect(availabilityChanged(period())).toBe(false);
+    store.getState().setAvailability(id, OTHER);
+    expect(availabilityChanged(period())).toBe(true);
+    store.getState().setResult(id, result({ e01: ["D"] }), []);
+    expect(availabilityChanged(period())).toBe(false);
+  });
+
+  it("setResult의 넷째 인자는 그 요청에 쓴 가능 시간이다", () => {
+    const { store, id, period } = withPeriod();
+    store.getState().setAvailability(id, OTHER);
+    store.getState().setResult(id, result({ e01: ["D"] }), [], SLOTS);
+    expect(availabilityChanged(period())).toBe(true);
+  });
+
+  it("시작일을 미루면 가능 시간을 비운다(링크가 새로 만들어진다)", () => {
+    const { store, id, period } = withPeriod();
+    store.getState().setAvailability(id, SLOTS);
+    store.getState().setResult(id, result({ e01: ["D"] }), []);
+    store.getState().postponeStart(id, dateOfDay(period(), 3));
+    expect(period().availability).toEqual({});
+    expect(period().availabilityUsed).toBeNull();
+  });
+});
+
 describe("toScheduleRequest", () => {
-  it("가능 시간이 없는 기간은 가능 시간 규칙을 더하지 않는다", () => {
+  it("제출 전이면 가능 시간이 없으므로 어느 근무에도 배정되지 않는다", () => {
     const { store, period } = withPeriod();
     const req = toScheduleRequest(store.getState().shop!, period(), store.getState().periods, TODAY);
-    expect(req.constraints!.filter((c) => c.id.startsWith("avail-"))).toEqual([]);
+    const all = Array.from({ length: period().length }, (_, i) => i + 1);
+    const rule = req.constraints!.find((c) => c.id === "avail-e01-D") as Rule;
+    expect((rule.body as Extract<Rule["body"], { kind: "require" }>).for_each.days?.days).toEqual(all);
   });
 
   it("가능 시간을 반드시 규칙으로 더하고 매장 조건에는 저장하지 않는다", () => {
@@ -705,7 +758,7 @@ describe("toScheduleRequest", () => {
     ]);
     expect(req.period).toEqual({ start_date: "2026-11-01", length: 30 });
     expect(req.holidays).toEqual([18]);
-    expect(req.constraints!.map((c) => [c.id, c.enabled])).toEqual([
+    expect(req.constraints!.filter((c) => !c.id.startsWith("avail-")).map((c) => [c.id, c.enabled])).toEqual([
       ["cov-weekday-D", true],
       ["r", true],
       ["l", false],
@@ -732,7 +785,7 @@ describe("toScheduleRequest", () => {
 
     const req = toScheduleRequest(store.getState().shop!, period(), store.getState().periods, TODAY);
     expect(req.employees.map((n) => n.id)).toEqual(["e01"]);
-    expect(req.constraints!.map((c) => c.id)).toEqual(["l1"]);
+    expect(req.constraints!.filter((c) => !c.id.startsWith("avail-")).map((c) => c.id)).toEqual(["l1"]);
     expect(req.carry_over).toEqual([{ employee_id: "e01", shifts: ["N"] }]);
     expect(req.previous).toEqual({ e01: ["D", "E"] });
   });
