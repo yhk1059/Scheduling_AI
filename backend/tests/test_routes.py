@@ -190,14 +190,19 @@ def test_solve_infeasible_with_conflicts():
 
 
 LEAVE_DRAFT = {
-    "type": "count",
-    "params": {"people": {"ids": ["n01"]}, "days": {"days": [15, 16, 17]}, "shifts": {"not_in": ["O"]}, "per": "person", "max": 0},
+    "values": {"max": {"value": 0, "label": "최대 횟수"}},
+    "body": {
+        "kind": "require",
+        "for_each": {"per": "person", "people": {"ids": ["n01"]}, "days": {"days": [15, 16, 17]}},
+        "then": {"left": {"shifts": {"not_in": ["O"]}}, "op": "le", "right": {"value": "max"}},
+    },
     "source_text": "n01 15~17일 휴가",
+    "hardness": "hard",
 }
 
 
 def test_translate_ok(llm):
-    llm.responses = [ok({"constraints": [LEAVE_DRAFT]})]
+    llm.responses = [ok({"rules": [LEAVE_DRAFT]})]
     r = client.post("/api/py/translate", json=translate_body())
     assert r.status_code == 200
     body = r.json()
@@ -205,22 +210,44 @@ def test_translate_ok(llm):
     assert body["input_version"] == 9
     assert body["config_changes"] == []
     (rule,) = body["constraints"]
-    assert rule["type"] == "count" and rule["hardness"] == "hard" and rule["scope"] == "period"
-    assert rule["params"]["shifts"] == {"in": None, "not_in": ["O"]}
+    assert rule["type"] == "rule" and rule["hardness"] == "hard" and rule["scope"] == "period"
+    assert rule["default"] is False and rule["values"] == {"max": {"value": 0.0, "label": "최대 횟수"}}
+    assert rule["body"]["then"]["left"]["shifts"] == {"in": None, "not_in": ["O"]}
+    assert rule["body"]["for_each"]["people"]["ids"] == ["n01"]
     assert rule["source_text"] == "이영희 15~17일 휴가"
+
+
+def test_translate_conditional_rule(llm):
+    conditional = {
+        "body": {
+            "kind": "require",
+            "for_each": {"per": "day"},
+            "when": {"left": {"who": {"min_years": 10}, "shifts": {"in": ["N"]}}, "op": "ge", "right": 1},
+            "then": {"left": {"who": {"max_years": 5}, "shifts": {"in": ["N"]}}, "op": "le", "right": 1},
+        },
+        "source_text": "고연차가 나이트면 저연차는 1명까지",
+    }
+    llm.responses = [ok({"rules": [conditional]})]
+    r = client.post("/api/py/translate", json=translate_body("고연차가 나이트면 저연차는 1명까지"))
+    (rule,) = r.json()["constraints"]
+    assert rule["body"]["when"]["op"] == "ge" and rule["body"]["then"]["right"] == 1
 
 
 def test_translate_ok_with_config_changes(llm):
     mid = {"code": "M", "name": "미드", "hours": 8, "start": "11:00"}
-    rule = {"type": "count", "params": {"shifts": {"in": ["M"]}, "per": "day", "min": 1}, "source_text": "미드 매일 1명"}
-    llm.responses = [ok({"constraints": [rule], "config_changes": [{"action": "add", "shift": mid}]})]
+    rule = {
+        "values": {"min": {"value": 1, "label": "최소 인원"}},
+        "body": {"kind": "require", "for_each": {"per": "day"}, "then": {"left": {"shifts": {"in": ["M"]}}, "op": "ge", "right": {"value": "min"}}},
+        "source_text": "미드 매일 1명",
+    }
+    llm.responses = [ok({"rules": [rule], "config_changes": [{"action": "add", "shift": mid}]})]
     r = client.post("/api/py/translate", json=translate_body("미드 근무 M 11시~19시 추가, 매일 1명"))
     assert r.status_code == 200
     body = r.json()
     assert body["config_changes"] == [
         {"action": "add", "shift": {"code": "M", "name": "미드", "hours": 8.0, "parts": [], "start": "11:00", "active": True}}
     ]
-    assert body["constraints"][0]["params"]["shifts"]["in"] == ["M"]
+    assert body["constraints"][0]["body"]["then"]["left"]["shifts"]["in"] == ["M"]
 
 
 def test_translate_clarify(llm):
@@ -319,6 +346,81 @@ def test_explain_block_update_verified_by_resolve(llm):
     assert [p["title"] for p in proposals] == ["데이 1명으로"]
     params = proposals[0]["changes"][0]["params"]
     assert params["min"] == 1 and params["shifts"]["in"] == ["D"] and params["per"] == "day"
+
+
+def rule_explain_body() -> dict:
+    """하루 데이 인원 규칙(값 min)이 명단보다 많아 휴가와 부딪친다 → 해 없음."""
+    req = sample()
+    nurse_ids = [n["id"] for n in req["nurses"]]
+    req["constraints"] = [
+        {
+            "id": "cov",
+            "scope": "ward",
+            "type": "rule",
+            "default": True,
+            "values": {"min": {"value": len(nurse_ids) - 1, "label": "최소 인원"}},
+            "body": {"kind": "require", "for_each": {"per": "day"}, "then": {"left": {"shifts": {"in": ["D"]}}, "op": "ge", "right": {"value": "min"}}},
+            "source_text": "데이 많이",
+        },
+        {
+            "id": "lv",
+            "scope": "period",
+            "type": "rule",
+            "values": {"max": {"value": 0, "label": "최대 횟수"}},
+            "body": {
+                "kind": "require",
+                "for_each": {"per": "person", "people": {"ids": nurse_ids[:2]}, "days": {"days": [3]}},
+                "then": {"left": {"shifts": {"not_in": ["O"]}}, "op": "le", "right": {"value": "max"}},
+            },
+            "source_text": "3일 휴가 둘",
+        },
+    ]
+    return {
+        "request": req,
+        "conflicts": [
+            {"constraint_id": "cov", "type": "rule", "source_text": "데이 많이"},
+            {"constraint_id": "lv", "type": "rule", "source_text": "3일 휴가 둘"},
+        ],
+    }
+
+
+def test_explain_rule_set_value_verified_by_resolve(llm):
+    body = rule_explain_body()
+    assert client.post("/api/py/solve", json=body["request"]).json()["status"] == "infeasible"
+    n = len(body["request"]["nurses"])
+
+    def change(title: str, *changes: dict) -> dict:
+        return {"title": title, "description": title, "changes": list(changes)}
+
+    lower = change("데이 1명으로", {"action": "set_value", "constraint_id": "cov", "name": "min", "value": 1})
+    still_bad = change("데이 그대로", {"action": "set_value", "constraint_id": "cov", "name": "min", "value": n - 1})
+    soft = change("가능하면으로", {"action": "set_hardness", "constraint_id": "cov", "hardness": "soft"})
+    structure = change("구조 바꾸기", {"action": "update", "constraint_id": "cov", "params": {"min": 1}})
+    llm.responses = [ok({"text": "데이 인원이 너무 많습니다.", "proposals": [still_bad, structure, lower, soft]})]
+    r = client.post("/api/py/explain", json=body)
+    assert r.status_code == 200
+    proposals = r.json()["proposals"]
+    assert [p["title"] for p in proposals] == ["데이 1명으로", "가능하면으로"]
+    (c,) = proposals[0]["changes"]
+    assert (c["action"], c["name"], c["value"]) == ("set_value", "min", 1)
+    assert proposals[0]["verified_summary"] is not None
+
+
+def test_apply_set_value_and_set_hardness():
+    from backend.domain.models import ConstraintChange, ScheduleRequest
+
+    req = ScheduleRequest.model_validate(rule_explain_body()["request"])
+    out = routes._apply(
+        req,
+        [
+            ConstraintChange(action="set_value", constraint_id="cov", name="min", value=2),
+            ConstraintChange(action="set_hardness", constraint_id="lv", hardness="soft"),
+        ],
+    )
+    cov, lv = out.constraints
+    assert cov.values["min"].value == 2 and cov.values["min"].label == "최소 인원" and cov.default is True
+    assert lv.hardness == "soft" and lv.values["max"].value == 0
+    assert req.constraints[0].values["min"].value == len(req.nurses) - 1  # 원본은 그대로
 
 
 @pytest.mark.parametrize("error", [LLMUnavailableError("down"), None])
@@ -613,7 +715,7 @@ def test_422_invalid_json():
 
 
 def test_502_llm_invalid_output(llm):
-    bad = ok({"constraints": [{"type": "unknown_template", "params": {}, "source_text": "x"}]})
+    bad = ok({"rules": [{"body": {"kind": "unknown_template"}, "source_text": "x"}]})
     llm.responses = [bad, bad, bad]
     assert_error(client.post("/api/py/translate", json=translate_body()), 502, "LLM_INVALID_OUTPUT")
 
@@ -650,9 +752,9 @@ def test_500_internal_hides_stack(monkeypatch, capsys):
 
 
 def test_log_line_for_llm_request_without_raw_text(llm, capsys):
-    bad_params = {**LEAVE_DRAFT["params"], "days": {"days": [40]}}
-    bad = ok({"constraints": [{**LEAVE_DRAFT, "params": bad_params, "source_text": "x"}]})
-    good = ok({"constraints": [{**LEAVE_DRAFT, "source_text": "n01 15일 휴가"}]})
+    for_each = {**LEAVE_DRAFT["body"]["for_each"], "days": {"days": [40]}}
+    bad = ok({"rules": [{**LEAVE_DRAFT, "body": {**LEAVE_DRAFT["body"], "for_each": for_each}, "source_text": "x"}]})
+    good = ok({"rules": [{**LEAVE_DRAFT, "source_text": "n01 15일 휴가"}]})
     llm.responses = [bad, good]
     capsys.readouterr()
     client.post("/api/py/translate", json=translate_body("이영희 15일 휴가 비밀메모"))

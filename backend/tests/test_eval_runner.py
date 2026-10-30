@@ -6,6 +6,7 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 
+from backend.domain.convert import block_to_rules
 from backend.llm.client import ToolCallResult
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -314,6 +315,15 @@ def leave_draft(nurse_id: str, days) -> dict:
 
 
 NF_DRAFT = draft("balance", {"people": {"exclude_tags": ["나이트전담"]}, "shifts": {"in": ["N"]}}, "hard")
+_SERVER_FIELDS = {"id", "scope", "enabled", "default", "type", "weight"}
+
+
+BAD_RULE = {"body": {"kind": "require", "for_each": {"per": "person"}, "then": "많이"}, "source_text": "원문"}  # 스키마 위반
+
+
+def rules(*blocks: dict) -> list[dict]:
+    """블록 초안을 translator가 받는 규칙 초안(RuleDraft)으로(설계 §2.5 변환표)."""
+    return [r.model_dump(mode="json", exclude=_SERVER_FIELDS) for b in blocks for r in block_to_rules(run._spec(b))]
 
 
 def test_score_compares_expected_with_draft_actual():
@@ -334,8 +344,8 @@ def test_run_cases_aggregates():
         case("b", {"status": "clarify"}),
     ]
     client = FakeClient(
-        ok({"constraints": [leave_draft("n01", "많이")]}),  # 스키마 위반 → 재시도
-        ok({"constraints": [leave_draft("n01", [16, 15]), NF_DRAFT]}),
+        ok({"rules": [BAD_RULE]}),  # 스키마 위반 → 재시도
+        ok({"rules": rules(leave_draft("n01", [16, 15]), NF_DRAFT)}),
         ok({"unsupported_reason": "템플릿 없음"}),
     )
     results = run.run_cases(cases, client)
@@ -361,8 +371,8 @@ def test_run_cases_exact_and_error():
         case("a", {"status": "ok", "constraints": [leave("n01", [15])]}),
         case("b", {"status": "ok", "constraints": [leave("n02", [3])]}),
     ]
-    bad = ok({"constraints": [leave_draft("n01", "x")]})
-    client = FakeClient(ok({"constraints": [leave_draft("n01", [15])]}), bad, bad, bad)
+    bad = ok({"rules": [BAD_RULE]})
+    client = FakeClient(ok({"rules": rules(leave_draft("n01", [15]))}), bad, bad, bad)
     results = run.run_cases(cases, client)
     m = run.aggregate(results)
 
@@ -376,7 +386,7 @@ def test_run_cases_exact_and_error():
 
 def test_write_results(tmp_path):
     cases = [case("a", {"status": "clarify"})]
-    results = run.run_cases(cases, FakeClient(ok({"constraints": [leave_draft("n01", [1])]})))
+    results = run.run_cases(cases, FakeClient(ok({"rules": rules(leave_draft("n01", [1]))})))
     out = tmp_path / "results.md"
     run.write_results(out, run.aggregate(results), results, model="fake-model", by_set=run.aggregate_by_set(results))
     text = out.read_text(encoding="utf-8")
@@ -386,12 +396,12 @@ def test_write_results(tmp_path):
 def test_run_case_config_changes():
     de_rule = count({"shifts": {"in": ["DE"]}, "per": "person", "max": 2})
     cases = [case("a", {"status": "ok", "config_changes": [DE], "constraints": [de_rule]}, set="new", scope="ward")]
-    client = FakeClient(ok({"config_changes": [DE], "constraints": [draft("count", de_rule["params"])]}))
+    client = FakeClient(ok({"config_changes": [DE], "rules": rules(draft("count", de_rule["params"]))}))
     (r,) = run.run_cases(cases, client)
     assert (r.tp, r.n_expected, r.n_actual, r.exact, r.set) == (2, 2, 2, True, "new")
     assert r.actual_changes == [DE["shift"] | {"start": None, "active": True}]
 
-    client = FakeClient(ok({"config_changes": [DE], "constraints": [draft("count", {**de_rule["params"], "max": 3})]}))
+    client = FakeClient(ok({"config_changes": [DE], "rules": rules(draft("count", {**de_rule["params"], "max": 3}))}))
     (r,) = run.run_cases(cases, client)
     assert (r.tp, r.exact) == (1, False)
 
@@ -403,7 +413,7 @@ def test_aggregate_by_set_and_gate():
         case("c", {"status": "unsupported"}, set="new"),
     ]
     client = FakeClient(
-        ok({"constraints": [leave_draft("n01", [15])]}),
+        ok({"rules": rules(leave_draft("n01", [15]))}),
         ok({"clarification_question": "누구?"}),
         ok({"clarification_question": "뭐?"}),
     )
@@ -460,5 +470,6 @@ def test_score_keeps_forbid_pattern_order():
     def forbid(*patterns):
         return {"type": "sequence", "hardness": "hard", "params": {"forbid": [[{"in": [a]}, {"in": [b]}] for a, b in patterns]}}
 
-    assert run.score_constraints([forbid(("N", "D"), ("N", "E"))], [forbid(("N", "E"), ("N", "D"))]) == (1, 1, 1)
+    # 금지 패턴 여럿은 패턴마다 규칙으로 나뉘어 규칙 단위로 맞춘다
+    assert run.score_constraints([forbid(("N", "D"), ("N", "E"))], [forbid(("N", "E"), ("N", "D"))]) == (2, 2, 2)
     assert run.score_constraints([forbid(("N", "D"))], [forbid(("D", "N"))]) == (0, 1, 1)
