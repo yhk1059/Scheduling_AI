@@ -5,7 +5,10 @@
     {
       "step": 0,
       "name": "tests-to-rules",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-10-30T22:48:58+0900",
+      "summary": "backend/tests/golden/solver-cases.json(blocks-cases 20케이스를 식 규칙 ScheduleRequest로 옮기고 지금 솔버의 status·목적값·배정/충돌 규칙 id 기록, 옛 기록과 일치 확인) 추가, test_golden을 이 파일만 읽게 다시 쓰고 gen_golden에 build_solver_cases 추가, rules.py·block_oracle·test_compile·test_domain·test_evaluate·test_demo_schedule·test_eval_runner·bench에서 convert/legacy import 제거. 결정: cases.json 9케이스는 blocks-cases의 같은 id 요청과 변환 결과가 같아 중복 없이 20케이스로 둠; 솔버 기대값의 충돌 id는 원 블록 id가 아닌 식 규칙 id; block_oracle은 옛 모델 대신 parse(dict)로 블록을 읽음(step 2에서 삭제 예정); test_compile의 골든 부분은 test_golden으로 합침; convert-cases 픽스처 테스트 2개는 test_golden에서 test_convert.py로 옮김; NIGHT_ONLY_RULE_ID와 나이트 전담 규칙은 rules.py에 식으로 직접 둠(bench는 인라인); test_eval_runner의 블록 입력은 rules.py 도우미로 쓴 식 규칙으로 바꾸고, 블록 거절 검사용 블록 dict 3개만 리터럴로 남김",
+      "completed_at": "2026-10-30T22:58:39+0900"
     },
     {
       "step": 1,
@@ -47,5 +50,6 @@
       "name": "eval-shop",
       "status": "pending"
     }
-  ]
+  ],
+  "created_at": "2026-10-30T22:48:58+0900"
 }
