@@ -1,6 +1,20 @@
 import { describe, expect, it } from "vitest";
 
-import { availabilityRules, coversShift, isAvailabilityRule, mergeAvailabilityConflicts, type AvailabilitySlots } from "./availability";
+import {
+  applyDrag,
+  availabilityFromLinks,
+  availabilityRules,
+  cellKey,
+  cellsFromSlots,
+  coversShift,
+  isAvailabilityRule,
+  mergeAvailabilityConflicts,
+  sameAvailability,
+  SLOT_COUNT,
+  slotLabel,
+  slotsFromCells,
+  type AvailabilitySlots,
+} from "./availability";
 import { DEFAULT_CONFIG } from "./rules";
 import type { Rule, ShopConfig } from "./types.gen";
 
@@ -128,5 +142,87 @@ describe("availabilityRules", () => {
       "avail-e01-C",
       "avail-e01-AC",
     ]);
+  });
+});
+
+describe("slotLabel", () => {
+  it("06:00에서 24:00까지 30분 칸 36개다", () => {
+    expect(SLOT_COUNT).toBe(36);
+    expect(slotLabel(0)).toEqual(["06:00", "06:30"]);
+    expect(slotLabel(13)).toEqual(["12:30", "13:00"]);
+    expect(slotLabel(35)).toEqual(["23:30", "24:00"]);
+  });
+});
+
+describe("slots ↔ 칸", () => {
+  const DAY = "2026-11-03";
+
+  it("구간을 칸으로 펼친다", () => {
+    const cells = cellsFromSlots({ [DAY]: [["06:00", "07:00"], ["23:30", "24:00"]] });
+    expect([...cells].sort()).toEqual([cellKey(DAY, 0), cellKey(DAY, 1), cellKey(DAY, 35)].sort());
+  });
+
+  it("이어진 칸은 구간 하나로 합치고 날짜별로 나눈다", () => {
+    const cells = new Set([cellKey(DAY, 12), cellKey(DAY, 13), cellKey(DAY, 15), cellKey("2026-11-02", 0)]);
+    expect(slotsFromCells(cells)).toEqual({
+      "2026-11-02": [["06:00", "06:30"]],
+      [DAY]: [["12:00", "13:00"], ["13:30", "14:00"]],
+    });
+  });
+
+  it("칸이 없으면 빈 객체다", () => {
+    expect(slotsFromCells(new Set())).toEqual({});
+  });
+
+  it("왕복해도 같다", () => {
+    const slots: AvailabilitySlots = { [DAY]: [["12:00", "23:00"]], "2026-11-05": [["12:00", "18:00"]] };
+    expect(slotsFromCells(cellsFromSlots(slots))).toEqual(slots);
+    expect(cellsFromSlots(slots).size).toBe(34);
+  });
+});
+
+describe("applyDrag", () => {
+  const DAY = "2026-11-03";
+  const keys = (...slots: number[]) => slots.map((i) => cellKey(DAY, i));
+
+  it("빈 칸에서 시작하면 범위를 칠한다. 위로 끌어도 같다", () => {
+    expect([...applyDrag(new Set(), DAY, 2, 4)].sort()).toEqual(keys(2, 3, 4).sort());
+    expect([...applyDrag(new Set(), DAY, 4, 2)].sort()).toEqual(keys(2, 3, 4).sort());
+  });
+
+  it("칠한 칸에서 시작하면 범위를 지운다", () => {
+    expect([...applyDrag(new Set(keys(2, 3, 4, 5)), DAY, 3, 4)].sort()).toEqual(keys(2, 5).sort());
+  });
+
+  it("빈 칸에서 시작해 칠한 칸을 지나도 칠한 채로 둔다", () => {
+    expect([...applyDrag(new Set(keys(3)), DAY, 2, 4)].sort()).toEqual(keys(2, 3, 4).sort());
+  });
+
+  it("원본과 다른 날은 건드리지 않는다", () => {
+    const base = new Set([cellKey("2026-11-02", 2)]);
+    const next = applyDrag(base, DAY, 2, 2);
+    expect(next.has(cellKey("2026-11-02", 2))).toBe(true);
+    expect(base.size).toBe(1);
+  });
+});
+
+describe("availabilityFromLinks", () => {
+  it("직원 id로 묶고 아직 비어 있는 행은 뺀다", () => {
+    const slots: AvailabilitySlots = { "2026-11-02": [["09:00", "15:00"]] };
+    expect(availabilityFromLinks([{ employee_id: "e01", slots }, { employee_id: "e02", slots: {} }])).toEqual({ e01: slots });
+  });
+});
+
+describe("sameAvailability", () => {
+  const a: AvailabilitySlots = { "2026-11-02": [["09:00", "15:00"]], "2026-11-03": [["12:00", "18:00"]] };
+  const reordered: AvailabilitySlots = { "2026-11-03": [["12:00", "18:00"]], "2026-11-02": [["09:00", "15:00"]] };
+
+  it("키 순서는 보지 않는다", () => {
+    expect(sameAvailability({ e01: a }, { e01: reordered })).toBe(true);
+  });
+
+  it("칸이 다르면 다르다", () => {
+    expect(sameAvailability({ e01: a }, { e01: { "2026-11-02": [["09:00", "15:30"]] } })).toBe(false);
+    expect(sameAvailability({ e01: a }, {})).toBe(false);
   });
 });

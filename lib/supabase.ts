@@ -1,6 +1,9 @@
-// Supabase 얇은 래퍼: Google 로그인과 매장 문서(shops 1행) load/save/delete (ADR-014).
+// Supabase 얇은 래퍼: Google 로그인, 매장 문서(shops 1행) load/save/delete (ADR-014), 직원 링크(ADR-020).
 // 접근 제어는 RLS(owner_id = auth.uid())가 한다. 오류는 Error로 throw한다.
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+
+import type { AvailabilitySlots } from "./availability";
+import type { PeriodRange } from "./period";
 
 const URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -77,4 +80,99 @@ export async function deleteShop(): Promise<void> {
   if (authError || !data.user) throw new Error(authError?.message ?? "Not signed in");
   const { error } = await supabase().from("shops").delete().eq("owner_id", data.user.id);
   if (error) throw new Error(error.message);
+}
+
+export interface AvailabilityLink {
+  token: string;
+  employee_id: string;
+  slots: AvailabilitySlots;
+}
+
+const LINK_COLUMNS = "token, employee_id, slots";
+
+/** 이 근무표의 링크 행들. */
+export async function loadAvailabilityLinks(periodStart: string): Promise<AvailabilityLink[]> {
+  const { data, error } = await supabase().from("availability_links").select(LINK_COLUMNS).eq("period_start", periodStart);
+  if (error) throw new Error(error.message);
+  return data as AvailabilityLink[];
+}
+
+// 시작일을 빠르게 바꿔도 앞선 호출의 삭제가 뒤 호출의 행을 지우지 않게 차례로 돌린다
+let linkQueue: Promise<unknown> = Promise.resolve();
+
+/**
+ * 작성 중 근무표의 링크 행을 맞춘다. 없는 직원의 행은 만들고(토큰은 DB가 정한다), 있는 행은 이름만 고친다.
+ * 잠기지 않은 다른 시작일의 행은 지운다(작성 중 근무표는 하나뿐이라 시작일이 바뀐 옛 행이다).
+ */
+export function syncAvailabilityLinks(
+  period: PeriodRange,
+  employees: { id: string; name: string }[],
+  shopName: string,
+): Promise<AvailabilityLink[]> {
+  const work = async () => {
+    const { data: shop, error: shopError } = await supabase().from("shops").select("id").maybeSingle();
+    if (shopError || !shop) throw new Error(shopError?.message ?? "Shop not saved yet");
+    const { error: deleteError } = await supabase()
+      .from("availability_links")
+      .delete()
+      .eq("shop_id", shop.id)
+      .neq("period_start", period.start_date)
+      .is("locked_at", null);
+    if (deleteError) throw new Error(deleteError.message);
+    const { error } = await supabase()
+      .from("availability_links")
+      .upsert(
+        employees.map((n) => ({
+          shop_id: shop.id,
+          period_start: period.start_date,
+          period_length: period.length,
+          employee_id: n.id,
+          employee_name: n.name,
+          shop_name: shopName,
+        })),
+        { onConflict: "shop_id,period_start,employee_id" },
+      );
+    if (error) throw new Error(error.message);
+    return loadAvailabilityLinks(period.start_date);
+  };
+  const run = linkQueue.then(work, work);
+  linkQueue = run;
+  return run;
+}
+
+/** 확정: 이 근무표의 링크를 잠근다. 이미 잠긴 행은 그대로 두어 다시 확정해도 처음 시각이 남는다. */
+export async function lockAvailabilityLinks(periodStart: string): Promise<void> {
+  const { error } = await supabase()
+    .from("availability_links")
+    .update({ locked_at: new Date().toISOString() })
+    .eq("period_start", periodStart)
+    .is("locked_at", null);
+  if (error) throw new Error(error.message);
+}
+
+export interface EmployeeAvailability {
+  shop_name: string;
+  employee_name: string;
+  period_start: string;
+  period_length: number;
+  slots: AvailabilitySlots;
+  locked: boolean;
+}
+
+/** 직원 링크로 읽는다. 없는 링크면 null. */
+export async function getAvailability(token: string): Promise<EmployeeAvailability | null> {
+  const { data, error } = await supabase().rpc("get_availability", { p_token: token });
+  // 22P02: 토큰 형식이 아니다
+  if (error?.code === "22P02") return null;
+  if (error) throw new Error(error.message);
+  return (data as EmployeeAvailability[])[0] ?? null;
+}
+
+/** 직원 제출. 잠겼거나 없는 링크는 throw하지 않고 그 상태를 돌려준다. */
+export async function submitAvailability(token: string, slots: AvailabilitySlots): Promise<"ok" | "locked" | "not_found"> {
+  const { error } = await supabase().rpc("submit_availability", { p_token: token, p_slots: slots });
+  if (!error) return "ok";
+  if (error.code === "P0001") return "locked";
+  if (error.code === "P0002" || error.code === "22P02") return "not_found";
+  throw new Error(error.message);
 }

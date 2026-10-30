@@ -5,7 +5,7 @@
 import { create } from "zustand";
 import { persist, type PersistStorage, type StorageValue } from "zustand/middleware";
 
-import { availabilityRules, type AvailabilitySlots } from "./availability";
+import { availabilityRules, sameAvailability, type AvailabilitySlots } from "./availability";
 import {
   carryOverFrom,
   diffAssignments,
@@ -144,8 +144,10 @@ export interface WorkPeriod extends PeriodRange {
   snapshot: { employees: ShopEmployee[]; rules: ConstraintSpec[] } | null;
   /** 요청 카드 id → 예시 판정(translate 응답) */
   examples?: Record<string, RuleExample[]>;
-  /** 직원 id → 가능 시간. 값이 아예 없으면 가능 시간 규칙을 더하지 않는다(입력 화면이 생기면 지운다) */
-  availability?: Record<string, AvailabilitySlots>;
+  /** 직원 id → 가능 시간(링크 행에서 읽은 것). 제출하지 않은 직원은 없고, 어느 칸에도 배정되지 않는다 */
+  availability: Record<string, AvailabilitySlots>;
+  /** result를 만든 요청에 쓴 가능 시간. 가능 시간 변경 판정에 쓴다. */
+  availabilityUsed: Record<string, AvailabilitySlots> | null;
 }
 
 /** 근무표 작성: ① 가능 시간 → ② 매장 조건 → ③ 근무표 */
@@ -248,8 +250,10 @@ export interface AppState extends Data {
   /** 그 칸의 기존 고정 배정을 지우고 수동 고정 제약을 추가한다. */
   setFixed: (periodId: string, employeeId: string, day: number, shift: Code) => void;
   clearFixed: (periodId: string, employeeId: string, day: number) => void;
-  /** 응답 버전이 현재와 같을 때만 부른다. resultVersion = 지금의 inputVersion. usedCarryOver = 그 요청의 carry_over. */
-  setResult: (periodId: string, result: ScheduleResult, usedCarryOver: CarryOverRow[]) => void;
+  /** 링크 행에서 읽은 가능 시간을 넣는다. 달라졌으면 true. 전용 배너를 쓰므로 inputVersion은 올리지 않는다. */
+  setAvailability: (periodId: string, availability: Record<string, AvailabilitySlots>) => boolean;
+  /** 응답 버전이 현재와 같을 때만 부른다. resultVersion = 지금의 inputVersion. usedCarryOver·usedAvailability = 그 요청에 쓴 값(가능 시간 기본값은 지금 값). */
+  setResult: (periodId: string, result: ScheduleResult, usedCarryOver: CarryOverRow[], usedAvailability?: Record<string, AvailabilitySlots>) => void;
   /** 첫 확정은 버전 1개, 이미 확정된 기간은 바뀐 칸이 있을 때만 버전을 추가한다([다시 확정]). 확정 근무표 화면으로 간다. */
   confirm: (periodId: string) => void;
   /** [변경 취소]: 요청과 결과를 마지막 확정본으로 되돌린다. 되돌릴 수 없으면 아무것도 하지 않는다. */
@@ -297,6 +301,8 @@ function newPeriod(range: PeriodRange): WorkPeriod {
     status: "draft",
     versions: [],
     snapshot: null,
+    availability: {},
+    availabilityUsed: null,
   };
 }
 
@@ -567,7 +573,7 @@ export function toScheduleRequest(
   const fixedCells = [...constraints, ...locks].flatMap((c) =>
     c.type === "fixed_assignment" && c.enabled !== false ? [c.params] : [],
   );
-  const availability = period.availability ? availabilityRules(active, shop.config, period, period.availability, fixedCells) : [];
+  const availability = availabilityRules(active, shop.config, period, period.availability, fixedCells);
   const prev = previousConfirmedPeriod(periods, period);
   return {
     config: shop.config,
@@ -588,6 +594,11 @@ export function carryOverChanged(period: WorkPeriod, periods: WorkPeriod[]): boo
   if (!prev) return false;
   const ids = period.result ? Object.keys(period.result.assignments) : period.carryOverUsed.map((r) => r.employee_id);
   return !sameCarryOver(period.carryOverUsed, carryOverFrom(prev, ids));
+}
+
+/** 마지막 생성에 쓴 가능 시간과 지금 가능 시간이 다른지. */
+export function availabilityChanged(period: WorkPeriod): boolean {
+  return period.availabilityUsed !== null && !sameAvailability(period.availabilityUsed, period.availability);
 }
 
 /** [변경 취소]를 보여 줄지: 마지막 확정본에 요청이 남아 있고, 배정이나 요청이 그 뒤로 바뀌었다. */
@@ -736,7 +747,10 @@ function isData(v: unknown): v is Data {
         ["holidays", "requests", "pendingRequests", "disabledIds", "carryOver", "versions"].every((k) =>
           Array.isArray(p[k]),
         ) &&
-        (p.carryOverUsed === null || Array.isArray(p.carryOverUsed)),
+        (p.carryOverUsed === null || Array.isArray(p.carryOverUsed)) &&
+        typeof p.availability === "object" &&
+        p.availability !== null &&
+        typeof p.availabilityUsed === "object",
     );
   return shopOk && periodsOk && typeof view?.screen === "string" && typeof d.inputVersion === "number";
 }
@@ -1166,6 +1180,9 @@ export function createAppStore(getStorage: () => Storage, now: () => Date = () =
               result: null,
               resultVersion: null,
               carryOverUsed: null,
+              // 시작일이 바뀌면 링크를 새로 만들므로 받은 가능 시간도 없어진다
+              availability: {},
+              availabilityUsed: null,
             }));
             return true;
           },
@@ -1287,9 +1304,19 @@ export function createAppStore(getStorage: () => Storage, now: () => Date = () =
           },
           clearFixed: (periodId, employeeId, day) =>
             editPeriod(periodId, (p) => ({ ...p, requests: p.requests.filter((c) => !isFixedCell(c, employeeId, day)) })),
-          setResult: (periodId, result, usedCarryOver) => {
+          setAvailability: (periodId, availability) => {
+            const period = get().periods.find((p) => p.id === periodId);
+            if (!period || sameAvailability(period.availability, availability)) return false;
+            editPeriod(periodId, (p) => ({ ...p, availability }), false);
+            return true;
+          },
+          setResult: (periodId, result, usedCarryOver, usedAvailability) => {
             const v = get().inputVersion;
-            editPeriod(periodId, (p) => ({ ...p, result, resultVersion: v, carryOverUsed: usedCarryOver }), false);
+            editPeriod(
+              periodId,
+              (p) => ({ ...p, result, resultVersion: v, carryOverUsed: usedCarryOver, availabilityUsed: usedAvailability ?? p.availability }),
+              false,
+            );
           },
           confirm: (periodId) => {
             const { shop } = get();
