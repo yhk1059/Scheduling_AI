@@ -377,6 +377,24 @@ describe("카드 예시", () => {
     store.getState().removeRequest(id, "l");
     expect(period().examples).toEqual({});
   });
+
+  it("값을 바꾸면 그 카드의 예시를 지운다(예시는 옛 값으로 판정한 것)", () => {
+    const store = fresh();
+    store.getState().startWard();
+    store.getState().addPendingRules([maxNights("p", 3), minOff("q", 8)], [], { p: [example("가")], q: [example("나")] });
+    store.getState().applyRule("q");
+    store.getState().setRuleValue("p", "없는값", 4);
+    expect(store.getState().ward!.examples).toEqual({ p: [example("가")], q: [example("나")] });
+    store.getState().setRuleValue("p", "max_len", 4);
+    store.getState().setRuleValue("q", "min", 9);
+    expect(store.getState().ward!.examples).toEqual({});
+
+    const { store: s2, id, period } = withPeriod();
+    s2.getState().addPendingRequests(id, [leave("l", "n01", [3])], { l: [example("휴가")] });
+    s2.getState().applyRequest(id, "l");
+    s2.getState().setRequestValue(id, "l", "max", 1);
+    expect(period().examples).toEqual({});
+  });
 });
 
 describe("카드 순서", () => {

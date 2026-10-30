@@ -9,6 +9,7 @@ import ward from "@/lib/samples/ward-15.json";
 import type { ConstraintSpec, Nurse, Period, ScheduleResult } from "@/lib/types.gen";
 import { describeRule, hardnessLabel, presetName } from "@/lib/wording";
 
+import RuleText from "./RuleText";
 import { ScheduleGrid } from "./ScheduleStep";
 import { ui } from "./ui";
 
@@ -49,7 +50,8 @@ export function PreviewCard({ card, nurses, period }: { card: ConstraintSpec; nu
         </div>
       </div>
       <p className="text-sm text-[#1B1B18]">“{card.source_text}”</p>
-      <p className="rounded-sm bg-[#F6F6F3] px-2.5 py-2 text-xs text-[#3D3D38]">{describeRule(card, DEFAULT_CONFIG, nurses, period).text}</p>
+      <p className="rounded-sm bg-[#F6F6F3] px-2.5 py-2 text-xs text-[#3D3D38]"><RuleText sentence={describeRule(card, DEFAULT_CONFIG, nurses, period)} />
+      </p>
       <div>
         <span className={`${ui.badge} bg-[#E6F2EA] text-[#1E6B3F]`}>적용됨</span>
       </div>

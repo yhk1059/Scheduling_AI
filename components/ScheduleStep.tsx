@@ -498,11 +498,13 @@ export function OutcomePanel({
               changes={p.changes.flatMap((ch) => {
                 const c = constraints.find((x) => x.id === ch.constraint_id);
                 if (!c) return [];
-                if (ch.action === "disable") return [`${presetName(c)} 끄기 · “${c.source_text}”`];
+                // 바꾸는 것만 결정적으로 쓴다(값·끄기·반드시/가능하면). 어느 규칙인지는 원문으로 붙인다
+                const quote = `“${c.source_text}”`;
+                if (ch.action === "disable") return [{ change: "이번 근무표에서만 끄기", quote }];
                 if (ch.action === "set_hardness" && ch.hardness)
-                  return [`${presetName(c)} ${hardnessLabel(c.hardness ?? "hard")} → ${hardnessLabel(ch.hardness)}`];
+                  return [{ change: `${hardnessLabel(c.hardness ?? "hard")} → ${hardnessLabel(ch.hardness)}`, quote }];
                 const v = c.type === "rule" ? c.values?.[ch.name ?? ""] : undefined;
-                return v ? [`${v.label} ${v.value} → ${ch.value}`] : [];
+                return v ? [{ change: `${v.label} ${v.value} → ${ch.value}`, quote }] : [];
               })}
               busy={busy}
               onAccept={() => onAccept(p)}
@@ -581,8 +583,8 @@ function ProposalCard({
   onDismiss,
 }: {
   proposal: RelaxationProposal;
-  /** 바뀌는 규칙을 블록 문장으로 */
-  changes: string[];
+  /** 바꾸는 것("최대 연속 나이트 3 → 4")과 그 규칙의 원문 */
+  changes: { change: string; quote: string }[];
   busy: boolean;
   onAccept: () => void;
   onDismiss: () => void;
@@ -594,13 +596,17 @@ function ProposalCard({
         <h3 className="text-[13px] font-semibold text-[#1B1B18]">{proposal.title}</h3>
         <span className={`${ui.badge} bg-[#E6F2EA] text-[#1E6B3F]`}>검증됨</span>
       </div>
-      <p className="text-sm leading-relaxed text-[#3D3D38]">{proposal.description}</p>
-      {changes.length > 0 && (
-        <ul className="flex flex-col gap-1 rounded-sm bg-[#F6F6F3] px-2.5 py-2 text-xs text-[#3D3D38]">
+      {changes.length > 0 ? (
+        <ul className="flex flex-col gap-1">
           {changes.map((t, i) => (
-            <li key={i}>{t}</li>
+            <li key={i} className="flex flex-col gap-0.5">
+              <span className="text-sm font-medium text-[#1B1B18]">{t.change}</span>
+              <span className="text-xs text-[#66665E]">{t.quote}</span>
+            </li>
           ))}
         </ul>
+      ) : (
+        <p className="text-sm leading-relaxed text-[#3D3D38]">{proposal.description}</p>
       )}
       <p className="text-xs text-[#66665E]">
         이렇게 바꾸면 근무표를 만들 수 있어요 · 희망 반영{" "}

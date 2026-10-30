@@ -1062,8 +1062,9 @@ export function createAppStore(getStorage: () => Storage, now: () => Date = () =
             const next = (pending ?? applied) && withRuleValue((pending ?? applied)!, name, value);
             if (!next) return;
             const swap = (list: ConstraintSpec[]) => list.map((c) => (c.id === id ? next : c));
-            if (pending) editWard((w) => ({ ...w, pendingRules: swap(w.pendingRules) }), false);
-            else editWard((w) => ({ ...w, rules: swap(w.rules) }));
+            // 예시는 옛 값으로 판정한 것이라 지운다
+            if (pending) editWard((w) => ({ ...w, pendingRules: swap(w.pendingRules), examples: withoutExamples(w.examples, [id]) }), false);
+            else editWard((w) => ({ ...w, rules: swap(w.rules), examples: withoutExamples(w.examples, [id]) }));
           },
           removeRule: (id) => {
             const w = get().ward;
@@ -1210,8 +1211,9 @@ export function createAppStore(getStorage: () => Storage, now: () => Date = () =
             const next = (pending ?? applied) && withRuleValue((pending ?? applied)!, name, value);
             if (!next) return;
             const swap = (list: ConstraintSpec[]) => list.map((c) => (c.id === id ? next : c));
-            if (pending) editPeriod(periodId, (p) => ({ ...p, pendingRequests: swap(p.pendingRequests) }), false);
-            else editPeriod(periodId, (p) => ({ ...p, requests: swap(p.requests) }));
+            if (pending)
+              editPeriod(periodId, (p) => ({ ...p, pendingRequests: swap(p.pendingRequests), examples: withoutExamples(p.examples, [id]) }), false);
+            else editPeriod(periodId, (p) => ({ ...p, requests: swap(p.requests), examples: withoutExamples(p.examples, [id]) }));
           },
           removeRequest: (periodId, id) => {
             const period = get().periods.find((p) => p.id === periodId);
