@@ -24,6 +24,14 @@
       "dir": "5-expressions",
       "status": "completed",
       "completed_at": "2026-10-30T15:50:06+0900"
+    },
+    {
+      "dir": "6-shop-pivot",
+      "status": "pending"
+    },
+    {
+      "dir": "7-availability",
+      "status": "pending"
     }
   ]
 }

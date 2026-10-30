@@ -1,0 +1,26 @@
+{
+  "project": "shop-scheduler",
+  "phase": "7-availability",
+  "steps": [
+    {
+      "step": 0,
+      "name": "availability-lib",
+      "status": "pending"
+    },
+    {
+      "step": 1,
+      "name": "flow-steps",
+      "status": "pending"
+    },
+    {
+      "step": 2,
+      "name": "availability-ui",
+      "status": "pending"
+    },
+    {
+      "step": 3,
+      "name": "samples-e2e",
+      "status": "pending"
+    }
+  ]
+}

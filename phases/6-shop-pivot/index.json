@@ -1,0 +1,56 @@
+{
+  "project": "shop-scheduler",
+  "phase": "6-shop-pivot",
+  "steps": [
+    {
+      "step": 0,
+      "name": "tests-to-rules",
+      "status": "pending"
+    },
+    {
+      "step": 1,
+      "name": "remove-legacy-backend",
+      "status": "pending"
+    },
+    {
+      "step": 2,
+      "name": "rename-backend",
+      "status": "pending"
+    },
+    {
+      "step": 3,
+      "name": "shift-times",
+      "status": "pending"
+    },
+    {
+      "step": 4,
+      "name": "llm-shop",
+      "status": "pending"
+    },
+    {
+      "step": 5,
+      "name": "eval-shop",
+      "status": "pending"
+    },
+    {
+      "step": 6,
+      "name": "client-lib",
+      "status": "pending"
+    },
+    {
+      "step": 7,
+      "name": "client-rename",
+      "status": "pending"
+    },
+    {
+      "step": 8,
+      "name": "login-required",
+      "status": "pending"
+    },
+    {
+      "step": 9,
+      "name": "availability-db",
+      "status": "pending"
+    }
+  ]
+}
