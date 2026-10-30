@@ -3,7 +3,7 @@
 uv run python eval/run.py [--dry-run] [--gate] [--limit N] [--ids r01,r02]
 
 --dry-run은 API를 호출하지 않고 데이터셋만 검증한다. 실행 모드는 결과를 eval/results.md에 쓴다.
---gate는 set별 완전 일치율과 스키마 유효율이 목표(GATE_*) 미만이면 exit 1.
+결과에 묶음별 완전 일치율과 합격 여부(전체 90%, time-window 90%)를 낸다. --gate는 불합격이면 exit 1.
 
 채점은 의미 기준이다(설계 §7). 고정 시드 무작위 근무표와, 기대 규칙이 세는 칸을 뒤집은 근무표에서
 evaluate.evaluate_rule의 위반 집합이 모두 같고 hardness(soft면 priority도)가 같으면 같은 규칙으로 본다.
@@ -60,26 +60,21 @@ from backend.solver import evaluate, select  # noqa: E402
 
 DATASET = ROOT / "eval" / "dataset.jsonl"
 RESULTS = ROOT / "eval" / "results.md"
-# 데이터셋이 아직 D/E/N 말투라 같은 근무 형태의 매장으로 판정한다
-SAMPLE = ROOT / "backend" / "tests" / "golden" / "den-shop.json"
+# eval 매장 = 샘플 매장(기본 근무조, 리더 3명, 신입 2명, 11/2부터 28일)
+SAMPLE = ROOT / "lib" / "samples" / "shop-12.json"
 STATUSES = ("ok", "clarify", "unsupported")
 SCOPES = ("shop", "period")
-SETS = ("basic", "new", "expr")
-PRIOR_SETS = ("basic", "new")  # 식 이전의 기존 79건
+SETS = ("basic", "config", "time-window", "hours", "tag", "conditional", "pair")
 EXPECTED_TYPES = ("rule", "fixed_assignment")
 
-# 게이트 목표(사용자 결정 ★8). 낮추지 않는다
-GATE_EXACT = {"basic": 0.95, "new": 0.95, "expr": 0.85}
-GATE_PRIOR_EXACT = 0.95  # 기존 79건 합산
-GATE_SCHEMA_VALID = 1.0
+# 합격 기준: 케이스 완전 일치율. 낮추지 않는다
+GATE_TOTAL_EXACT = 0.90
+GATE_EXACT = {"time-window": 0.90}
 
 # 의미 판정: 무작위 근무표 수, 기대 규칙의 세기마다 세는 칸을 뒤집은 근무표 수, 시드
 K_RANDOM = 50
 FLIPS_PER_COUNT = 4
 SEED = 20261030
-
-# eval 병동 = 샘플 병동 + 태그(책임 2명, 신규 3명)
-EVAL_TAGS = {"e01": ["책임"], "e06": ["책임"], "e11": ["신규"], "e12": ["신규"], "e13": ["신규"]}
 
 _spec_adapter = TypeAdapter(ConstraintSpec)
 _FILLER = {"id": "eval", "scope": "shop", "source_text": "eval", "weight": 1}
@@ -87,11 +82,7 @@ _DUMP_EXCLUDE = {"id", "scope", "source_text", "enabled", "weight"}
 
 
 def _shop() -> dict:
-    shop = json.loads(SAMPLE.read_text(encoding="utf-8"))
-    employees = []
-    for n in shop["employees"]:
-        employees.append(n | {"tags": EVAL_TAGS.get(n["id"], []) + n["tags"]})
-    return {**shop, "employees": employees}
+    return json.loads(SAMPLE.read_text(encoding="utf-8"))
 
 
 def _known_tags(shop: dict) -> set[str]:
@@ -280,11 +271,11 @@ def score_constraints(expected: list, actual: list, case: dict | None = None, co
 
 def _change_key(ch: dict | ShiftChange) -> tuple:
     shift = (ch if isinstance(ch, ShiftChange) else ShiftChange.model_validate(ch)).shift
-    return (shift.code, shift.hours, tuple(sorted(shift.parts)))
+    return (shift.code, shift.hours, tuple(sorted(shift.parts)), shift.start, shift.end)
 
 
 def score_config_changes(expected: list, actual: list) -> tuple[int, int, int]:
-    """근무 형태 변경: 코드·hours·parts가 같으면 일치."""
+    """근무 형태 변경: 코드·hours·parts·시각이 같으면 일치."""
     e, a = Counter(map(_change_key, expected)), Counter(map(_change_key, actual))
     return sum((e & a).values()), len(expected), len(actual)
 
@@ -358,7 +349,7 @@ def validate_dataset(cases: list[dict]) -> list[str]:
         for spec in req.constraints:
             tags = {t for sel in _people_selectors(spec) for t in (*(sel.tags or []), *sel.exclude_tags)}
             if tags - known_tags:
-                errors.append(f"{cid}: eval 병동에 없는 태그 {sorted(tags - known_tags)}")
+                errors.append(f"{cid}: eval 매장에 없는 태그 {sorted(tags - known_tags)}")
     return errors
 
 
@@ -520,26 +511,36 @@ def aggregate_by_set(results: list[CaseResult]) -> dict[str, dict[str, Any]]:
     return {s: aggregate([r for r in results if r.set == s]) for s in SETS if any(r.set == s for r in results)}
 
 
-def prior_exact_rate(by_set: dict[str, dict]) -> float | None:
-    """기존 79건(PRIOR_SETS) 합산 완전 일치율."""
-    sets = [by_set[s] for s in PRIOR_SETS if s in by_set]
-    cases = sum(m["cases"] for m in sets)
-    return round(sum(m["exact_match_rate"] * m["cases"] for m in sets), 6) / cases if cases else None
-
-
 def gate_failures(metrics: dict, by_set: dict[str, dict]) -> list[str]:
-    """목표 미달 항목. 비어 있으면 통과."""
+    """합격 기준 미달 항목. 비어 있으면 합격."""
     out = []
-    if (metrics["schema_valid_rate"] or 0) < GATE_SCHEMA_VALID:
-        out.append(f"스키마 유효율 {metrics['schema_valid_rate']:.1%} < {GATE_SCHEMA_VALID:.0%}")
+    total = metrics["exact_match_rate"]
+    if (total or 0) < GATE_TOTAL_EXACT:
+        out.append(f"전체 완전 일치율 {_pct(total)} < {GATE_TOTAL_EXACT:.0%}")
     for s, target in GATE_EXACT.items():
         rate = by_set.get(s, {}).get("exact_match_rate")
         if rate is None or rate < target:
-            out.append(f"{s} 완전 일치율 {'-' if rate is None else f'{rate:.1%}'} < {target:.0%}")
-    prior = prior_exact_rate(by_set)
-    if prior is None or prior < GATE_PRIOR_EXACT:
-        out.append(f"기존 {'+'.join(PRIOR_SETS)} 합산 완전 일치율 {_pct(prior)} < {GATE_PRIOR_EXACT:.0%}")
+            out.append(f"{s} 완전 일치율 {_pct(rate)} < {target:.0%}")
     return out
+
+
+def _gate_criteria() -> str:
+    return " · ".join([f"전체 ≥ {GATE_TOTAL_EXACT:.0%}"] + [f"{s} ≥ {t:.0%}" for s, t in GATE_EXACT.items()])
+
+
+def _verdict(metrics: dict, by_set: dict[str, dict]) -> str:
+    return "불합격" if gate_failures(metrics, by_set) else "합격"
+
+
+def gate_report(metrics: dict, by_set: dict[str, dict]) -> list[str]:
+    """묶음별 정확도와 합격 여부(터미널 출력)."""
+    rates = ", ".join(f"{s} {_pct(m['exact_match_rate'])} ({m['cases']}개)" for s, m in by_set.items())
+    return [
+        f"묶음별 완전 일치: {rates}",
+        f"전체 완전 일치: {_pct(metrics['exact_match_rate'])}, 스키마 유효율: {_pct(metrics['schema_valid_rate'])}",
+        f"합격 기준: {_gate_criteria()} → {_verdict(metrics, by_set)}",
+        *[f"미달: {f}" for f in gate_failures(metrics, by_set)],
+    ]
 
 
 # --- 결과 파일 ---
@@ -573,30 +574,31 @@ def _pct(v: float | None) -> str:
 
 HISTORY = "## 실행 이력"
 _HISTORY_HEAD = [
-    "| 실행 시각 | 모델 | 케이스 | " + " | ".join(SETS) + " | 기존 합산 | 스키마 유효율 | 게이트 |",
+    "| 실행 시각 | 모델 | 케이스 | " + " | ".join(SETS) + " | 전체 | 스키마 유효율 | 합격 |",
     "|" + "---|" * (len(SETS) + 6),
 ]
 
 
 def _history_rows(path: Path) -> list[str]:
-    """지난 결과 파일의 실행 이력 행."""
+    """지난 결과 파일의 실행 이력 행. 묶음이 달라 열이 맞지 않는 옛 행은 옮기지 않는다."""
     if not path.exists():
         return []
     text = path.read_text(encoding="utf-8")
     if HISTORY not in text:
         return []
     section = text.split(HISTORY, 1)[1].split("\n## ", 1)[0]
-    return [line for line in section.splitlines() if line.startswith("| ") and not line.startswith("| 실행 시각")]
+    columns = _HISTORY_HEAD[0].count("|")
+    return [line for line in section.splitlines() if line.startswith("| ") and not line.startswith("| 실행 시각") and line.count("|") == columns]
 
 
 def write_results(path: Path, metrics: dict, results: list[CaseResult], model: str, by_set: dict | None = None) -> None:
     by_set = by_set if by_set is not None else aggregate_by_set(results)
     now = datetime.now().astimezone().isoformat(timespec="seconds")
-    gate = "통과" if not gate_failures(metrics, by_set) else "미달"
+    verdict = _verdict(metrics, by_set)
     row = (
         f"| {now} | `{model}` | {metrics['cases']} | "
         + " | ".join(_pct(by_set[s]["exact_match_rate"]) if s in by_set else "-" for s in SETS)
-        + f" | {_pct(prior_exact_rate(by_set))} | {_pct(metrics['schema_valid_rate'])} | {gate} |"
+        + f" | {_pct(metrics['exact_match_rate'])} | {_pct(metrics['schema_valid_rate'])} | {verdict} |"
     )
     history = _history_rows(path) + [row]
     lines = [
@@ -608,20 +610,22 @@ def write_results(path: Path, metrics: dict, results: list[CaseResult], model: s
         f"- 판정: 의미 기준(무작위 근무표 {K_RANDOM}개 + 기대 규칙의 세기마다 세는 칸을 뒤집은 근무표 {FLIPS_PER_COUNT}개, 시드 {SEED}, "
         "위반은 evaluate.evaluate_rule)",
         "",
-        "## set별 지표",
+        f"- 합격 기준: {_gate_criteria()} → **{verdict}**",
+        *[f"- 미달: {f}" for f in gate_failures(metrics, by_set)],
         "",
-        "| set | 케이스 | 완전 일치율 | 목표 | status 정확도 | 제약 F1 | 스키마 유효율 |",
+        "## 묶음별 정확도",
+        "",
+        "| 묶음 | 케이스 | 완전 일치율 | 목표 | status 정확도 | 제약 F1 | 스키마 유효율 |",
         "|---|---|---|---|---|---|---|",
     ]
     for s, m in by_set.items():
+        target = f"≥ {GATE_EXACT[s]:.0%}" if s in GATE_EXACT else "-"
         lines.append(
-            f"| {s} | {m['cases']} | {_pct(m['exact_match_rate'])} | ≥ {GATE_EXACT[s]:.0%} | {_pct(m['status_accuracy'])} "
+            f"| {s} | {m['cases']} | {_pct(m['exact_match_rate'])} | {target} | {_pct(m['status_accuracy'])} "
             f"| {_pct(m['f1'])} | {_pct(m['schema_valid_rate'])} |"
         )
-    prior = prior_exact_rate(by_set)
-    if prior is not None:
-        lines.append(f"| 기존 {'+'.join(s for s in PRIOR_SETS if s in by_set)} 합산 | "
-                     f"{sum(by_set[s]['cases'] for s in PRIOR_SETS if s in by_set)} | {_pct(prior)} | ≥ {GATE_PRIOR_EXACT:.0%} | | | |")
+    lines.append(f"| 전체 | {metrics['cases']} | {_pct(metrics['exact_match_rate'])} | ≥ {GATE_TOTAL_EXACT:.0%} | {_pct(metrics['status_accuracy'])} "
+                 f"| {_pct(metrics['f1'])} | {_pct(metrics['schema_valid_rate'])} |")
     lines += ["", "## 전체 지표", "", "| 지표 | 값 |", "|---|---|"]
     for key, label, fmt in _LABELS:
         value = metrics[key]
@@ -665,7 +669,7 @@ def _select(cases: list[dict], ids: str | None, limit: int | None) -> list[dict]
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="LLM 번역 정확도 eval")
     parser.add_argument("--dry-run", action="store_true", help="API를 호출하지 않고 데이터셋만 검증")
-    parser.add_argument("--gate", action="store_true", help="목표(GATE_*) 미만이면 exit 1")
+    parser.add_argument("--gate", action="store_true", help="불합격이면 exit 1")
     parser.add_argument("--limit", type=int)
     parser.add_argument("--ids", help="쉼표로 구분한 케이스 id")
     args = parser.parse_args(argv)
@@ -698,14 +702,9 @@ def main(argv: list[str] | None = None) -> int:
     metrics = aggregate(results)
     by_set = aggregate_by_set(results)
     write_results(RESULTS, metrics, results, model=client.model, by_set=by_set)
-    rates = ", ".join(f"{s} {_pct(m['exact_match_rate'])}" for s, m in by_set.items())
-    print(f"결과: {os.path.relpath(RESULTS, ROOT)} (완전 일치 {rates}, 스키마 유효율 {_pct(metrics['schema_valid_rate'])})")
-    if args.gate:
-        failures = gate_failures(metrics, by_set)
-        for f in failures:
-            print(f"게이트 미달: {f}", file=sys.stderr)
-        return 1 if failures else 0
-    return 0
+    print(f"결과: {os.path.relpath(RESULTS, ROOT)}")
+    print("\n".join(gate_report(metrics, by_set)))
+    return 1 if args.gate and gate_failures(metrics, by_set) else 0
 
 
 if __name__ == "__main__":
