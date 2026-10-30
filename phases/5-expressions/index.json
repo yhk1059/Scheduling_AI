@@ -13,7 +13,10 @@
     {
       "step": 1,
       "name": "domain-expr",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-10-30T13:20:22+0900",
+      "summary": "models.py에 식 모델(Value·ValueRef·ValueName, ForEach, Count, Cmp, All/Any, Cond=Cmp|All|Any 비재귀, Require, Balance, Rule)을 블록 옆에 더하고 ConstraintSpec에 Rule 추가(블록·칸 고정 유지); Rule은 _BlockBase 상속(priority→weight), balance 본문이면 hardness soft·priority low 기본; 모델 검증: window는 person_window 전용, offset은 day/person_day 전용·−7..+14·폭(b−a+1)≤14·a≤b, Cmp 총수≤6, All/Any 2..4, values≤5·ValueRef 모두 정의·안 쓰는 값 금지; 상수 MAX_RULE_VALUES·MAX_RULE_CMPS·MIN/MAX_COND_CMPS·MIN/MAX_OFFSET·MAX_OFFSET_SPAN; _constraint_refs/_codes가 규칙의 for_each·모든 Count(who·days·shifts)·Balance를 검사. convert.py에 block_to_rules·rules_request(설계 §2.5), expr-convert-cases.json 164케이스(모양 27 + blocks-cases 요청의 모든 블록)를 gen:golden이 쓰고 --check 비교. 테스트 test_domain_expr 50·test_convert_expr, 전체 pytest 671 통과. 결정: typing.Any를 가리지 않게 models.py는 `import typing`으로 바꿈; min_len·then_off는 offset 구조에 들어가 values에 넣지 않음(안 쓰는 값 금지 규칙과 충돌), max_len은 values지만 창 길이(k+1)는 구조라 값만 바꾸면 의미가 어긋남(step 9 카드 수정에서 주의); run에 min_len·max_len이 함께 있으면 max_len 규칙이 원 id, min_len 규칙이 -2; min_len 1은 늘 참이라 규칙을 만들지 않고 그것만 있으면 ValueError; min==max는 eq 하나로 값 이름 min(label은 명사만); day 범위 Count.who는 people이 기본값이면 None; 0·1 같은 구조 숫자(금지 순서 eq 0, when ≥1)는 리터럴; value label: 인원/휴무 일수/근무 시간/횟수에 최소·최대, 최대 연속 나이트/근무/일수, 최대 차이; default=True는 id가 cov- 접두이거나 night-only면 block_to_rules에서 붙임.",
+      "completed_at": "2026-10-30T13:25:48+0900"
     },
     {
       "step": 2,
