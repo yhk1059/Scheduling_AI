@@ -11,6 +11,7 @@ from backend.domain.models import (
     DiffCell,
     NurseStats,
     People,
+    Require,
     ScheduleRequest,
     ScheduleResult,
     Shifts,
@@ -294,12 +295,30 @@ def _preference_cells(request: ScheduleRequest, c: Any) -> list[tuple[str, int, 
     """희망·기피로 세는 칸 (nurse_id, 날짜, 근무, 희망 여부).
 
     한 사람·기간 범위·soft 세기 블록(per=person, 개수). max=0이면 기피, 아니면 희망.
+    규칙 식은 같은 모양(person 범위, when 없음, 한 사람(who.ids 또는 for_each.people.ids)의 개수를 숫자·값과 비교)을
+    센다. 0 이하·0과 같음이면 기피, 아니면 희망.
     """
-    if c.type == "count" and c.hardness == "soft" and c.scope == "period":
+    if c.hardness != "soft" or c.scope != "period":
+        return []
+    if c.type == "count":
         p = c.params
         if p.per == "person" and p.measure == "count" and p.people.ids is not None and len(p.people.ids) == 1:
             prefer = p.max != 0
             return [(p.people.ids[0], d, p.shifts, prefer) for d in select.days(request, p.days)]
+    if c.type == "rule" and isinstance(c.body, Require):
+        body = c.body
+        cmps = cond_cmps(body.then)
+        if body.for_each.per != "person" or body.when is not None:
+            return []
+        if any(isinstance(x.right, Count) or x.left.measure != "count" or x.left != cmps[0].left for x in cmps):
+            return []
+        left = cmps[0].left
+        who = left.who if left.who is not None else body.for_each.people
+        if who.ids is None or len(who.ids) != 1:
+            return []
+        prefer = not any(x.op in ("le", "eq") and evaluate.resolve(c, x.right) == 0 for x in cmps)
+        days = [d for d in select.days(request, body.for_each.days) if select.day_matches(request, left.days, d)]
+        return [(who.ids[0], d, left.shifts, prefer) for d in days]
     return []
 
 
