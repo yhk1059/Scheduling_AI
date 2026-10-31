@@ -44,7 +44,7 @@ npx tsc --noEmit
 npm run lint
 npx vitest run
 npm run build
-grep -L "node:fs" app/page.tsx
+! grep -q "node:fs" app/page.tsx
 ```
 
 ## 검증 절차
