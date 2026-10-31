@@ -25,21 +25,23 @@ test("S1. 랜딩 → 샘플 데모 → 로그인 → 매장 준비", async ({ pa
   page.on("request", onRequest);
 
   await page.goto("/");
-  await expect(page.getByRole("heading", { level: 1 })).toHaveText(/말로 설명한 규칙으로\s*근무표를 짭니다/);
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText(/말로 설명하면,\s*근무표가 나옵니다/);
   const sampleCta = page.getByRole("link", { name: "샘플로 체험하기" });
   const ownCta = page.getByRole("link", { name: "내 매장으로 시작하기" });
-  await expect(sampleCta).toHaveAttribute("href", "/demo");
-  await expect(ownCta).toHaveAttribute("href", "/app");
+  // 상단 바·첫 화면·CTA 띠에 같은 버튼이 있고 모두 같은 곳으로 간다
+  for (const link of await sampleCta.all()) await expect(link).toHaveAttribute("href", "/demo");
+  for (const link of await ownCta.all()) await expect(link).toHaveAttribute("href", "/app");
 
   // 샘플 데모: 보기 전용, 저장하지 않음
-  await sampleCta.click();
+  await sampleCta.first().click();
   await expect(page).toHaveURL(/\/demo$/);
   await expect(page.getByRole("heading", { name: "샘플 매장", level: 1 })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "매장 조건", level: 2 })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "매장 조건 7개", level: 2 })).toBeVisible();
   // 랜딩 조각도 같은 샘플 규칙을 보여 주고, 지나온 랜딩은 숨겨진 채 DOM에 남을 수 있어 main 안에서 찾는다
-  await expect(page.getByRole("main").getByText("“마감 다음 날 오픈은 안 되게”")).toBeVisible();
+  await expect(page.getByRole("main").getByText("마감 다음 날 오픈은 안 되게")).toBeVisible();
   for (const name of ["이영희", "강서연", "신도윤"]) {
-    await expect(page.getByRole("button", { name: new RegExp(`^${name} 11월 2일 [AMCO]$`) })).toBeVisible();
+    // 보기 전용이라 button이 아니다. 숨겨진 랜딩의 히어로 칸과 겹치지 않게 main 안에서 찾는다
+    await expect(page.getByRole("main").getByLabel(new RegExp(`^${name} 11월 2일 [AMCO]$`))).toBeVisible();
   }
   page.off("request", onRequest);
   expect(apiCalls, "랜딩과 데모는 API를 부르지 않는다").toEqual([]);
@@ -47,7 +49,7 @@ test("S1. 랜딩 → 샘플 데모 → 로그인 → 매장 준비", async ({ pa
   await expectNoDevTerms(page, "샘플 데모");
 
   // 로그인하지 않았으면 로그인 화면
-  await page.getByRole("link", { name: "내 매장으로 시작하기" }).click();
+  await page.getByRole("link", { name: "내 매장으로 시작하기" }).first().click();
   await expect(page.getByRole("button", { name: "Google로 로그인" })).toBeVisible();
   expect(new URL(page.url()).pathname).toBe("/app");
   await expectNoDevTerms(page, "로그인 화면");
@@ -58,7 +60,7 @@ test("S1. 랜딩 → 샘플 데모 → 로그인 → 매장 준비", async ({ pa
 
   // 이미 로그인했으니 로그인 화면 없이 들어간다
   await page.goto("/");
-  await ownCta.click();
+  await ownCta.first().click();
   await expect(setupHeading(page)).toBeVisible();
   await expect(page.getByRole("button", { name: "Google로 로그인" })).toHaveCount(0);
 });

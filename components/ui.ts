@@ -48,7 +48,6 @@ export const ui = {
   /** 배지 색. ui.badge와 함께 쓴다. */
   badgeTone: {
     applied: "bg-[#E6F2EA] text-[#1E6B3F]",
-    pending: "bg-[#FDF0DC] text-[#7A4506]",
     draft: "bg-white text-[#3D3D38] border border-[#C9C9C1]",
     confirmed: "bg-[#E6F2EA] text-[#1E6B3F]",
     operating: "bg-[#E3F0F3] text-[#155E75]",
