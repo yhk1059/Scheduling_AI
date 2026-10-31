@@ -53,7 +53,10 @@
     {
       "step": 6,
       "name": "schedule-step",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-11-01T06:36:09+0900",
+      "summary": "components/ScheduleStep.tsx·PeriodWork.tsx·RulesStep.tsx·ConstraintCard.tsx: ③을 예외 입력 패널(RulesStep scope=period가 패널 안 7fr_5fr 두 열, 카드는 compact) → 요약 지표+안내 → 근무표 → 버튼 줄 → 개인별 통계 순으로, 제목 ui.pageTitle, ① 링크 카드를 홈 모양(진행 막대)으로 바꿈. ScheduleBody에 선택 prop hint·actions·outcomeAtGrid, SummaryCard에 care, 날짜 머리 DayHead export. 배려 칸 출처: 클라이언트 history(historyLoadFor)와 result.stats의 마감 수로 historyEvidence와 같은 대상(최근 4주 평균 초과 & 이번 평균 이하)을 고른 closingCare. 결정: ShiftTable은 근무 셀을 그리지 않아(지난 근무 표는 PeriodWork의 CarryOverTable) 고치지 않고 CarryOverTable 머리만 DayHead로 맞춤, 해 없음이어도 마지막 근무표는 패널 아래 유지(칸 고정으로 풀 수 있음), 배려 칸은 대상자가 없으면 그리지 않고 2명까지, 근거 한 줄은 유지, 안내의 🔒는 UI_GUIDE 아이콘 규칙대로 SVG, 만들기 전 버튼 줄에도 [이전], 휴가 카드에 토글 대신 반드시 배지, ConfirmedPeriod는 안 고쳤지만 공유 컴포넌트로 통계 머리·날짜 머리·배려 칸이 함께 바뀜. e2e에 영향(step 10): [이번 근무표 예외 입력] 접기 버튼이 없어 입력이 항상 보임(operating.spec:139, journey.spec:482·569), '칸을 눌러 근무를 고정하면…' 문구가 '칸을 누르면 바꿀 수 있어요…'로 바뀜(journey.spec:531), 예외 설명 문구 변경, 버튼 줄이 근무표 아래로 이동, ① 링크 복사가 링크 줄이 아니라 카드 머리, ③ 첫 단계 설명 줄이 [근무표 만들기] 옆으로 이동, 해 없음 패널이 예외 패널 아래, 요약 지표 아래.",
+      "completed_at": "2026-11-01T06:42:35+0900"
     },
     {
       "step": 7,
