@@ -13,7 +13,10 @@
     {
       "step": 1,
       "name": "app-shell",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-11-01T06:06:12+0900",
+      "summary": "AppShell 상단 바(60px, 워드마크·구분선·매장 이름·주기)와 탭 줄(44px, 청록 밑줄), Account 아바타 메뉴(ui.shadow), LoginScreen 두 열, Stepper 26px. 결정: 탭 줄을 header 안에 둠, 매장 이름과 주기 사이 ' · '는 e2e·시나리오 문구에 맞춰 유지, 워드마크는 매장 준비·비로그인에서 '/' 링크(준비를 건너뛰지 않게), LoginButton이 G 아이콘을 포함, main 가로 여백 px-10, 탭·계정 버튼에 focus-visible 링 추가",
+      "completed_at": "2026-11-01T06:11:31+0900"
     },
     {
       "step": 2,
