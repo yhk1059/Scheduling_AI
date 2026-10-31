@@ -37,7 +37,10 @@
     {
       "step": 4,
       "name": "shop-home",
-      "status": "pending"
+      "status": "completed",
+      "summary": "components/ShopHome.tsx 재작성(제목 줄, 얇은 운영 중 카드, 지금 할 일 강조 패널 + 작성 중 직원 링크 카드, 지난 근무표 표 5열), lib/stats.ts closingSpread(assignments: Record<string, Code[]>, config, activeIds) → {min,max}|null. 결정: 링크·제출 현황은 store에 없어 PeriodWork와 같은 syncAvailabilityLinks를 ShopHome의 useShareStatus에서 부른다(①과 같은 쓰기 포함, 작성 중 근무표는 하나뿐이라 안전). PeriodWork는 export 추가만 허용이라 고치지 않아 LinksSection과 상태 로직이 중복되며 step 6에서 합칠 수 있다. 배정 행이 없는 직원은 closingSpread에서 빼고, 지난 근무표는 확정 snapshot의 명단으로 센다. h2는 근무표 이름만 담아 section 찾기를 유지하고, 날짜 범위는 아이브로우 옆에 둔다. 행 클릭과 [열기 →] 모두 연다. e2e에 영향: S3-a의 '확인하세요. 아직 근무표를…' 이어진 문장이 문장과 보조 줄로 나뉨 — step 10에서 고침",
+      "started_at": "2026-11-01T06:27:38+0900",
+      "completed_at": "2026-11-01T06:31:43+0900"
     },
     {
       "step": 5,
