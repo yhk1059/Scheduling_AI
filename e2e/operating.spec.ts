@@ -94,7 +94,8 @@ test("S3. 운영 중인 매장: 다음 근무표 작성과 확정", async () => 
   await expect(operating.getByRole("button", { name: "변경 입력" })).toBeVisible();
   const task = sectionWith(NOV_NAME);
   await expect(task).toContainText("2026.11.2 – 11.29");
-  await expect(task).toContainText("직원 링크를 공유하고 조건을 확인하세요. 아직 근무표를 만들지 않았어요");
+  await expect(task).toContainText("직원 링크를 공유하고 조건을 확인하세요");
+  await expect(task).toContainText("아직 근무표를 만들지 않았어요");
   await expect(primaryButtons(page)).toHaveCount(1);
   await expect(primaryButtons(page)).toHaveText("이어서 하기");
   await expect(page.getByText("확정한 근무표가 여기에 쌓여요.")).toBeVisible();
@@ -131,15 +132,12 @@ test("S3. 운영 중인 매장: 다음 근무표 작성과 확정", async () => 
   await expect(appliedCards(page)).toHaveCount(7);
   await expectNoDevTerms(page, "② 매장 조건");
 
-  // ③ 근무표: 접힌 예외 입력에 요청 3개
+  // ③ 근무표: 맨 위 예외 입력 패널에 요청 3개
   await page.getByRole("button", { name: "다음", exact: true }).click();
   await expect(stepper.locator('[aria-current="step"]')).toContainText("근무표");
   await expect(scheduleTitle(page)).toBeVisible();
   await expect(page.getByText("가능 시간과 매장 조건으로 근무표를 만들어요")).toBeVisible();
-  const exception = page.getByRole("button", { name: "이번 근무표 예외 입력" });
-  await expect(exception).toHaveAttribute("aria-expanded", "false");
-  await exception.click();
-  await expect(exception).toHaveAttribute("aria-expanded", "true");
+  await expect(page.getByRole("textbox", { name: "예외 입력" })).toBeVisible();
   await expect(pendingCards(page)).toHaveCount(0);
   await expect(appliedCards(page)).toHaveCount(3);
   for (const summary of ["이영희 · 11/10~11/12 · 휴무", "박민수 · 주말·공휴일 · 마감 피하기", "정유진 · 11/20 · 오픈 희망"]) {

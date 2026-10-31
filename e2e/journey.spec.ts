@@ -348,7 +348,7 @@ test("S8. ② 매장 조건", async () => {
   // S8-a. 요약표와 필요 인원 폼
   await expect(currentStep()).toContainText("매장 조건");
   await expect(page.getByRole("heading", { name: "매장 조건", exact: true }).first()).toBeFocused();
-  await expect(page.getByText("근무 형태, 필요 인원, 지켜야 할 규칙을 말로 적어 주세요")).toBeVisible();
+  await expect(page.getByText("근무 형태, 필요 인원, 지켜야 할 규칙 모두 한 곳에서요.")).toBeVisible();
   const summaryRow = (name: string) => page.getByRole("row").filter({ hasText: name }).first();
   await expect(summaryRow("오픈")).toContainText("09:00~15:00");
   await expect(summaryRow("미들")).toContainText("12:00~18:00");
@@ -479,9 +479,6 @@ test("S9. ③ 근무표: 예외 입력과 근무표 만들기", async () => {
   await expect(scheduleTitle(page)).toBeVisible();
   await expect(workStepper().getByRole("button", { name: /가능 시간/ })).toBeEnabled();
   await expect(workStepper().getByRole("button", { name: /매장 조건/ })).toBeEnabled();
-  const exception = page.getByRole("button", { name: "이번 근무표 예외 입력" });
-  await expect(exception).toHaveAttribute("aria-expanded", "false");
-  await exception.click();
   await expect(page.getByRole("textbox", { name: REQUEST_INPUT })).toBeVisible();
 
   const lee = await employeeId(page, "이영희");
@@ -528,7 +525,7 @@ test("S9. ③ 근무표: 예외 입력과 근무표 만들기", async () => {
   await expect(page.getByText("규칙을 모두 지켰어요", { exact: true })).toBeVisible();
   await expect(page.getByText("희망 반영", { exact: true })).toBeVisible();
   await expect(page.getByText("못 지킨 규칙", { exact: true })).toBeVisible();
-  await expect(page.getByText("칸을 눌러 근무를 고정하면 나머지를 최소한으로 바꿔 다시 만들어요.")).toBeVisible();
+  await expect(page.getByText("칸을 누르면 바꿀 수 있어요.")).toBeVisible();
   await expect(primaryButtons(page)).toHaveCount(1);
   await expect(primaryButtons(page)).toHaveText("확정");
   await expect(page.getByRole("button", { name: "다시 만들기" })).toBeVisible();
@@ -566,8 +563,6 @@ test("S9. ③ 근무표: 예외 입력과 근무표 만들기", async () => {
   expect(await solve(() => changed.getByRole("button", { name: "다시 만들기" }).click())).toBe("ok");
   await expect(changed).toHaveCount(0);
   await expect(page.getByText("규칙을 모두 지켰어요", { exact: true })).toBeVisible();
-  // 새로고침으로 접힌 예외 입력을 다시 펼쳐 둔다(S10)
-  await exception.click();
 });
 
 /** 박민수는 칠한 칸이 근무조를 완전히 덮는 칸에만 배정된다. 칸 고정한 날은 뺀다. */
