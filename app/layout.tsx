@@ -15,8 +15,8 @@ const plexMono = IBM_Plex_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "매장 직원 근무표",
-  description: "LLM + CP-SAT 매장 직원 근무표 프로토타입",
+  title: { default: "말로 · 근무표", template: "%s · 말로" },
+  description: "말로 짜는 매장 직원 근무표",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

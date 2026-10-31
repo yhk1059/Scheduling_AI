@@ -4,6 +4,9 @@ import { normalizeRule, ruleShape, type Bound } from "./rules";
 import { homeSummary, upcomingRange, type Shop, type WorkPeriod } from "./store";
 import type { Cmp, ConstraintSpec, Count, Days, Employee, People, Rule, ShiftChange, Shifts, ShopConfig } from "./types.gen";
 
+/** 제품 이름. 화면 문구에서 제품 이름을 쓸 때 이 상수를 쓴다. */
+export const PRODUCT_NAME = "말로";
+
 /** "11월 근무표"(1일에 시작하는 달력 월) / "11/2~11/15 근무표"(주 단위, 1일이 아닌 날에 시작하는 달력 월). */
 export function scheduleName(period: PeriodRange, unit: PeriodUnit): string {
   if (unit === "month" && period.start_date.endsWith("-01")) return `${monthDay(period, 1).split("/")[0]}월 근무표`;

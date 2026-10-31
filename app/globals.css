@@ -9,3 +9,10 @@ body {
   background: #f6f6f3;
   color: #1b1b18;
 }
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+  }
+}

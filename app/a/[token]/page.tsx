@@ -4,7 +4,7 @@ import { Suspense } from "react";
 import AvailabilityForm from "@/components/AvailabilityForm";
 
 export const metadata: Metadata = {
-  title: "가능 시간 입력 · 매장 직원 근무표",
+  title: "가능 시간 입력",
   robots: { index: false },
   referrer: "no-referrer",
 };
