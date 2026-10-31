@@ -285,7 +285,7 @@ function emptyShop(): Shop {
   };
 }
 
-function newPeriod(range: PeriodRange): WorkPeriod {
+export function newPeriod(range: PeriodRange): WorkPeriod {
   return {
     ...range,
     id: `p-${range.start_date}`,
