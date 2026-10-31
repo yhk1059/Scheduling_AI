@@ -36,7 +36,7 @@ import { describeRule, formatDeviation, hardnessLabel, josa, presetName } from "
 import RulesStep, { Spinner, today } from "./RulesStep";
 import { ui } from "./ui";
 
-const WEEKDAYS = ["일", "월", "화", "수", "목", "금", "토"];
+export const WEEKDAYS = ["일", "월", "화", "수", "목", "금", "토"];
 
 /** 근무표 날짜 머리 두 줄(날짜 / 요일). 토요일 청록, 일요일·공휴일 빨강. */
 export function DayHead({
@@ -262,7 +262,7 @@ export function ToastAlert({ toast, busy, onClose }: { toast: NonNullable<Toast>
 }
 
 /**
- * 근무표 본문: stale 배너, 해 없음 패널, (children), 요약 지표, 근거 한 줄, 근무표(칸 고정), (actions), 통계.
+ * 근무표 본문: stale 배너, 해 없음 패널, 요약 지표, 근거 한 줄, 근무표(칸 고정), (actions), 통계.
  * readOnly면 칸을 누를 수 없다(끝난 근무표). outcomeAtGrid면 해 없음 패널을 근무표 자리(요약 지표 아래)에 둔다.
  */
 export function ScheduleBody({
@@ -270,8 +270,9 @@ export function ScheduleBody({
   solve: sv,
   busy,
   readOnly = false,
-  children,
   hint,
+  summaryLead,
+  gridNote,
   actions,
   outcomeAtGrid = false,
 }: {
@@ -279,9 +280,12 @@ export function ScheduleBody({
   solve: Solve;
   busy: boolean;
   readOnly?: boolean;
-  children?: ReactNode;
   /** 요약 지표 오른쪽에 놓을 안내 */
   hint?: ReactNode;
+  /** 요약 지표 왼쪽에 놓을 내용(확정 근무표의 바뀐 칸 배너) */
+  summaryLead?: ReactNode;
+  /** 근무표 제목 아래, 표 위에 놓을 한 줄 */
+  gridNote?: ReactNode;
   /** 근무표와 통계 사이의 버튼 줄 */
   actions?: ReactNode;
   outcomeAtGrid?: boolean;
@@ -371,11 +375,10 @@ export function ScheduleBody({
 
       {!outcomeAtGrid && outcomePanel}
 
-      {children}
-
       {result && (
         <>
           <div className="flex items-end justify-between gap-6">
+            {summaryLead}
             <SummaryCard result={result} infeasible={outcome !== null} confirmed={isConfirmed} draft={isDraft} legacy={legacy} care={care} />
             {hint}
           </div>
@@ -400,6 +403,7 @@ export function ScheduleBody({
               />
             )}
           </div>
+          {gridNote}
           <ScheduleGrid
             config={shop.config}
             rows={rows}
@@ -560,7 +564,7 @@ export default function ScheduleStep() {
 }
 
 /** 문장 안의 자물쇠. */
-function InlineLock() {
+export function InlineLock() {
   return (
     <svg aria-label="자물쇠" role="img" viewBox="0 0 9 9" className="inline size-3 align-[-1px]" fill="none" stroke="currentColor" strokeWidth={1.2}>
       <rect x="1.5" y="4" width="6" height="4.5" rx="0.5" />
@@ -1030,7 +1034,7 @@ export function ScheduleGrid({
                     title={past ? "지난 날짜는 바꿀 수 없어요" : warn ? warn.join(", ") : undefined}
                     style={cellStyle?.(n.id, d)}
                     className={`${CELL} ${codeClass(code, isWeekend(d))} ${
-                      past ? "cursor-not-allowed" : "hover:opacity-80"
+                      past ? "cursor-not-allowed opacity-55" : "hover:opacity-80"
                     } disabled:cursor-wait ${
                       changed.has(key) ? "shadow-[inset_0_0_0_2px_#D97706]" : ""
                     } ${isSel ? "outline-2 outline-offset-1 outline-[#155E75]" : ""}`}

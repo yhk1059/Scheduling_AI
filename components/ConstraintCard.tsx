@@ -281,6 +281,7 @@ export default function ConstraintCard({
   readOnly = false,
   withConfig,
   compact = false,
+  appliedLabel = "적용됨",
 }: {
   card: ConstraintSpec;
   pending: boolean;
@@ -300,6 +301,8 @@ export default function ConstraintCard({
   withConfig?: string;
   /** 좁은 자리(③ 예외 입력 패널)의 작은 변형: 제목 14, 원문 14, 패딩 px-4 py-3.5 */
   compact?: boolean;
+  /** 적용된 카드의 배지 글자(확정 근무표의 변경 카드) */
+  appliedLabel?: string;
 }) {
   const shop = useAppStore((s) => s.shop);
   const period = useAppStore(currentPeriod);
@@ -422,7 +425,7 @@ export default function ConstraintCard({
           ) : pending ? (
             <span className={`${ui.badge} bg-[#FDF0DC] text-[#7A4506]`}>적용 대기</span>
           ) : (
-            <span className={`${ui.badge} bg-[#E6F2EA] text-[#1E6B3F]`}>적용됨</span>
+            <span className={`${ui.badge} bg-[#E6F2EA] text-[#1E6B3F]`}>{appliedLabel}</span>
           )}
           {pending && replaces && (
             <span className="text-xs font-medium text-[#66665E]" title={`“${replaces.source_text}”`}>
