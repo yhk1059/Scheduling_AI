@@ -46,7 +46,7 @@ export default function SampleDemo() {
               수 없어요.
             </p>
           </div>
-          <Link href="/app?start=new" className={ui.primary}>
+          <Link href="/app" className={ui.primary}>
             내 매장으로 시작하기
           </Link>
         </div>

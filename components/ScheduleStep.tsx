@@ -401,12 +401,14 @@ export default function ScheduleStep() {
   const busy = sv.busy || confirming;
   const { loading } = sv;
 
-  // 마지막으로 읽은 뒤 들어온 제출이 있으면 확정하지 않고 배너로 알린다. 링크를 잠근 뒤에 확정한다
+  // 마지막 생성에 쓴 가능 시간과 다르면 확정하지 않고 배너로 알린다. 링크를 잠근 뒤에 확정한다
   const onConfirm = async () => {
     setConfirming(true);
     setToast(null);
     try {
-      if (await readAvailability(periodId)) return;
+      await readAvailability(periodId);
+      const latest = useAppStore.getState().periods.find((p) => p.id === periodId);
+      if (latest && availabilityChanged(latest)) return;
       try {
         await lockAvailabilityLinks(period.start_date);
       } catch (e) {
@@ -451,7 +453,7 @@ export default function ScheduleStep() {
               {loading && <Spinner />}
               {loading ? "만드는 중…" : "다시 만들기"}
             </button>
-            <button type="button" onClick={() => void onConfirm()} disabled={busy} className={ui.primary}>
+            <button type="button" onClick={() => void onConfirm()} disabled={busy || availabilityChanged(period)} className={ui.primary}>
               확정
             </button>
           </>

@@ -29,7 +29,7 @@ from backend.domain.constants import (
 from backend.llm.client import LLMConfigError, LLMUnavailableError, ToolCallResult
 from backend.routes import app, get_llm_client
 from backend.solver.model import solve as real_solve
-from backend.tests.rules import DEN_CONFIG, DEN_SHIFTS, count, history, sample_data
+from backend.tests.rules import DEN_CONFIG, DEN_SHIFTS, cmp, cnt, con, count, history, require, sample_data
 
 client = TestClient(app)
 
@@ -533,7 +533,8 @@ def test_solve_accepts_past_day_locks_beyond_constraint_cap():
 
 
 def _avail(cid: str, nid: str, day: int, shift: str) -> dict:
-    return count(cid, {"in": [shift]}, "person", hi=0, people={"ids": [nid]}, days={"days": [day]}, scope="period")
+    body = require("person", cmp(cnt({"in": [shift]}), "eq", 0), people={"ids": [nid]}, days={"days": [day]})
+    return con(cid, body, scope="period")
 
 
 def test_solve_accepts_availability_rules_beyond_constraint_cap():
@@ -551,13 +552,21 @@ def test_solve_accepts_availability_rules_beyond_constraint_cap():
 
 def test_413_too_many_availability_rules():
     data = sample()
-    data["constraints"] = [{"id": f"{AVAILABILITY_RULE_PREFIX}{i}"} for i in range(MAX_AVAILABILITY_RULES + 1)]
+    data["constraints"] = [_avail(f"{AVAILABILITY_RULE_PREFIX}{i}", "n1", 1, "D") for i in range(MAX_AVAILABILITY_RULES + 1)]
+    assert_error(client.post("/api/py/solve", json=data), 413, "PAYLOAD_TOO_LARGE")
+
+
+def test_prefix_alone_does_not_exempt_rule_from_constraint_cap():
+    # 가능 시간 모양이 아닌 규칙은 id가 avail-로 시작해도 일반 규칙으로 센다
+    data = sample()
+    other = count("x", {"in": ["D"]}, "person", hi=3)
+    data["constraints"] = [{**other, "id": f"{AVAILABILITY_RULE_PREFIX}{i}"} for i in range(MAX_CONSTRAINTS + 1)]
     assert_error(client.post("/api/py/solve", json=data), 413, "PAYLOAD_TOO_LARGE")
 
 
 def test_constraint_cap_still_counts_other_rules_beside_availability():
     data = sample()
-    data["constraints"] = [{"id": f"r{i}"} for i in range(MAX_CONSTRAINTS + 1)] + [{"id": f"{AVAILABILITY_RULE_PREFIX}0"}]
+    data["constraints"] = [{"id": f"r{i}"} for i in range(MAX_CONSTRAINTS + 1)] + [_avail(f"{AVAILABILITY_RULE_PREFIX}0", "n1", 1, "D")]
     assert_error(client.post("/api/py/solve", json=data), 413, "PAYLOAD_TOO_LARGE")
 
 

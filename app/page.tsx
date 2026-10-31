@@ -77,7 +77,7 @@ export default function Home() {
               샘플로 체험하기
             </Link>
             <Link
-              href="/app?start=new"
+              href="/app"
               className="inline-flex h-11 items-center gap-2 rounded-md border border-[#C9C9C1] bg-white px-[18px] text-[15px] font-medium text-[#1B1B18] transition-colors duration-[120ms] hover:bg-[#EFEFEB]"
             >
               내 매장으로 시작하기

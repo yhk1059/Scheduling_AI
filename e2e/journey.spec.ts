@@ -523,6 +523,7 @@ test("S9. ③ 근무표: 예외 입력과 근무표 만들기", async () => {
   await expect(scheduleTitle(page)).toBeVisible();
   const changed = page.getByRole("status").filter({ hasText: "가능 시간이 바뀌었어요. 다시 만들어 주세요" });
   await expect(changed).toBeVisible();
+  await expect(page.getByRole("button", { name: "확정", exact: true }), "다시 만들기 전에는 확정할 수 없다").toBeDisabled();
   await expect(page.getByText("입력이 바뀌었어요. 다시 만들어 주세요"), "새로고침만으로 입력 변경 배너가 뜨지 않는다").toHaveCount(0);
   expect(await solve(() => changed.getByRole("button", { name: "다시 만들기" }).click())).toBe("ok");
   await expect(changed).toHaveCount(0);
