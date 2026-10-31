@@ -1003,7 +1003,6 @@ export function ScheduleGrid({
         {teams.map(({ code }, i) => (
           <div key={code} className={`${rowClass} ${i === 0 ? "mt-1.5 border-t border-[#EFEFEB] pt-1.5" : ""}`} style={grid}>
             <span className="flex h-7 items-center text-xs font-medium text-[#66665E]">{code} 합계</span>
-            <span />
             {dayList.map((d) => (
               <span key={d} className={`${total} rounded-xs ${weekendBg(d)}`}>
                 {rows.filter((n) => covers(result.assignments[n.id][d - 1], code)).length}
