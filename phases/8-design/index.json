@@ -77,7 +77,10 @@
     {
       "step": 9,
       "name": "settings-setup",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-11-01T06:49:51+0900",
+      "summary": "ShopSetup·ShopSettings·CoverageForm·ShiftTable·Dialog·HolidayCalendar를 새 토큰으로(pageTitle, sectionTitle, primaryLg, cardXl+shadow, 태그 칩 rounded-full h-7, 필요 인원 칸 ui.cell, 공휴일 선택 #155E75, 오늘 테두리). 결정: 설정 탭은 e2e·시나리오의 tab 역할을 지키려 role=tab·aria-selected를 두고 aria-current를 더함, ui.input의 테두리·placeholder를 UI_GUIDE 값(#8A8A80, #707068)으로 고쳐 Account·ConstraintCard·PeriodWork 입력에도 함께 적용됨, 공휴일 달력은 요일 머리와 주말 색까지 무채색, 오늘 테두리는 #1B1B18 + aria-current=date(기간 밖 날짜에도 표시), 행 끝 메뉴에 ui.shadow, CoverageSection 제목이 sectionTitle이라 근무표 작성 ②의 펼친 폼에도 적용됨. 수동 저니는 테스트 계정 임시 spec과 스크린샷으로 확인 후 삭제. e2e 영향 없음(접근성 이름·역할 유지).",
+      "completed_at": "2026-11-01T06:52:18+0900"
     },
     {
       "step": 10,
