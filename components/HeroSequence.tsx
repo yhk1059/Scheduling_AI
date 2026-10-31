@@ -1,13 +1,14 @@
 "use client";
 
 // 랜딩 첫 화면의 시퀀스(말 한 줄 → 규칙 카드 → 근무표)와 랜딩 조각. 앱의 그리드 컴포넌트를 샘플 데이터로 정적 렌더한다(조작 불가).
-import { useState } from "react";
+import { type ReactNode, useState } from "react";
 
 import { isWeekendDay } from "@/lib/period";
 import demo from "@/lib/samples/demo-schedule.json";
 import shop from "@/lib/samples/shop-12.json";
 import type { Code } from "@/lib/store";
 import type { Employee, ScheduleResult } from "@/lib/types.gen";
+import { hardnessLabel } from "@/lib/wording";
 
 import { CELL, codeClass, ScheduleGrid } from "./ScheduleStep";
 import { ui } from "./ui";
@@ -36,13 +37,27 @@ const cellDelay = (employeeId: string, day: number) => ({
   animationDelay: `${2.6 + EMPLOYEES.findIndex((n) => n.id === employeeId) * 0.42 + (day - 1) * 0.06}s`,
 });
 
-/** 답장 모양의 정적 규칙 카드(랜딩 전용, UI_GUIDE "규칙·요청 카드"의 작은 자리 크기). */
-export function ReplyCard({ title, quote, reading, className = "" }: { title: string; quote: string; reading: string; className?: string }) {
+/** 답장 모양의 정적 규칙 카드(랜딩·샘플 데모, UI_GUIDE "규칙·요청 카드"의 작은 자리 크기). */
+export function ReplyCard({
+  title,
+  quote,
+  reading,
+  hardness = "hard",
+  className = "",
+}: {
+  title: string;
+  quote: string;
+  reading: ReactNode;
+  hardness?: "hard" | "soft";
+  className?: string;
+}) {
   return (
     <article className={`flex flex-col gap-2.5 rounded-lg border border-[#E2E2DC] bg-white px-4 py-3.5 ${className}`}>
       <div className="flex items-center justify-between gap-3">
         <h3 className="text-sm font-semibold text-[#1B1B18]">{title}</h3>
-        <span className={`${ui.badge} bg-[#1B1B18] text-white`}>반드시</span>
+        <span className={`${ui.badge} ${hardness === "hard" ? "bg-[#1B1B18] text-white" : "border border-[#C9C9C1] bg-white text-[#3D3D38]"}`}>
+          {hardnessLabel(hardness)}
+        </span>
       </div>
       <p className="flex items-start gap-1.5 text-sm text-[#1B1B18]">
         <span aria-hidden="true" className="text-[20px] leading-5 text-[#155E75]">
