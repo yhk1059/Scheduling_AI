@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 export const metadata: Metadata = {
-  title: "개인정보처리방침 · 매장 직원 근무표",
+  title: "개인정보처리방침",
 };
 
 const EFFECTIVE_DATE = "2026-10-28";

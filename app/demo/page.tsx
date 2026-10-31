@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import SampleDemo from "@/components/SampleDemo";
 
 export const metadata: Metadata = {
-  title: "샘플 데모 · 매장 직원 근무표",
+  title: "샘플 데모",
 };
 
 export default function DemoPage() {
