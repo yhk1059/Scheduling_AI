@@ -29,7 +29,10 @@
     {
       "step": 3,
       "name": "sample-demo",
-      "status": "pending"
+      "status": "completed",
+      "summary": "components/SampleDemo.tsx 재작성(상단 바 → 제목 → 요약 지표 → 28일 근무표 → 규칙 카드 7장 + 필요 인원 표 → 하단 CTA). 결정: 근무표는 inert 대신 readOnly(inert면 1280px에서 표 상자를 가로 스크롤할 수 없음), 요약 지표는 칸이 달라 직접 그림, ReplyCard에 선택 prop hardness 추가·reading을 ReactNode로 넓힘(밑줄 값과 가능하면 배지), 필요 인원 표는 lib/store를 import하지 않으려 샘플의 cov-* 값을 직접 읽음, ScheduleGrid 합계 행의 빈 <span /> 제거(합계 한 칸 밀림 수정, 히어로·앱에도 적용). e2e에 영향: S1의 /demo 근무 칸이 button이 아니라 aria-label 있는 div, 원문이 “…” 따옴표 문자 없이 글리프 + 글자, 제목이 '매장 조건 7개', [내 매장으로 시작하기] 링크 2개(strict 위반) — step 10에서 고침",
+      "started_at": "2026-11-01T06:24:29+0900",
+      "completed_at": "2026-11-01T06:27:31+0900"
     },
     {
       "step": 4,
