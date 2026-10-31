@@ -21,8 +21,10 @@
     {
       "step": 2,
       "name": "landing",
-      "status": "pending",
-      "summary": "components/HeroSequence.tsx(LandingPreview 대체, ReplyCard·ChangeFragment도 export), app/page.tsx 랜딩 전체 재작성, ScheduleGrid에 선택 prop cellStyle·totalCodes 추가, 시퀀스는 globals.css @keyframes + 칸별 animationDelay(기본 스타일이 끝 상태, reduced-motion은 animation:none). 결정: PreviewCard는 유일한 사용처인 SampleDemo로 옮김, 마감 합계 행만 그리려 totalCodes 추가, [다시 보기]는 inert 영역만 재마운트해 포커스 유지, 합계 숫자는 칸이 찬 뒤 5s에 나타남. 남은 일: ScheduleGrid 합계 행의 빈 <span />로 합계가 한 칸 밀림(기존 버그, 히어로·앱 모두, 이 step 금지 범위라 안 고침), e2e S1의 옛 h1 문구와 CTA 중복 strict 위반은 step 10에서 고침"
+      "status": "completed",
+      "summary": "components/HeroSequence.tsx(LandingPreview 대체, ReplyCard·ChangeFragment도 export), app/page.tsx 랜딩 전체 재작성, ScheduleGrid에 선택 prop cellStyle·totalCodes 추가, 시퀀스는 globals.css @keyframes + 칸별 animationDelay(기본 스타일이 끝 상태, reduced-motion은 animation:none). 결정: PreviewCard는 유일한 사용처인 SampleDemo로 옮김, 마감 합계 행만 그리려 totalCodes 추가, [다시 보기]는 inert 영역만 재마운트해 포커스 유지, 합계 숫자는 칸이 찬 뒤 5s에 나타남. 남은 일: ScheduleGrid 합계 행의 빈 <span />로 합계가 한 칸 밀림(기존 버그, 히어로·앱 모두, 이 step 금지 범위라 안 고침), e2e S1의 옛 h1 문구와 CTA 중복 strict 위반은 step 10에서 고침",
+      "started_at": "2026-11-01T06:22:32+0900",
+      "completed_at": "2026-11-01T06:24:22+0900"
     },
     {
       "step": 3,
