@@ -2,16 +2,64 @@
   "project": "shop-scheduler",
   "phase": "8-design",
   "steps": [
-    { "step": 0, "name": "design-tokens", "status": "pending" },
-    { "step": 1, "name": "app-shell", "status": "pending" },
-    { "step": 2, "name": "landing", "status": "pending" },
-    { "step": 3, "name": "sample-demo", "status": "pending" },
-    { "step": 4, "name": "shop-home", "status": "pending" },
-    { "step": 5, "name": "rule-cards", "status": "pending" },
-    { "step": 6, "name": "schedule-step", "status": "pending" },
-    { "step": 7, "name": "confirmed-period", "status": "pending" },
-    { "step": 8, "name": "availability-form", "status": "pending" },
-    { "step": 9, "name": "settings-setup", "status": "pending" },
-    { "step": 10, "name": "e2e-docs", "status": "pending" }
-  ]
+    {
+      "step": 0,
+      "name": "design-tokens",
+      "status": "completed",
+      "started_at": "2026-11-01T06:03:50+0900",
+      "summary": "components/ui.ts에 primaryLg·secondaryLg·primaryXl·secondaryXl·primaryBar·chip·panel·bar·barInput·cardXl·shadow·pageTitle·sectionTitle·eyebrow·bigNumber·badgeTone(applied·pending·draft·confirmed·operating·none·excluded·base) 추가, components/Wordmark.tsx(Mark({size,tone?:accent|inverse|muted}), default Wordmark({size:bar|hero|small,href?,tone?:accent|inverse})), layout title template, reduced-motion 규칙, lib/wording.ts PRODUCT_NAME. 결정: Wordmark 링크는 next/link(<a>로 렌더), applied·base 배지 색은 기존 화면 값(#E6F2EA, #EFEFEB), template과 겹치지 않게 demo·privacy·a/[token]의 title에서 옛 제품 이름을 뺌.",
+      "completed_at": "2026-11-01T06:06:05+0900"
+    },
+    {
+      "step": 1,
+      "name": "app-shell",
+      "status": "pending"
+    },
+    {
+      "step": 2,
+      "name": "landing",
+      "status": "pending"
+    },
+    {
+      "step": 3,
+      "name": "sample-demo",
+      "status": "pending"
+    },
+    {
+      "step": 4,
+      "name": "shop-home",
+      "status": "pending"
+    },
+    {
+      "step": 5,
+      "name": "rule-cards",
+      "status": "pending"
+    },
+    {
+      "step": 6,
+      "name": "schedule-step",
+      "status": "pending"
+    },
+    {
+      "step": 7,
+      "name": "confirmed-period",
+      "status": "pending"
+    },
+    {
+      "step": 8,
+      "name": "availability-form",
+      "status": "pending"
+    },
+    {
+      "step": 9,
+      "name": "settings-setup",
+      "status": "pending"
+    },
+    {
+      "step": 10,
+      "name": "e2e-docs",
+      "status": "pending"
+    }
+  ],
+  "created_at": "2026-11-01T06:03:50+0900"
 }
