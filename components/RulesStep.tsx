@@ -16,6 +16,7 @@ import type { ConstraintSpec } from "@/lib/types.gen";
 
 import ConstraintCard, { ShiftChangeCardView } from "./ConstraintCard";
 import { ui } from "./ui";
+import { Mark } from "./Wordmark";
 
 const MAX_TEXT_CHARS = 1000; // backend/domain/constants.py MAX_TEXT_CHARS
 
@@ -23,7 +24,8 @@ const COPY = {
   shop: {
     title: "매장 조건",
     noun: "규칙",
-    description: "근무 형태, 필요 인원, 지켜야 할 규칙을 말로 적어 주세요",
+    prompt: "매장 조건을 말로 적어 주세요",
+    description: "근무 형태, 필요 인원, 지켜야 할 규칙 모두 한 곳에서요.",
     placeholder: "예: 마감 다음 날 오픈은 안 되게",
     submit: "규칙 만들기",
     empty: "아직 규칙이 없어요.",
@@ -32,6 +34,7 @@ const COPY = {
   period: {
     title: "예외",
     noun: "요청",
+    prompt: "이번 근무표에만 적용할 예외가 있나요?",
     description: "이번 근무표에만 적용할 휴가, 고정 근무, 희망·기피 근무를 말로 적어 주세요. 가능 시간에 이미 있는 내용은 다시 적지 않아도 돼요.",
     placeholder: "예: 이영희 15~17일 휴가",
     submit: "요청 만들기",
@@ -195,43 +198,47 @@ export default function RulesStep({
   return (
     <div className="flex flex-col gap-5">
       {/* 매장 설정의 탭 안과 예외 입력에는 페이지 제목을 두지 않는다 */}
-      <div className="flex flex-col gap-1">
-        {step && (
-          <h2 tabIndex={-1} data-step-title className={`${ui.cardTitle} outline-none`}>
-            {copy.title}
-          </h2>
-        )}
-        <p className="text-sm leading-relaxed text-[#3D3D38]">{copy.description}</p>
-      </div>
+      {step && (
+        <h2 tabIndex={-1} data-step-title className={`${ui.cardTitle} outline-none`}>
+          {copy.title}
+        </h2>
+      )}
 
       {summary}
 
-      <section className={`${ui.card} flex flex-col gap-2.5`}>
+      <section className={`${ui.panel} flex flex-col gap-3`}>
+        <div className="flex flex-col gap-1">
+          <p className={ui.cardTitle}>{copy.prompt}</p>
+          <p className="text-[13px] text-[#3D3D38]">{copy.description}</p>
+        </div>
         <form
-          className="flex gap-2"
+          className={`${ui.bar} ${tooLong ? "border-[#B42318]!" : ""}`}
           onSubmit={(e) => {
             e.preventDefault();
             if (!loading && !tooLong && text.trim() !== "") void run(text.trim());
           }}
         >
-          <input
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-            placeholder={copy.placeholder}
-            aria-label={`${copy.title} 입력`}
-            aria-invalid={tooLong || undefined}
-            className={`${ui.input} flex-1 ${tooLong ? "border-[#B42318]" : ""}`}
-          />
-          <button type="submit" disabled={loading || tooLong || text.trim() === ""} className={ui.primary}>
+          <Mark size={18} />
+          <label className="flex min-w-0 flex-1">
+            <span className="sr-only">{copy.title} 입력</span>
+            <input
+              value={text}
+              onChange={(e) => setText(e.target.value)}
+              placeholder={copy.placeholder}
+              aria-invalid={tooLong || undefined}
+              className={ui.barInput}
+            />
+          </label>
+          <button type="submit" disabled={loading || tooLong || text.trim() === ""} className={ui.primaryBar}>
             {loading && <Spinner />}
             {loading ? "읽는 중…" : copy.submit}
           </button>
         </form>
         {copy.examples.length > 0 && (
-          <div className="flex flex-wrap items-center gap-1">
+          <div className="flex flex-wrap items-center gap-1.5">
             <span className={ui.help}>예시</span>
             {copy.examples.map((ex) => (
-              <button key={ex} type="button" onClick={() => setText(ex)} className={ui.textSm}>
+              <button key={ex} type="button" onClick={() => setText(ex)} className={ui.chip}>
                 {ex}
               </button>
             ))}

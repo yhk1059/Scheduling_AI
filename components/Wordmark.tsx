@@ -7,16 +7,25 @@ const MARK_COLORS = {
   muted: { bg: "#66665E", fg: "#FFFFFF" },
 };
 
+const QUOTE_PATH =
+  "M10.5 7.5c-2.6.6-4 2.5-4 5v4H11v-4.5H9c0-1 .5-1.7 1.5-2V7.5zM17.5 7.5c-2.6.6-4 2.5-4 5v4H18v-4.5h-2c0-1 .5-1.7 1.5-2V7.5z";
+
 /** 여는 따옴표 마크. */
 export function Mark({ size, tone = "accent" }: { size: number; tone?: "accent" | "inverse" | "muted" }) {
   const { bg, fg } = MARK_COLORS[tone];
   return (
     <svg aria-hidden="true" viewBox="0 0 24 24" width={size} height={size} className="shrink-0">
       <rect width="24" height="24" rx="6" fill={bg} />
-      <path
-        fill={fg}
-        d="M10.5 7.5c-2.6.6-4 2.5-4 5v4H11v-4.5H9c0-1 .5-1.7 1.5-2V7.5zM17.5 7.5c-2.6.6-4 2.5-4 5v4H18v-4.5h-2c0-1 .5-1.7 1.5-2V7.5z"
-      />
+      <path fill={fg} d={QUOTE_PATH} />
+    </svg>
+  );
+}
+
+/** 사각형 없는 따옴표 글리프(규칙·요청 카드의 원문 앞). */
+export function QuoteGlyph({ size }: { size: number }) {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 24 24" width={size} height={size} className="shrink-0">
+      <path fill="#155E75" d={QUOTE_PATH} />
     </svg>
   );
 }
