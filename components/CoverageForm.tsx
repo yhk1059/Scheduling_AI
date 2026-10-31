@@ -83,7 +83,7 @@ export default function CoverageForm({
           <tr>
             <th />
             {DAY_KINDS.map(({ kind, label }) => (
-              <th key={kind} className="px-2 pb-1 text-left text-xs font-medium text-[#3D3D38]">
+              <th key={kind} className={`${ui.label} px-2 pb-1 text-left`}>
                 {label}
               </th>
             ))}
@@ -109,7 +109,7 @@ export default function CoverageForm({
                       onChange={(e) => change(shift, kind, side, e.target.value.trim())}
                       aria-label={`${kindLabel} ${label} ${side === "min" ? "최소" : "최대"} 인원`}
                       aria-invalid={bad || undefined}
-                      className={`${ui.input} w-14 font-mono ${bad ? "border-[#B42318] text-[#9F1F14]" : ""}`}
+                      className={`${ui.cell} w-14 font-mono ${bad ? ui.cellErr : ui.cellOk}`}
                     />
                   );
                 };

@@ -57,7 +57,7 @@ export const ui = {
     base: "bg-[#EFEFEB] text-[#3D3D38]",
   },
   input:
-    "h-10 rounded-md bg-white border border-[#C9C9C1] px-3 text-sm text-[#1B1B18] placeholder:text-[#8A8A80] focus:outline-2 focus:outline-[#155E75] focus:-outline-offset-1 focus:border-[#155E75]",
+    "h-10 rounded-md bg-white border border-[#8A8A80] px-3 text-sm text-[#1B1B18] placeholder:text-[#707068] focus:outline-2 focus:outline-[#155E75] focus:-outline-offset-1 focus:border-[#155E75]",
   /** 표 안 입력 칸(명단·근무 형태). 테두리 색은 상태에 따라 붙인다. */
   cell: "h-8 rounded-md border bg-white px-2 text-[13px] text-[#1B1B18] focus:outline-2 focus:outline-[#155E75] focus:-outline-offset-1",
   cellOk: "border-[#8A8A80]",
