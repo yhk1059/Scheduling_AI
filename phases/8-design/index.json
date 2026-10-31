@@ -85,7 +85,10 @@
     {
       "step": 10,
       "name": "e2e-docs",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-11-01T06:52:25+0900",
+      "summary": "e2e 19개 전부 통과. 고친 것: entry.spec(S1 제목, 같은 이름 링크 여럿, 데모 h2 '매장 조건 7개', 따옴표 없는 원문, 데모 칸은 main 안 div), operating.spec(S3 홈 문장 두 줄, 접기 버튼 없는 예외 패널), journey.spec(S8 설명 문구, S9 예외 패널·칸 고정 안내), test-helpers는 수정 없음. 앱 수정 없음(접근성 위반으로 못 찾는 경우 없음). ui 키는 badgeTone.pending만 지움(나머지 최상위 키는 모두 사용 중). BROWSER_TEST_SCENARIOS를 새 화면대로 갱신, README 맨 위에 '말로' 소개와 옛 내용 안내를 두고 Eval 절 제목을 '번역 정확도 측정 방법 (Eval)'로 바꿈. 결정: S1·S2·S9·S14 따라가기는 갱신한 spec 실행으로 갈음(손으로 따로 하지 않음), 화면과 UI_GUIDE 문구가 다른 곳(홈 상태 문장, ② 입력 설명, ③ 안내)은 금지사항대로 화면을 기준으로 spec·시나리오만 고침. 남은 문제: README 본문과 Eval 수치·랜딩 번역 정확도 자리표시가 간호사 시절 그대로, UI_GUIDE 문구 3곳이 실제 화면과 다름, 실패한 e2e가 남긴 playwright-report·test-results를 eslint가 읽어 lint가 실패함(eslint 무시 목록에 없음), 직원 화면 '매장 근무조' 카드 없음(step 8)",
+      "completed_at": "2026-11-01T07:01:58+0900"
     }
   ],
   "created_at": "2026-11-01T06:03:50+0900"
