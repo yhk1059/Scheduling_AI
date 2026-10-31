@@ -61,7 +61,10 @@
     {
       "step": 7,
       "name": "confirmed-period",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-11-01T06:42:42+0900",
+      "summary": "components/ConfirmedPeriod.tsx 재작성(제목 ui.pageTitle + '마지막 확정 … · 직원 링크는 잠겼어요', 변경 입력 패널 7fr_5fr, 바뀐 칸 배너 + SummaryCard 한 줄, 표 위 오늘 안내, 버튼 줄, 확정 기록, 통계). 확정 기록 출처: period.versions(최신 위, 첫 버전은 '처음 확정', 나머지는 changed.length). ScheduleBody에 선택 prop summaryLead·gridNote, ConstraintCard에 appliedLabel, 지난 날짜 칸 opacity-55. 결정: 변경 카드는 changeIds + cardsInOrder로 적용 뒤에도 [다시 확정]·[변경 취소]까지 패널에 readOnly로 남긴다(수정·삭제 경로를 새로 만들지 않음), 배지 '적용됨 · 다시 만들었어요'는 다시 만들기가 성공했을 때만이고 진행 중·근무표 없음·오류면 '적용됨', 시각은 ShopHome shortTime(M/D HH:MM)을 export해 쓰고 안 쓰이게 된 confirmedTime·formatTime과 ScheduleBody children을 지움, 빈 카드 자리에 '아직 변경이 없어요.', '만드는 중…' 표시는 제목 줄 오른쪽. 수동 저니는 D3 + 실제 LLM 임시 spec으로 확인 후 삭제(포커스, 2명 2칸 배너, 변경 취소, 다시 확정 후 기록 2행, 끝난 근무표 CSV만, Primary 하나). e2e 영향(step 10): 마지막 확정이 항상 날짜 포함(BROWSER_TEST_SCENARIOS S12의 HH:MM), 바뀐 칸 문구 끝이 '아직 다시 확정하지 않았어요.', [다시 확정]·[변경 취소]·[CSV 받기]가 제목 줄에서 근무표 아래로 이동, 변경 카드가 적용 뒤에도 남아 appliedCards 수가 늘 수 있음.",
+      "completed_at": "2026-11-01T06:46:13+0900"
     },
     {
       "step": 8,
