@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { DEN_CONFIG } from "./test-rules";
-import { statsFromAssignments } from "./stats";
+import { closingSpread, statsFromAssignments } from "./stats";
 import type { ShopConfig } from "./types.gen";
 
 // 2026-11-01 일요일. 7일: 일 월 화 수 목 금 토
@@ -41,5 +41,33 @@ describe("statsFromAssignments", () => {
     const stats = statsFromAssignments({ a: row("DOOOOOO"), b: row("OOOOOOO"), c: row("OOOOOOO") }, DEN_CONFIG, WEEK, []);
     expect(stats.a.deviation).toBe(0.67);
     expect(stats.b.deviation).toBe(-0.33);
+  });
+});
+
+describe("closingSpread", () => {
+  const SHOP: ShopConfig = {
+    shifts: [
+      { code: "A", name: "오픈", hours: 6 },
+      { code: "C", name: "마감", hours: 6 },
+      { code: "O", name: "휴무", hours: 0 },
+      { code: "AC", name: "더블", hours: 12, parts: ["A", "C"] },
+      { code: "AM", name: "오픈미들", hours: 12, parts: ["A", "M"] },
+    ],
+  } as ShopConfig;
+
+  it("직원마다 마감 수의 가장 적음과 가장 많음을 센다", () => {
+    expect(closingSpread({ a: ["C", "C", "O"], b: ["A", "C", "O"], c: ["A", "A", "O"] }, SHOP, ["a", "b", "c"])).toEqual({ min: 0, max: 2 });
+  });
+
+  it("복합 코드는 마감을 셀 때만 더한다", () => {
+    expect(closingSpread({ a: ["AC", "C"], b: ["AM", "AC"] }, SHOP, ["a", "b"])).toEqual({ min: 1, max: 2 });
+  });
+
+  it("활성 직원만 센다. 배정 행이 없는 직원은 뺀다", () => {
+    expect(closingSpread({ a: ["C", "C"], gone: ["O", "O"] }, SHOP, ["a", "new"])).toEqual({ min: 2, max: 2 });
+  });
+
+  it("활성 직원이 없으면 null", () => {
+    expect(closingSpread({ a: ["C"] }, SHOP, [])).toBeNull();
   });
 });
