@@ -4,6 +4,21 @@ import { isWeekendDay, type PeriodRange } from "./period";
 import type { EmployeeStats, ScheduleResult, ShopConfig } from "./types.gen";
 
 const OFF = "O";
+const CLOSING = "C";
+
+/** 직원별 마감 수의 가장 적음과 가장 많음. 복합 코드는 parts로 센다. 셀 직원이 없으면 null. */
+export function closingSpread(
+  assignments: Record<string, string[]>,
+  config: ShopConfig,
+  activeIds: string[],
+): { min: number; max: number } | null {
+  const closing = new Set(config.shifts.filter((s) => s.parts?.includes(CLOSING)).map((s) => s.code));
+  closing.add(CLOSING);
+  const counts = activeIds
+    .filter((id) => id in assignments)
+    .map((id) => assignments[id].filter((code) => closing.has(code)).length);
+  return counts.length === 0 ? null : { min: Math.min(...counts), max: Math.max(...counts) };
+}
 
 export function statsFromAssignments(
   assignments: ScheduleResult["assignments"],
