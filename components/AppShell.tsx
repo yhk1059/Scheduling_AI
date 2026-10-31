@@ -1,16 +1,18 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 
 import { useAppStore } from "@/lib/store";
 import { onAuthChange, supabaseConfigured } from "@/lib/supabase";
-import { unitShort } from "@/lib/wording";
+import { PRODUCT_NAME, unitShort } from "@/lib/wording";
 
 import { AccountBar } from "./Account";
 import ConfirmedPeriod from "./ConfirmedPeriod";
 import PeriodWork from "./PeriodWork";
 import LoginScreen from "./LoginScreen";
 import { ui } from "./ui";
+import Wordmark from "./Wordmark";
 import ShopHome from "./ShopHome";
 import ShopSettings from "./ShopSettings";
 import ShopSetup from "./ShopSetup";
@@ -29,6 +31,7 @@ export default function AppShell() {
   const [authChecked, setAuthChecked] = useState(!supabaseConfigured);
   const loading = !authChecked || (auth !== null && syncStatus === "loading");
   const started = auth !== null && shop !== null && !loading;
+  const loginScreen = !loading && auth === null;
 
   useEffect(() => {
     if (!supabaseConfigured) return;
@@ -54,37 +57,61 @@ export default function AppShell() {
   return (
     <div className="flex flex-1 flex-col">
       <header className="border-b border-[#E2E2DC] bg-white">
-        <div className="mx-auto flex h-14 max-w-[1360px] items-center justify-between px-8">
-          <div className="flex items-baseline gap-3">
-            <span className="text-[15px] font-semibold text-[#1B1B18]">매장 직원 근무표</span>
+        <div className="mx-auto flex h-[60px] max-w-[1360px] items-center justify-between px-10">
+          <div className="flex items-center gap-3">
+            {/* 매장 준비를 건너뛰지 않게 그 화면에서는 앱 홈으로 보내지 않는다 */}
+            {started && view.screen !== "setup" ? (
+              <button
+                type="button"
+                aria-label={`${PRODUCT_NAME} 홈`}
+                onClick={() => go({ screen: "home" })}
+                className="inline-flex rounded-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#155E75]"
+              >
+                <Wordmark size="bar" />
+              </button>
+            ) : (
+              <Wordmark size="bar" href="/" />
+            )}
             {started && (
-              <span className="text-xs font-medium text-[#66665E]">
-                {shop.name || "이름 없는 매장"} · {unitShort(shop.unit)}
-              </span>
+              <>
+                <span aria-hidden="true" className="h-5 w-px bg-[#E2E2DC]" />
+                <span className="text-sm font-medium text-[#1B1B18]">
+                  {shop.name || "이름 없는 매장"}
+                  <span className="text-[13px] font-normal text-[#66665E]"> · {unitShort(shop.unit)}</span>
+                </span>
+              </>
             )}
           </div>
-          <AccountBar />
+          {loginScreen ? (
+            <Link href="/demo" className={ui.text}>
+              샘플로 체험하기
+            </Link>
+          ) : (
+            <AccountBar />
+          )}
         </div>
-      </header>
-      {started && view.screen !== "setup" && (
-        <nav className="border-b border-[#E2E2DC] bg-white">
-          <div className="mx-auto flex max-w-[1360px] gap-1 px-6">
+        {started && view.screen !== "setup" && (
+          <nav className="mx-auto flex h-11 max-w-[1360px] px-10">
             {tabs.map((t) => (
               <button
                 key={t.label}
                 type="button"
                 onClick={t.onClick}
                 aria-current={t.current ? "page" : undefined}
-                className={`${ui.text} ${t.current ? "font-semibold text-[#1B1B18]" : ""}`}
+                className={`mr-5 h-11 border-b-2 px-1 text-sm transition-colors duration-[120ms] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#155E75] ${
+                  t.current
+                    ? "border-[#155E75] font-semibold text-[#1B1B18]"
+                    : "border-transparent font-medium text-[#3D3D38] hover:text-[#1B1B18]"
+                }`}
               >
                 {t.label}
               </button>
             ))}
-          </div>
-        </nav>
-      )}
+          </nav>
+        )}
+      </header>
 
-      <main className="mx-auto flex w-full max-w-[1360px] flex-col gap-5 px-8 py-6">
+      <main className="mx-auto flex w-full max-w-[1360px] flex-col gap-5 px-10 py-6">
         {!storageAvailable && (
           <p role="status" className={ui.banner}>
             이 브라우저에서는 저장소를 쓸 수 없어요. 저장에 실패하면 입력이 사라질 수 있어요.

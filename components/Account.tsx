@@ -39,8 +39,11 @@ export function PrivacyLink({ className = ui.text }: { className?: string }) {
 export function LoginButton({ className = ui.secondary }: { className?: string }) {
   const { busy, error, login, label } = useGoogleLogin();
   return (
-    <span className="inline-flex flex-col gap-1">
+    <span className="flex flex-col gap-1">
       <button type="button" onClick={login} disabled={busy} className={className}>
+        <svg aria-hidden="true" viewBox="0 0 24 24" className="size-4" fill="currentColor">
+          <path d="M21.6 10.2H12v3.9h5.5c-.5 2.6-2.7 4.1-5.5 4.1a6.2 6.2 0 1 1 4-10.9l2.9-2.9A10.2 10.2 0 1 0 12 22.2c5.1 0 9.8-3.7 9.8-10.2 0-.6-.1-1.2-.2-1.8z" />
+        </svg>
         {label}
       </button>
       {error && (
@@ -196,8 +199,7 @@ export function AccountBar() {
   return (
     <div className="flex items-center gap-3 text-xs text-[#66665E]">
       <span role="status">{status}</span>
-      <div ref={menuRef} className="relative flex items-center gap-1">
-        <span className="text-xs text-[#3D3D38]">{auth.email}</span>
+      <div ref={menuRef} className="relative flex items-center">
         <button
           ref={menuButtonRef}
           type="button"
@@ -205,8 +207,15 @@ export function AccountBar() {
           aria-haspopup="menu"
           aria-expanded={menuOpen}
           onClick={() => setMenuOpen((o) => !o)}
-          className={ui.textSm}
+          className="inline-flex h-8 items-center gap-2 rounded-md px-1.5 text-xs text-[#3D3D38] transition-colors duration-[120ms] hover:bg-[#EFEFEB] active:bg-[#E2E2DC] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#155E75]"
         >
+          <span
+            aria-hidden="true"
+            className="flex size-6 items-center justify-center rounded-full bg-[#E3F0F3] text-xs font-semibold text-[#155E75]"
+          >
+            {auth.email?.charAt(0).toUpperCase()}
+          </span>
+          {auth.email}
           <svg aria-hidden="true" viewBox="0 0 12 12" className="size-3" fill="none" stroke="currentColor" strokeWidth={1.6}>
             <path d="M2.5 4.5 6 8l3.5-3.5" />
           </svg>
@@ -214,7 +223,7 @@ export function AccountBar() {
         {menuOpen && (
           <div
             role="menu"
-            className="absolute top-full right-0 z-10 mt-1 flex min-w-[180px] flex-col rounded-lg border border-[#E2E2DC] bg-white p-1"
+            className={`absolute top-full right-0 z-10 mt-1 flex min-w-[180px] flex-col rounded-lg border border-[#E2E2DC] bg-white p-1 ${ui.shadow}`}
           >
             <button type="button" role="menuitem" onClick={() => void logout()} className={`${ui.textSm} justify-start`}>
               로그아웃
