@@ -4,9 +4,10 @@ import { useEffect, useRef, useState } from "react";
 
 import { translate } from "@/lib/api";
 import { isOperating } from "@/lib/continuity";
-import { formatRange, periodEnd } from "@/lib/period";
+import { formatRange, periodDays, periodEnd } from "@/lib/period";
 import {
   canRevertToConfirmed,
+  cardsInOrder,
   carryOverChanged,
   currentPeriod,
   findReplaced,
@@ -19,9 +20,10 @@ import { scheduleName } from "@/lib/wording";
 import { takeConfirmedEntry } from "./confirmedEntry";
 import ConstraintCard from "./ConstraintCard";
 import { Spinner, today } from "./RulesStep";
-import { downloadCsv, ScheduleBody, toMessage, ToastAlert, useSolve } from "./ScheduleStep";
+import { downloadCsv, InlineLock, ScheduleBody, toMessage, ToastAlert, useSolve, WEEKDAYS } from "./ScheduleStep";
+import { shortTime } from "./ShopHome";
 import { ui } from "./ui";
-import { confirmedTime } from "./ShopHome";
+import { Mark } from "./Wordmark";
 
 const MAX_TEXT_CHARS = 1000; // backend/domain/constants.py MAX_TEXT_CHARS
 
@@ -42,7 +44,7 @@ export default function ConfirmedPeriod() {
 
   const [entry] = useState(() => (period ? takeConfirmedEntry(period.id) : null));
   const [translating, setTranslating] = useState(false);
-  // 이 화면의 변경 입력 바에서 만든 대기 카드
+  // 이 화면의 변경 입력 바에서 만든 카드(대기·적용). [다시 확정]이나 [변경 취소]까지 남겨 둔다
   const [changeIds, setChangeIds] = useState<string[]>([]);
   const titleRef = useRef<HTMLHeadingElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -62,7 +64,10 @@ export default function ConfirmedPeriod() {
   const lastVersion = period.versions.at(-1);
   const unconfirmed = hasUnconfirmedChanges(period);
   const revertable = canRevertToConfirmed(period);
-  const changeCards = period.pendingRequests.filter((c) => changeIds.includes(c.id));
+  const ofChange = (c: { id: string }) => changeIds.includes(c.id);
+  const changeCards = cardsInOrder(period.pendingRequests.filter(ofChange), period.requests.filter(ofChange), period.cardOrder);
+  // 다시 만들기가 끝나 결과에 반영됐을 때만 그렇게 적는다
+  const appliedLabel = sv.busy || sv.outcome || sv.toast ? undefined : "적용됨 · 다시 만들었어요";
   const diff = unconfirmed ? (result?.diff ?? []) : [];
 
   const translateChange = async (input: string): Promise<string | null> => {
@@ -97,6 +102,7 @@ export default function ConfirmedPeriod() {
   };
 
   const csv = () => result && downloadCsv(period, employees, result);
+  const todayInfo = isOperating(period, now) ? periodDays(period).find((d) => d.date === now) : undefined;
 
   return (
     <div className="flex flex-col gap-5">
@@ -108,48 +114,27 @@ export default function ConfirmedPeriod() {
         </div>
         <div className="flex items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            <h1 ref={titleRef} tabIndex={-1} className="text-[22px] font-semibold text-[#1B1B18] outline-none">
+            <h1 ref={titleRef} tabIndex={-1} className={`${ui.pageTitle} outline-none`}>
               {scheduleName(period, shop.unit)}
             </h1>
             <span className="font-mono text-sm text-[#66665E]">{formatRange(period)}</span>
             {isOperating(period, now) ? (
-              <span className={`${ui.badge} bg-[#E3F0F3] text-[#155E75]`}>운영 중</span>
+              <span className={`${ui.badge} ${ui.badgeTone.operating}`}>운영 중</span>
             ) : (
-              <span className={`${ui.badge} bg-[#E6F2EA] text-[#1E6B3F]`}>확정</span>
+              <span className={`${ui.badge} ${ui.badgeTone.confirmed}`}>확정</span>
             )}
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-3">
             {sv.loading && (
-              <span role="status" className={`${ui.help} mr-1 flex items-center gap-1.5`}>
+              <span role="status" className={`${ui.help} flex items-center gap-1.5`}>
                 <Spinner />
                 만드는 중…
               </span>
             )}
             {lastVersion && (
-              <span className={`${ui.help} mr-1`}>
-                마지막 확정 <span className="font-mono">{confirmedTime(lastVersion.confirmed_at)}</span>
+              <span className={ui.help}>
+                마지막 확정 <span className="font-mono">{shortTime(lastVersion.confirmed_at)}</span> · 직원 링크는 잠겼어요
               </span>
-            )}
-            {!ended && (unconfirmed || revertable) ? (
-              <>
-                {revertable && (
-                  <button type="button" onClick={revert} disabled={busy} className={ui.text}>
-                    변경 취소
-                  </button>
-                )}
-                <button type="button" onClick={csv} disabled={busy} className={ui.text}>
-                  CSV 받기
-                </button>
-                {unconfirmed && (
-                  <button type="button" onClick={reconfirm} disabled={busy} className={ui.primary}>
-                    다시 확정
-                  </button>
-                )}
-              </>
-            ) : (
-              <button type="button" onClick={csv} disabled={busy} className={ui.secondary}>
-                CSV 받기
-              </button>
             )}
           </div>
         </div>
@@ -166,31 +151,106 @@ export default function ConfirmedPeriod() {
 
       {sv.toast && <ToastAlert toast={sv.toast} busy={busy} onClose={() => sv.setToast(null)} />}
 
-      {!ended && <ChangeBar inputRef={inputRef} busy={busy} translating={translating} onSubmit={translateChange} />}
-      {changeCards.length > 0 && (
-        <div className="grid grid-cols-2 gap-4">
-          {changeCards.map((c) => (
-            <ConstraintCard
-              key={c.id}
-              card={c}
-              pending
-              replaces={findReplaced(period.requests, c)}
-              busy={busy}
-              onApplied={sv.run}
-            />
-          ))}
-        </div>
+      {!ended && (
+        <section className={`${ui.panel} grid grid-cols-[7fr_5fr] gap-6`}>
+          <ChangeBar inputRef={inputRef} busy={busy} translating={translating} onSubmit={translateChange} />
+          <div className="flex min-w-0 flex-col gap-3">
+            {changeCards.length === 0 ? (
+              <p className="text-sm text-[#66665E]">아직 변경이 없어요.</p>
+            ) : (
+              changeCards.map(({ card, pending }) =>
+                pending ? (
+                  <ConstraintCard
+                    key={card.id}
+                    card={card}
+                    pending
+                    replaces={findReplaced(period.requests, card)}
+                    busy={busy}
+                    onApplied={sv.run}
+                    compact
+                  />
+                ) : (
+                  <ConstraintCard key={card.id} card={card} pending={false} readOnly appliedLabel={appliedLabel} compact />
+                ),
+              )
+            )}
+          </div>
+        </section>
       )}
 
-      <ScheduleBody period={period} solve={sv} busy={busy} readOnly={ended}>
-        {diff.length > 0 && (
-          <p role="status" className="rounded-lg border border-[#F1D3A8] bg-[#FDF0DC] px-4 py-2.5 text-sm text-[#7A4506]">
-            <span className="font-mono font-semibold">{new Set(diff.map((c) => c.employee_id)).size}</span>명,{" "}
-            <span className="font-mono font-semibold">{diff.length}</span>칸 변경 · 주황 테두리 칸이 바뀐 곳이에요. [다시
-            확정]하면 새 확정본으로 남겨요.
-          </p>
-        )}
-      </ScheduleBody>
+      <ScheduleBody
+        period={period}
+        solve={sv}
+        busy={busy}
+        readOnly={ended}
+        summaryLead={
+          diff.length > 0 && (
+            <p role="status" className={`${ui.banner} flex-1 justify-start! self-stretch`}>
+              <span aria-hidden="true" className="size-4 shrink-0 rounded-xs bg-white shadow-[inset_0_0_0_2px_#D97706]" />
+              <span>
+                <strong className="font-semibold">
+                  <span className="font-mono">{new Set(diff.map((c) => c.employee_id)).size}</span>명,{" "}
+                  <span className="font-mono">{diff.length}</span>칸 변경
+                </strong>{" "}
+                · 주황 테두리 칸이 바뀐 곳이에요. 아직 다시 확정하지 않았어요.
+              </span>
+            </p>
+          )
+        }
+        gridNote={
+          todayInfo && (
+            <p className="text-[13px] text-[#3D3D38]">
+              오늘은{" "}
+              <span className="font-mono">
+                {todayInfo.month}/{todayInfo.dom}
+              </span>{" "}
+              {WEEKDAYS[todayInfo.weekday]}예요. 지난 날짜는 <InlineLock /> 자동으로 고정돼요.
+            </p>
+          )
+        }
+        actions={
+          <>
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                {!ended && revertable && (
+                  <button type="button" onClick={revert} disabled={busy} className={ui.text}>
+                    변경 취소
+                  </button>
+                )}
+              </div>
+              <div className="flex items-center gap-2">
+                <button type="button" onClick={csv} disabled={busy} className={!ended && (unconfirmed || revertable) ? ui.text : ui.secondary}>
+                  CSV 받기
+                </button>
+                {!ended && unconfirmed && (
+                  <button type="button" onClick={reconfirm} disabled={busy} className={ui.primaryLg}>
+                    다시 확정
+                  </button>
+                )}
+              </div>
+            </div>
+            <section className="flex flex-col gap-3">
+              <h2 className={ui.sectionTitle}>확정 기록</h2>
+              <ul className={`${ui.card} flex flex-col py-1.5!`}>
+                {period.versions
+                  .map((v, i) => (
+                    <li key={v.confirmed_at} className="flex items-center gap-2 border-b border-[#EFEFEB] py-2 text-[13px] text-[#3D3D38] last:border-b-0">
+                      <span className="font-mono font-medium text-[#1B1B18]">{shortTime(v.confirmed_at)}</span>· 확정 ·{" "}
+                      {i === 0 ? (
+                        "처음 확정"
+                      ) : (
+                        <span>
+                          바뀐 칸 <span className="font-mono">{v.changed.length}</span>칸
+                        </span>
+                      )}
+                    </li>
+                  ))
+                  .reverse()}
+              </ul>
+            </section>
+          </>
+        }
+      />
     </div>
   );
 }
@@ -219,18 +279,21 @@ function ChangeBar({
   };
 
   return (
-    <section className={`${ui.card} flex flex-col gap-2.5`}>
+    <div className="flex min-w-0 flex-col gap-3">
       <div className="flex flex-col gap-1">
         <h2 className={ui.cardTitle}>변경 입력</h2>
-        <p className={ui.help}>확정한 뒤 생긴 병가·휴가를 적으면, 확정 근무표에서 최소한으로 바꿔 다시 만들어요.</p>
+        <p className="text-[13px] text-[#3D3D38]">
+          확정한 뒤 생긴 병가·휴가를 적으면, 확정 근무표에서 최소한으로 바꿔 다시 만들어요. 이미 지난 날은 건드리지 않아요.
+        </p>
       </div>
       <form
-        className="flex gap-2"
+        className={`${ui.bar} ${tooLong ? "border-[#B42318]!" : ""}`}
         onSubmit={(e) => {
           e.preventDefault();
           if (!busy && !tooLong && text.trim() !== "") void submit();
         }}
       >
+        <Mark size={18} />
         <input
           ref={inputRef}
           value={text}
@@ -238,9 +301,9 @@ function ChangeBar({
           placeholder="예: 최지훈 이번 주 병가"
           aria-label="변경 입력"
           aria-invalid={tooLong || undefined}
-          className={`${ui.input} flex-1 ${tooLong ? "border-[#B42318]" : ""}`}
+          className={ui.barInput}
         />
-        <button type="submit" disabled={busy || tooLong || text.trim() === ""} className={ui.primary}>
+        <button type="submit" disabled={busy || tooLong || text.trim() === ""} className={ui.primaryBar}>
           {translating && <Spinner />}
           {translating ? "읽는 중…" : "요청 만들기"}
         </button>
@@ -250,6 +313,6 @@ function ChangeBar({
           {notice} <span className="text-xs font-medium text-[#66665E]">내용을 보완해서 다시 입력해 주세요.</span>
         </p>
       )}
-    </section>
+    </div>
   );
 }

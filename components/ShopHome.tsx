@@ -12,21 +12,8 @@ import { markConfirmedEntry } from "./confirmedEntry";
 import { today } from "./RulesStep";
 import { ui } from "./ui";
 
-function formatTime(iso: string): string {
-  const d = new Date(iso);
-  const p = (n: number) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
-}
-
-/** 마지막 확정 시각. 오늘이면 "14:32", 아니면 날짜까지. */
-export function confirmedTime(iso: string): string {
-  const full = formatTime(iso);
-  return full.startsWith(today()) ? full.slice(11) : full;
-}
-
-
 /** 홈의 확정 시각: "10/28 14:32". */
-function shortTime(iso: string): string {
+export function shortTime(iso: string): string {
   const d = new Date(iso);
   const p = (n: number) => String(n).padStart(2, "0");
   return `${d.getMonth() + 1}/${d.getDate()} ${p(d.getHours())}:${p(d.getMinutes())}`;
