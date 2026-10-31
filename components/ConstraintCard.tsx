@@ -170,10 +170,10 @@ function WarningIcon() {
 
 const CARD = "flex flex-col gap-3.5 rounded-lg border bg-white px-5 py-[18px]";
 
-function Quote({ text, dim = false }: { text: string; dim?: boolean }) {
+function Quote({ text, dim = false, compact = false }: { text: string; dim?: boolean; compact?: boolean }) {
   return (
-    <p className={`flex items-start gap-1.5 text-[15px] leading-5 ${dim ? "text-[#66665E]" : "text-[#1B1B18]"}`}>
-      <QuoteGlyph size={20} />
+    <p className={`flex items-start gap-1.5 ${compact ? "text-sm" : "text-[15px]"} leading-5 ${dim ? "text-[#66665E]" : "text-[#1B1B18]"}`}>
+      <QuoteGlyph size={compact ? 16 : 20} />
       <span>{text}</span>
     </p>
   );
@@ -280,6 +280,7 @@ export default function ConstraintCard({
   onToggleOff,
   readOnly = false,
   withConfig,
+  compact = false,
 }: {
   card: ConstraintSpec;
   pending: boolean;
@@ -297,6 +298,8 @@ export default function ConstraintCard({
   readOnly?: boolean;
   /** 딸린 카드: [적용]하면 함께 적용되는 설정 변경 카드의 근무 코드 */
   withConfig?: string;
+  /** 좁은 자리(③ 예외 입력 패널)의 작은 변형: 제목 14, 원문 14, 패딩 px-4 py-3.5 */
+  compact?: boolean;
 }) {
   const shop = useAppStore((s) => s.shop);
   const period = useAppStore(currentPeriod);
@@ -346,11 +349,13 @@ export default function ConstraintCard({
   };
 
   return (
-    <article className={`${CARD} ${pending ? "border-[#C9C9C1]" : "border-[#E2E2DC]"}`}>
+    <article className={`${CARD} ${compact ? "px-4! py-3.5!" : ""} ${pending ? "border-[#C9C9C1]" : "border-[#E2E2DC]"}`}>
       <div className="flex items-center justify-between gap-3">
-        <h3 className={ui.cardTitle}>{presetName(card)}</h3>
-        {/* 휴가 카드는 항상 반드시라 토글을 두지 않는다 */}
-        {!isLeaveRule(card) && (
+        <h3 className={compact ? "text-sm font-semibold text-[#1B1B18]" : ui.cardTitle}>{presetName(card)}</h3>
+        {/* 휴가 카드는 항상 반드시라 토글 대신 배지를 둔다 */}
+        {isLeaveRule(card) ? (
+          <span className={`${ui.badge} bg-[#1B1B18] text-white`}>반드시</span>
+        ) : (
           <div className="flex items-center gap-2">
             {hardness === "soft" && card.type !== "fixed_assignment" && (
               <PrioritySelect
@@ -367,7 +372,7 @@ export default function ConstraintCard({
           </div>
         )}
       </div>
-      <Quote text={card.source_text} dim={dim} />
+      <Quote text={card.source_text} dim={dim} compact={compact} />
 
       <Reading sentence={<RuleText sentence={describeRule(card, config, employees, range)} />} dim={dim}>
         {draft && (
