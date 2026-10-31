@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useState, type CSSProperties, type ReactNode } from "react";
 
 import { ApiError, errorMessage, explain, solve } from "@/lib/api";
 import { toScheduleCsv } from "@/lib/csv";
@@ -846,6 +846,8 @@ export function ScheduleGrid({
   pastDays = 0,
   todayDay = null,
   hideViolations = false,
+  cellStyle,
+  totalCodes,
 }: {
   /** 매장 근무 형태. 합계 열과 하단 합계 행이 이 코드를 따른다 */
   config?: ShopConfig;
@@ -868,11 +870,15 @@ export function ScheduleGrid({
   todayDay?: number | null;
   /** 변환 전 결과: 못 지킨 규칙 표시를 숨긴다 */
   hideViolations?: boolean;
+  /** 칸마다 줄 인라인 스타일(랜딩 시퀀스의 지연) */
+  cellStyle?: (employeeId: string, day: number) => CSSProperties;
+  /** 하단 합계 행을 이 근무조로 줄인다. 없으면 모두 */
+  totalCodes?: Code[];
 }) {
   const pdays = periodDays(period);
   const codes = shownCodes(config, result.assignments);
   // 하단 합계는 근무조(복합 코드는 세는 근무조마다 더한다)
-  const teams = codes.filter((s) => s.code !== "O" && !s.parts?.length);
+  const teams = codes.filter((s) => s.code !== "O" && !s.parts?.length && (!totalCodes || totalCodes.includes(s.code)));
   const covers = (code: Code, team: Code) =>
     code === team || (config.shifts.find((s) => s.code === code)?.parts ?? []).includes(team);
   // 최근 4주 기록이 하나도 없으면(첫 근무표) 누적 부담 열을 그리지 않는다
@@ -949,6 +955,7 @@ export function ScheduleGrid({
                       key={d}
                       aria-label={`${n.name} ${m}월 ${dom}일 ${code}`}
                       title={warn ? warn.join(", ") : undefined}
+                      style={cellStyle?.(n.id, d)}
                       className={`${CELL} ${codeClass(code, isWeekend(d))}`}
                     >
                       {code}
@@ -965,6 +972,7 @@ export function ScheduleGrid({
                     onClick={() => !past && onSelect({ employeeId: n.id, day: d })}
                     aria-label={`${n.name} ${m}월 ${dom}일 ${code}`}
                     title={past ? "지난 날짜는 바꿀 수 없어요" : warn ? warn.join(", ") : undefined}
+                    style={cellStyle?.(n.id, d)}
                     className={`${CELL} ${codeClass(code, isWeekend(d))} ${
                       past ? "cursor-not-allowed" : "hover:opacity-80"
                     } disabled:cursor-wait ${

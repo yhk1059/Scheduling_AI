@@ -10,9 +10,68 @@ body {
   color: #1b1b18;
 }
 
+/* 랜딩 히어로 시퀀스. 기본 스타일이 끝 상태이고, backwards 채움으로 시작 전 모습을 만든다. */
+@keyframes hero-type {
+  from {
+    width: 0;
+  }
+}
+@keyframes hero-caret {
+  50% {
+    border-color: #155e75;
+  }
+}
+@keyframes hero-rise {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+@keyframes hero-cell {
+  from {
+    opacity: 0;
+    transform: scale(0.6);
+  }
+}
+@keyframes hero-fade {
+  from {
+    opacity: 0;
+  }
+}
+.hero-typing {
+  position: absolute;
+  top: 0;
+  left: 0;
+  box-sizing: content-box;
+  width: 100%;
+  overflow: hidden;
+  border-right: 2px solid transparent;
+  animation:
+    hero-type 1.2s steps(15) 0.4s backwards,
+    hero-caret 0.5s step-end 8;
+}
+.hero-rise {
+  animation: hero-rise 240ms ease-out 2s backwards;
+}
+.hero-cells [aria-label] {
+  animation: hero-cell 200ms ease-out backwards;
+}
+/* 합계는 칸이 다 채워진 뒤에 나타난다(이름 칸 제외) */
+.hero-cells .grid:not(:first-child) > span:not(:first-child) {
+  animation: hero-fade 200ms ease-out 5s backwards;
+}
+.hero-badge {
+  animation: hero-rise 240ms ease-out 5.3s backwards;
+}
+
 @media (prefers-reduced-motion: reduce) {
   * {
     transition-duration: 0.01ms !important;
     animation-duration: 0.01ms !important;
+  }
+  /* 지연까지 없애 끝 상태를 바로 보인다 */
+  .hero-seq,
+  .hero-seq * {
+    animation: none !important;
   }
 }
