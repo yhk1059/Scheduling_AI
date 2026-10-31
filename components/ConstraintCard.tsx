@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { type ReactNode, useState } from "react";
 
 import type { Priority } from "@/lib/rules";
 import {
@@ -21,6 +21,7 @@ import RuleText from "./RuleText";
 import { previewRange } from "./RulesStep";
 import { codeClass } from "./ScheduleStep";
 import { ui } from "./ui";
+import { QuoteGlyph } from "./Wordmark";
 
 /** 휴가 모양과 칸 고정은 항상 반드시다(토글을 막는다). */
 const alwaysHard = (c: ConstraintSpec) => c.type === "fixed_assignment" || isLeaveRule(c);
@@ -61,7 +62,7 @@ function FieldInput({ field, value, onChange }: { field: Field; value: string; o
   return (
     <label className="flex flex-col gap-1">
       <span className={ui.label}>{field.label}</span>
-      <input inputMode="decimal" value={value} onChange={(e) => onChange(e.target.value)} className={`${ui.input} h-8 w-20 font-mono`} />
+      <input inputMode="decimal" value={value} onChange={(e) => onChange(e.target.value)} className={`${ui.input} h-8! w-20 font-mono`} />
     </label>
   );
 }
@@ -165,7 +166,30 @@ function WarningIcon() {
   );
 }
 
-// --- 카드 ---
+// --- 카드: 내 말(원문)과 "이렇게 읽었어요" 해석이 이어지는 답장 모양 ---
+
+const CARD = "flex flex-col gap-3.5 rounded-lg border bg-white px-5 py-[18px]";
+
+function Quote({ text, dim = false }: { text: string; dim?: boolean }) {
+  return (
+    <p className={`flex items-start gap-1.5 text-[15px] leading-5 ${dim ? "text-[#66665E]" : "text-[#1B1B18]"}`}>
+      <QuoteGlyph size={20} />
+      <span>{text}</span>
+    </p>
+  );
+}
+
+function Reading({ sentence, dim = false, children }: { sentence: ReactNode; dim?: boolean; children?: ReactNode }) {
+  return (
+    <div className="ml-2 flex flex-col gap-2.5 border-l-2 border-[#CFE4EA] pl-3.5">
+      <div className="flex flex-col gap-1">
+        <span className={`${ui.eyebrow} text-[11px]!`}>이렇게 읽었어요</span>
+        <p className={`text-sm ${dim ? "text-[#66665E]" : "text-[#1B1B18]"}`}>{sentence}</p>
+      </div>
+      {children}
+    </div>
+  );
+}
 
 function HardnessToggle({ value, disabled, onChange }: { value: Hardness; disabled: boolean; onChange: (h: Hardness) => void }) {
   return (
@@ -206,7 +230,7 @@ function PrioritySelect({ value, disabled, onChange }: { value: Priority; disabl
         value={value}
         disabled={disabled}
         onChange={(e) => onChange(e.target.value as Priority)}
-        className={`${ui.input} h-7 px-2 text-xs`}
+        className={`${ui.input} h-7! px-2 text-xs`}
       >
         {PRIORITIES.map((p) => (
           <option key={p.value} value={p.value}>
@@ -224,13 +248,13 @@ export function ShiftChangeCardView({ card }: { card: ShiftChangeCard }) {
   if (!config) return null;
   const store = useAppStore.getState();
   return (
-    <article className="flex flex-col gap-2.5 rounded-lg border border-[#C9C9C1] bg-white px-[18px] py-4">
+    <article className={`${CARD} border-[#C9C9C1]`}>
       <div className="flex items-center justify-between gap-3">
-        <h3 className="text-[13px] font-semibold text-[#1B1B18]">근무 형태</h3>
+        <h3 className={ui.cardTitle}>근무 형태</h3>
         <span className={`${ui.badge} bg-[#EFEFEB] text-[#3D3D38]`}>근무 형태</span>
       </div>
-      {card.source_text && <p className="text-sm text-[#1B1B18]">“{card.source_text}”</p>}
-      <p className="rounded-sm bg-[#F6F6F3] px-2.5 py-2 text-xs text-[#3D3D38]">{describeShiftChange(card.change, config)}</p>
+      {card.source_text && <Quote text={card.source_text} />}
+      <Reading sentence={describeShiftChange(card.change, config)} />
       <div className="flex items-center justify-between gap-3">
         <span className={`${ui.badge} bg-[#FDF0DC] text-[#7A4506]`}>적용 대기</span>
         <div className="flex items-center gap-1">
@@ -322,11 +346,9 @@ export default function ConstraintCard({
   };
 
   return (
-    <article
-      className={`flex flex-col gap-2.5 rounded-lg border bg-white px-[18px] py-4 ${pending ? "border-[#C9C9C1]" : "border-[#E2E2DC]"}`}
-    >
+    <article className={`${CARD} ${pending ? "border-[#C9C9C1]" : "border-[#E2E2DC]"}`}>
       <div className="flex items-center justify-between gap-3">
-        <h3 className="text-[13px] font-semibold text-[#1B1B18]">{presetName(card)}</h3>
+        <h3 className={ui.cardTitle}>{presetName(card)}</h3>
         {/* 휴가 카드는 항상 반드시라 토글을 두지 않는다 */}
         {!isLeaveRule(card) && (
           <div className="flex items-center gap-2">
@@ -345,40 +367,38 @@ export default function ConstraintCard({
           </div>
         )}
       </div>
-      <p className={`text-sm ${dim ? "text-[#66665E]" : "text-[#1B1B18]"}`}>“{card.source_text}”</p>
+      <Quote text={card.source_text} dim={dim} />
 
-      <p className={`rounded-sm bg-[#F6F6F3] px-2.5 py-2 text-xs ${dim ? "text-[#66665E]" : "text-[#3D3D38]"}`}>
-        <RuleText sentence={describeRule(card, config, employees, range)} />
-      </p>
-
-      {draft && (
-        <div className="flex flex-col gap-2.5 rounded-sm border border-[#E2E2DC] px-2.5 py-2">
-          <div className="flex flex-wrap items-end gap-3">
-            {fields.map((f) => (
-              <FieldInput key={f.key} field={f} value={draft[f.key]} onChange={(v) => setDraft({ ...draft, [f.key]: v })} />
-            ))}
+      <Reading sentence={<RuleText sentence={describeRule(card, config, employees, range)} />} dim={dim}>
+        {draft && (
+          <div className="flex flex-col gap-2.5 rounded-sm border border-[#E2E2DC] px-2.5 py-2">
+            <div className="flex flex-wrap items-end gap-3">
+              {fields.map((f) => (
+                <FieldInput key={f.key} field={f} value={draft[f.key]} onChange={(v) => setDraft({ ...draft, [f.key]: v })} />
+              ))}
+            </div>
+            {error && <p className={ui.error}>{error}</p>}
+            <p className={ui.help}>바꾸려면 말로 다시 적어 주세요</p>
           </div>
-          {error && <p className={ui.error}>{error}</p>}
-          <p className={ui.help}>바꾸려면 말로 다시 적어 주세요</p>
-        </div>
-      )}
+        )}
 
-      {examples.length > 0 &&
-        (pending ? (
-          <Examples examples={examples} employees={shop.employees} range={range} holidays={holidays} />
-        ) : (
-          <div className="flex flex-col gap-2">
-            <button
-              type="button"
-              aria-expanded={showExamples}
-              onClick={() => setShowExamples(!showExamples)}
-              className={`${ui.textSm} self-start`}
-            >
-              예시 보기
-            </button>
-            {showExamples && <Examples examples={examples} employees={shop.employees} range={range} holidays={holidays} />}
-          </div>
-        ))}
+        {examples.length > 0 &&
+          (pending ? (
+            <Examples examples={examples} employees={shop.employees} range={range} holidays={holidays} />
+          ) : (
+            <div className="flex flex-col gap-2">
+              <button
+                type="button"
+                aria-expanded={showExamples}
+                onClick={() => setShowExamples(!showExamples)}
+                className={`${ui.textSm} self-start`}
+              >
+                예시 보기
+              </button>
+              {showExamples && <Examples examples={examples} employees={shop.employees} range={range} holidays={holidays} />}
+            </div>
+          ))}
+      </Reading>
 
       {orphan && (
         <p className="flex items-center gap-1.5 text-xs font-medium text-[#A15C07]">
