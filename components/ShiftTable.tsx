@@ -98,7 +98,7 @@ function ShiftRow({ shift, shifts }: { shift: ShiftDef; shifts: ShiftDef[] }) {
       <td className={`px-2 py-1 font-mono font-semibold ${muted}`}>
         <span className="flex items-center gap-2">
           {shift.code}
-          {!active && <span className={`${ui.badge} bg-[#EFEFEB] font-sans text-[#66665E]`}>꺼짐</span>}
+          {!active && <span className={`${ui.badge} ${ui.badgeTone.excluded} font-sans`}>꺼짐</span>}
         </span>
       </td>
       {editable ? (

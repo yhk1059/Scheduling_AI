@@ -29,8 +29,8 @@ export default function ShopSettings() {
   return (
     <div className="flex flex-col gap-5">
       <div className="flex flex-col gap-3">
-        <h1 className="text-[22px] font-semibold text-[#1B1B18]">매장 설정</h1>
-        <div role="tablist" className="flex gap-1 border-b border-[#E2E2DC]">
+        <h1 className={ui.pageTitle}>매장 설정</h1>
+        <div role="tablist" className="flex gap-5 border-b border-[#E2E2DC]">
           {TABS.map((t) => (
             <button
               key={t.tab}
@@ -38,8 +38,11 @@ export default function ShopSettings() {
               role="tab"
               onClick={() => go({ screen: "settings", tab: t.tab })}
               aria-selected={tab === t.tab}
-              className={`-mb-px h-10 border-b-2 px-3 text-sm transition-colors duration-[120ms] hover:text-[#1B1B18] ${
-                tab === t.tab ? "border-[#155E75] font-semibold text-[#1B1B18]" : "border-transparent text-[#3D3D38]"
+              aria-current={tab === t.tab ? "page" : undefined}
+              className={`-mb-px h-11 border-b-2 px-1 text-sm transition-colors duration-[120ms] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#155E75] ${
+                tab === t.tab
+                  ? "border-[#155E75] font-semibold text-[#1B1B18]"
+                  : "border-transparent font-medium text-[#3D3D38] hover:text-[#1B1B18]"
               }`}
             >
               {t.label}
@@ -56,7 +59,7 @@ export default function ShopSettings() {
         </>
       ) : tab === "shifts" ? (
         <section className={`${ui.card} flex flex-col gap-3`}>
-          <h2 className={ui.cardTitle}>근무 형태</h2>
+          <h2 className={ui.sectionTitle}>근무 형태</h2>
           <ShiftTable />
         </section>
       ) : (
@@ -102,7 +105,7 @@ export function BasicSection() {
 
   return (
     <section className={`${ui.card} flex flex-col gap-3`}>
-      <h2 className={ui.cardTitle}>기본</h2>
+      <h2 className={ui.sectionTitle}>기본</h2>
       <div className="flex flex-wrap items-end gap-4">
         <label className="flex flex-col gap-1">
           <span className={ui.label}>매장 이름</span>
@@ -148,7 +151,7 @@ export function RosterSection() {
   return (
     <section className={`${ui.card} flex flex-col gap-3.5`}>
       <div className="flex flex-col gap-1">
-        <h2 className={ui.cardTitle}>명단</h2>
+        <h2 className={ui.sectionTitle}>명단</h2>
         <p className={ui.help}>
           맨 아래 줄에 이름을 적고 Enter를 누르면 한 명씩 더해져요. 이름 입력란에는 이니셜을 써도 됩니다. 바꾼 내용은 바로 저장돼요.
         </p>
@@ -170,7 +173,7 @@ export function CoverageSection({ collapsible = false }: { collapsible?: boolean
   const body = (
     <>
       <div className="flex flex-col gap-1">
-        <h2 className={ui.cardTitle}>근무조별 필요 인원</h2>
+        <h2 className={ui.sectionTitle}>근무조별 필요 인원</h2>
         <p className={ui.help}>하루에 그 근무조에 들어갈 직원 수예요. 최대를 비우면 그 이상이면 돼요.</p>
       </div>
       <div className="self-start">
@@ -299,13 +302,13 @@ function TagInput({
     <div className="flex flex-col gap-0.5">
       <div className="flex flex-wrap items-center gap-1">
         {tags.map((t) => (
-          <span key={t} className="inline-flex h-6 items-center gap-1 rounded-sm border border-[#C9C9C1] bg-white pr-0.5 pl-2 text-xs text-[#1B1B18]">
+          <span key={t} className="inline-flex h-7 items-center gap-1 rounded-full border border-[#C9C9C1] bg-white pr-1 pl-3 text-xs font-normal text-[#3D3D38]">
             {t}
             <button
               type="button"
               onClick={() => onRemove(t)}
               aria-label={`${label} ${t} 빼기`}
-              className="inline-flex size-5 items-center justify-center rounded-xs text-[#66665E] hover:bg-[#EFEFEB] hover:text-[#1B1B18]"
+              className="inline-flex size-5 items-center justify-center rounded-full text-[#66665E] hover:bg-[#EFEFEB] hover:text-[#1B1B18] focus-visible:outline-2 focus-visible:outline-[#155E75]"
             >
               <svg aria-hidden="true" viewBox="0 0 12 12" className="size-3" fill="none" stroke="currentColor" strokeWidth="1.6">
                 <path d="M3 3l6 6M9 3l-6 6" />
@@ -370,7 +373,7 @@ function EmployeeRow({ employee, index, employees }: { employee: ShopEmployee; i
               onChange={(e) => onName(e.target.value)}
               aria-label={`${row}행 이름`}
               aria-invalid={nameMsg !== null || undefined}
-              className={`${cellInput} w-48 ${nameMsg ? err : "border-[#8A8A80]"}`}
+              className={`${cellInput} w-48 ${nameMsg ? err : ui.cellOk}`}
             />
             {nameMsg && <p className={`${ui.error} mt-0.5`}>{nameMsg}</p>}
           </td>
@@ -390,7 +393,7 @@ function EmployeeRow({ employee, index, employees }: { employee: ShopEmployee; i
           <td className="px-2 py-1">
             <span className="flex items-center gap-2 text-[#66665E]">
               {employee.name}
-              <span className={`${ui.badge} bg-[#EFEFEB] text-[#66665E]`}>제외</span>
+              <span className={`${ui.badge} ${ui.badgeTone.excluded}`}>제외</span>
             </span>
           </td>
           <td className="px-2 py-1 text-[#66665E]">{employee.tags.join(", ")}</td>
@@ -463,7 +466,7 @@ function NewEmployeeRow({ employees }: { employees: ShopEmployee[] }) {
           placeholder="이름"
           aria-label="새 직원 이름"
           aria-invalid={showName ? true : undefined}
-          className={`${cellInput} w-48 placeholder:text-[#8A8A80] ${showName ? err : "border-[#8A8A80]"}`}
+          className={`${cellInput} w-48 placeholder:text-[#707068] ${showName ? err : ui.cellOk}`}
         />
         {showName && <p className={`${ui.error} mt-0.5`}>{nameMsg}</p>}
       </td>
@@ -524,7 +527,7 @@ function RowMenu({ name, onDelete }: { name: string; onDelete: () => void }) {
         </svg>
       </button>
       {open && (
-        <div role="menu" className="absolute top-full right-0 z-10 mt-1 rounded-md border border-[#E2E2DC] bg-white p-1">
+        <div role="menu" className={`absolute top-full right-0 z-10 mt-1 rounded-md border border-[#E2E2DC] bg-white p-1 ${ui.shadow}`}>
           <button
             type="button"
             role="menuitem"

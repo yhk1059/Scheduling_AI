@@ -55,9 +55,9 @@ export default function Dialog({
         role="dialog"
         aria-modal="true"
         aria-labelledby="dialog-title"
-        className={`${ui.card} flex w-full max-w-[440px] flex-col gap-3.5`}
+        className={`${ui.cardXl} ${ui.shadow} flex w-full max-w-[440px] flex-col gap-3.5 px-6 py-5`}
       >
-        <h2 id="dialog-title" className={ui.cardTitle}>
+        <h2 id="dialog-title" className={ui.sectionTitle}>
           {title}
         </h2>
         <div className="flex flex-col gap-2.5 text-sm leading-relaxed text-[#3D3D38]">{children}</div>
