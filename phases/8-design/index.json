@@ -69,7 +69,10 @@
     {
       "step": 8,
       "name": "availability-form",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-11-01T06:46:19+0900",
+      "summary": "components/AvailabilityForm.tsx 재작성(워드마크 줄, 이름 칩, 두 열 캘린더 + '이번 주 칠한 시간' 카드, sticky 하단 72px 줄). 칸 높이: 달력 상자 height min(100%, 622px) + 행 minmax(14px,1fr)로 JS 없이 14~16px(1280×720 14, 1440×900 16, 세로 스크롤 없음). 결정: '매장 근무조' 카드와 공휴일 빨강 머리는 넣지 않음 — get_availability_roster·get_availability가 근무조와 공휴일을 돌려주지 않고 이 step은 세 DB 함수만 쓰며 기본 근무조를 하드코딩하면 틀린 정보가 되므로, DB 함수 변경이 필요한 후속 과제로 남김. [이전 주]·[다음 주]는 1280×720에 맞추려 제목 줄 오른쪽에 둠, 드래그 그림자는 pointer-events-none 겹침 span, 머리 날짜는 '월 11/2', 잠긴 화면은 하단 줄에 칠한 양 없이 문구만, 틀린 토큰은 pageTitle h1. 수동 저니는 RPC를 모킹한 임시 spec으로 확인 후 삭제(실제 Supabase 미사용). e2e 영향(step 10): 셀 aria-label·aria-pressed와 기존 문구는 유지, 제목이 '{매장} · {이름}님의 가능 시간'과 '{매장} · 가능 시간 입력'으로 합쳐짐, 하단 줄이 main 밖 footer.",
+      "completed_at": "2026-11-01T06:49:44+0900"
     },
     {
       "step": 9,
