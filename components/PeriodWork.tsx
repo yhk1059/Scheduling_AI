@@ -86,14 +86,14 @@ export default function PeriodWork() {
   );
 }
 
-/** ① 직원 링크 표. 행마다 [링크 복사]. 근무표 시작일이나 명단이 바뀌면 행을 맞춘다. */
+/** ① 공용 직원 링크 하나와 제출 현황. 근무표 시작일이나 명단이 바뀌면 행을 맞춘다. */
 function LinksSection({ period }: { period: WorkPeriod }) {
   const shop = useAppStore((s) => s.shop);
   const shopName = shop?.name ?? "";
   const employees = (shop?.employees ?? []).filter((n) => n.active);
   const roster = JSON.stringify(employees.map(({ id, name }) => ({ id, name })));
   const { start_date: start, length } = period;
-  const [links, setLinks] = useState<{ key: string; rows: AvailabilityLink[] } | null>(null);
+  const [links, setLinks] = useState<{ key: string; shareToken: string; rows: AvailabilityLink[] } | null>(null);
   const [failed, setFailed] = useState<string | null>(null);
   const [attempt, setAttempt] = useState(0);
   const [copied, setCopied] = useState<string | null>(null);
@@ -103,8 +103,8 @@ function LinksSection({ period }: { period: WorkPeriod }) {
   useEffect(() => {
     let live = true;
     syncAvailabilityLinks({ start_date: start, length }, JSON.parse(roster), shopName)
-      .then((rows) => {
-        if (live) setLinks({ key, rows });
+      .then((synced) => {
+        if (live) setLinks({ key, ...synced });
       })
       .catch(() => {
         if (live) setFailed(key);
@@ -114,15 +114,17 @@ function LinksSection({ period }: { period: WorkPeriod }) {
     };
   }, [key, start, length, roster, shopName, attempt]);
 
-  const rows = links?.key === key ? links.rows : null;
-  const urlOf = (employeeId: string) => {
-    const token = rows?.find((r) => r.employee_id === employeeId)?.token;
-    return token ? `${location.origin}/a/${token}` : "";
+  const current = links?.key === key ? links : null;
+  const url = current ? `${location.origin}/a/${current.shareToken}` : "";
+  const missing = employees.filter((n) => !current?.rows.find((r) => r.employee_id === n.id)?.submitted_at);
+  const reload = () => {
+    setFailed(null);
+    setAttempt((n) => n + 1);
   };
-  const copy = async (employeeId: string) => {
+  const copy = async () => {
     try {
-      await navigator.clipboard.writeText(urlOf(employeeId));
-      setCopied(employeeId);
+      await navigator.clipboard.writeText(url);
+      setCopied(url);
       setCopyFailed(false);
     } catch {
       setCopyFailed(true);
@@ -133,46 +135,44 @@ function LinksSection({ period }: { period: WorkPeriod }) {
     <section className={`${ui.card} flex flex-col gap-3`}>
       <div className="flex flex-col gap-1">
         <h3 className={ui.cardTitle}>직원 링크</h3>
-        <p className={ui.help}>직원마다 자기 링크를 보내 주세요. 링크를 연 사람은 그 직원의 가능 시간만 입력할 수 있어요</p>
+        <p className={ui.help}>단체 대화방에 이 링크 하나만 올려 주세요. 직원이 자기 이름을 골라 가능 시간을 입력해요</p>
       </div>
-      {rows ? (
-        <table className="w-full table-fixed border-collapse">
-          <tbody>
-            {employees.map((n) => (
-              <tr key={n.id} className="border-b border-[#EFEFEB] last:border-b-0">
-                <td className="w-[150px] truncate py-1.5 pr-4 text-sm text-[#1B1B18]">{n.name}</td>
-                <td className="truncate py-1.5 pr-4 font-mono text-[13px] text-[#3D3D38]">{urlOf(n.id)}</td>
-                <td className="w-[120px] py-1.5 text-right">
-                  <button type="button" onClick={() => void copy(n.id)} className={ui.secondarySm}>
-                    {copied === n.id ? "복사했어요" : "링크 복사"}
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      ) : failed === key ? (
+      {current && (
+        <>
+          <div className="flex items-center gap-4">
+            <p className="min-w-0 flex-1 truncate font-mono text-[13px] text-[#3D3D38]">{url}</p>
+            <button type="button" onClick={() => void copy()} className={ui.secondarySm}>
+              {copied === url ? "복사했어요" : "링크 복사"}
+            </button>
+          </div>
+          <div className="flex items-center gap-3 border-t border-[#EFEFEB] pt-3">
+            <p className="text-sm text-[#1B1B18]">
+              <span className="font-mono">{employees.length}</span>명 중 <span className="font-mono">{employees.length - missing.length}</span>명 제출
+            </p>
+            {missing.length > 0 && <p className={`${ui.help} min-w-0 flex-1`}>미제출: {missing.map((n) => n.name).join(", ")}</p>}
+            <button type="button" onClick={reload} className={`${ui.textSm} ml-auto`}>
+              새로고침
+            </button>
+          </div>
+        </>
+      )}
+      {failed === key ? (
         <div role="alert" className="flex items-center gap-2 text-sm text-[#B42318]">
-          링크를 만들지 못했어요. 네트워크를 확인하고 다시 시도해 주세요
-          <button
-            type="button"
-            onClick={() => {
-              setFailed(null);
-              setAttempt((n) => n + 1);
-            }}
-            className={ui.textSm}
-          >
+          링크를 불러오지 못했어요. 네트워크를 확인하고 다시 시도해 주세요
+          <button type="button" onClick={reload} className={ui.textSm}>
             다시 시도
           </button>
         </div>
       ) : (
-        <p role="status" className={ui.help}>
-          링크를 만드는 중…
-        </p>
+        !current && (
+          <p role="status" className={ui.help}>
+            링크를 만드는 중…
+          </p>
+        )
       )}
       {copyFailed && (
         <p role="alert" className={ui.error}>
-          복사하지 못했어요. 표의 링크를 직접 복사해 주세요
+          복사하지 못했어요. 위의 링크를 직접 복사해 주세요
         </p>
       )}
     </section>

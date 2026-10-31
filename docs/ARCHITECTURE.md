@@ -4,7 +4,7 @@
 ```
 app/                  # Next.js 페이지 (UI 세부는 UI_GUIDE 확정 후)
 ├── page.tsx          # 랜딩 (/) — 정적, API 호출 없음
-├── a/[token]/page.tsx # 직원 가능 시간 입력 (/a/{토큰}) — 로그인 없음, 토큰 DB 함수만 호출
+├── a/[token]/page.tsx # 직원 가능 시간 입력 (/a/{공용 토큰}) — 로그인 없음, 토큰 DB 함수만 호출
 ├── demo/page.tsx     # 샘플 데모 (/demo) — 정적, 보기 전용, 저장 없음 (ADR-016)
 └── app/page.tsx      # 앱 (/app) — 시작, 매장 홈, 매장 설정, 기간 작업 (PRD 화면)
 components/           # UI 컴포넌트
@@ -29,7 +29,7 @@ backend/              # FastAPI 앱 (무상태)
 └── tests/
 eval/                 # dataset.jsonl, run.py, results.md
 e2e/                  # Playwright 데모 저니 (수동 실행, 실제 API, 테스트 전용 계정, ADR-013, ADR-020)
-supabase/migrations/  # shops 테이블 + RLS, availability_links 테이블 + 토큰 DB 함수 (ADR-014, ADR-020)
+supabase/migrations/  # shops 테이블 + RLS, availability_links·availability_shares 테이블 + 토큰 DB 함수 (ADR-014, ADR-020, ADR-021)
 scripts/              # harness 전용 (앱 코드를 두지 않음)
 ```
 
@@ -47,7 +47,7 @@ scripts/              # harness 전용 (앱 코드를 두지 않음)
 - **결정적 대체 경로**: explain이 실패해도 충돌 제약의 `source_text`와 [이번 기간만 끄기]로 진행할 수 있다.
 - **가명 처리**: LLM 호출 전에 직원 이름을 `E01` 같은 가명으로 바꾸고, 응답에서 되돌린다.
 - **가능 시간**: 직원이 입력한 시간대를 `lib/availability.ts`가 근무조 시각과 비교해, 시각을 완전히 덮지 못하는 칸을 금지하는 반드시 규칙으로 바꾼다. 규칙 id는 `avail-`로 시작하고, 요청에 담을 때만 만들며 매장 조건에 저장하지 않는다. LLM을 거치지 않는다. explain은 이 규칙의 완화를 거부한다. 고정 근무처럼 규칙·요청 200개 상한과 따로 세되, 이 모양(사람마다 고른 칸의 수 = 0인 반드시 규칙)일 때만 그렇다. 칸 고정은 가능 시간보다 우선하므로 고정한 칸은 규칙에서 뺀다.
-- **직원 링크**: `availability_links`에 직원·근무표마다 한 행을 두고, 토큰으로만 접근한다. anon에게 테이블 권한을 주지 않고 `security definer` DB 함수 `get_availability(token)`, `submit_availability(token, slots)`만 연다. 함수는 그 행만 다루고, 잠긴 행의 제출을 거부한다. 매니저는 RLS로 자기 매장 행만 읽고 쓴다.
+- **직원 링크**: `availability_shares`에 근무표마다 공용 토큰 한 행을, `availability_links`에 직원·근무표마다 한 행을 둔다. anon에게 테이블 권한을 주지 않고 `security definer` DB 함수 `get_availability_roster(공용 토큰)`, `get_availability(직원 토큰)`, `submit_availability(직원 토큰, slots)`만 연다. 명단 함수는 이름, 직원 토큰, 제출 여부를 돌려주고 칸은 돌려주지 않는다. 제출 함수는 잠긴 행을 거부한다. 매니저는 RLS로 자기 매장 행만 읽고 쓴다.
 - **수동 조정**: 칸 수정은 "고정 배정" 제약이 된다. 솔버 경로는 하나다.
 - **매장 구조**: 근무 코드(이름, 시작·끝 시각, 실근무 시간, 세는 근무조)는 `ShopConfig`이고 매 요청에 담는다. 칸마다 코드 하나이며, 더블은 복합 코드다. 시작·끝 시각은 솔버가 직접 쓰지 않고 가능 시간 판정, LLM 문맥, 화면에 쓴다. 자정을 넘기는 근무조는 받지 않는다. 시간대 필요 인원은 LLM이 그 시간을 덮는 코드 집합을 세는 규칙으로 세운다(ADR-020). 코드 참조(제약, 이월, 이전 해, 이력)는 모두 `config`로 검증한다.
 - **제약 단일 표현**: 필요 인원(폼이든 말이든)도 날마다 범위의 규칙 식이고 `default: true`(기본 규칙)다. 별도의 staffing 필드는 없다. 모든 제약은 `enabled` 플래그를 가진다. [이번 기간만 끄기]는 그 기간의 꺼진 제약 id 목록에 넣고, 매장 조건 원본은 바꾸지 않는다. 요청을 보낼 때 이 목록으로 `enabled=false`를 채운다.
@@ -68,8 +68,8 @@ scripts/              # harness 전용 (앱 코드를 두지 않음)
 
 다음 기간: 지난 확정본 → carry_over, 최근 28일 배정 → history (lib/ 순수 함수) → 요청 → /solve
 
-가능 시간: 매니저 store → availability_links 행 생성(토큰) → 링크 복사
-           직원 /a/{토큰} → supabase-js rpc(get·submit_availability) → availability_links
+가능 시간: 매니저 store → availability_links·availability_shares 행 생성(토큰) → 공용 링크 복사
+           직원 /a/{공용 토큰} → 이름 선택(get_availability_roster) → supabase-js rpc(get·submit_availability) → availability_links
            매니저 → RLS로 행 읽기 → lib/availability.ts → avail- 규칙을 요청에 담아 /solve
 
 저장:      store ↔ supabase-js ↔ shops(data jsonb, RLS owner_id = auth.uid())
@@ -135,7 +135,7 @@ POST /api/py/explain
 | 영역 | 사용 | 쓰지 않는 것 |
 |---|---|---|
 | 프론트 | Next.js 16 App Router, TS strict, Tailwind 4, Zustand + persist, `@supabase/supabase-js` | Redux, React Query, UI 컴포넌트 라이브러리, 차트 라이브러리, `@supabase/ssr`, 미들웨어 인증 |
-| 저장·인증 | Supabase(Postgres + Auth, Google OAuth), `shops`·`availability_links` 테이블 + RLS, 토큰 DB 함수 (ADR-014, ADR-020) | 정규화 테이블, ORM, Edge Function, service role 키, 직원 계정 |
+| 저장·인증 | Supabase(Postgres + Auth, Google OAuth), `shops`·`availability_links`·`availability_shares` 테이블 + RLS, 토큰 DB 함수 (ADR-014, ADR-020, ADR-021) | 정규화 테이블, ORM, Edge Function, service role 키, 직원 계정 |
 | 백엔드 | Python 3.12, FastAPI, Pydantic v2, ortools, anthropic (`requirements.txt` 고정) | LangChain, 에이전트 프레임워크, ORM, DB 접근. **런타임 Python 의존성 추가 금지**(번들 한도, ADR-007) |
 | LLM | Claude tool use | 스트리밍, RAG, 벡터 DB, 멀티 에이전트 |
 | 테스트 | pytest(솔버는 실제로 돌리고 LLM은 mock), vitest(`lib/` 순수 함수), Playwright(`e2e/`, 수동 실행, ADR-013) | 컴포넌트 테스트 프레임워크 |

@@ -5,7 +5,7 @@ import { useEffect, useRef, useState } from "react";
 
 import { applyDrag, cellKey, cellsFromSlots, SLOT_COUNT, slotLabel, slotsFromCells } from "@/lib/availability";
 import { formatRange, periodDays, type PeriodDay } from "@/lib/period";
-import { getAvailability, submitAvailability, type EmployeeAvailability } from "@/lib/supabase";
+import { getAvailability, getAvailabilityRoster, submitAvailability, type AvailabilityRoster, type EmployeeAvailability } from "@/lib/supabase";
 
 import { ui } from "./ui";
 
@@ -14,9 +14,114 @@ const DAYS_PER_PAGE = 7;
 const SLOTS = Array.from({ length: SLOT_COUNT }, (_, i) => i);
 
 type Load = { kind: "loading" } | { kind: "error" } | { kind: "not_found" } | { kind: "ok"; link: EmployeeAvailability };
+type RosterLoad = { kind: "loading" } | { kind: "error" } | { kind: "not_found" } | { kind: "ok"; roster: AvailabilityRoster };
 
-/** 직원 가능 시간 입력(/a/{토큰}). 로그인을 요구하지 않고 store를 쓰지 않는다. */
+/** 직원 가능 시간 입력(/a/{공용 토큰}). 이름을 고른 뒤 캘린더로 간다. 로그인을 요구하지 않고 store를 쓰지 않는다. */
 export default function AvailabilityForm({ token }: { token: string }) {
+  const [load, setLoad] = useState<RosterLoad>({ kind: "loading" });
+  const [attempt, setAttempt] = useState(0);
+  const [picked, setPicked] = useState<string | null>(null);
+
+  useEffect(() => {
+    let live = true;
+    getAvailabilityRoster(token)
+      .then((roster) => {
+        if (live) setLoad(roster ? { kind: "ok", roster } : { kind: "not_found" });
+      })
+      .catch(() => {
+        if (live) setLoad({ kind: "error" });
+      });
+    return () => {
+      live = false;
+    };
+  }, [token, attempt]);
+
+  const retry = () => setAttempt((n) => n + 1);
+  if (picked)
+    return (
+      <EmployeeForm
+        key={picked}
+        token={picked}
+        onBack={() => {
+          setPicked(null);
+          retry();
+        }}
+      />
+    );
+  if (load.kind === "ok") return <NamePicker roster={load.roster} onPick={setPicked} />;
+  return <LoadMessage kind={load.kind} onRetry={retry} />;
+}
+
+function LoadMessage({ kind, onRetry }: { kind: "loading" | "error" | "not_found"; onRetry: () => void }) {
+  return (
+    <main className="mx-auto flex w-full max-w-[1360px] flex-col gap-3 px-8 py-6">
+      {kind === "loading" && (
+        <p role="status" className="text-sm text-[#3D3D38]">
+          불러오는 중…
+        </p>
+      )}
+      {kind === "not_found" && <p className="text-sm text-[#1B1B18]">링크를 확인해 주세요</p>}
+      {kind === "error" && (
+        <div role="alert" className={ui.banner}>
+          불러오지 못했어요. 네트워크를 확인하고 다시 시도해 주세요
+          <button type="button" onClick={onRetry} className={ui.textSm}>
+            다시 시도
+          </button>
+        </div>
+      )}
+    </main>
+  );
+}
+
+/** 이름 고르기. 이미 제출한 이름은 다른 사람 입력을 덮어쓰지 않게 한 번 더 묻는다. */
+function NamePicker({ roster, onPick }: { roster: AvailabilityRoster; onPick: (token: string) => void }) {
+  const [confirming, setConfirming] = useState<AvailabilityRoster["employees"][number] | null>(null);
+  const range = { start_date: roster.period_start, length: roster.period_length };
+
+  return (
+    <main className="mx-auto flex w-full max-w-[640px] flex-col gap-4 px-8 py-6">
+      <header className="flex flex-col gap-1">
+        <span className="text-sm text-[#3D3D38]">{roster.shop_name}</span>
+        <h1 className="text-[22px] font-semibold text-[#1B1B18]">가능 시간 입력</h1>
+        <span className="font-mono text-sm text-[#66665E]">{formatRange(range)}</span>
+      </header>
+      <p className="text-sm text-[#7A4506] md:hidden">PC에서 입력해 주세요. 휴대폰에서는 드래그할 수 없어요</p>
+      <section className={`${ui.card} flex flex-col gap-3`}>
+        <h2 className={ui.cardTitle}>내 이름을 골라 주세요</h2>
+        <div className="grid grid-cols-2 gap-2">
+          {roster.employees.map((e) => (
+            <button
+              key={e.link_token}
+              type="button"
+              onClick={() => (e.submitted && !roster.locked ? setConfirming(e) : onPick(e.link_token))}
+              className={`${ui.secondary} justify-between`}
+            >
+              <span className="truncate">{e.employee_name}</span>{" "}
+              {e.submitted &&<span className="ml-2 text-xs font-normal text-[#66665E]">제출함</span>}
+            </button>
+          ))}
+        </div>
+        {confirming && (
+          <div role="alert" className={ui.banner}>
+            <span className="min-w-0 flex-1">{confirming.employee_name}님은 이미 제출했어요. 본인이 맞으면 이어서 고칠 수 있어요</span>
+            <button type="button" onClick={() => onPick(confirming.link_token)} className={`${ui.textSm} shrink-0 whitespace-nowrap`}>
+              이어서 고치기
+            </button>
+            <button type="button" onClick={() => setConfirming(null)} className={`${ui.textSm} shrink-0 whitespace-nowrap`}>
+              취소
+            </button>
+          </div>
+        )}
+      </section>
+      <Link href="/privacy" className={`${ui.text} self-start`}>
+        개인정보처리방침
+      </Link>
+    </main>
+  );
+}
+
+/** 고른 직원의 칸을 읽어 캘린더를 보여 준다. */
+function EmployeeForm({ token, onBack }: { token: string; onBack: () => void }) {
   const [load, setLoad] = useState<Load>({ kind: "loading" });
   const [attempt, setAttempt] = useState(0);
 
@@ -34,28 +139,11 @@ export default function AvailabilityForm({ token }: { token: string }) {
     };
   }, [token, attempt]);
 
-  if (load.kind === "ok") return <Calendar token={token} link={load.link} onGone={() => setLoad({ kind: "not_found" })} />;
-  return (
-    <main className="mx-auto flex w-full max-w-[1360px] flex-col gap-3 px-8 py-6">
-      {load.kind === "loading" && (
-        <p role="status" className="text-sm text-[#3D3D38]">
-          불러오는 중…
-        </p>
-      )}
-      {load.kind === "not_found" && <p className="text-sm text-[#1B1B18]">링크를 확인해 주세요</p>}
-      {load.kind === "error" && (
-        <div role="alert" className={ui.banner}>
-          불러오지 못했어요. 네트워크를 확인하고 다시 시도해 주세요
-          <button type="button" onClick={() => setAttempt((n) => n + 1)} className={ui.textSm}>
-            다시 시도
-          </button>
-        </div>
-      )}
-    </main>
-  );
+  if (load.kind === "ok") return <Calendar token={token} link={load.link} onGone={() => setLoad({ kind: "not_found" })} onBack={onBack} />;
+  return <LoadMessage kind={load.kind} onRetry={() => setAttempt((n) => n + 1)} />;
 }
 
-function Calendar({ token, link, onGone }: { token: string; link: EmployeeAvailability; onGone: () => void }) {
+function Calendar({ token, link, onGone, onBack }: { token: string; link: EmployeeAvailability; onGone: () => void; onBack: () => void }) {
   const range = { start_date: link.period_start, length: link.period_length };
   const days = periodDays(range);
   const pages = Math.ceil(days.length / DAYS_PER_PAGE);
@@ -112,6 +200,9 @@ function Calendar({ token, link, onGone }: { token: string; link: EmployeeAvaila
         <span className="text-sm text-[#3D3D38]">{link.shop_name}</span>
         <h1 className="text-[22px] font-semibold text-[#1B1B18]">{link.employee_name}님의 가능 시간</h1>
         <span className="font-mono text-sm text-[#66665E]">{formatRange(range)}</span>
+        <button type="button" onClick={onBack} className={`${ui.textSm} ml-auto`}>
+          이름 다시 고르기
+        </button>
       </header>
 
       {pages > 1 && (

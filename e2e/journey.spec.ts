@@ -28,6 +28,7 @@ import {
   interpretOk,
   leaveOf,
   leavesOf,
+  getRoster,
   linkRows,
   loginAsTestUser,
   openFlow,
@@ -69,7 +70,7 @@ let page: Page;
 let problems: string[] = [];
 let lastSolve: ScheduleRequest | undefined;
 let ruleCount: number;
-let parkLink: string;
+let shareLink: string;
 let fixedCell: { day: number; code: Code };
 let finalGrid: Grid;
 
@@ -204,16 +205,15 @@ test("S6. ① 가능 시간: 준비 요약과 링크 표", async () => {
   await expect(page.getByRole("heading", { name: "명단 확인" })).toHaveCount(0);
 
   // 링크 표
-  await expect(page.getByText("직원마다 자기 링크를 보내 주세요. 링크를 연 사람은 그 직원의 가능 시간만 입력할 수 있어요")).toBeVisible();
-  const copyButtons = page.getByRole("button", { name: "링크 복사" });
-  await expect(copyButtons).toHaveCount(EMPLOYEE_COUNT);
+  await expect(page.getByText("단체 대화방에 이 링크 하나만 올려 주세요. 직원이 자기 이름을 골라 가능 시간을 입력해요")).toBeVisible();
+  await expect(page.getByRole("button", { name: "링크 복사" })).toHaveCount(1);
+  await expect(page.getByText(`${EMPLOYEE_COUNT}명 중 0명 제출`)).toBeVisible();
   const links = await shownLinks(page);
-  expect(links).toHaveLength(EMPLOYEE_COUNT);
-  const parkRow = page.getByRole("row").filter({ hasText: "박민수" });
-  await parkRow.getByRole("button", { name: "링크 복사" }).click();
-  await expect(parkRow.getByRole("button", { name: "복사했어요" })).toBeVisible();
-  parkLink = await page.evaluate(() => navigator.clipboard.readText());
-  expect(parkLink).toBe((await parkRow.locator("td").nth(1).innerText()).trim());
+  expect(links).toHaveLength(1);
+  await page.getByRole("button", { name: "링크 복사" }).click();
+  await expect(page.getByRole("button", { name: "복사했어요" })).toBeVisible();
+  shareLink = await page.evaluate(() => navigator.clipboard.readText());
+  expect(shareLink).toBe(links[0].trim());
   await expect(page.getByRole("button", { name: "다음", exact: true })).toBeEnabled();
 
   const p = await periodByStart(page, WEEK.start_date);
@@ -223,6 +223,26 @@ test("S6. ① 가능 시간: 준비 요약과 링크 표", async () => {
   expect(rows).toHaveLength(EMPLOYEE_COUNT);
   expect(new Set(rows.map((r) => r.token)).size, "토큰이 모두 다르다").toBe(EMPLOYEE_COUNT);
   await expectNoDevTerms(page, "① 가능 시간");
+
+  // 명단에서 뺀 직원은 공용 링크의 명단에서도 사라지고, 다시 넣으면 돌아온다
+  const rosterNames = async () => {
+    const { data } = await getRoster(new URL(shareLink).pathname.split("/").at(-1)!);
+    return (data as { employee_name: string }[]).map((r) => r.employee_name);
+  };
+  const openLinks = async () => {
+    await page.getByRole("button", { name: "근무표", exact: true }).click();
+    await page.getByRole("button", { name: "이어서 하기" }).click();
+    await expect(page.getByRole("button", { name: "링크 복사" })).toHaveCount(1);
+  };
+  await page.getByRole("button", { name: "매장 설정", exact: true }).click();
+  await page.getByRole("button", { name: "근무표에서 빼기" }).last().click();
+  await openLinks();
+  await expect.poll(rosterNames, { message: "빠진 직원 없음" }).not.toContain("신도윤");
+  await page.getByRole("button", { name: "매장 설정", exact: true }).click();
+  await page.getByRole("button", { name: "제외된 직원 1명 보기" }).click();
+  await page.getByRole("row").filter({ hasText: "신도윤" }).getByRole("button", { name: "다시 넣기" }).click();
+  await openLinks();
+  await expect.poll(rosterNames, { message: "다시 넣은 직원 있음" }).toContain("신도윤");
 });
 
 test("S7. 직원 화면: 드래그 입력과 제출", async ({ browser }) => {
@@ -231,7 +251,14 @@ test("S7. 직원 화면: 드래그 입력과 제출", async ({ browser }) => {
   const cell = (label: string) => p.getByRole("button", { name: label, exact: true });
   const pressed = p.locator('main button[aria-pressed="true"]');
 
-  await p.goto(parkLink);
+  await p.goto(shareLink);
+  await expect(p.getByRole("heading", { name: "내 이름을 골라 주세요" })).toBeVisible();
+  await expect(p.getByRole("main").getByRole("button").filter({ hasNotText: "개인정보" })).toHaveCount(EMPLOYEE_COUNT);
+  const { data: roster } = await getRoster(new URL(shareLink).pathname.split("/").at(-1)!);
+  expect(JSON.stringify(roster), "명단 응답에 칸이 없다").not.toContain("slots");
+  expect(JSON.stringify(roster), "명단 응답에 직원 id가 없다").not.toContain("employee_id");
+  await expectNoDevTerms(p, "직원 화면(이름 고르기)");
+  await p.getByRole("button", { name: "박민수", exact: true }).click();
   await expect(p.getByText("박민수님의 가능 시간")).toBeVisible();
   await expect(p.getByText("한강 카페")).toBeVisible();
   await expect(p.getByText(WEEK_RANGE)).toBeVisible();
@@ -271,8 +298,14 @@ test("S7. 직원 화면: 드래그 입력과 제출", async ({ browser }) => {
 
   // 다시 열어도 같다. 다른 직원 정보는 보이지 않는다
   const reopen = await openFlow(browser, { width: 1280, height: 800 });
-  const parkToken = new URL(parkLink).pathname.split("/").at(-1)!;
-  await reopen.page.goto(parkLink);
+  const parkToken = (await linkRows(WEEK.start_date)).find((r) => r.employee_name === "박민수")!.token;
+  await reopen.page.goto(shareLink);
+  // 제출한 이름은 다시 묻고, 취소하면 이름 고르기에 남는다
+  await reopen.page.getByRole("button", { name: "박민수 제출함" }).click();
+  await reopen.page.getByRole("button", { name: "취소" }).click();
+  await expect(reopen.page.getByRole("button", { name: "이어서 고치기" })).toHaveCount(0);
+  await reopen.page.getByRole("button", { name: "박민수 제출함" }).click();
+  await reopen.page.getByRole("button", { name: "이어서 고치기" }).click();
   await expect(reopen.page.locator('main button[aria-pressed="true"]')).toHaveCount(34);
   await expect(reopen.page.getByRole("button", { name: "11월 3일 12:00~12:30" })).toHaveAttribute("aria-pressed", "true");
   await expect(reopen.page.getByRole("button", { name: "11월 5일 17:30~18:00" })).toHaveAttribute("aria-pressed", "true");
@@ -302,6 +335,10 @@ test("S7. 직원 화면: 드래그 입력과 제출", async ({ browser }) => {
   expect(rows.every((r) => r.submitted_at), "12행 모두 제출").toBe(true);
   const park = rows.find((r) => r.employee_name === "박민수")!;
   expect(park.slots).toEqual({ "2026-11-03": [["12:00", "23:00"]], "2026-11-05": [["12:00", "18:00"]] });
+  // 매니저 화면의 제출 현황은 [새로고침]에서 다시 읽는다
+  await page.getByRole("button", { name: "새로고침" }).click();
+  await expect(page.getByText(`${EMPLOYEE_COUNT}명 중 ${EMPLOYEE_COUNT}명 제출`)).toBeVisible();
+  await expect(page.getByText("미제출:")).toHaveCount(0);
 });
 
 test("S8. ② 매장 조건", async () => {
@@ -349,7 +386,7 @@ test("S8. ② 매장 조건", async () => {
   await expect(page.getByText(/인원은 숫자로|최소가 최대보다/)).toHaveCount(0);
 
   await page.getByRole("button", { name: "이전" }).click();
-  await expect(page.getByRole("button", { name: "링크 복사" })).toHaveCount(EMPLOYEE_COUNT);
+  await expect(page.getByRole("button", { name: "링크 복사" })).toHaveCount(1);
   await next.click();
   await expect(currentStep()).toContainText("매장 조건");
 
@@ -688,7 +725,8 @@ test("S12. 확정 → 확정 근무표 → 직원 링크 잠김", async ({ brows
 
   // 잠긴 직원 화면
   const staff = await openFlow(browser, { width: 1280, height: 800 });
-  await staff.page.goto(parkLink);
+  await staff.page.goto(shareLink);
+  await staff.page.getByRole("button", { name: "박민수 제출함" }).click();
   await expect(staff.page.getByText("이미 확정된 근무표예요")).toBeVisible();
   await expect(staff.page.locator('main button[aria-pressed="true"]')).toHaveCount(34);
   await expect(staff.page.getByRole("button", { name: "제출" })).toHaveCount(0);
