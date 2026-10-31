@@ -163,6 +163,24 @@ async def handle_errors_and_log(request: Request, call_next):
 # --- 입력 ---
 
 
+def _is_availability_rule(c: Any) -> bool:
+    """가능 시간 규칙 모양인지(lib/availability.ts): 사람마다 고른 칸의 수 = 0인 반드시 규칙. id만 보면 일반 규칙이 상한을 비껴간다."""
+    if not isinstance(c, dict) or not str(c.get("id", "")).startswith(AVAILABILITY_RULE_PREFIX):
+        return False
+    body = c.get("body")
+    if c.get("type") != "rule" or c.get("hardness") != "hard" or not isinstance(body, dict) or body.get("when"):
+        return False
+    for_each, then = body.get("for_each"), body.get("then")
+    return (
+        body.get("kind") == "require"
+        and isinstance(for_each, dict)
+        and for_each.get("per") == "person"
+        and isinstance(then, dict)
+        and then.get("op") == "eq"
+        and then.get("right") == 0
+    )
+
+
 def _check_limits(data: Any) -> None:
     """Pydantic 검증 전에 개수와 길이만 가볍게 확인한다."""
     if not isinstance(data, dict):
@@ -182,7 +200,7 @@ def _check_limits(data: Any) -> None:
             raise ApiError(413, "PAYLOAD_TOO_LARGE", f"근무 코드는 최대 {MAX_SHIFT_CODES}개입니다")
         if isinstance(constraints, list):
             fixed = sum(1 for c in constraints if isinstance(c, dict) and c.get("type") == "fixed_assignment")
-            avail = sum(1 for c in constraints if isinstance(c, dict) and str(c.get("id", "")).startswith(AVAILABILITY_RULE_PREFIX))
+            avail = sum(1 for c in constraints if _is_availability_rule(c))
             if avail > MAX_AVAILABILITY_RULES:
                 raise ApiError(413, "PAYLOAD_TOO_LARGE", f"가능 시간 규칙은 최대 {MAX_AVAILABILITY_RULES}개입니다")
             if len(constraints) - fixed - avail > MAX_CONSTRAINTS:

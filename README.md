@@ -154,8 +154,9 @@ npm install
 # .env.local (저장소에 커밋하지 않음)
 #   ANTHROPIC_API_KEY=...
 #   ANTHROPIC_MODEL=claude-sonnet-5-5   # 선택, 기본값
-#   NEXT_PUBLIC_SUPABASE_URL=...        # 선택, 없으면 게스트 모드만
+#   NEXT_PUBLIC_SUPABASE_URL=...        # 없으면 앱은 로그인 설정 안내만 보인다
 #   NEXT_PUBLIC_SUPABASE_ANON_KEY=...
+#   E2E_TEST_EMAIL, E2E_TEST_PASSWORD   # e2e 전용, docs/BROWSER_TEST_SCENARIOS.md 참고
 
 npm run dev                 # Next :3000 + FastAPI :8000 (/api/py/* 리라이트)
 npm run test                # pytest (backend/tests, scripts/test_hooks.py) + vitest

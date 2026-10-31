@@ -29,7 +29,7 @@ test("S1. 랜딩 → 샘플 데모 → 로그인 → 매장 준비", async ({ pa
   const sampleCta = page.getByRole("link", { name: "샘플로 체험하기" });
   const ownCta = page.getByRole("link", { name: "내 매장으로 시작하기" });
   await expect(sampleCta).toHaveAttribute("href", "/demo");
-  await expect(ownCta).toHaveAttribute("href", "/app?start=new");
+  await expect(ownCta).toHaveAttribute("href", "/app");
 
   // 샘플 데모: 보기 전용, 저장하지 않음
   await sampleCta.click();

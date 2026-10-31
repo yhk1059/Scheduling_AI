@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 
 import { applyDrag, cellKey, cellsFromSlots, SLOT_COUNT, slotLabel, slotsFromCells } from "@/lib/availability";
@@ -181,6 +182,9 @@ function Calendar({ token, link, onGone }: { token: string; link: EmployeeAvaila
       </div>
 
       <div className="flex items-center justify-end gap-3">
+        <Link href="/privacy" className={`${ui.text} mr-auto`}>
+          개인정보처리방침
+        </Link>
         {locked ? (
           <p className="text-sm text-[#3D3D38]">이미 확정된 근무표예요</p>
         ) : (
