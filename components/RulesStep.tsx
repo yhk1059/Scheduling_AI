@@ -35,7 +35,7 @@ const COPY = {
     title: "예외",
     noun: "요청",
     prompt: "이번 근무표에만 적용할 예외가 있나요?",
-    description: "이번 근무표에만 적용할 휴가, 고정 근무, 희망·기피 근무를 말로 적어 주세요. 가능 시간에 이미 있는 내용은 다시 적지 않아도 돼요.",
+    description: "휴가, 희망, 기피를 말로 적어요. 가능 시간에 이미 있는 내용은 다시 적지 않아도 돼요.",
     placeholder: "예: 이영희 15~17일 휴가",
     submit: "요청 만들기",
     empty: "아직 요청이 없어요.",
@@ -56,7 +56,7 @@ export function previewRange(unit: PeriodUnit): PeriodRange {
 type Notice = { kind: "clarify" | "unsupported"; text: string } | null;
 
 /**
- * 말로 적는 입력 바와 카드 목록. scope shop은 매장 조건(작성 ②, 매장 설정), scope period는 이번 근무표 예외(작성 ③).
+ * 말로 적는 입력 바와 카드 목록. scope shop은 매장 조건(작성 ②, 매장 설정), scope period는 이번 근무표 예외(작성 ③, 패널 안 두 열).
  * pendingNote=false: 화면이 대기 카드 안내를 버튼 옆에 따로 둘 때.
  * step: 단계 화면. 제목을 두고, 요약표에 든 필요 인원은 카드에서 빼고, 이 근무표의 꺼짐과 수정본을 보여 준다.
  * summary, afterInput: 입력 바 위·아래에 놓을 영역.
@@ -126,6 +126,7 @@ export default function RulesStep({
         card={c}
         pending
         replaces={findReplaced(scope === "shop" ? shop.rules : period!.requests, c)}
+        compact={scope === "period"}
       />
     ) : scope === "period" ? (
       <ConstraintCard
@@ -134,6 +135,7 @@ export default function RulesStep({
         pending={false}
         off={period!.disabledIds.includes(c.id)}
         onToggleOff={(off) => setDisabled(period!.id, c.id, off)}
+        compact
       />
     ) : stepPeriod ? (
       <ConstraintCard
@@ -195,9 +197,129 @@ export default function RulesStep({
     }
   };
 
+  const input = (
+    <>
+      <div className="flex flex-col gap-1">
+        <p className={ui.cardTitle}>{copy.prompt}</p>
+        <p className="text-[13px] text-[#3D3D38]">{copy.description}</p>
+      </div>
+      <form
+        className={`${ui.bar} ${tooLong ? "border-[#B42318]!" : ""}`}
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (!loading && !tooLong && text.trim() !== "") void run(text.trim());
+        }}
+      >
+        <Mark size={18} />
+        <label className="flex min-w-0 flex-1">
+          <span className="sr-only">{copy.title} 입력</span>
+          <input
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            placeholder={copy.placeholder}
+            aria-invalid={tooLong || undefined}
+            className={ui.barInput}
+          />
+        </label>
+        <button type="submit" disabled={loading || tooLong || text.trim() === ""} className={ui.primaryBar}>
+          {loading && <Spinner />}
+          {loading ? "읽는 중…" : copy.submit}
+        </button>
+      </form>
+      {copy.examples.length > 0 && (
+        <div className="flex flex-wrap items-center gap-1.5">
+          <span className={ui.help}>예시</span>
+          {copy.examples.map((ex) => (
+            <button key={ex} type="button" onClick={() => setText(ex)} className={ui.chip}>
+              {ex}
+            </button>
+          ))}
+        </div>
+      )}
+      {failure && (
+        <div role="alert" className="flex items-center gap-2 text-sm text-[#9F1F14]">
+          {failure.message}
+          <button type="button" disabled={loading} onClick={() => void run(failure.text)} className={ui.textSm}>
+            다시 시도
+          </button>
+        </div>
+      )}
+      <div className="flex items-start justify-between gap-3">
+        <div className="text-sm">
+          {notice?.kind === "clarify" && (
+            <p className="text-[#1B1B18]">
+              {notice.text} <span className="text-xs font-medium text-[#66665E]">내용을 보완해서 다시 입력해 주세요.</span>
+            </p>
+          )}
+          {notice?.kind === "unsupported" && <p className="text-[#7A4506]">{notice.text}</p>}
+        </div>
+        <span className={`shrink-0 font-mono text-xs ${tooLong ? "text-[#B42318]" : "text-[#9A9A91]"}`}>
+          {text.length}/{MAX_TEXT_CHARS}
+        </span>
+      </div>
+    </>
+  );
+
+  const list =
+    items.length === 0 ? (
+      copy.empty && <p className="text-sm text-[#66665E]">{copy.empty}</p>
+    ) : (
+      <div className="flex flex-col gap-3">
+        {pendingCount >= 2 && (
+          <div className="flex justify-end">
+            <button type="button" onClick={applyAll} className={ui.secondary}>
+              모두 적용
+            </button>
+          </div>
+        )}
+        <div className={scope === "period" ? "flex flex-col gap-3" : "grid grid-cols-2 gap-4"}>
+          {items.map(({ id, cfg, entry }) =>
+            cfg ? (
+              <div key={id} className="flex flex-col gap-3">
+                <ShiftChangeCardView card={cfg} />
+                {shop.pendingRules
+                  .filter((c) => cfg.ruleIds.includes(c.id))
+                  .map((c) => (
+                    <div key={c.id} className="pl-4">
+                      <ConstraintCard
+                        card={c}
+                        pending
+                        replaces={findReplaced(shop.rules, c)}
+                        withConfig={cfg.change.shift.code}
+                      />
+                    </div>
+                  ))}
+              </div>
+            ) : (
+              renderCard(entry!.card, entry!.pending)
+            ),
+          )}
+        </div>
+      </div>
+    );
+
+  const note = pendingNote && pendingCount > 0 && (
+    <p className={ui.help}>
+      적용하지 않은 {copy.noun} {pendingCount}개는 빠져요
+    </p>
+  );
+
+  // ③ 예외 입력: 왼쪽 입력, 오른쪽 요청 카드를 패널 하나에 둔다
+  if (scope === "period") {
+    return (
+      <section className={`${ui.panel} grid grid-cols-[7fr_5fr] gap-6`}>
+        <div className="flex min-w-0 flex-col gap-3">{input}</div>
+        <div className="flex min-w-0 flex-col gap-3">
+          {list}
+          {note}
+        </div>
+      </section>
+    );
+  }
+
   return (
     <div className="flex flex-col gap-5">
-      {/* 매장 설정의 탭 안과 예외 입력에는 페이지 제목을 두지 않는다 */}
+      {/* 매장 설정의 탭 안에는 페이지 제목을 두지 않는다 */}
       {step && (
         <h2 tabIndex={-1} data-step-title className={`${ui.cardTitle} outline-none`}>
           {copy.title}
@@ -206,111 +328,13 @@ export default function RulesStep({
 
       {summary}
 
-      <section className={`${ui.panel} flex flex-col gap-3`}>
-        <div className="flex flex-col gap-1">
-          <p className={ui.cardTitle}>{copy.prompt}</p>
-          <p className="text-[13px] text-[#3D3D38]">{copy.description}</p>
-        </div>
-        <form
-          className={`${ui.bar} ${tooLong ? "border-[#B42318]!" : ""}`}
-          onSubmit={(e) => {
-            e.preventDefault();
-            if (!loading && !tooLong && text.trim() !== "") void run(text.trim());
-          }}
-        >
-          <Mark size={18} />
-          <label className="flex min-w-0 flex-1">
-            <span className="sr-only">{copy.title} 입력</span>
-            <input
-              value={text}
-              onChange={(e) => setText(e.target.value)}
-              placeholder={copy.placeholder}
-              aria-invalid={tooLong || undefined}
-              className={ui.barInput}
-            />
-          </label>
-          <button type="submit" disabled={loading || tooLong || text.trim() === ""} className={ui.primaryBar}>
-            {loading && <Spinner />}
-            {loading ? "읽는 중…" : copy.submit}
-          </button>
-        </form>
-        {copy.examples.length > 0 && (
-          <div className="flex flex-wrap items-center gap-1.5">
-            <span className={ui.help}>예시</span>
-            {copy.examples.map((ex) => (
-              <button key={ex} type="button" onClick={() => setText(ex)} className={ui.chip}>
-                {ex}
-              </button>
-            ))}
-          </div>
-        )}
-        {failure && (
-          <div role="alert" className="flex items-center gap-2 text-sm text-[#9F1F14]">
-            {failure.message}
-            <button type="button" disabled={loading} onClick={() => void run(failure.text)} className={ui.textSm}>
-              다시 시도
-            </button>
-          </div>
-        )}
-        <div className="flex items-start justify-between gap-3">
-          <div className="text-sm">
-            {notice?.kind === "clarify" && (
-              <p className="text-[#1B1B18]">
-                {notice.text} <span className="text-xs font-medium text-[#66665E]">내용을 보완해서 다시 입력해 주세요.</span>
-              </p>
-            )}
-            {notice?.kind === "unsupported" && <p className="text-[#7A4506]">{notice.text}</p>}
-          </div>
-          <span className={`shrink-0 font-mono text-xs ${tooLong ? "text-[#B42318]" : "text-[#9A9A91]"}`}>
-            {text.length}/{MAX_TEXT_CHARS}
-          </span>
-        </div>
-      </section>
+      <section className={`${ui.panel} flex flex-col gap-3`}>{input}</section>
 
       {afterInput}
 
-      {items.length === 0 ? (
-        copy.empty && <p className="text-sm text-[#66665E]">{copy.empty}</p>
-      ) : (
-        <div className="flex flex-col gap-3">
-          {pendingCount >= 2 && (
-            <div className="flex justify-end">
-              <button type="button" onClick={applyAll} className={ui.secondary}>
-                모두 적용
-              </button>
-            </div>
-          )}
-          <div className="grid grid-cols-2 gap-4">
-            {items.map(({ id, cfg, entry }) =>
-              cfg ? (
-                <div key={id} className="flex flex-col gap-3">
-                  <ShiftChangeCardView card={cfg} />
-                  {shop.pendingRules
-                    .filter((c) => cfg.ruleIds.includes(c.id))
-                    .map((c) => (
-                      <div key={c.id} className="pl-4">
-                        <ConstraintCard
-                          card={c}
-                          pending
-                          replaces={findReplaced(shop.rules, c)}
-                          withConfig={cfg.change.shift.code}
-                        />
-                      </div>
-                    ))}
-                </div>
-              ) : (
-                renderCard(entry!.card, entry!.pending)
-              ),
-            )}
-          </div>
-        </div>
-      )}
+      {list}
 
-      {pendingNote && pendingCount > 0 && (
-        <p className={ui.help}>
-          적용하지 않은 {copy.noun} {pendingCount}개는 빠져요
-        </p>
-      )}
+      {note}
     </div>
   );
 }

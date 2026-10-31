@@ -13,7 +13,6 @@ import {
   carryOverChanged,
   type Code,
   currentPeriod,
-  orphanConstraintIds,
   toScheduleRequest,
   useAppStore,
   type WorkPeriod,
@@ -38,6 +37,33 @@ import RulesStep, { Spinner, today } from "./RulesStep";
 import { ui } from "./ui";
 
 const WEEKDAYS = ["일", "월", "화", "수", "목", "금", "토"];
+
+/** 근무표 날짜 머리 두 줄(날짜 / 요일). 토요일 청록, 일요일·공휴일 빨강. */
+export function DayHead({
+  label,
+  weekday,
+  holiday,
+  weekend,
+  today: isToday = false,
+}: {
+  label: string;
+  weekday: number;
+  holiday: boolean;
+  weekend: boolean;
+  today?: boolean;
+}) {
+  const color = weekday === 0 || holiday ? "text-[#B42318]" : weekday === 6 ? "text-[#155E75]" : "text-[#66665E]";
+  return (
+    <span
+      className={`flex flex-col items-center rounded-xs py-0.5 text-[11px] ${weekend ? "bg-[#F1EEE6]" : ""} ${color} ${
+        isToday ? "border-b-2 border-[#155E75]" : ""
+      }`}
+    >
+      <span className="font-mono font-medium tracking-[-0.04em] whitespace-nowrap">{label}</span>
+      <span>{WEEKDAYS[weekday]}</span>
+    </span>
+  );
+}
 
 export const CELL =
   "relative w-[30px] h-7 rounded-xs inline-flex items-center justify-center font-mono transition-colors duration-[120ms]";
@@ -84,11 +110,8 @@ type Cell = { employeeId: string; day: number };
 export type Toast = { message: string; retry: () => void } | null;
 type Load = { closings: number; weekends: number };
 
-/**
- * 누적 부담 근거 한 줄. 최근 4주 마감이 평균보다 많았던 직원 중 이번 근무표 마감이 평균 이하인 사람.
- * 해당자가 없거나 history가 비면 null.
- */
-function historyEvidence(rows: Employee[], result: ScheduleResult, history: Map<string, Load>, config: ShopConfig): string | null {
+/** 최근 4주 마감이 평균보다 많았던 직원 중 이번 근무표 마감이 평균 이하인 사람. 해당자가 없거나 history가 비면 null. */
+function easedClosings(rows: Employee[], result: ScheduleResult, history: Map<string, Load>, config: ShopConfig) {
   const closing = closingShift(config);
   if (history.size === 0 || rows.length === 0 || !closing) return null;
   const past = (n: Employee) => history.get(n.id)?.closings ?? 0;
@@ -97,9 +120,25 @@ function historyEvidence(rows: Employee[], result: ScheduleResult, history: Map<
   const pastAvg = avg(past);
   const nowAvg = avg(now);
   const eased = rows.filter((n) => past(n) > pastAvg && now(n) <= nowAvg);
-  if (eased.length === 0) return null;
+  return eased.length === 0 ? null : { closing, eased, past, now };
+}
+
+/** 누적 부담 근거 한 줄. */
+function historyEvidence(rows: Employee[], result: ScheduleResult, history: Map<string, Load>, config: ShopConfig): string | null {
+  const found = easedClosings(rows, result, history, config);
+  if (!found) return null;
+  const { closing, eased, past, now } = found;
   if (eased.length === 1) return `${eased[0].name} 최근 4주 ${closing.name} ${past(eased[0])}회 → 이번 근무표 ${now(eased[0])}회`;
   return `최근 4주 ${closing.name}${josa(closing.name, "이", "가")} 많았던 ${eased.length}명은 이번 근무표에서 ${closing.name}${josa(closing.name, "을", "를")} 줄였어요`;
+}
+
+/** 요약 지표의 "최근 4주 마감 배려" 칸. 최근 4주 마감이 가장 많았던 2명까지 적는다. */
+function closingCare(rows: Employee[], result: ScheduleResult, history: Map<string, Load>, config: ShopConfig) {
+  const found = easedClosings(rows, result, history, config);
+  if (!found) return null;
+  const { closing, eased, past, now } = found;
+  const top = [...eased].sort((a, b) => past(b) - past(a)).slice(0, 2);
+  return { label: `최근 4주 ${closing.name} 배려`, text: top.map((n) => `${n.name} ${past(n)}회 → ${now(n)}회`).join(" · ") };
 }
 
 export function toMessage(e: unknown): string {
@@ -223,8 +262,8 @@ export function ToastAlert({ toast, busy, onClose }: { toast: NonNullable<Toast>
 }
 
 /**
- * 근무표 본문: stale 배너, 해 없음 패널, (children), 요약 지표, 근거 한 줄, 근무표(칸 고정), 통계.
- * readOnly면 칸을 누를 수 없다(끝난 근무표).
+ * 근무표 본문: stale 배너, 해 없음 패널, (children), 요약 지표, 근거 한 줄, 근무표(칸 고정), (actions), 통계.
+ * readOnly면 칸을 누를 수 없다(끝난 근무표). outcomeAtGrid면 해 없음 패널을 근무표 자리(요약 지표 아래)에 둔다.
  */
 export function ScheduleBody({
   period,
@@ -232,12 +271,20 @@ export function ScheduleBody({
   busy,
   readOnly = false,
   children,
+  hint,
+  actions,
+  outcomeAtGrid = false,
 }: {
   period: WorkPeriod;
   solve: Solve;
   busy: boolean;
   readOnly?: boolean;
   children?: ReactNode;
+  /** 요약 지표 오른쪽에 놓을 안내 */
+  hint?: ReactNode;
+  /** 근무표와 통계 사이의 버튼 줄 */
+  actions?: ReactNode;
+  outcomeAtGrid?: boolean;
 }) {
   const shop = useAppStore((s) => s.shop);
   const periods = useAppStore((s) => s.periods);
@@ -286,6 +333,27 @@ export function ScheduleBody({
   const shownVersion = outcome ? outcome.version : resultVersion;
   const stale = !busy && shownVersion !== null && shownVersion !== inputVersion;
   const evidence = result ? historyEvidence(rows, result, history, shop.config) : null;
+  const care = result ? closingCare(rows, result, history, shop.config) : null;
+  const outcomePanel = outcome && (
+    <OutcomePanel
+      outcome={outcome}
+      explaining={sv.explaining}
+      busy={busy}
+      constraints={constraints}
+      employees={employees}
+      period={period}
+      hasResult={result !== null}
+      onAccept={(p) => {
+        applyChanges(periodId, p.changes);
+        sv.run();
+      }}
+      onDisable={(id) => {
+        setDisabled(periodId, id, true);
+        sv.run();
+      }}
+      onToggle={(id, enabled) => setDisabled(periodId, id, !enabled)}
+    />
+  );
 
   return (
     <>
@@ -301,73 +369,65 @@ export function ScheduleBody({
         </div>
       )}
 
-      {outcome && (
-        <OutcomePanel
-          outcome={outcome}
-          explaining={sv.explaining}
-          busy={busy}
-          constraints={constraints}
-          employees={employees}
-          period={period}
-          hasResult={result !== null}
-          onAccept={(p) => {
-            applyChanges(periodId, p.changes);
-            sv.run();
-          }}
-          onDisable={(id) => {
-            setDisabled(periodId, id, true);
-            sv.run();
-          }}
-          onToggle={(id, enabled) => setDisabled(periodId, id, !enabled)}
-        />
-      )}
+      {!outcomeAtGrid && outcomePanel}
 
       {children}
 
       {result && (
         <>
-          <SummaryCard result={result} infeasible={outcome !== null} confirmed={isConfirmed} draft={isDraft} legacy={legacy} />
+          <div className="flex items-end justify-between gap-6">
+            <SummaryCard result={result} infeasible={outcome !== null} confirmed={isConfirmed} draft={isDraft} legacy={legacy} care={care} />
+            {hint}
+          </div>
           {legacy && <p className="-mt-2 text-sm text-[#66665E]">변환 전에 확정한 근무표예요. 희망 반영과 못 지킨 규칙은 보여 주지 않아요.</p>}
           {evidence && <p className="-mt-2 text-sm text-[#3D3D38]">{evidence}</p>}
-          <section className={`${ui.card} flex flex-col gap-3`}>
-            <div className="flex h-8 items-center justify-between gap-3">
-              <h2 className={ui.cardTitle}>근무표</h2>
-              {selected && (
-                <CellEditor
-                  codes={shop.config.shifts.filter((s) => s.active !== false)}
-                  label={`${employees.find((n) => n.id === selected.employeeId)?.name ?? selected.employeeId} ${monthDay(period, selected.day)}`}
-                  fixed={fixed.get(`${selected.employeeId}-${selected.day}`)}
-                  onPick={(code) => onPick(selected, code)}
-                  onCancel={() => setSelected(null)}
-                />
-              )}
-            </div>
-            <ScheduleGrid
-              config={shop.config}
-              rows={rows}
-              result={result}
-              period={period}
-              holidays={holidays}
-              isWeekend={isWeekend}
-              fixed={fixed}
-              selected={selected}
-              disabled={busy}
-              readOnly={readOnly}
-              onSelect={onSelect}
-              history={history}
-              pastDays={pastDays}
-              todayDay={todayDay}
-              hideViolations={legacy}
-            />
-          </section>
-          <StatsTable config={shop.config} rows={rows} result={result} history={history} legacy={legacy} />
         </>
       )}
+
+      {outcomeAtGrid && outcomePanel}
+
+      {result && (
+        <section className={`${ui.card} flex flex-col gap-3`}>
+          <div className="flex h-8 items-center justify-between gap-3">
+            <h2 className={ui.cardTitle}>근무표</h2>
+            {selected && (
+              <CellEditor
+                codes={shop.config.shifts.filter((s) => s.active !== false)}
+                label={`${employees.find((n) => n.id === selected.employeeId)?.name ?? selected.employeeId} ${monthDay(period, selected.day)}`}
+                fixed={fixed.get(`${selected.employeeId}-${selected.day}`)}
+                onPick={(code) => onPick(selected, code)}
+                onCancel={() => setSelected(null)}
+              />
+            )}
+          </div>
+          <ScheduleGrid
+            config={shop.config}
+            rows={rows}
+            result={result}
+            period={period}
+            holidays={holidays}
+            isWeekend={isWeekend}
+            fixed={fixed}
+            selected={selected}
+            disabled={busy}
+            readOnly={readOnly}
+            onSelect={onSelect}
+            history={history}
+            pastDays={pastDays}
+            todayDay={todayDay}
+            hideViolations={legacy}
+          />
+        </section>
+      )}
+
+      {actions}
+
+      {result && <StatsTable config={shop.config} rows={rows} result={result} history={history} legacy={legacy} />}
     </>
   );
 }
 
-/** 근무표 작성 ③ 근무표. 접힌 예외 입력 아래에 버튼을 둔다. 만들기 전 [근무표 만들기], 만든 뒤 [확정]. 확정하면 확정 근무표 화면으로 간다. */
+/** 근무표 작성 ③ 근무표: 예외 입력 패널 → 요약 지표 → 근무표 → 버튼 줄 → 통계. 만들기 전 [근무표 만들기], 만든 뒤 [확정]. 확정하면 확정 근무표 화면으로 간다. */
 export default function ScheduleStep() {
   const shop = useAppStore((s) => s.shop);
   const period = useAppStore(currentPeriod);
@@ -423,42 +483,14 @@ export default function ScheduleStep() {
   };
   const employees = toScheduleRequest(shop, period, periods, today()).employees;
 
+  const remake = busy || employees.length === 0;
+  const blocked = availabilityChanged(period);
+
   return (
     <div className="flex flex-col gap-5">
-      <div className="flex flex-col gap-1">
-        <h2 tabIndex={-1} data-step-title className={`${ui.cardTitle} outline-none`}>
-          근무표
-        </h2>
-        <p className="text-sm leading-relaxed text-[#3D3D38]">
-          {result
-            ? "칸을 눌러 근무를 고정하면 나머지를 최소한으로 바꿔 다시 만들어요."
-            : "가능 시간과 매장 조건으로 근무표를 만들어요"}
-        </p>
-      </div>
-
-      <ExceptionSection period={period} />
-
-      <div className="flex items-center justify-end gap-2">
-        {!result ? (
-          <button type="button" onClick={sv.run} disabled={busy || employees.length === 0} className={ui.primary}>
-            {loading && <Spinner />}
-            {loading ? "만드는 중…" : "근무표 만들기"}
-          </button>
-        ) : (
-          <>
-            <button type="button" onClick={() => downloadCsv(period, employees, result)} disabled={busy} className={ui.text}>
-              CSV 받기
-            </button>
-            <button type="button" onClick={sv.run} disabled={busy || employees.length === 0} className={ui.secondary}>
-              {loading && <Spinner />}
-              {loading ? "만드는 중…" : "다시 만들기"}
-            </button>
-            <button type="button" onClick={() => void onConfirm()} disabled={busy || availabilityChanged(period)} className={ui.primary}>
-              확정
-            </button>
-          </>
-        )}
-      </div>
+      <h2 tabIndex={-1} data-step-title className={`${ui.cardTitle} outline-none`}>
+        근무표
+      </h2>
 
       {carryOverChanged(period, periods) && (
         <div role="status" className={ui.banner}>
@@ -469,7 +501,7 @@ export default function ScheduleStep() {
         </div>
       )}
 
-      {availabilityChanged(period) && result && (
+      {blocked && result && (
         <div role="status" className={ui.banner}>
           가능 시간이 바뀌었어요. 다시 만들어 주세요
           <button type="button" onClick={sv.run} disabled={busy} className={ui.textSm}>
@@ -478,34 +510,62 @@ export default function ScheduleStep() {
         </div>
       )}
 
+      <RulesStep scope="period" />
+
       {sv.toast && <ToastAlert toast={sv.toast} busy={busy} onClose={() => sv.setToast(null)} />}
 
-      <ScheduleBody period={period} solve={sv} busy={busy} />
-
-      <div>
-        <button type="button" onClick={() => go({ screen: "period", periodId, step: 2 })} className={ui.secondary}>
-          이전
-        </button>
-      </div>
+      <ScheduleBody
+        period={period}
+        solve={sv}
+        busy={busy}
+        outcomeAtGrid
+        hint={
+          <p className="max-w-[300px] text-right text-[13px] leading-relaxed text-[#3D3D38]">
+            칸을 누르면 바꿀 수 있어요. <InlineLock /> 고정한 칸은 다시 만들 때 그대로 둬요
+          </p>
+        }
+        actions={
+          <div className="flex items-center justify-between gap-3">
+            <button type="button" onClick={() => go({ screen: "period", periodId, step: 2 })} className={ui.secondary}>
+              이전
+            </button>
+            {!result ? (
+              <div className="flex items-center gap-3">
+                <p className="text-sm text-[#3D3D38]">가능 시간과 매장 조건으로 근무표를 만들어요</p>
+                <button type="button" onClick={sv.run} disabled={remake} className={ui.primaryLg}>
+                  {loading && <Spinner />}
+                  {loading ? "만드는 중…" : "근무표 만들기"}
+                </button>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2">
+                {blocked && <p className={`${ui.help} mr-1`}>가능 시간이 바뀌어 다시 만들어야 확정할 수 있어요</p>}
+                <button type="button" onClick={() => downloadCsv(period, employees, result)} disabled={busy} className={ui.text}>
+                  CSV 받기
+                </button>
+                <button type="button" onClick={sv.run} disabled={remake} className={ui.secondary}>
+                  {loading && <Spinner />}
+                  {loading ? "만드는 중…" : "다시 만들기"}
+                </button>
+                <button type="button" onClick={() => void onConfirm()} disabled={busy || blocked} className={ui.primaryLg}>
+                  확정
+                </button>
+              </div>
+            )}
+          </div>
+        }
+      />
     </div>
   );
 }
 
-/** 접힌 "이번 근무표 예외 입력". 확인할 카드(적용 대기, 명단에 없는 직원)가 있으면 펼쳐서 시작한다. */
-function ExceptionSection({ period }: { period: WorkPeriod }) {
-  const shop = useAppStore((s) => s.shop);
-  const [open, setOpen] = useState(
-    () => period.pendingRequests.length > 0 || (shop !== null && orphanConstraintIds({ ...shop, rules: [] }, period).length > 0),
-  );
+/** 문장 안의 자물쇠. */
+function InlineLock() {
   return (
-    <section className={`${ui.card} flex flex-col gap-3`}>
-      <div>
-        <button type="button" aria-expanded={open} onClick={() => setOpen((o) => !o)} className={ui.textSm}>
-          이번 근무표 예외 입력
-        </button>
-      </div>
-      {open && <RulesStep scope="period" />}
-    </section>
+    <svg aria-label="자물쇠" role="img" viewBox="0 0 9 9" className="inline size-3 align-[-1px]" fill="none" stroke="currentColor" strokeWidth={1.2}>
+      <rect x="1.5" y="4" width="6" height="4.5" rx="0.5" />
+      <path d="M3 4V2.8a1.5 1.5 0 0 1 3 0V4" />
+    </svg>
   );
 }
 
@@ -545,7 +605,7 @@ export function OutcomePanel({
   return (
     <section className="flex flex-col gap-3.5 rounded-lg border border-[#E8B4AE] bg-white px-[18px] py-4">
       <div className="flex items-center gap-2">
-        <span className={`${ui.badge} bg-[#FBE9E7] text-[#9F1F14]`}>{outcome.kind === "timeout" ? "시간 초과" : "근무표 없음"}</span>
+        <span className={`${ui.badge} ${ui.badgeTone.none}`}>{outcome.kind === "timeout" ? "시간 초과" : "근무표 없음"}</span>
         <h2 className={ui.cardTitle}>
           {outcome.kind === "timeout" ? "시간 안에 근무표를 만들지 못했어요" : "규칙을 모두 지키는 근무표가 없어요"}
         </h2>
@@ -725,6 +785,7 @@ export function SummaryCard({
   confirmed,
   draft,
   legacy = false,
+  care = null,
 }: {
   result: ScheduleResult;
   infeasible: boolean;
@@ -732,9 +793,11 @@ export function SummaryCard({
   draft: boolean;
   /** 변환 전 결과: 희망 반영·못 지킨 규칙 칸을 숨긴다 */
   legacy?: boolean;
+  /** "최근 4주 마감 배려" 칸. 없으면 그리지 않는다 */
+  care?: { label: string; text: string } | null;
 }) {
   const { summary } = result;
-  const item = "flex flex-col gap-1 border-r border-[#E2E2DC] px-5 py-3.5";
+  const item = "flex flex-col gap-1 border-r border-[#E2E2DC] px-5 py-3.5 last:border-r-0";
   const label = "text-xs font-medium text-[#66665E]";
   const value = "font-mono text-xl font-semibold";
   return (
@@ -771,6 +834,12 @@ export function SummaryCard({
         <div className={item}>
           <span className={label}>확정본에서 바뀐 칸</span>
           <span className={`${value} text-[#1B1B18]`}>{result.diff.length}칸</span>
+        </div>
+      )}
+      {care && (
+        <div className={item}>
+          <span className={label}>{care.label}</span>
+          <span className="flex h-7 items-center text-[13px] font-medium text-[#1B1B18]">{care.text}</span>
         </div>
       )}
     </section>
@@ -904,30 +973,17 @@ export function ScheduleGrid({
       <div className="flex w-max flex-col gap-0.5">
         <div className={rowClass} style={grid}>
           <span className="flex items-end text-xs font-medium text-[#66665E]">이름</span>
-          {pdays.map(({ day: d, weekday: w }) => {
-            const color = w === 0 || holidays.includes(d) ? "text-[#B42318]" : w === 6 ? "text-[#155E75]" : "text-[#66665E]";
-            return (
-              <span
-                key={d}
-                className={`flex flex-col items-center rounded-xs py-0.5 font-mono ${weekendBg(d)} ${color} ${
-                  d === todayDay ? "border-b-2 border-[#155E75]" : ""
-                }`}
-              >
-                <span className={`${dayHeader(period, d).includes("/") ? "text-[11px]" : "text-[13px]"} font-medium`}>
-                  {dayHeader(period, d)}
-                </span>
-                <span className="text-[11px]">{WEEKDAYS[w]}</span>
-              </span>
-            );
-          })}
+          {pdays.map(({ day: d, weekday: w }) => (
+            <DayHead key={d} label={dayHeader(period, d)} weekday={w} holiday={holidays.includes(d)} weekend={isWeekend(d)} today={d === todayDay} />
+          ))}
           {codes.map(({ code, name }) => (
             <span key={code} title={name} className="flex items-end justify-center font-mono text-xs font-semibold text-[#66665E]">
               {code}
             </span>
           ))}
           {/* 누적 부담(최근 4주) */}
-          {showHistory && [`최근 4주 ${closingShift(config)?.name ?? "마감"}`, "최근 4주 주말"].map((label) => (
-            <span key={label} className="flex items-end justify-center text-center text-[11px] leading-tight font-medium text-[#66665E]">
+          {showHistory && [`최근 4주\n${closingShift(config)?.name ?? "마감"}`, "최근 4주\n주말"].map((label) => (
+            <span key={label} className="flex items-end justify-center text-center text-[11px] leading-tight font-medium whitespace-pre-line text-[#66665E]">
               {label}
             </span>
           ))}
@@ -1035,9 +1091,12 @@ export function StatsTable({
   const td = "px-3 py-1.5 text-right font-mono text-[13px] font-medium text-[#1B1B18]";
   const showHistory = [...history.values()].some((h) => h.closings > 0 || h.weekends > 0);
   return (
-    <section className={`${ui.card} flex flex-col gap-3`}>
-      <h2 className={ui.cardTitle}>개인별 통계</h2>
-      <div className="overflow-x-auto">
+    <section className="flex flex-col gap-3">
+      <div className="flex items-baseline justify-between gap-4">
+        <h2 className={ui.sectionTitle}>개인별 통계</h2>
+        <p className={ui.help}>“왜 나만 주말이 많아요?”에 보여 줄 근거예요.</p>
+      </div>
+      <div className={`${ui.card} overflow-x-auto`}>
         <table className="w-full border-collapse">
           <thead>
             <tr className="border-b border-[#E2E2DC]">
@@ -1078,7 +1137,7 @@ export function StatsTable({
                   {!legacy && (
                     <td className={td}>{s.preference_rate === null ? "–" : `${Math.round(s.preference_rate * 100)}%`}</td>
                   )}
-                  <td className={td}>{formatDeviation(s.deviation)}</td>
+                  <td className={`${td} ${Math.round(s.deviation) > 0 ? "text-[#A15C07]!" : ""}`}>{formatDeviation(s.deviation)}</td>
                   {showHistory && (
                     <>
                       <td className={td}>{history.get(n.id)?.closings ?? 0}</td>

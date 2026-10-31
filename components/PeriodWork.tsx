@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 
 import { carryOverFrom, previousConfirmedPeriod } from "@/lib/continuity";
-import { dateOfDay, formatRange, isWeekendDay, MAX_MONTH_START_DAY, monthDay, periodEnd, validStart } from "@/lib/period";
+import { dateOfDay, dayHeader, formatRange, isWeekendDay, MAX_MONTH_START_DAY, monthDay, periodDays, periodEnd, validStart } from "@/lib/period";
 import { parseCarryOver, type CellError } from "@/lib/roster-import";
 import { syncAvailabilityLinks, type AvailabilityLink } from "@/lib/supabase";
 import {
@@ -23,7 +23,7 @@ import { coverageText, presetName, scheduleName } from "@/lib/wording";
 
 import HolidayCalendar from "./HolidayCalendar";
 import RulesStep from "./RulesStep";
-import ScheduleStep, { CELL, codeClass } from "./ScheduleStep";
+import ScheduleStep, { CELL, codeClass, DayHead } from "./ScheduleStep";
 import Stepper from "./Stepper";
 import ShiftTable from "./ShiftTable";
 import { CoverageSection } from "./ShopSettings";
@@ -57,9 +57,9 @@ export default function PeriodWork() {
           </button>
         </div>
         <div className="flex items-center gap-3">
-          <h1 className="text-[22px] font-semibold text-[#1B1B18]">{scheduleName(period, unit)}</h1>
+          <h1 className={ui.pageTitle}>{scheduleName(period, unit)}</h1>
           <span className="font-mono text-sm text-[#66665E]">{formatRange(period)}</span>
-          <span className={`${ui.badge} border border-[#C9C9C1] bg-white text-[#3D3D38]`}>작성 중</span>
+          <span className={`${ui.badge} ${ui.badgeTone.draft}`}>작성 중</span>
         </div>
         <Stepper label="근무표 작성 단계" labels={["가능 시간", "매장 조건", "근무표"]} current={step} reached={period.result ? 3 : step} onSelect={toStep} />
       </div>
@@ -117,6 +117,7 @@ function LinksSection({ period }: { period: WorkPeriod }) {
   const current = links?.key === key ? links : null;
   const url = current ? `${location.origin}/a/${current.shareToken}` : "";
   const missing = employees.filter((n) => !current?.rows.find((r) => r.employee_id === n.id)?.submitted_at);
+  const submitted = employees.length - missing.length;
   const reload = () => {
     setFailed(null);
     setAttempt((n) => n + 1);
@@ -133,27 +134,32 @@ function LinksSection({ period }: { period: WorkPeriod }) {
 
   return (
     <section className={`${ui.card} flex flex-col gap-3`}>
-      <div className="flex flex-col gap-1">
-        <h3 className={ui.cardTitle}>직원 링크</h3>
-        <p className={ui.help}>단체 대화방에 이 링크 하나만 올려 주세요. 직원이 자기 이름을 골라 가능 시간을 입력해요</p>
+      <div className="flex items-start justify-between gap-4">
+        <div className="flex min-w-0 flex-col gap-1">
+          <h3 className={ui.cardTitle}>직원 링크</h3>
+          <p className={ui.help}>단체 대화방에 이 링크 하나만 올려 주세요. 직원이 자기 이름을 골라 가능 시간을 입력해요</p>
+        </div>
+        {current && (
+          <button type="button" onClick={() => void copy()} className={ui.secondarySm}>
+            {copied === url ? "복사했어요" : "링크 복사"}
+          </button>
+        )}
       </div>
       {current && (
         <>
-          <div className="flex items-center gap-4">
-            <p className="min-w-0 flex-1 truncate font-mono text-[13px] text-[#3D3D38]">{url}</p>
-            <button type="button" onClick={() => void copy()} className={ui.secondarySm}>
-              {copied === url ? "복사했어요" : "링크 복사"}
-            </button>
-          </div>
-          <div className="flex items-center gap-3 border-t border-[#EFEFEB] pt-3">
-            <p className="text-sm text-[#1B1B18]">
-              <span className="font-mono">{employees.length}</span>명 중 <span className="font-mono">{employees.length - missing.length}</span>명 제출
+          <p className="truncate font-mono text-[13px] text-[#3D3D38]">{url}</p>
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-[13px] text-[#1B1B18]">
+              <span className="font-mono">{employees.length}</span>명 중 <span className="font-mono">{submitted}</span>명 제출
             </p>
-            {missing.length > 0 && <p className={`${ui.help} min-w-0 flex-1`}>미제출: {missing.map((n) => n.name).join(", ")}</p>}
-            <button type="button" onClick={reload} className={`${ui.textSm} ml-auto`}>
+            <button type="button" onClick={reload} className={ui.textSm}>
               새로고침
             </button>
           </div>
+          <div aria-hidden="true" className="h-1.5 overflow-hidden rounded bg-[#E2E2DC]">
+            <div className="h-full bg-[#155E75]" style={{ width: `${employees.length === 0 ? 0 : (submitted / employees.length) * 100}%` }} />
+          </div>
+          {missing.length > 0 && <p className={ui.help}>미제출: {missing.map((n) => n.name).join(", ")}</p>}
         </>
       )}
       {failed === key ? (
@@ -282,7 +288,7 @@ function PrepareSummary({ period }: { period: WorkPeriod }) {
 
   return (
     <div className="flex flex-col gap-3">
-      <section className={`${ui.card} flex items-center justify-between gap-3 py-2.5`}>
+      <section className={`${ui.card} flex items-center justify-between gap-3`}>
         <p className="text-sm text-[#3D3D38]">
           <span className="font-mono font-medium text-[#1B1B18]">{formatRange(period)}</span> ·{" "}
           {period.holidays.length > 0 ? (
@@ -454,6 +460,7 @@ function CarryOverTable({ period, prev }: { period: WorkPeriod; prev: WorkPeriod
   const days = Array.from({ length: width }, (_, i) => prev.length - width + 1 + i);
   const grid = { gridTemplateColumns: `150px repeat(${width}, 30px)` };
   const name = (id: string) => employees.find((n) => n.id === id)?.name ?? id;
+  const prevDays = periodDays(prev);
 
   return (
     <section className={`${ui.card} flex flex-col gap-3`}>
@@ -468,10 +475,14 @@ function CarryOverTable({ period, prev }: { period: WorkPeriod; prev: WorkPeriod
         <div className="flex w-max flex-col gap-0.5">
           <div className="grid gap-x-0.5" style={grid}>
             <span className="flex items-end text-xs font-medium text-[#66665E]">이름</span>
-            {days.map((d) => (
-              <span key={d} className="flex justify-center font-mono text-[11px] font-medium text-[#66665E]">
-                {monthDay(prev, d)}
-              </span>
+            {days.map((d, i) => (
+              <DayHead
+                key={d}
+                label={i === 0 ? monthDay(prev, d) : dayHeader(prev, d)}
+                weekday={prevDays[d - 1].weekday}
+                holiday={prev.holidays.includes(d)}
+                weekend={isWeekendDay(prev, d, prev.holidays)}
+              />
             ))}
           </div>
           {rows.map((r) => (
