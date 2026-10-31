@@ -7,9 +7,9 @@ import { isWeekendDay } from "@/lib/period";
 import demo from "@/lib/samples/demo-schedule.json";
 import shop from "@/lib/samples/shop-12.json";
 import type { ConstraintSpec, Employee, Period, ScheduleResult, ShopConfig } from "@/lib/types.gen";
-import { describeRule, presetName } from "@/lib/wording";
+import { describeRule, hardnessLabel, presetName } from "@/lib/wording";
 
-import { PreviewCard } from "./LandingPreview";
+import RuleText from "./RuleText";
 import { ScheduleGrid } from "./ScheduleStep";
 import { ui } from "./ui";
 
@@ -24,6 +24,33 @@ const isWeekend = (d: number) => isWeekendDay(PERIOD, d, []);
 
 const h2 = "text-[17px] font-semibold text-[#1B1B18]";
 const card = "rounded-lg border border-[#E2E2DC] bg-white px-[18px] py-4";
+
+// ConstraintCard는 store의 매장을 읽어 데모(빈 store)에서는 그려지지 않으므로, 같은 모양의 적용된 카드를 직접 그린다.
+function PreviewCard({ card, employees, period }: { card: ConstraintSpec; employees: Employee[]; period: Period }) {
+  return (
+    <article className="flex flex-col gap-2.5 rounded-lg border border-[#E2E2DC] bg-white px-[18px] py-4">
+      <div className="flex items-center justify-between gap-3">
+        <h3 className="text-[13px] font-semibold text-[#1B1B18]">{presetName(card)}</h3>
+        <div role="group" aria-label="반드시/가능하면" className="inline-flex overflow-hidden rounded-md border border-[#C9C9C1]">
+          {(["hard", "soft"] as const).map((h) => (
+            <span
+              key={h}
+              className={`inline-flex h-7 items-center px-3 text-xs font-medium ${card.hardness === h ? "bg-[#1B1B18] text-white" : "bg-white text-[#66665E]"}`}
+            >
+              {hardnessLabel(h)}
+            </span>
+          ))}
+        </div>
+      </div>
+      <p className="text-sm text-[#1B1B18]">“{card.source_text}”</p>
+      <p className="rounded-sm bg-[#F6F6F3] px-2.5 py-2 text-xs text-[#3D3D38]"><RuleText sentence={describeRule(card, CONFIG, employees, period)} />
+      </p>
+      <div>
+        <span className={`${ui.badge} bg-[#E6F2EA] text-[#1E6B3F]`}>적용됨</span>
+      </div>
+    </article>
+  );
+}
 
 export default function SampleDemo() {
   return (
