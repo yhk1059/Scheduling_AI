@@ -120,7 +120,7 @@ test("S3. 운영 중인 매장: 다음 근무표 작성과 확정", async () => 
   for (const [name, row] of Object.entries(octGrid)) expect(carry[name], `${name} 지난 근무`).toEqual(row.slice(-CARRY_OVER_DAYS));
   await expectNoDevTerms(page, "① 가능 시간(준비 펼침)");
   await page.getByRole("button", { name: "접기" }).first().click();
-  await expect(page.getByRole("button", { name: "링크 복사" })).toHaveCount(EMPLOYEE_COUNT);
+  await expect(page.getByRole("button", { name: "링크 복사" })).toHaveCount(1);
 
   // ② 매장 조건: 요약표(D2)와 적용된 규칙 카드 7장
   await page.getByRole("button", { name: "다음", exact: true }).click();

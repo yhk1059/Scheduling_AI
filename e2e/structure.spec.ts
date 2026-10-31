@@ -91,7 +91,7 @@ test("S14. 시작일 15일과 근무 형태(피크 추가, 더블), 태그 배�
   await page.getByRole("button", { name: "바꾸기" }).click();
   const start = page.getByLabel("시작일");
   await expect(start).toHaveValue("2026-11-01");
-  await expect(page.getByRole("button", { name: "링크 복사" })).toHaveCount(EMPLOYEE_COUNT);
+  await expect(page.getByRole("button", { name: "링크 복사" })).toHaveCount(1);
   const before = await shownLinks(page);
   await start.fill("2026-11-29");
   await expect(page.getByText("한 달 근무표는 1~28일에만 시작할 수 있어요. 다른 날을 골라 주세요.")).toBeVisible();
@@ -99,7 +99,7 @@ test("S14. 시작일 15일과 근무 형태(피크 추가, 더블), 태그 배�
   await expect(page.getByRole("heading", { level: 1 })).toHaveText("11/15~12/14 근무표");
   await expect(page.getByRole("main")).toContainText("2026.12.14 · 30일");
   await expect.poll(async () => (await shownLinks(page)).filter((l) => before.includes(l)).length, { message: "링크가 모두 새것" }).toBe(0);
-  await expect(page.getByRole("button", { name: "링크 복사" })).toHaveCount(EMPLOYEE_COUNT);
+  await expect(page.getByRole("button", { name: "링크 복사" })).toHaveCount(1);
   firstLinks = await shownLinks(page);
   await expectNoDevTerms(page, "① 가능 시간(시작일 15일)");
   await submitFullDay(FIRST, EMPLOYEE_COUNT);
@@ -213,7 +213,7 @@ test("S15. 피크·더블 근무표 → 다음 근무표 시작일 미루기", a
   await expect(page.getByRole("heading", { level: 1 })).toHaveText("12/15~1/14 근무표");
   await expect(stepper().locator('[aria-current="step"]')).toContainText("가능 시간");
   await expect(page.getByRole("main")).toContainText("지난 근무표에서 이어져요");
-  await expect(page.getByRole("button", { name: "링크 복사" })).toHaveCount(EMPLOYEE_COUNT);
+  await expect(page.getByRole("button", { name: "링크 복사" })).toHaveCount(1);
   expect((await shownLinks(page)).filter((l) => firstLinks.includes(l)), "링크는 근무표마다 새로 만든다").toEqual([]);
 
   // [시작일 미루기]: 이어지는 날보다 앞은 오류, 뒤로 미루면 지난 근무가 끊겨 직접 입력한다

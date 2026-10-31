@@ -94,9 +94,10 @@ export interface AvailabilityLink {
   token: string;
   employee_id: string;
   slots: AvailabilitySlots;
+  submitted_at: string | null;
 }
 
-const LINK_COLUMNS = "token, employee_id, slots";
+const LINK_COLUMNS = "token, employee_id, slots, submitted_at";
 
 /** 이 근무표의 링크 행들. */
 export async function loadAvailabilityLinks(periodStart: string): Promise<AvailabilityLink[]> {
@@ -109,14 +110,15 @@ export async function loadAvailabilityLinks(periodStart: string): Promise<Availa
 let linkQueue: Promise<unknown> = Promise.resolve();
 
 /**
- * 작성 중 근무표의 링크 행을 맞춘다. 없는 직원의 행은 만들고(토큰은 DB가 정한다), 있는 행은 이름만 고친다.
+ * 작성 중 근무표의 공용 링크와 직원 행을 맞춘다. 없는 직원의 행은 만들고(토큰은 DB가 정한다), 있는 행은 이름만 고친다.
  * 잠기지 않은 다른 시작일의 행은 지운다(작성 중 근무표는 하나뿐이라 시작일이 바뀐 옛 행이다).
+ * 명단에서 빠진 직원의 행도 지운다. 공용 링크의 명단에 남지 않게 한다.
  */
 export function syncAvailabilityLinks(
   period: PeriodRange,
   employees: { id: string; name: string }[],
   shopName: string,
-): Promise<AvailabilityLink[]> {
+): Promise<{ shareToken: string; rows: AvailabilityLink[] }> {
   const work = async () => {
     const { data: shop, error: shopError } = await supabase().from("shops").select("id").maybeSingle();
     if (shopError || !shop) throw new Error(shopError?.message ?? "Shop not saved yet");
@@ -127,6 +129,23 @@ export function syncAvailabilityLinks(
       .neq("period_start", period.start_date)
       .is("locked_at", null);
     if (deleteError) throw new Error(deleteError.message);
+    const { error: deleteShareError } = await supabase()
+      .from("availability_shares")
+      .delete()
+      .eq("shop_id", shop.id)
+      .neq("period_start", period.start_date)
+      .is("locked_at", null);
+    if (deleteShareError) throw new Error(deleteShareError.message);
+    if (employees.length > 0) {
+      const { error: deleteLeftError } = await supabase()
+        .from("availability_links")
+        .delete()
+        .eq("shop_id", shop.id)
+        .eq("period_start", period.start_date)
+        .is("locked_at", null)
+        .not("employee_id", "in", `(${employees.map((n) => JSON.stringify(n.id)).join(",")})`);
+      if (deleteLeftError) throw new Error(deleteLeftError.message);
+    }
     const { error } = await supabase()
       .from("availability_links")
       .upsert(
@@ -141,7 +160,18 @@ export function syncAvailabilityLinks(
         { onConflict: "shop_id,period_start,employee_id" },
       );
     if (error) throw new Error(error.message);
-    return loadAvailabilityLinks(period.start_date);
+    const { error: shareError } = await supabase()
+      .from("availability_shares")
+      .upsert({ shop_id: shop.id, period_start: period.start_date }, { onConflict: "shop_id,period_start", ignoreDuplicates: true });
+    if (shareError) throw new Error(shareError.message);
+    const { data: share, error: readError } = await supabase()
+      .from("availability_shares")
+      .select("token")
+      .eq("shop_id", shop.id)
+      .eq("period_start", period.start_date)
+      .single();
+    if (readError) throw new Error(readError.message);
+    return { shareToken: share.token as string, rows: await loadAvailabilityLinks(period.start_date) };
   };
   const run = linkQueue.then(work, work);
   linkQueue = run;
@@ -150,12 +180,34 @@ export function syncAvailabilityLinks(
 
 /** 확정: 이 근무표의 링크를 잠근다. 이미 잠긴 행은 그대로 두어 다시 확정해도 처음 시각이 남는다. */
 export async function lockAvailabilityLinks(periodStart: string): Promise<void> {
-  const { error } = await supabase()
-    .from("availability_links")
-    .update({ locked_at: new Date().toISOString() })
-    .eq("period_start", periodStart)
-    .is("locked_at", null);
+  for (const table of ["availability_links", "availability_shares"]) {
+    const { error } = await supabase()
+      .from(table)
+      .update({ locked_at: new Date().toISOString() })
+      .eq("period_start", periodStart)
+      .is("locked_at", null);
+    if (error) throw new Error(error.message);
+  }
+}
+
+export interface AvailabilityRoster {
+  shop_name: string;
+  period_start: string;
+  period_length: number;
+  locked: boolean;
+  employees: { employee_name: string; link_token: string; submitted: boolean }[];
+}
+
+/** 공용 링크로 명단을 읽는다. 없는 링크면 null. */
+export async function getAvailabilityRoster(token: string): Promise<AvailabilityRoster | null> {
+  const { data, error } = await supabase().rpc("get_availability_roster", { p_token: token });
+  // 22P02: 토큰 형식이 아니다
+  if (error?.code === "22P02") return null;
   if (error) throw new Error(error.message);
+  const rows = data as (AvailabilityRoster["employees"][number] & Omit<AvailabilityRoster, "employees">)[];
+  if (rows.length === 0) return null;
+  const { shop_name, period_start, period_length, locked } = rows[0];
+  return { shop_name, period_start, period_length, locked, employees: rows };
 }
 
 export interface EmployeeAvailability {
@@ -167,7 +219,7 @@ export interface EmployeeAvailability {
   locked: boolean;
 }
 
-/** 직원 링크로 읽는다. 없는 링크면 null. */
+/** 고른 직원의 토큰으로 읽는다. 없으면 null. */
 export async function getAvailability(token: string): Promise<EmployeeAvailability | null> {
   const { data, error } = await supabase().rpc("get_availability", { p_token: token });
   // 22P02: 토큰 형식이 아니다

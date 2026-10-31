@@ -126,6 +126,7 @@ export async function savedDoc(): Promise<StoredDoc | null> {
 export const submitAvailability = (token: string, slots: AvailabilitySlots) =>
   anon.rpc("submit_availability", { p_token: token, p_slots: slots });
 export const getAvailability = (token: string) => anon.rpc("get_availability", { p_token: token });
+export const getRoster = (token: string) => anon.rpc("get_availability_roster", { p_token: token });
 
 /** 화면이 링크 행을 만들 때까지 기다린 뒤, 그 근무표의 직원들에게 전일 가능 시간을 제출한다. exclude는 빼고. */
 export async function submitFullDay(period: PeriodRange, count: number, exclude: string[] = []) {
@@ -611,6 +612,5 @@ export async function dragCells(page: Page, from: string, to: string) {
   await page.mouse.up();
 }
 
-/** 표에 보이는 직원 링크(`/a/{토큰}`). */
-export const shownLinks = (page: Page) =>
-  page.locator("td").filter({ hasText: "/a/" }).allInnerTexts();
+/** 화면에 보이는 공용 직원 링크(`/a/{토큰}`). */
+export const shownLinks = (page: Page) => page.getByText(/\/a\/[0-9a-f-]{36}$/).allInnerTexts();
