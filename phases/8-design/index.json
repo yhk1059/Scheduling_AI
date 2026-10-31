@@ -45,7 +45,10 @@
     {
       "step": 5,
       "name": "rule-cards",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-11-01T06:31:49+0900",
+      "summary": "ConstraintCard·ShiftChangeCardView를 답장 형태로(제목+토글 → 따옴표 글리프+원문 → '이렇게 읽었어요' 해석·수정 폼·예시 → 배지+버튼), RulesStep 입력을 ui.panel+ui.bar+칩으로, Wordmark에 QuoteGlyph 추가. 결정: 패널 제목은 heading이 아니라 p(e2e의 heading '매장 조건'과 겹치지 않게), period 범위도 같은 패널을 쓰고 제목은 UI_GUIDE의 '이번 근무표에만 적용할 예외가 있나요?', 입력 이름은 aria-label 대신 sr-only label(이름은 같음), 중요도 select·값 입력 높이가 ui.input의 h-10에 눌려 h-7!·h-8!로 고침, HeroSequence ReplyCard의 따옴표는 글자 그대로 둠(step 범위 밖, SVG 글리프로 바꿀 수 있음). e2e에 영향: journey.spec:351의 설명 문구가 '근무 형태, 필요 인원, 지켜야 할 규칙 모두 한 곳에서요.'로 바뀌어 step 10에서 고침(BROWSER_TEST_SCENARIOS S8-a와 원문 “따옴표” 표기도), cardOrder의 첫 p는 원문 그대로.",
+      "completed_at": "2026-11-01T06:36:02+0900"
     },
     {
       "step": 6,
