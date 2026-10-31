@@ -171,7 +171,7 @@ test("S5. 매장 준비 → 첫 근무표 시작", async () => {
   await expect(page.getByRole("heading", { level: 1 })).toHaveText(WEEK_NAME);
 });
 
-test("S6. ① 가능 시간: 준비 요약과 링크 표", async () => {
+test("S6. ① 가능 시간: 준비 요약과 직원 링크", async () => {
   const titleRow = page.getByRole("heading", { level: 1 }).locator("..");
   await expect(titleRow).toContainText(WEEK_RANGE);
   await expect(titleRow.getByText("작성 중", { exact: true })).toBeVisible();
@@ -204,10 +204,11 @@ test("S6. ① 가능 시간: 준비 요약과 링크 표", async () => {
   await page.getByRole("button", { name: "접기" }).first().click();
   await expect(page.getByRole("heading", { name: "명단 확인" })).toHaveCount(0);
 
-  // 링크 표
+  // 직원 링크
   await expect(page.getByText("단체 대화방에 이 링크 하나만 올려 주세요. 직원이 자기 이름을 골라 가능 시간을 입력해요")).toBeVisible();
   await expect(page.getByRole("button", { name: "링크 복사" })).toHaveCount(1);
   await expect(page.getByText(`${EMPLOYEE_COUNT}명 중 0명 제출`)).toBeVisible();
+  await expect(page.getByText(/^미제출: /)).toContainText("박민수");
   const links = await shownLinks(page);
   expect(links).toHaveLength(1);
   await page.getByRole("button", { name: "링크 복사" }).click();
