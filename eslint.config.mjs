@@ -14,6 +14,9 @@ const eslintConfig = defineConfig([
     "next-env.d.ts",
     // git worktrees (each has its own .next build output)
     ".claude/**",
+    // Playwright 산출물 (npm run test:e2e)
+    "playwright-report/**",
+    "test-results/**",
   ]),
 ]);
 

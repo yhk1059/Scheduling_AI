@@ -1,10 +1,9 @@
 "use client";
 
-import Link from "next/link";
-
 import { supabaseConfigured } from "@/lib/supabase";
 
 import { LoginButton, PrivacyLink } from "./Account";
+import DemoVideoButton from "./DemoVideo";
 import { CELL, codeClass } from "./ScheduleStep";
 import { ui } from "./ui";
 import Wordmark from "./Wordmark";
@@ -55,9 +54,7 @@ export default function LoginScreen() {
           또는
           <span aria-hidden="true" className="h-px flex-1 bg-[#E2E2DC]" />
         </div>
-        <Link href="/demo" className={`${ui.secondaryXl} w-full justify-center`}>
-          로그인 없이 샘플 보기
-        </Link>
+        <DemoVideoButton className={`${ui.secondaryXl} w-full justify-center`}>데모 영상 보기</DemoVideoButton>
         {supabaseConfigured && (
           <p className="text-xs leading-relaxed text-[#66665E]">
             내 매장과 근무표는 서버에 저장되고, 언제든 직접 지울 수 있어요.

@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 
 import Link from "next/link";
 
+import DemoVideoButton from "@/components/DemoVideo";
 import HeroSequence, { ChangeFragment, ReplyCard } from "@/components/HeroSequence";
 import { ui } from "@/components/ui";
 import { Mark } from "@/components/Wordmark";
@@ -250,14 +251,12 @@ export default function Home() {
               직원은 링크로 가능 시간을 칠하고, 매니저는 매장 조건을 말로 적어요. 막히면 이유와 해결책을 알려 드려요.
             </p>
             <div className="flex items-center gap-2">
-              <Link href="/demo" className={ui.primaryXl}>
-                샘플로 체험하기
-              </Link>
+              <DemoVideoButton className={ui.primaryXl}>데모 영상 보기</DemoVideoButton>
               <Link href="/app" className={ui.secondaryXl}>
                 내 매장으로 시작하기
               </Link>
             </div>
-            <p className={ui.help}>샘플은 로그인 없이 볼 수 있어요.</p>
+            <p className={ui.help}>1분짜리 실제 화면이에요. 로그인 없이 볼 수 있어요.</p>
           </div>
           <HeroSequence />
         </section>
@@ -339,7 +338,7 @@ export default function Home() {
                 직원 명단만 넣으면
                 <br />첫 근무표를 시작할 수 있어요
               </h2>
-              <p className="text-base text-[#CFE4EA]">샘플은 로그인 없이 볼 수 있어요.</p>
+              <p className="text-base text-[#CFE4EA]">영상은 로그인 없이 볼 수 있어요.</p>
             </div>
             <div className="flex shrink-0 items-center gap-2">
               <Link
@@ -348,12 +347,9 @@ export default function Home() {
               >
                 내 매장으로 시작하기
               </Link>
-              <Link
-                href="/demo"
-                className="inline-flex h-12 items-center rounded-md border border-white px-[22px] text-[15px] font-medium text-white transition-colors duration-[120ms] hover:bg-[#0E4A5C] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
-              >
-                샘플로 체험하기
-              </Link>
+              <DemoVideoButton className="inline-flex h-12 items-center rounded-md border border-white px-[22px] text-[15px] font-medium text-white transition-colors duration-[120ms] hover:bg-[#0E4A5C] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white">
+                데모 영상 보기
+              </DemoVideoButton>
             </div>
           </div>
         </section>

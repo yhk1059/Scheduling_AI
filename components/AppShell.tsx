@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useEffect, useState } from "react";
 
 import { useAppStore } from "@/lib/store";
@@ -10,6 +9,7 @@ import { unitShort } from "@/lib/wording";
 
 import { AccountBar } from "./Account";
 import ConfirmedPeriod from "./ConfirmedPeriod";
+import DemoVideoButton from "./DemoVideo";
 import PeriodWork from "./PeriodWork";
 import LoginScreen from "./LoginScreen";
 import { ui } from "./ui";
@@ -84,9 +84,7 @@ export default function AppShell() {
             )}
           </div>
           {loginScreen ? (
-            <Link href="/demo" className={ui.text}>
-              샘플로 체험하기
-            </Link>
+            <DemoVideoButton className={ui.text}>데모 영상 보기</DemoVideoButton>
           ) : (
             <AccountBar />
           )}
