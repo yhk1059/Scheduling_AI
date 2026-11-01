@@ -106,6 +106,14 @@ export async function loadAvailabilityLinks(periodStart: string): Promise<Availa
   return data as AvailabilityLink[];
 }
 
+/** 이 근무표의 공용 링크 토큰과 직원 행. 쓰지 않는다(매장 홈). ①에서 아직 링크를 만들지 않았으면 null. */
+export async function loadShareStatus(periodStart: string): Promise<{ shareToken: string; rows: AvailabilityLink[] } | null> {
+  const { data, error } = await supabase().from("availability_shares").select("token").eq("period_start", periodStart).maybeSingle();
+  if (error) throw new Error(error.message);
+  if (!data) return null;
+  return { shareToken: data.token as string, rows: await loadAvailabilityLinks(periodStart) };
+}
+
 // 시작일을 빠르게 바꿔도 앞선 호출의 삭제가 뒤 호출의 행을 지우지 않게 차례로 돌린다
 let linkQueue: Promise<unknown> = Promise.resolve();
 

@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 
 import { formatRange } from "@/lib/period";
 import { closingSpread } from "@/lib/stats";
-import { syncAvailabilityLinks, type AvailabilityLink } from "@/lib/supabase";
+import { loadShareStatus, type AvailabilityLink } from "@/lib/supabase";
 import { homeSummary, isShopReady, upcomingRange, useAppStore, viewForPeriod, type WorkPeriod } from "@/lib/store";
 import { nextTask, scheduleName, TASK_STEPS, taskDoneSteps, unitShort, shopRuleCount } from "@/lib/wording";
 
@@ -28,16 +28,16 @@ function TaskProgress({ done }: { done: number }) {
         const current = i === done;
         return (
           <li key={label} className="flex items-center gap-2">
-            {i > 0 && <span aria-hidden="true" className="h-px w-7 bg-[#C9C9C1]" />}
+            {i > 0 && <span aria-hidden="true" className="h-px w-6 bg-[#C9C9C1]" />}
             {finished ? (
-              <span className="flex size-[26px] items-center justify-center rounded-full bg-[#E3F0F3] text-[#155E75]">
+              <span className="flex size-[22px] items-center justify-center rounded-full bg-[#E3F0F3] text-[#155E75]">
                 <svg aria-hidden="true" viewBox="0 0 12 12" className="size-3" fill="none" stroke="currentColor" strokeWidth={1.8}>
                   <path d="M2.5 6.2 5 8.5l4.5-5" />
                 </svg>
               </span>
             ) : (
               <span
-                className={`flex size-[26px] items-center justify-center rounded-full font-mono text-xs ${
+                className={`flex size-[22px] items-center justify-center rounded-full font-mono text-xs ${
                   current ? "bg-[#155E75] text-white" : "border border-[#C9C9C1] text-[#66665E]"
                 }`}
               >
@@ -55,7 +55,7 @@ function TaskProgress({ done }: { done: number }) {
   );
 }
 
-/** 작성 중 근무표의 공용 링크와 제출 현황. ① 가능 시간과 같은 함수로 읽는다. period가 없으면 읽지 않는다. */
+/** 작성 중 근무표의 공용 링크와 제출 현황. 읽기만 한다(링크를 만들고 맞추는 것은 ① 가능 시간). period가 없으면 읽지 않는다. */
 function useShareStatus(period: WorkPeriod | null) {
   const shop = useAppStore((s) => s.shop);
   const shopName = shop?.name ?? "";
@@ -65,15 +65,18 @@ function useShareStatus(period: WorkPeriod | null) {
   const length = period?.length;
   const [links, setLinks] = useState<{ key: string; shareToken: string; rows: AvailabilityLink[] } | null>(null);
   const [failed, setFailed] = useState<string | null>(null);
+  const [none, setNone] = useState<string | null>(null);
   const [attempt, setAttempt] = useState(0);
   const key = `${start}|${length}|${shopName}|${roster}`;
 
   useEffect(() => {
     if (start === undefined || length === undefined) return;
     let live = true;
-    syncAvailabilityLinks({ start_date: start, length }, JSON.parse(roster), shopName)
-      .then((synced) => {
-        if (live) setLinks({ key, ...synced });
+    loadShareStatus(start)
+      .then((loaded) => {
+        if (!live) return;
+        setLinks(loaded ? { key, ...loaded } : null);
+        setNone(loaded ? null : key);
       })
       .catch(() => {
         if (live) setFailed(key);
@@ -81,7 +84,7 @@ function useShareStatus(period: WorkPeriod | null) {
     return () => {
       live = false;
     };
-  }, [key, start, length, roster, shopName, attempt]);
+  }, [key, start, length, attempt]);
 
   const current = links?.key === key ? links : null;
   return {
@@ -89,6 +92,7 @@ function useShareStatus(period: WorkPeriod | null) {
     total: employees.length,
     missing: employees.filter((n) => !current?.rows.find((r) => r.employee_id === n.id)?.submitted_at).map((n) => n.name),
     failed: failed === key,
+    none: none === key,
     reload: () => {
       setFailed(null);
       setAttempt((n) => n + 1);
@@ -98,7 +102,7 @@ function useShareStatus(period: WorkPeriod | null) {
 
 /** 지금 할 일 패널 오른쪽의 직원 링크 카드. */
 function ShareCard({ status }: { status: ReturnType<typeof useShareStatus> }) {
-  const { url, total, missing, failed, reload } = status;
+  const { url, total, missing, failed, none, reload } = status;
   const [copied, setCopied] = useState<string | null>(null);
   const [copyFailed, setCopyFailed] = useState(false);
   const submitted = total - missing.length;
@@ -152,7 +156,7 @@ function ShareCard({ status }: { status: ReturnType<typeof useShareStatus> }) {
       ) : (
         !url && (
           <p role="status" className={ui.help}>
-            링크를 만드는 중…
+            {none ? "[이어서 하기]를 누르면 링크가 만들어져요." : "불러오는 중…"}
           </p>
         )
       )}

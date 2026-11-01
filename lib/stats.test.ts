@@ -47,8 +47,8 @@ describe("statsFromAssignments", () => {
 describe("closingSpread", () => {
   const SHOP: ShopConfig = {
     shifts: [
-      { code: "A", name: "오픈", hours: 6 },
-      { code: "C", name: "마감", hours: 6 },
+      { code: "A", name: "오픈", hours: 6, start: "09:00", end: "15:00" },
+      { code: "C", name: "마감", hours: 6, start: "17:00", end: "23:00" },
       { code: "O", name: "휴무", hours: 0 },
       { code: "AC", name: "더블", hours: 12, parts: ["A", "C"] },
       { code: "AM", name: "오픈미들", hours: 12, parts: ["A", "M"] },
@@ -65,6 +65,23 @@ describe("closingSpread", () => {
 
   it("활성 직원만 센다. 배정 행이 없는 직원은 뺀다", () => {
     expect(closingSpread({ a: ["C", "C"], gone: ["O", "O"] }, SHOP, ["a", "new"])).toEqual({ min: 2, max: 2 });
+  });
+
+  it("마감은 가장 늦게 끝나는 근무조다(C가 아닌 매장). 그 코드를 가진 복합 코드도 센다", () => {
+    const night: ShopConfig = {
+      shifts: [
+        { code: "A", name: "오픈", hours: 6, start: "09:00", end: "15:00" },
+        { code: "N", name: "야간", hours: 6, start: "18:00", end: "24:00" },
+        { code: "O", name: "휴무", hours: 0 },
+        { code: "AN", name: "더블", hours: 12, parts: ["A", "N"] },
+      ],
+    } as ShopConfig;
+    expect(closingSpread({ a: ["N", "AN", "C"], b: ["A", "O", "O"] }, night, ["a", "b"])).toEqual({ min: 0, max: 2 });
+  });
+
+  it("마감 근무조가 없으면(휴무뿐) null", () => {
+    const offOnly = { shifts: [{ code: "O", name: "휴무", hours: 0 }] } as ShopConfig;
+    expect(closingSpread({ a: ["O"] }, offOnly, ["a"])).toBeNull();
   });
 
   it("활성 직원이 없으면 null", () => {
