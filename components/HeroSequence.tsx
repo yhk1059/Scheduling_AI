@@ -15,7 +15,7 @@ import { ui } from "./ui";
 import { Mark, QuoteGlyph } from "./Wordmark";
 
 const TYPED = "마감 다음 날 오픈은 안 되게";
-// 샘플 데모(/demo)와 같은 데이터: 근무표 첫 주(2026년 11월 2~8일, 월~일)의 5명.
+// 샘플 매장(lib/samples) 데이터: 근무표 첫 주(2026년 11월 2~8일, 월~일)의 5명.
 const EMPLOYEES: Employee[] = shop.employees.filter((n) => ["e01", "e05", "e06", "e07", "e08"].includes(n.id));
 const ROWS: Record<string, Code[]> = Object.fromEntries(
   EMPLOYEES.map((n) => [n.id, (demo.result.assignments as Record<string, Code[]>)[n.id].slice(0, 7)]),
@@ -37,7 +37,7 @@ const cellDelay = (employeeId: string, day: number) => ({
   animationDelay: `${2.6 + EMPLOYEES.findIndex((n) => n.id === employeeId) * 0.42 + (day - 1) * 0.06}s`,
 });
 
-/** 답장 모양의 정적 규칙 카드(랜딩·샘플 데모, UI_GUIDE "규칙·요청 카드"의 작은 자리 크기). */
+/** 답장 모양의 정적 규칙 카드(랜딩, UI_GUIDE "규칙·요청 카드"의 작은 자리 크기). */
 export function ReplyCard({
   title,
   quote,

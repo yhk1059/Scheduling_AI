@@ -5,7 +5,6 @@
 app/                  # Next.js 페이지 (UI 세부는 UI_GUIDE 확정 후)
 ├── page.tsx          # 랜딩 (/) — 정적, API 호출 없음
 ├── a/[token]/page.tsx # 직원 가능 시간 입력 (/a/{공용 토큰}) — 로그인 없음, 토큰 DB 함수만 호출
-├── demo/page.tsx     # 샘플 데모 (/demo) — 정적, 보기 전용, 저장 없음 (ADR-016)
 └── app/page.tsx      # 앱 (/app) — 시작, 매장 홈, 매장 설정, 기간 작업 (PRD 화면)
 components/           # UI 컴포넌트
 lib/
@@ -16,7 +15,8 @@ lib/
 ├── roster-import.ts  # 지난 근무(이월) 붙여넣기 파싱 (순수 함수)
 ├── csv.ts            # CSV 직렬화 (순수 함수)
 ├── types.gen.ts      # Pydantic JSON Schema에서 생성 (직접 수정 금지)
-└── samples/         # shop-12.json(샘플 매장), demo-schedule.json(데모 근무표, npm run gen:demo)
+└── samples/         # shop-12.json(샘플 매장), demo-schedule.json(랜딩 히어로 근무표, npm run gen:demo)
+public/demo.mp4       # 데모 영상 (npm run record:demo, ADR-022)
 api/index.py          # Vercel Python 함수 진입점 (import만 함)
 backend/              # FastAPI 앱 (무상태)
 ├── routes.py         # HTTP 계층, solver와 llm 오케스트레이션
@@ -25,12 +25,12 @@ backend/              # FastAPI 앱 (무상태)
 ├── solver/           # CP-SAT: model, select(대상 고르기), compile(식 → CP-SAT, hard·soft), evaluate(근무표 위 식 평가), stats, conflicts — llm을 import하지 않음
 ├── llm/              # client, translator, explainer, prompts, pseudonym — solver를 import하지 않음
 ├── gen_types.py      # JSON Schema → lib/types.gen.ts
-├── gen_demo.py       # 샘플 매장 → lib/samples/demo-schedule.json
+├── gen_demo.py       # 샘플 매장 → lib/samples/demo-schedule.json (랜딩 히어로)
 └── tests/
 eval/                 # dataset.jsonl, run.py, results.md
 e2e/                  # Playwright 데모 저니 (수동 실행, 실제 API, 테스트 전용 계정, ADR-013, ADR-020)
 supabase/migrations/  # shops 테이블 + RLS, availability_links·availability_shares 테이블 + 토큰 DB 함수 (ADR-014, ADR-020, ADR-021)
-scripts/              # harness 전용 (앱 코드를 두지 않음)
+scripts/              # harness 전용 + seed.ts(수동 테스트 시드), record-demo.ts(데모 영상 녹화) — 앱 코드를 두지 않음
 ```
 
 ## 패턴
