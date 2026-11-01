@@ -702,6 +702,9 @@ test("S12. 확정 → 확정 근무표 → 직원 링크 잠김", async ({ brows
   finalGrid = await readGrid(page, WEEK);
   expect((await periodByStart(page, WEEK.start_date)).versions).toHaveLength(1);
   await expectNoDevTerms(page, "확정 근무표");
+  // 확정 저장(디바운스 1초)이 홈으로 옮기기 전에 끝나야 한다. 화면 이동만으로는 저장하지 않으므로(store),
+  // 먼저 옮기면 서버 문서의 화면이 홈이 되어 S13이 확정 근무표를 열어도 저장된 상태와 달라진다
+  await expectSaved(page);
 
   await page.getByRole("button", { name: "← 근무표 목록" }).click();
   await expect(page.getByText("운영 중", { exact: true })).toHaveCount(0);
