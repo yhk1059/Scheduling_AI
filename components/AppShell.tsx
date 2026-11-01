@@ -5,7 +5,8 @@ import { useEffect, useState } from "react";
 
 import { useAppStore } from "@/lib/store";
 import { onAuthChange, supabaseConfigured } from "@/lib/supabase";
-import { PRODUCT_NAME, unitShort } from "@/lib/wording";
+import { PRODUCT_NAME } from "@/lib/product";
+import { unitShort } from "@/lib/wording";
 
 import { AccountBar } from "./Account";
 import ConfirmedPeriod from "./ConfirmedPeriod";

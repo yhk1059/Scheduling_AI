@@ -21,7 +21,7 @@ export default function Stepper<S extends number>({
         const done = !active && step <= reached;
         return (
           <li key={step} className="flex items-center gap-2">
-            {i > 0 && <span aria-hidden="true" className="h-px w-7 bg-[#C9C9C1]" />}
+            {i > 0 && <span aria-hidden="true" className="h-px w-6 bg-[#C9C9C1]" />}
             <button
               type="button"
               disabled={!done}
@@ -30,14 +30,14 @@ export default function Stepper<S extends number>({
               className="flex items-center gap-2 rounded-md px-1 text-sm transition-colors duration-[120ms] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#155E75] disabled:cursor-default enabled:hover:bg-[#EFEFEB] enabled:active:bg-[#E2E2DC]"
             >
               {done ? (
-                <span className="flex size-[26px] items-center justify-center rounded-full bg-[#E3F0F3] text-[#155E75]">
+                <span className="flex size-[22px] items-center justify-center rounded-full bg-[#E3F0F3] text-[#155E75]">
                   <svg aria-hidden="true" viewBox="0 0 12 12" className="size-3" fill="none" stroke="currentColor" strokeWidth={1.8}>
                     <path d="M2.5 6.2 5 8.5l4.5-5" />
                   </svg>
                 </span>
               ) : (
                 <span
-                  className={`flex size-[26px] items-center justify-center rounded-full font-mono text-xs ${
+                  className={`flex size-[22px] items-center justify-center rounded-full font-mono text-xs ${
                     active ? "bg-[#155E75] text-white" : "border border-[#C9C9C1] text-[#9A9A91]"
                   }`}
                 >

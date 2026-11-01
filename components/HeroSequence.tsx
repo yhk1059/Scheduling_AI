@@ -12,7 +12,7 @@ import { hardnessLabel } from "@/lib/wording";
 
 import { CELL, codeClass, ScheduleGrid } from "./ScheduleStep";
 import { ui } from "./ui";
-import { Mark } from "./Wordmark";
+import { Mark, QuoteGlyph } from "./Wordmark";
 
 const TYPED = "마감 다음 날 오픈은 안 되게";
 // 샘플 데모(/demo)와 같은 데이터: 근무표 첫 주(2026년 11월 2~8일, 월~일)의 5명.
@@ -60,9 +60,7 @@ export function ReplyCard({
         </span>
       </div>
       <p className="flex items-start gap-1.5 text-sm text-[#1B1B18]">
-        <span aria-hidden="true" className="text-[20px] leading-5 text-[#155E75]">
-          “
-        </span>
+        <QuoteGlyph size={16} />
         {quote}
       </p>
       <div className="ml-2 flex flex-col gap-1 border-l-2 border-[#CFE4EA] pl-3.5">

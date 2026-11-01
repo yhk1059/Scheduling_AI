@@ -5,7 +5,7 @@ import Link from "next/link";
 import HeroSequence, { ChangeFragment, ReplyCard } from "@/components/HeroSequence";
 import { ui } from "@/components/ui";
 import { Mark } from "@/components/Wordmark";
-import { PRODUCT_NAME } from "@/lib/wording";
+import { PRODUCT_NAME } from "@/lib/product";
 
 // 저장소를 옮기면 이 한 줄만 바꾼다.
 const REPO_URL = "https://github.com/yhk1059/harness_framework";

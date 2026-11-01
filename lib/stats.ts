@@ -1,19 +1,21 @@
 // 배정에서 개인별 통계를 다시 센다(★12: 변환 전에 확정한 근무표는 옛 형식 통계 대신 이 값을 보여 준다).
 // backend/solver/stats.py compute_result의 EmployeeStats와 같은 정의다. 희망 반영률은 셀 수 없어 null.
 import { isWeekendDay, type PeriodRange } from "./period";
+import { closingShift } from "./rules";
 import type { EmployeeStats, ScheduleResult, ShopConfig } from "./types.gen";
 
 const OFF = "O";
-const CLOSING = "C";
 
-/** 직원별 마감 수의 가장 적음과 가장 많음. 복합 코드는 parts로 센다. 셀 직원이 없으면 null. */
+/** 직원별 마감 수의 가장 적음과 가장 많음. 마감은 closingShift(가장 늦게 끝나는 근무조), 복합 코드는 parts로 센다. 마감 근무조나 셀 직원이 없으면 null. */
 export function closingSpread(
   assignments: Record<string, string[]>,
   config: ShopConfig,
   activeIds: string[],
 ): { min: number; max: number } | null {
-  const closing = new Set(config.shifts.filter((s) => s.parts?.includes(CLOSING)).map((s) => s.code));
-  closing.add(CLOSING);
+  const code = closingShift(config)?.code;
+  if (!code) return null;
+  const closing = new Set(config.shifts.filter((s) => s.parts?.includes(code)).map((s) => s.code));
+  closing.add(code);
   const counts = activeIds
     .filter((id) => id in assignments)
     .map((id) => assignments[id].filter((code) => closing.has(code)).length);

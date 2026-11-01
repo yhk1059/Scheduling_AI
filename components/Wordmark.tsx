@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { PRODUCT_NAME } from "@/lib/wording";
+import { PRODUCT_NAME } from "@/lib/product";
 
 const MARK_COLORS = {
   accent: { bg: "#155E75", fg: "#FFFFFF" },
