@@ -204,6 +204,15 @@ export interface AvailabilityRoster {
   period_length: number;
   locked: boolean;
   employees: { employee_name: string; link_token: string; submitted: boolean }[];
+  /** 매장의 근무조(휴무·꺼진 것·복합 코드 제외). 직원 화면 "매장 근무조" 카드. */
+  shifts: RosterShift[];
+}
+
+export interface RosterShift {
+  code: string;
+  name: string;
+  start: string | null;
+  end: string | null;
 }
 
 /** 공용 링크로 명단을 읽는다. 없는 링크면 null. */
@@ -214,8 +223,8 @@ export async function getAvailabilityRoster(token: string): Promise<Availability
   if (error) throw new Error(error.message);
   const rows = data as (AvailabilityRoster["employees"][number] & Omit<AvailabilityRoster, "employees">)[];
   if (rows.length === 0) return null;
-  const { shop_name, period_start, period_length, locked } = rows[0];
-  return { shop_name, period_start, period_length, locked, employees: rows };
+  const { shop_name, period_start, period_length, locked, shifts } = rows[0];
+  return { shop_name, period_start, period_length, locked, shifts: shifts ?? [], employees: rows };
 }
 
 export interface EmployeeAvailability {

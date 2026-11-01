@@ -5,7 +5,7 @@ import { useEffect, useRef, useState } from "react";
 
 import { applyDrag, cellKey, cellsFromSlots, SLOT_COUNT, slotLabel, slotsFromCells } from "@/lib/availability";
 import { formatRange, periodDays, type PeriodDay } from "@/lib/period";
-import { getAvailability, getAvailabilityRoster, submitAvailability, type AvailabilityRoster, type EmployeeAvailability } from "@/lib/supabase";
+import { getAvailability, getAvailabilityRoster, submitAvailability, type AvailabilityRoster, type EmployeeAvailability, type RosterShift } from "@/lib/supabase";
 
 import { ui } from "./ui";
 import Wordmark from "./Wordmark";
@@ -47,6 +47,7 @@ export default function AvailabilityForm({ token }: { token: string }) {
       <EmployeeForm
         key={picked}
         token={picked}
+        shifts={load.kind === "ok" ? load.roster.shifts : []}
         onBack={() => {
           setPicked(null);
           retry();
@@ -137,7 +138,7 @@ function NamePicker({ roster, onPick }: { roster: AvailabilityRoster; onPick: (t
 }
 
 /** 고른 직원의 칸을 읽어 캘린더를 보여 준다. */
-function EmployeeForm({ token, onBack }: { token: string; onBack: () => void }) {
+function EmployeeForm({ token, shifts, onBack }: { token: string; shifts: RosterShift[]; onBack: () => void }) {
   const [load, setLoad] = useState<Load>({ kind: "loading" });
   const [attempt, setAttempt] = useState(0);
 
@@ -155,11 +156,23 @@ function EmployeeForm({ token, onBack }: { token: string; onBack: () => void }) 
     };
   }, [token, attempt]);
 
-  if (load.kind === "ok") return <Calendar token={token} link={load.link} onGone={() => setLoad({ kind: "not_found" })} onBack={onBack} />;
+  if (load.kind === "ok") return <Calendar token={token} link={load.link} shifts={shifts} onGone={() => setLoad({ kind: "not_found" })} onBack={onBack} />;
   return <LoadMessage kind={load.kind} onRetry={() => setAttempt((n) => n + 1)} />;
 }
 
-function Calendar({ token, link, onGone, onBack }: { token: string; link: EmployeeAvailability; onGone: () => void; onBack: () => void }) {
+function Calendar({
+  token,
+  link,
+  shifts,
+  onGone,
+  onBack,
+}: {
+  token: string;
+  link: EmployeeAvailability;
+  shifts: RosterShift[];
+  onGone: () => void;
+  onBack: () => void;
+}) {
   const range = { start_date: link.period_start, length: link.period_length };
   const days = periodDays(range);
   const pages = Math.ceil(days.length / DAYS_PER_PAGE);
@@ -313,6 +326,7 @@ function Calendar({ token, link, onGone, onBack }: { token: string; link: Employ
 
           <aside className="flex min-h-0 flex-col gap-3 overflow-y-auto">
             <PaintedSummary days={shown} cells={cells} />
+            {shifts.length > 0 && <ShiftsCard shifts={shifts} />}
             <div className="flex flex-col gap-1 px-1 text-xs font-medium text-[#66665E]">
               <p>제출한 뒤에도 이 링크로 다시 고칠 수 있어요.</p>
               <p>근무표가 확정되면 잠겨요.</p>
@@ -385,6 +399,31 @@ function PaintedSummary({ days, cells }: { days: PeriodDay[]; cells: Set<string>
       <p className="border-t border-[#EFEFEB] pt-2 text-[13px] font-medium text-[#1B1B18]">
         합계 <span className="font-mono">{hours}</span>시간
       </p>
+    </section>
+  );
+}
+
+/** 매장 근무조(UI_GUIDE 직원 가능 시간 입력): 코드·이름·시각. 어느 근무에 들어가려면 그 시간을 다 칠해야 한다는 안내. */
+function ShiftsCard({ shifts }: { shifts: RosterShift[] }) {
+  return (
+    <section className={`${ui.card} flex flex-col gap-2`}>
+      <h2 className={ui.cardTitle}>매장 근무조</h2>
+      <ul className="flex flex-col gap-1 text-[13px] text-[#3D3D38]">
+        {shifts.map((s) => (
+          <li key={s.code} className="flex items-center gap-2">
+            <span className="inline-flex size-6 shrink-0 items-center justify-center rounded border border-[#C9C9C1] bg-white font-mono text-xs font-semibold text-[#1B1B18]">
+              {s.code}
+            </span>
+            <span className="min-w-0 truncate">{s.name}</span>
+            {s.start && s.end && (
+              <span className="ml-auto shrink-0 font-mono text-[#66665E]">
+                {s.start}~{s.end}
+              </span>
+            )}
+          </li>
+        ))}
+      </ul>
+      <p className="border-t border-[#EFEFEB] pt-2 text-xs text-[#66665E]">근무조 시간을 다 덮어야 그 근무에 들어갈 수 있어요.</p>
     </section>
   );
 }
