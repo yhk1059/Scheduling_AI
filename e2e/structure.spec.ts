@@ -120,6 +120,7 @@ test("S14. 시작일 15일과 근무 형태(피크 추가, 더블), 태그 배�
   await expect(page.getByRole("button", { name: "접기" })).toHaveAttribute("aria-expanded", "true");
   await expect(page.getByRole("textbox", { name: "A 끝 시각" })).toHaveValue("15:00");
   await expect(page.getByRole("textbox", { name: "A 실근무 시간" })).toHaveValue("6");
+  await expect(page.getByRole("cell", { name: "휴무", exact: true })).toHaveCount(0);
   await page.getByRole("textbox", { name: "새 근무 코드" }).fill("P");
   await page.getByRole("textbox", { name: "새 근무 이름" }).fill("피크");
   await page.getByRole("textbox", { name: "새 근무 시작 시각" }).fill("11:00");

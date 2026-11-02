@@ -18,13 +18,12 @@ function parseHours(v: string): number | null {
 }
 const HOURS_MSG = "시간은 0.5~24 사이로 0.5 단위로 적어 주세요";
 
-/** 세는 근무조 칸: 기본 코드는 그 코드, 더블은 "A + C", 휴무는 없음. */
+/** 세는 근무조 칸: 기본 코드는 그 코드, 더블은 "A + C". */
 function partsText(s: ShiftDef): string {
-  if (s.code === OFF_CODE) return "–";
   return s.parts?.length ? s.parts.join(" + ") : s.code;
 }
 
-/** 근무 형태(근무 코드 표). 맨 아래 줄에 적어 하나씩 더한다. 매장 설정 [근무 형태] 탭과 근무표 작성 ②에서 쓴다. */
+/** 근무 형태(근무 코드 표). 휴무는 고칠 수 없어 보여 주지 않는다. 맨 아래 줄에 적어 하나씩 더한다. 매장 설정 [근무 형태] 탭과 근무표 작성 ②에서 쓴다. */
 export default function ShiftTable() {
   const shifts = useAppStore((s) => s.shop?.config.shifts ?? []);
 
@@ -45,9 +44,11 @@ export default function ShiftTable() {
             </tr>
           </thead>
           <tbody>
-            {shifts.map((s) => (
-              <ShiftRow key={s.code} shift={s} shifts={shifts} />
-            ))}
+            {shifts
+              .filter((s) => s.code !== OFF_CODE)
+              .map((s) => (
+                <ShiftRow key={s.code} shift={s} shifts={shifts} />
+              ))}
             <NewShiftRow shifts={shifts} />
           </tbody>
         </table>
@@ -66,11 +67,9 @@ function ShiftRow({ shift, shifts }: { shift: ShiftDef; shifts: ShiftDef[] }) {
   const [hours, setHours] = useState<string | null>(null);
   const [times, setTimes] = useState<{ start: string; end: string } | null>(null);
 
-  const off = shift.code === OFF_CODE;
   const active = shift.active !== false;
   const partOff = (shift.parts ?? []).some((p) => shifts.find((s) => s.code === p)?.active === false);
-  const editable = !off && active;
-  const timed = editable && !shift.parts?.length;
+  const timed = active && !shift.parts?.length;
   const shownTimes = times ?? { start: shift.start ?? "", end: shift.end ?? "" };
   const timesMsg = times && shiftTimesError(times.start, times.end);
 
@@ -92,7 +91,7 @@ function ShiftRow({ shift, shifts }: { shift: ShiftDef; shifts: ShiftDef[] }) {
     setTimes(null);
   };
 
-  const muted = editable ? "" : "text-[#66665E]";
+  const muted = active ? "" : "text-[#66665E]";
   return (
     <tr className="border-b border-[#EFEFEB]">
       <td className={`px-2 py-1 font-mono font-semibold ${muted}`}>
@@ -101,7 +100,7 @@ function ShiftRow({ shift, shifts }: { shift: ShiftDef; shifts: ShiftDef[] }) {
           {!active && <span className={`${ui.badge} ${ui.badgeTone.excluded} font-sans`}>꺼짐</span>}
         </span>
       </td>
-      {editable ? (
+      {active ? (
         <>
           <td className="px-1 py-1">
             <input
@@ -164,7 +163,7 @@ function ShiftRow({ shift, shifts }: { shift: ShiftDef; shifts: ShiftDef[] }) {
       <td className={`px-2 py-1 font-mono ${muted}`}>{partsText(shift)}</td>
       <td className="px-1 py-1">
         <div className="flex items-center justify-end gap-1">
-          {off ? null : !active ? (
+          {!active ? (
             <button
               type="button"
               disabled={partOff}
@@ -208,9 +207,11 @@ function NewShiftRow({ shifts }: { shifts: ShiftDef[] }) {
       ? "코드를 적어 주세요"
       : !CODE_RE.test(code)
         ? "코드는 영문 대문자·숫자 3자까지예요"
-        : shifts.some((s) => s.code === code)
-          ? "같은 코드가 이미 있어요"
-          : null;
+        : code === OFF_CODE
+          ? "O는 쉬는 날을 나타내는 코드라 쓸 수 없어요"
+          : shifts.some((s) => s.code === code)
+            ? "같은 코드가 이미 있어요"
+            : null;
   const nameMsg = name.trim() === "" ? "이름을 적어 주세요" : null;
   const hoursMsg = parseHours(hours) === null ? HOURS_MSG : null;
   // 더블은 세는 근무조의 시각을 쓰므로 시각을 받지 않는다
