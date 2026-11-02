@@ -21,6 +21,7 @@ import {
 } from "@/lib/store";
 import { coverageText, presetName, scheduleName } from "@/lib/wording";
 
+import AvailabilityOverview from "./AvailabilityOverview";
 import HolidayCalendar from "./HolidayCalendar";
 import RulesStep from "./RulesStep";
 import ScheduleStep, { CELL, codeClass, DayHead } from "./ScheduleStep";
@@ -86,7 +87,7 @@ export default function PeriodWork() {
   );
 }
 
-/** ① 공용 직원 링크 하나와 제출 현황. 근무표 시작일이나 명단이 바뀌면 행을 맞춘다. */
+/** ① 공용 직원 링크 하나, 제출 현황, 직원별 가능 시간. 근무표 시작일이나 명단이 바뀌면 행을 맞춘다. */
 function LinksSection({ period }: { period: WorkPeriod }) {
   const shop = useAppStore((s) => s.shop);
   const shopName = shop?.name ?? "";
@@ -133,55 +134,60 @@ function LinksSection({ period }: { period: WorkPeriod }) {
   };
 
   return (
-    <section className={`${ui.card} flex flex-col gap-3`}>
-      <div className="flex items-start justify-between gap-4">
-        <div className="flex min-w-0 flex-col gap-1">
-          <h3 className={ui.cardTitle}>직원 링크</h3>
-          <p className={ui.help}>단체 대화방에 이 링크 하나만 올려 주세요. 직원이 자기 이름을 골라 가능 시간을 입력해요</p>
+    <>
+      <section className={`${ui.card} flex flex-col gap-3`}>
+        <div className="flex items-start justify-between gap-4">
+          <div className="flex min-w-0 flex-col gap-1">
+            <h3 className={ui.cardTitle}>직원 링크</h3>
+            <p className={ui.help}>단체 대화방에 이 링크 하나만 올려 주세요. 직원이 자기 이름을 골라 가능 시간을 입력해요</p>
+          </div>
+          {current && (
+            <button type="button" onClick={() => void copy()} className={ui.secondarySm}>
+              {copied === url ? "복사했어요" : "링크 복사"}
+            </button>
+          )}
         </div>
         {current && (
-          <button type="button" onClick={() => void copy()} className={ui.secondarySm}>
-            {copied === url ? "복사했어요" : "링크 복사"}
-          </button>
+          <>
+            <p className="truncate font-mono text-[13px] text-[#3D3D38]">{url}</p>
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-[13px] text-[#1B1B18]">
+                <span className="font-mono">{employees.length}</span>명 중 <span className="font-mono">{submitted}</span>명 제출
+              </p>
+              <button type="button" onClick={reload} className={ui.textSm}>
+                새로고침
+              </button>
+            </div>
+            <div aria-hidden="true" className="h-1.5 overflow-hidden rounded bg-[#E2E2DC]">
+              <div className="h-full bg-[#155E75]" style={{ width: `${employees.length === 0 ? 0 : (submitted / employees.length) * 100}%` }} />
+            </div>
+            {missing.length > 0 && <p className={ui.help}>미제출: {missing.map((n) => n.name).join(", ")}</p>}
+          </>
         )}
-      </div>
-      {current && (
-        <>
-          <p className="truncate font-mono text-[13px] text-[#3D3D38]">{url}</p>
-          <div className="flex items-center justify-between gap-3">
-            <p className="text-[13px] text-[#1B1B18]">
-              <span className="font-mono">{employees.length}</span>명 중 <span className="font-mono">{submitted}</span>명 제출
-            </p>
+        {failed === key ? (
+          <div role="alert" className="flex items-center gap-2 text-sm text-[#B42318]">
+            링크를 불러오지 못했어요. 네트워크를 확인하고 다시 시도해 주세요
             <button type="button" onClick={reload} className={ui.textSm}>
-              새로고침
+              다시 시도
             </button>
           </div>
-          <div aria-hidden="true" className="h-1.5 overflow-hidden rounded bg-[#E2E2DC]">
-            <div className="h-full bg-[#155E75]" style={{ width: `${employees.length === 0 ? 0 : (submitted / employees.length) * 100}%` }} />
-          </div>
-          {missing.length > 0 && <p className={ui.help}>미제출: {missing.map((n) => n.name).join(", ")}</p>}
-        </>
-      )}
-      {failed === key ? (
-        <div role="alert" className="flex items-center gap-2 text-sm text-[#B42318]">
-          링크를 불러오지 못했어요. 네트워크를 확인하고 다시 시도해 주세요
-          <button type="button" onClick={reload} className={ui.textSm}>
-            다시 시도
-          </button>
-        </div>
-      ) : (
-        !current && (
-          <p role="status" className={ui.help}>
-            링크를 만드는 중…
+        ) : (
+          !current && (
+            <p role="status" className={ui.help}>
+              링크를 만드는 중…
+            </p>
+          )
+        )}
+        {copyFailed && (
+          <p role="alert" className={ui.error}>
+            복사하지 못했어요. 위의 링크를 직접 복사해 주세요
           </p>
-        )
+        )}
+      </section>
+      {current && shop && (
+        <AvailabilityOverview key={period.id} period={period} employees={employees} rows={current.rows} config={shop.config} />
       )}
-      {copyFailed && (
-        <p role="alert" className={ui.error}>
-          복사하지 못했어요. 위의 링크를 직접 복사해 주세요
-        </p>
-      )}
-    </section>
+    </>
   );
 }
 

@@ -123,6 +123,16 @@ export function coversShift(ranges: TimeRange[], shift: ShiftDef, config: ShopCo
   return shift.start == null || shift.end == null || coversTime(ranges, shift.start, shift.end);
 }
 
+/** 구간의 시작 칸과 끝 칸(미포함). */
+export function slotSpan([from, to]: TimeRange): [number, number] {
+  return [slotOf(from), slotOf(to)];
+}
+
+/** 그날 근무조 시각을 완전히 덮는 직원 수. 배정과 같은 기준으로 센다. */
+export function availableCount(slotsList: AvailabilitySlots[], date: string, shift: ShiftDef, config: ShopConfig): number {
+  return slotsList.filter((slots) => coversShift(slots[date] ?? [], shift, config)).length;
+}
+
 /**
  * 직원 × 근무 코드마다 덮지 못하는 날을 금지하는 반드시 규칙. 금지할 날이 없으면 규칙도 없다.
  * 가능 시간이 없는 직원은 휴무 말고 모두 금지다. 칸 고정이 우선하므로 고정한 칸은 뺀다.

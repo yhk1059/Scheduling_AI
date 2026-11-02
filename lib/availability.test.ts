@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   applyDrag,
+  availableCount,
   availabilityFromLinks,
   availabilityRules,
   cellKey,
@@ -11,6 +12,7 @@ import {
   mergeAvailabilityConflicts,
   sameAvailability,
   SLOT_COUNT,
+  slotSpan,
   slotLabel,
   slotsFromCells,
   type AvailabilitySlots,
@@ -224,5 +226,32 @@ describe("sameAvailability", () => {
   it("칸이 다르면 다르다", () => {
     expect(sameAvailability({ e01: a }, { e01: { "2026-11-02": [["09:00", "15:30"]] } })).toBe(false);
     expect(sameAvailability({ e01: a }, {})).toBe(false);
+  });
+});
+
+describe("slotSpan", () => {
+  it("구간을 시작 칸과 끝 칸(끝 칸 미포함)으로 바꾼다", () => {
+    expect(slotSpan(["06:00", "06:30"])).toEqual([0, 1]);
+    expect(slotSpan(["09:00", "18:00"])).toEqual([6, 24]);
+    expect(slotSpan(["17:00", "24:00"])).toEqual([22, SLOT_COUNT]);
+  });
+});
+
+describe("availableCount", () => {
+  const DATE = "2026-11-02";
+  const slots = (...ranges: [string, string][]): AvailabilitySlots => ({ [DATE]: ranges });
+
+  it("근무조 시각을 완전히 덮는 직원만 센다", () => {
+    const list = [slots(["09:00", "23:00"]), slots(["09:00", "15:00"]), slots(["12:00", "18:00"])];
+    expect(availableCount(list, DATE, shift("A"), CONFIG)).toBe(2);
+    expect(availableCount(list, DATE, shift("C"), CONFIG)).toBe(1);
+  });
+
+  it("나눠 칠해도 이어지면 덮은 것으로 센다", () => {
+    expect(availableCount([slots(["09:00", "12:00"], ["12:00", "15:00"])], DATE, shift("A"), CONFIG)).toBe(1);
+  });
+
+  it("그날 칠하지 않았거나 비어 있으면 세지 않는다", () => {
+    expect(availableCount([{}, { "2026-11-03": FULL }], DATE, shift("A"), CONFIG)).toBe(0);
   });
 });

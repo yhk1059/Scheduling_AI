@@ -209,6 +209,10 @@ test("S6. ① 가능 시간: 준비 요약과 직원 링크", async () => {
   await expect(page.getByRole("button", { name: "링크 복사" })).toHaveCount(1);
   await expect(page.getByText(`${EMPLOYEE_COUNT}명 중 0명 제출`)).toBeVisible();
   await expect(page.getByText(/^미제출: /)).toContainText("박민수");
+  await expect(page.getByRole("heading", { name: "직원별 가능 시간" })).toBeVisible();
+  await expect(page.getByRole("region", { name: /가능 시간$/ })).toHaveCount(EMPLOYEE_COUNT);
+  await expect(page.getByRole("region", { name: /가능 시간$/ }).getByText("미제출", { exact: true })).toHaveCount(EMPLOYEE_COUNT);
+  await expect(page.getByRole("table", { name: "날짜별 가능 인원" }).getByRole("cell").filter({ hasNotText: /^0$/ })).toHaveCount(0);
   const links = await shownLinks(page);
   expect(links).toHaveLength(1);
   await page.getByRole("button", { name: "링크 복사" }).click();
@@ -340,6 +344,21 @@ test("S7. 직원 화면: 드래그 입력과 제출", async ({ browser }) => {
   await page.getByRole("button", { name: "새로고침" }).click();
   await expect(page.getByText(`${EMPLOYEE_COUNT}명 중 ${EMPLOYEE_COUNT}명 제출`)).toBeVisible();
   await expect(page.getByText("미제출:")).toHaveCount(0);
+
+  // 매니저는 제출한 가능 시간을 한 화면에서 본다
+  const counts = page.getByRole("table", { name: "날짜별 가능 인원" });
+  const countCell = (shift: string, column: number) => counts.getByRole("row", { name: new RegExp(`^${shift} `) }).getByRole("cell").nth(column);
+  await expect(countCell("마감", 1)).toHaveText(String(EMPLOYEE_COUNT)); // 11/3: 박민수도 덮는다
+  await expect(countCell("미들", 3)).toHaveText(String(EMPLOYEE_COUNT)); // 11/5: 박민수도 덮는다
+  await expect(countCell("마감", 3)).toHaveText(String(EMPLOYEE_COUNT - 1)); // 11/5: 일부만 겹치면 세지 않는다
+  await expect(countCell("오픈", 3)).toHaveText(String(EMPLOYEE_COUNT - 1));
+  const parkCard = page.getByRole("region", { name: "박민수 가능 시간" });
+  await expect(parkCard.getByRole("img")).toHaveCount(2);
+  await expect(parkCard.getByRole("img", { name: "11월 3일 12:00~23:00" })).toBeVisible();
+  await expect(parkCard.getByRole("img", { name: "11월 5일 12:00~18:00" })).toBeVisible();
+  await expect(parkCard.getByText("미제출", { exact: true })).toHaveCount(0);
+  await expect(parkCard.getByRole("button")).toHaveCount(0);
+  await expectNoDevTerms(page, "① 가능 시간(직원별 가능 시간)");
 });
 
 test("S8. ② 매장 조건", async () => {
