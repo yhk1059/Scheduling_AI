@@ -21,7 +21,7 @@ export const T0 = new Date("2026-10-28T09:00:00+09:00");
 export const EMPLOYEE_COUNT = 12;
 export const CARRY_OVER_DAYS = 7;
 const STORAGE_KEY = "shop-scheduler";
-/** [이름, 태그] (BROWSER_TEST_SCENARIOS D1) */
+/** [이름, 직급] (BROWSER_TEST_SCENARIOS D1) */
 export const ROSTER: [string, string | null][] = [
   ["이영희", "리더"],
   ["박민수", null],
@@ -197,10 +197,10 @@ export async function expectNoProblems(page: Page, problems: string[]) {
   expect(problems.splice(0), "콘솔 오류·API 실패").toEqual([]);
 }
 
-/** 명단 표 맨 아래 줄에 적고 이름 칸에서 Enter. 적다 만 태그도 함께 들어간다. */
+/** 명단 표 맨 아래 줄에 적고 이름 칸에서 Enter. 적다 만 직급도 함께 들어간다. */
 export async function addRoster(page: Page, roster: [string, string | null][]) {
   const name = page.getByRole("textbox", { name: "새 직원 이름" });
-  const tag = page.getByRole("combobox", { name: "새 직원 태그" });
+  const tag = page.getByRole("combobox", { name: "새 직원 직급" });
   for (const [n, t] of roster) {
     await name.fill(n);
     if (t) await tag.fill(t);

@@ -115,7 +115,7 @@ function shiftsLabel(s: Selector, config: ShopConfig): string {
   return rest.length ? `${names(rest)} 말고 다른 근무` : "근무";
 }
 
-/** 사람 고르기: 이름(3명 넘으면 "김OO 외 2명"), "리더 태그", "신입 빼고". 비어 있으면 "". */
+/** 사람 고르기: 이름(3명 넘으면 "김OO 외 2명"), "리더 직급", "신입 빼고". 비어 있으면 "". */
 function peopleLabel(p: People | null | undefined, employees: Employee[]): string {
   if (!p) return "";
   const parts: string[] = [];
@@ -123,7 +123,7 @@ function peopleLabel(p: People | null | undefined, employees: Employee[]): strin
     const names = p.ids.map((id) => employeeLabel(id, employees));
     parts.push(names.length > 3 ? `${names[0]} 외 ${names.length - 1}명` : names.join(" "));
   }
-  if (p.tags?.length) parts.push(`${p.tags.join("·")} 태그`);
+  if (p.tags?.length) parts.push(`${p.tags.join("·")} 직급`);
   if (p.exclude_tags?.length) parts.push(`${p.exclude_tags.join("·")} 빼고`);
   return parts.join(" ");
 }
@@ -217,7 +217,7 @@ function shapeName(s: Shape, hardness: string): string {
         if (hours) return "세는 규칙";
         if (noPeople(s.people)) return "필요 인원";
         const { ids, tags, exclude_tags } = s.people;
-        if (!ids && !exclude_tags?.length && tags?.length) return "태그별 배치";
+        if (!ids && !exclude_tags?.length && tags?.length) return "직급별 배치";
         return "세는 규칙";
       }
       if (isLeaveShape(s, hardness)) return "휴가";

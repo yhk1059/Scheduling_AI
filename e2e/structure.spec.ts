@@ -1,4 +1,4 @@
-// docs/BROWSER_TEST_SCENARIOS.md S14, S15. 매장이 정하는 근무 형태(피크 추가, 더블), 태그 배치 규칙, 근무표 시작일을
+// docs/BROWSER_TEST_SCENARIOS.md S14, S15. 매장이 정하는 근무 형태(피크 추가, 더블), 직급 배치 규칙, 근무표 시작일을
 // 매장 준비부터 다음 근무표까지 하나의 흐름으로 돈다. LLM은 mock하지 않는다(ADR-013).
 // LLM 해석은 흔들릴 수 있어 카드 문장은 핵심 낱말만 본다.
 import { type BrowserContext, expect, type Page, test } from "@playwright/test";
@@ -72,14 +72,14 @@ test.afterEach(async () => {
   await expectNoProblems(page, problems);
 });
 
-test("S14. 시작일 15일과 근무 형태(피크 추가, 더블), 태그 배치 규칙", async () => {
+test("S14. 시작일 15일과 근무 형태(피크 추가, 더블), 직급 배치 규칙", async () => {
   await clearAccount();
   await page.goto("/app");
   await loginAsTestUser(page);
   await page.getByRole("textbox", { name: "매장 이름" }).fill("연남 카페");
   await page.getByRole("combobox", { name: "근무표 주기" }).selectOption({ label: "한 달(1일~말일)" });
   await addRoster(page, ROSTER);
-  await expect(page.getByRole("button", { name: "6행 태그 리더 빼기" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "6행 직급 리더 빼기" })).toBeVisible();
   const { shop: afterRoster } = await readState(page);
   expect(afterRoster.employees.filter((n) => n.tags.includes("리더")).map((n) => n.name)).toEqual(["이영희", "강서연", "윤지민"]);
   expect(afterRoster.employees.filter((n) => n.tags.includes("신입")).map((n) => n.name)).toEqual(["서예린", "신도윤"]);
@@ -165,7 +165,7 @@ test("S14. 시작일 15일과 근무 형태(피크 추가, 더블), 태그 배�
   expect([...(added?.parts ?? [])].sort(), "더블이 오픈·마감으로 센다").toEqual(["A", "C"]);
   expect(afterDouble.rules.some((r) => r.id === limits[0].id), "규칙이 함께 적용됨").toBe(true);
 
-  // 태그 배치 규칙
+  // 직급 배치 규칙
   const tagText = "리더는 매일 오픈에 1명 이상 있어야 해";
   const tagCards = await interpretOk(page, RULE_INPUT, "규칙 만들기", tagText);
   expect(tagCards.length).toBeGreaterThan(0);
@@ -173,7 +173,7 @@ test("S14. 시작일 15일과 근무 형태(피크 추가, 더블), 태그 배�
     const s = ruleShape(c);
     expect(s?.kind).toBe("count");
     if (s?.kind === "count") {
-      expect(s.people.tags, "리더 태그 대상").toEqual(["리더"]);
+      expect(s.people.tags, "리더 직급 대상").toEqual(["리더"]);
       expect(s.min?.n).toBe(1);
       expect(s.shifts.in).toContain("A");
     }

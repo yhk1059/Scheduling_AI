@@ -219,21 +219,9 @@ export default function Home() {
             {PRODUCT_NAME}
           </Link>
           <nav className="flex items-center gap-1">
-            <a href="#problem" className={ui.text}>
-              문제
-            </a>
-            <a href="#how" className={ui.text}>
-              동작 방식
-            </a>
-            <a href="#built" className={ui.text}>
-              만든 방식
-            </a>
             <a href={REPO_URL} className={ui.text}>
               GitHub
             </a>
-            <Link href="/app" className={`${ui.primary} ml-3`}>
-              내 매장으로 시작하기
-            </Link>
           </nav>
         </div>
       </header>
@@ -242,17 +230,17 @@ export default function Home() {
         <section className={`${container} grid grid-cols-[minmax(0,5fr)_minmax(0,7fr)] items-center gap-14 py-[88px]`}>
           <div className="flex flex-col gap-6">
             <p className={ui.eyebrow}>{PRODUCT_NAME} · 매장 직원 근무표</p>
-            <h1 className="text-[52px] leading-[1.15] font-bold tracking-[-0.03em] text-[#1B1B18]">
-              말로 설명하면,
+            <h1 className="text-[30px] leading-[1.15] font-bold tracking-[-0.03em] break-keep text-[#1B1B18] xl:text-[38px]">
+              복잡한 근무표,
               <br />
-              근무표가 나옵니다
+              이제 {PRODUCT_NAME}에게 맡기세요
             </h1>
             <p className="text-base leading-relaxed text-[#3D3D38]">
               직원은 링크로 가능 시간을 칠하고, 매니저는 매장 조건을 말로 적어요. 막히면 이유와 해결책을 알려 드려요.
             </p>
             <div className="flex items-center gap-2">
-              <DemoVideoButton className={ui.primaryXl}>데모 영상 보기</DemoVideoButton>
-              <Link href="/app" className={ui.secondaryXl}>
+              <DemoVideoButton className={ui.secondaryXl}>데모 영상</DemoVideoButton>
+              <Link href="/app" className={ui.primaryXl}>
                 내 매장으로 시작하기
               </Link>
             </div>
@@ -261,7 +249,7 @@ export default function Home() {
           <HeroSequence />
         </section>
 
-        <section id="problem" className={section}>
+        <section className={section}>
           <div className={`${container} flex flex-col gap-12`}>
             <SectionHead eyebrow="01 · 문제" title="메신저와 엑셀, 머릿속 규칙으로 짜고 있어요">
               가능 시간을 옮겨 적고, 규칙을 떠올리고, 어디서 막히는지 찾느라 시간이 가요.
@@ -289,7 +277,7 @@ export default function Home() {
           </div>
         </section>
 
-        <section id="how" className={section}>
+        <section className={section}>
           <div className={`${container} flex flex-col gap-12`}>
             <SectionHead eyebrow="02 · 동작 방식" title="링크 하나, 말 한 줄, 버튼 하나">
               근무표마다 같은 순서예요. 한 번 적은 매장 조건은 다음 근무표에도 그대로 써요.
@@ -309,7 +297,7 @@ export default function Home() {
           </div>
         </section>
 
-        <section id="built" className={section}>
+        <section className={section}>
           <div className={`${container} flex flex-col gap-8`}>
             <SectionHead eyebrow="03 · 만든 방식" title="말은 LLM이, 계산은 솔버가">
               LLM이 낸 결과는 사람이 확인하거나 서버가 다시 풀어 검증한 것만 근무표에 들어가요.
@@ -348,7 +336,7 @@ export default function Home() {
                 내 매장으로 시작하기
               </Link>
               <DemoVideoButton className="inline-flex h-12 items-center rounded-md border border-white px-[22px] text-[15px] font-medium text-white transition-colors duration-[120ms] hover:bg-[#0E4A5C] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white">
-                데모 영상 보기
+                데모 영상
               </DemoVideoButton>
             </div>
           </div>

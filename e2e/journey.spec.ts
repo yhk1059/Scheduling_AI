@@ -120,7 +120,7 @@ test("S5. 매장 준비 → 첫 근무표 시작", async () => {
   await expect(page.getByText("명단에 직원을 1명 이상 넣으면 시작할 수 있어요")).toBeVisible();
   await expect(page.getByText("바꾼 내용은 바로 저장돼요.")).toBeVisible();
   await expect(page.getByText("이니셜을 써도 됩니다")).toBeVisible();
-  await expect(page.getByText("태그에는 이름을 쓰지 마세요")).toBeVisible();
+  await expect(page.getByText("직급에는 이름을 쓰지 마세요")).toBeVisible();
 
   await addRoster(page, ROSTER);
 
@@ -135,7 +135,7 @@ test("S5. 매장 준비 → 첫 근무표 시작", async () => {
 
   await expect(page.getByRole("textbox", { name: "1행 이름", exact: true })).toHaveValue("이영희");
   await expect(page.getByRole("textbox", { name: "12행 이름", exact: true })).toHaveValue("신도윤");
-  for (const label of ["1행 태그 리더 빼기", "6행 태그 리더 빼기", "7행 태그 리더 빼기", "11행 태그 신입 빼기", "12행 태그 신입 빼기"]) {
+  for (const label of ["1행 직급 리더 빼기", "6행 직급 리더 빼기", "7행 직급 리더 빼기", "11행 직급 신입 빼기", "12행 직급 신입 빼기"]) {
     await expect(page.getByRole("button", { name: label })).toBeVisible();
   }
   await expect(page.getByRole("button", { name: /붙이기/ })).toHaveCount(0);
@@ -240,10 +240,12 @@ test("S6. ① 가능 시간: 준비 요약과 직원 링크", async () => {
     await expect(page.getByRole("button", { name: "링크 복사" })).toHaveCount(1);
   };
   await page.getByRole("button", { name: "매장 설정", exact: true }).click();
+  await page.getByRole("tab", { name: "명단" }).click();
   await page.getByRole("button", { name: "근무표에서 빼기" }).last().click();
   await openLinks();
   await expect.poll(rosterNames, { message: "빠진 직원 없음" }).not.toContain("신도윤");
   await page.getByRole("button", { name: "매장 설정", exact: true }).click();
+  await page.getByRole("tab", { name: "명단" }).click();
   await page.getByRole("button", { name: "제외된 직원 1명 보기" }).click();
   await page.getByRole("row").filter({ hasText: "신도윤" }).getByRole("button", { name: "다시 넣기" }).click();
   await openLinks();

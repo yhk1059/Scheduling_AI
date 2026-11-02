@@ -194,7 +194,7 @@ def _check_limits(data: Any) -> None:
         if isinstance(employees, list) and any(
             isinstance(n, dict) and isinstance(n.get("tags"), list) and len(n["tags"]) > MAX_TAGS_PER_EMPLOYEE for n in employees
         ):
-            raise ApiError(413, "PAYLOAD_TOO_LARGE", f"태그는 사람당 최대 {MAX_TAGS_PER_EMPLOYEE}개입니다")
+            raise ApiError(413, "PAYLOAD_TOO_LARGE", f"직급은 사람당 최대 {MAX_TAGS_PER_EMPLOYEE}개입니다")
         config = part.get("config")
         if isinstance(config, dict) and isinstance(config.get("shifts"), list) and len(config["shifts"]) > MAX_SHIFT_CODES:
             raise ApiError(413, "PAYLOAD_TOO_LARGE", f"근무 코드는 최대 {MAX_SHIFT_CODES}개입니다")

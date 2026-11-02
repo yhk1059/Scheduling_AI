@@ -36,7 +36,7 @@ const SIZES = {
   small: { mark: 18, text: "gap-1.5 text-[13px] font-semibold" },
 };
 
-/** 워드마크: 마크 + "말로". href가 있으면 홈 링크다. */
+/** 워드마크: 마크 + "스케줄링 AI". href가 있으면 홈 링크다. */
 export default function Wordmark({
   size,
   href,

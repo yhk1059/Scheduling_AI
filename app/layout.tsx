@@ -15,7 +15,7 @@ const plexMono = IBM_Plex_Mono({
 });
 
 export const metadata: Metadata = {
-  title: { default: "말로 · 근무표", template: "%s · 말로" },
+  title: { default: "스케줄링 AI · 근무표", template: "%s · 스케줄링 AI" },
   description: "말로 짜는 매장 직원 근무표",
 };
 

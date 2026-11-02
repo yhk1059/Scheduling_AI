@@ -1,13 +1,13 @@
 "use client";
 
-// 데모 영상(ADR-022). 랜딩과 로그인 화면의 [데모 영상 보기]가 대화상자로 연다. 영상은 public/demo.mp4(npm run record:demo로 다시 만든다).
+// 데모 영상(ADR-022). 랜딩과 로그인 화면의 [데모 영상]가 대화상자로 연다. 영상은 public/demo.mp4(npm run record:demo로 다시 만든다).
 import { type ReactNode, useEffect, useRef, useState } from "react";
 
 import { ui } from "./ui";
 
 export const DEMO_VIDEO = "/demo.mp4";
 
-/** [데모 영상 보기] 버튼. 누르면 영상 대화상자가 열린다. */
+/** [데모 영상] 버튼. 누르면 영상 대화상자가 열린다. */
 export default function DemoVideoButton({ className, children }: { className: string; children: ReactNode }) {
   const [open, setOpen] = useState(false);
   return (

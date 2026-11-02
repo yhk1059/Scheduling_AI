@@ -171,7 +171,7 @@ def _check_targets(i: int, rule: Rule, ctx: TranslateContext) -> tuple[list[str]
     people_sels, days_sels = _selectors(rule)
     for loc, sel in people_sels:
         if not _people(ctx.employees, sel):
-            named = f"{', '.join(sel.tags)} 태그를 가진 " if sel.tags else "고른 조건에 맞는 "
+            named = f"{', '.join(sel.tags)} 직급인 " if sel.tags else "고른 조건에 맞는 "
             return [f"rules.{i}.{loc}: 고른 사람이 0명"], [f"{named}직원이 없어요. 누구를 말씀하시는 건가요?"]
     for loc, sel in days_sels:
         if not _days(ctx, sel):
@@ -224,7 +224,7 @@ def _to_specs(output: TranslatorOutput, req: TranslateRequest) -> list[Rule]:
         tags = sorted({t for _, sel in _selectors(rule)[0] for t in (*(sel.tags or []), *sel.exclude_tags)} - known_tags)
         if tags:
             errors.append(f"rules.{i}: known_tags에 없는 태그 {tags}")
-            questions.append(f"명단에 없는 태그({', '.join(tags)})예요. 태그를 확인해 주세요.")
+            questions.append(f"명단에 없는 직급({', '.join(tags)})이에요. 직급을 확인해 주세요.")
         out = sorted({d for d in cdays if not 1 <= d <= days})
         if out:
             errors.append(f"rules.{i}: 1..{days} 범위 밖 날짜 {out}")

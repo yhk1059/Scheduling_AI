@@ -56,7 +56,7 @@ export function LoginButton({ className = ui.secondary }: { className?: string }
 }
 
 function shopLabel(name: string | undefined): string {
-  return name || "이름 없는 매장";
+  return name?.trim() || "이름 없는 매장";
 }
 
 /** [내 매장 데이터 삭제] 2단계 확인. */

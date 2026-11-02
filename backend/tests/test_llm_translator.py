@@ -465,7 +465,7 @@ def test_missing_value_ref_then_fixed():
 def test_empty_people_clarify():
     # 이영희는 주방 태그가 아님 → 세기 who 0명
     res, _ = retry_then_clarify({"rules": [staffing(A, 1, who={"ids": ["e01"], "tags": ["주방"]})]}, request("주방 이영희 1명은 오픈에", "shop"))
-    assert "직원이 없어요" in res.question
+    assert "주방 직급인 직원이 없어요" in res.question
 
 
 def test_empty_scope_people_clarify():
