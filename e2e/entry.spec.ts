@@ -25,8 +25,8 @@ test("S1. 랜딩 → 데모 영상 → 로그인 → 매장 준비", async ({ pa
   page.on("request", onRequest);
 
   await page.goto("/");
-  await expect(page.getByRole("heading", { level: 1 })).toHaveText(/말로 설명하면,\s*근무표가 나옵니다/);
-  const demoCta = page.getByRole("button", { name: "데모 영상 보기" });
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText(/복잡한 근무표,\s*이제 스케줄링 AI에게 맡기세요/);
+  const demoCta = page.getByRole("button", { name: "데모 영상" });
   const ownCta = page.getByRole("link", { name: "내 매장으로 시작하기" });
   // 첫 화면과 CTA 띠에 같은 버튼이 있고, [내 매장으로 시작하기]는 모두 앱으로 간다
   await expect(demoCta).toHaveCount(2);
@@ -68,7 +68,7 @@ test("S1-b. 앱을 로그인 없이 열면 로그인 화면", async ({ page }) =
   const login = page.getByRole("button", { name: "Google로 로그인" });
   await expect(login).toBeVisible();
   await expect(login).toHaveClass(/bg-\[#155E75\]/);
-  await expect(page.getByRole("button", { name: "데모 영상 보기" })).toHaveCount(2);
+  await expect(page.getByRole("button", { name: "데모 영상" })).toHaveCount(0);
   await expect(page.getByRole("link", { name: "개인정보처리방침" })).toBeVisible();
   await expect(page.getByRole("button", { name: "근무표", exact: true })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "매장 설정", exact: true })).toHaveCount(0);

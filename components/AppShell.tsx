@@ -9,7 +9,6 @@ import { unitShort } from "@/lib/wording";
 
 import { AccountBar } from "./Account";
 import ConfirmedPeriod from "./ConfirmedPeriod";
-import DemoVideoButton from "./DemoVideo";
 import PeriodWork from "./PeriodWork";
 import LoginScreen from "./LoginScreen";
 import { ui } from "./ui";
@@ -47,12 +46,12 @@ export default function AppShell() {
   }, []);
 
   const tabs = [
-    { label: "근무표", current: view.screen === "home", onClick: () => go({ screen: "home" }) },
     {
       label: "매장 설정",
       current: view.screen === "settings",
-      onClick: () => go({ screen: "settings", tab: "roster" }),
+      onClick: () => go({ screen: "settings", tab: "shifts" }),
     },
+    { label: "근무표", current: view.screen === "home", onClick: () => go({ screen: "home" }) },
   ];
 
   return (
@@ -83,11 +82,7 @@ export default function AppShell() {
               </>
             )}
           </div>
-          {loginScreen ? (
-            <DemoVideoButton className={ui.text}>데모 영상 보기</DemoVideoButton>
-          ) : (
-            <AccountBar />
-          )}
+          {!loginScreen && <AccountBar />}
         </div>
         {started && view.screen !== "setup" && (
           <nav className="mx-auto flex h-11 max-w-[1360px] px-10">

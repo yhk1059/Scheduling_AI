@@ -117,7 +117,7 @@ describe("presetName / describeRule: 프리셋 모양", () => {
     ["하루 근무 시간", count({ shifts: WORK, per: "day", measure: "hours", max: 80 }), "세는 규칙", "매일 근무 시간 80시간 이하"],
     ["금지 순서", forbid([C, A]), "금지 순서", "마감 다음 날 오픈 금지"],
     ["금지 순서 다른 쌍", forbid([C, M]), "금지 순서", "마감 다음 날 미들 금지"],
-    ["금지 순서 3일", forbid([C, OFF, A], { tags: ["신입"] }), "금지 순서", "신입 태그 마감 → 휴무 → 오픈 금지"],
+    ["금지 순서 3일", forbid([C, OFF, A], { tags: ["신입"] }), "금지 순서", "신입 직급 마감 → 휴무 → 오픈 금지"],
     ["최대 연속 근무", maxRun(WORK, 5), "최대 연속 근무", "연속 근무 5일까지"],
     ["최대 연속 마감", maxRun(C, 3), "최대 연속 마감", "마감 연속 3일까지"],
     ["블록 길이", minRun(C, 2), "최소 연속 마감", "마감은 2일 이상씩 이어서"],
@@ -162,10 +162,10 @@ describe("presetName / describeRule: 프리셋 모양", () => {
 describe("presetName / describeRule: 새 모양", () => {
   const d = (b: ConstraintSpec) => [presetName(b), text(b, CONFIG)];
 
-  it("태그·요일·공휴일로 고른 날마다 인원", () => {
+  it("직급·요일·공휴일로 고른 날마다 인원", () => {
     expect(d(count({ people: { tags: ["리더"] }, shifts: { in: ["A"] }, per: "day", min: 1 }))).toEqual([
-      "태그별 배치",
-      "매일 리더 태그 오픈 1명 이상",
+      "직급별 배치",
+      "매일 리더 직급 오픈 1명 이상",
     ]);
     expect(d(count({ days: { weekdays: [5] }, shifts: { in: ["A"] }, per: "day", min: 2, max: 2 }))).toEqual([
       "필요 인원",
@@ -177,7 +177,7 @@ describe("presetName / describeRule: 새 모양", () => {
     ]);
     expect(
       d(count({ people: { tags: ["리더"] }, days: { kind: "holiday" }, shifts: { in: ["C"] }, per: "day", min: 1 })),
-    ).toEqual(["태그별 배치", "공휴일마다 리더 태그 마감 1명 이상"]);
+    ).toEqual(["직급별 배치", "공휴일마다 리더 직급 마감 1명 이상"]);
     expect(d(count({ days: { kind: "weekday" }, shifts: { in: ["P"] }, per: "day", min: 1, max: 1 }))).toEqual([
       "필요 인원",
       "평일마다 피크 1명",
@@ -195,7 +195,7 @@ describe("presetName / describeRule: 새 모양", () => {
     ]);
     expect(d(count({ people: { tags: ["신입"] }, shifts: { in: ["C"] }, per: "person", measure: "hours", max: 80 }))).toEqual([
       "근무 시간",
-      "신입 태그 근무표마다 마감 근무 시간 80시간 이하",
+      "신입 직급 근무표마다 마감 근무 시간 80시간 이하",
     ]);
   });
 
@@ -229,14 +229,14 @@ describe("presetName / describeRule: 새 모양", () => {
     ]);
     expect(d(maxRun(WORK, 4, { tags: ["신입"] }))).toEqual([
       "최대 연속 근무",
-      "신입 태그 연속 근무 4일까지",
+      "신입 직급 연속 근무 4일까지",
     ]);
   });
 
-  it("고르게: 시간, 태그, 최근 4주를 빼면", () => {
+  it("고르게: 시간, 직급, 최근 4주를 빼면", () => {
     expect(d(balance({ people: { tags: ["신입"] }, shifts: WORK, measure: "hours" }))).toEqual([
       "고르게 규칙",
-      "신입 태그 근무 시간을 고르게(최근 4주 포함)",
+      "신입 직급 근무 시간을 고르게(최근 4주 포함)",
     ]);
     expect(d(balance({ shifts: { in: ["AC"] }, with_history: false }))).toEqual(["고르게 규칙", "더블(AC) 수를 고르게"]);
   });
@@ -291,7 +291,7 @@ describe("describeRule: 새로 표현되는 규칙(설계 §2.6)", () => {
       when: { left: count(["C"], { who: { tags: ["신입"] } }), op: "ge", right: 1 },
       then: { left: count(["C"], { who: { tags: ["리더"] } }), op: "ge", right: 1 },
     });
-    expect(d(r)).toEqual(["조건 규칙", "매일, 신입 태그 마감 1명 이상이면 리더 태그 마감 1명 이상"]);
+    expect(d(r)).toEqual(["조건 규칙", "매일, 신입 직급 마감 1명 이상이면 리더 직급 마감 1명 이상"]);
   });
 
   it("둘은 같은 날 마감 금지", () => {
@@ -314,7 +314,7 @@ describe("describeRule: 새로 표현되는 규칙(설계 §2.6)", () => {
       for_each: { per: "day" },
       then: { left: count(["C"], { who: { tags: ["리더"] } }), op: "ge", right: count(["C"], { who: { tags: ["신입"] } }) },
     });
-    expect(d(r)).toEqual(["세는 규칙", "매일 리더 태그 마감이 신입 태그 마감 이상"]);
+    expect(d(r)).toEqual(["세는 규칙", "매일 리더 직급 마감이 신입 직급 마감 이상"]);
   });
 
   it("주말 마감 다음 월요일은 휴무", () => {
@@ -357,7 +357,7 @@ describe("describeRule: 새로 표현되는 규칙(설계 §2.6)", () => {
       for_each: { per: "person_day", people: { tags: ["신입"] } },
       then: { left: { ...count(["C"]), offset: [-2, -1] }, op: "le", right: 1 },
     });
-    expect(d(seq)).toEqual(["순서 규칙", "신입 태그 · 날마다 앞 2일 마감 1번 이하"]);
+    expect(d(seq)).toEqual(["순서 규칙", "신입 직급 · 날마다 앞 2일 마감 1번 이하"]);
   });
 });
 
