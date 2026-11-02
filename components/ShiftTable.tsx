@@ -18,9 +18,9 @@ function parseHours(v: string): number | null {
 }
 const HOURS_MSG = "시간은 0.5~24 사이로 0.5 단위로 적어 주세요";
 
-/** 세는 근무조 칸: 기본 코드는 그 코드, 더블은 "A + C". */
-function partsText(s: ShiftDef): string {
-  return s.parts?.length ? s.parts.join(" + ") : s.code;
+/** 더블이 세는 근무조: "오픈 + 마감". */
+function partsText(s: ShiftDef, shifts: ShiftDef[]): string {
+  return (s.parts ?? []).map((code) => shifts.find((b) => b.code === code)?.name ?? code).join(" + ");
 }
 
 /** 근무 형태(근무 코드 표). 휴무는 고칠 수 없어 보여 주지 않는다. 맨 아래 줄에 적어 하나씩 더한다. 매장 설정 [근무 형태] 탭과 근무표 작성 ②에서 쓴다. */
@@ -39,7 +39,6 @@ export default function ShiftTable() {
               <th className="px-2 py-2 font-medium">시작 시각</th>
               <th className="px-2 py-2 font-medium">끝 시각</th>
               <th className="px-2 py-2 font-medium">실근무 시간</th>
-              <th className="px-2 py-2 font-medium">세는 근무조</th>
               <th />
             </tr>
           </thead>
@@ -135,10 +134,9 @@ function ShiftRow({ shift, shifts }: { shift: ShiftDef; shifts: ShiftDef[] }) {
               </td>
             </>
           ) : (
-            <>
-              <td className={`px-2 py-1 font-mono ${muted}`}>–</td>
-              <td className={`px-2 py-1 font-mono ${muted}`}>–</td>
-            </>
+            <td colSpan={2} className="px-2 py-1">
+              {partsText(shift, shifts)}
+            </td>
           )}
           <td className="px-1 py-1">
             <input
@@ -155,12 +153,19 @@ function ShiftRow({ shift, shifts }: { shift: ShiftDef; shifts: ShiftDef[] }) {
       ) : (
         <>
           <td className={`px-2 py-1 ${muted}`}>{shift.name}</td>
-          <td className={`px-2 py-1 font-mono ${muted}`}>{shift.start ?? "–"}</td>
-          <td className={`px-2 py-1 font-mono ${muted}`}>{shift.end ?? "–"}</td>
+          {shift.parts?.length ? (
+            <td colSpan={2} className={`px-2 py-1 ${muted}`}>
+              {partsText(shift, shifts)}
+            </td>
+          ) : (
+            <>
+              <td className={`px-2 py-1 font-mono ${muted}`}>{shift.start}</td>
+              <td className={`px-2 py-1 font-mono ${muted}`}>{shift.end}</td>
+            </>
+          )}
           <td className={`px-2 py-1 font-mono ${muted}`}>{shift.hours}</td>
         </>
       )}
-      <td className={`px-2 py-1 font-mono ${muted}`}>{partsText(shift)}</td>
       <td className="px-1 py-1">
         <div className="flex items-center justify-end gap-1">
           {!active ? (
@@ -188,7 +193,7 @@ function ShiftRow({ shift, shifts }: { shift: ShiftDef; shifts: ShiftDef[] }) {
   );
 }
 
-/** 표 맨 아래 입력 줄. Enter나 [추가]로 코드 하나를 더하고 다시 코드 칸으로 돌아간다. 세는 근무조를 둘 고르면 더블이다. */
+/** 표 맨 아래 입력 줄. Enter나 [추가]로 코드 하나를 더하고 다시 코드 칸으로 돌아간다. 더블은 말로만 더한다. */
 function NewShiftRow({ shifts }: { shifts: ShiftDef[] }) {
   const addShift = useAppStore((s) => s.addShift);
   const [code, setCode] = useState("");
@@ -196,11 +201,9 @@ function NewShiftRow({ shifts }: { shifts: ShiftDef[] }) {
   const [start, setStart] = useState("");
   const [end, setEnd] = useState("");
   const [hours, setHours] = useState("");
-  const [parts, setParts] = useState<string[]>([]);
   const [tried, setTried] = useState(false);
   const codeRef = useRef<HTMLInputElement>(null);
 
-  const bases = shifts.filter((s) => s.active !== false && !s.parts?.length && s.code !== OFF_CODE);
   const full = shifts.length >= MAX_SHIFT_CODES;
   const codeMsg =
     code === ""
@@ -214,26 +217,17 @@ function NewShiftRow({ shifts }: { shifts: ShiftDef[] }) {
             : null;
   const nameMsg = name.trim() === "" ? "이름을 적어 주세요" : null;
   const hoursMsg = parseHours(hours) === null ? HOURS_MSG : null;
-  // 더블은 세는 근무조의 시각을 쓰므로 시각을 받지 않는다
-  const double = parts.length > 0;
-  const timesMsg = double ? null : shiftTimesError(start, end);
-  const partsMsg = parts.length === 0 || parts.length === 2 ? null : "더블은 근무조를 두 개 골라 주세요";
+  const timesMsg = shiftTimesError(start, end);
 
   const add = () => {
     if (full) return;
-    if (codeMsg || nameMsg || timesMsg || hoursMsg || partsMsg) return setTried(true);
-    addShift({
-      code,
-      name: name.trim(),
-      hours: parseHours(hours)!,
-      ...(double ? { parts: bases.map((b) => b.code).filter((c) => parts.includes(c)) } : { start, end }),
-    });
+    if (codeMsg || nameMsg || timesMsg || hoursMsg) return setTried(true);
+    addShift({ code, name: name.trim(), hours: parseHours(hours)!, start, end });
     setCode("");
     setName("");
     setStart("");
     setEnd("");
     setHours("");
-    setParts([]);
     setTried(false);
     codeRef.current?.focus();
   };
@@ -246,7 +240,7 @@ function NewShiftRow({ shifts }: { shifts: ShiftDef[] }) {
   if (full) {
     return (
       <tr>
-        <td colSpan={7} className={`${ui.help} px-2 py-2`}>
+        <td colSpan={6} className={`${ui.help} px-2 py-2`}>
           근무 코드는 휴무를 포함해 최대 {MAX_SHIFT_CODES}개까지 넣을 수 있어요.
         </td>
       </tr>
@@ -285,27 +279,25 @@ function NewShiftRow({ shifts }: { shifts: ShiftDef[] }) {
       </td>
       <td className="px-1 py-1">
         <input
-          value={double ? "" : start}
-          disabled={double}
+          value={start}
           onChange={(e) => setStart(e.target.value.trim())}
           onKeyDown={onEnter}
           placeholder="11:00"
           aria-label="새 근무 시작 시각"
           aria-invalid={show(timesMsg) ? true : undefined}
-          className={`${ui.cell} w-20 font-mono disabled:bg-[#EFEFEB] ${placeholder} ${cls(timesMsg)}`}
+          className={`${ui.cell} w-20 font-mono ${placeholder} ${cls(timesMsg)}`}
         />
         {show(timesMsg) && <p className={`${ui.error} mt-0.5 max-w-40`}>{timesMsg}</p>}
       </td>
       <td className="px-1 py-1">
         <input
-          value={double ? "" : end}
-          disabled={double}
+          value={end}
           onChange={(e) => setEnd(e.target.value.trim())}
           onKeyDown={onEnter}
           placeholder="14:00"
           aria-label="새 근무 끝 시각"
           aria-invalid={show(timesMsg) ? true : undefined}
-          className={`${ui.cell} w-20 font-mono disabled:bg-[#EFEFEB] ${placeholder} ${cls(timesMsg)}`}
+          className={`${ui.cell} w-20 font-mono ${placeholder} ${cls(timesMsg)}`}
         />
       </td>
       <td className="px-1 py-1">
@@ -320,27 +312,6 @@ function NewShiftRow({ shifts }: { shifts: ShiftDef[] }) {
           className={`${ui.cell} w-16 font-mono ${placeholder} ${cls(hoursMsg)}`}
         />
         {show(hoursMsg) && <p className={`${ui.error} mt-0.5 max-w-40`}>{hoursMsg}</p>}
-      </td>
-      <td className="px-2 py-1">
-        <fieldset className="flex flex-wrap items-center gap-x-3 gap-y-1 pt-1.5">
-          <legend className="sr-only">새 근무 세는 근무조</legend>
-          {bases.map((b) => (
-            <label key={b.code} className="flex items-center gap-1 text-[13px] text-[#3D3D38]">
-              <input
-                type="checkbox"
-                checked={parts.includes(b.code)}
-                onChange={(e) => setParts((p) => (e.target.checked ? [...p, b.code] : p.filter((c) => c !== b.code)))}
-                className="size-4 accent-[#155E75]"
-              />
-              <span className="font-mono">{b.code}</span>
-            </label>
-          ))}
-        </fieldset>
-        {show(partsMsg) ? (
-          <p className={`${ui.error} mt-0.5`}>{partsMsg}</p>
-        ) : (
-          <p className={`${ui.help} mt-0.5`}>두 개를 고르면 더블이에요</p>
-        )}
       </td>
       <td className="px-1 py-1">
         <div className="flex justify-end">
