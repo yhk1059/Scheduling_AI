@@ -234,9 +234,9 @@ function Calendar({
     <div className="flex h-screen min-h-[720px] flex-col">
       <main className={`${PAGE} min-h-0 flex-1 flex-col pt-2 pb-1.5`}>
         <TopLine />
-        <header className="flex items-center gap-2">
-          <h1 className={`${ui.pageTitle} mr-auto truncate`}>
-            {link.shop_name} · {link.employee_name}님의 가능 시간
+        <header className="mb-2 flex items-center gap-2">
+          <h1 className={`${ui.sectionTitle} mr-auto truncate`}>
+            {link.shop_name} · {link.employee_name}님
           </h1>
           {pages > 1 && (
             <>
@@ -255,9 +255,6 @@ function Calendar({
             이름 다시 고르기
           </button>
         </header>
-        <p className="mb-2 text-sm leading-5 text-[#3D3D38]">
-          <span className="font-mono">{formatRange(range)}</span> 근무표예요. 일할 수 있는 시간을 드래그해서 칠해 주세요. 칠한 칸에서 시작하면 지워져요.
-        </p>
 
         <div className="grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)_260px] grid-rows-[minmax(0,1fr)] gap-5">
           <div

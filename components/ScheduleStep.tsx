@@ -12,6 +12,7 @@ import {
   availabilityChanged,
   carryOverChanged,
   type Code,
+  COVERAGE_SOURCE_TEXT,
   currentPeriod,
   toScheduleRequest,
   useAppStore,
@@ -603,6 +604,8 @@ export function OutcomePanel({
   const proposals = (explanation?.proposals ?? []).filter((p) => p.verified_summary && !dismissed.includes(p));
   const conflicts = outcome.kind === "infeasible" ? mergeAvailabilityConflicts(outcome.conflicts) : [];
   const unknownCause = outcome.kind === "timeout" || conflicts.length === 0;
+  const ruleConflicts = conflicts.filter((c) => !isAvailabilityRule(c.constraint_id));
+  const availabilityNames = conflicts.filter((c) => isAvailabilityRule(c.constraint_id)).map((c) => c.source_text.replace(/ 가능 시간$/, ""));
   // 가능 시간은 직원이 정한 것이라 끌 수 없다
   const hardList = constraints.filter((c) => (c.hardness ?? "hard") === "hard" && !isAvailabilityRule(c.id));
 
@@ -611,71 +614,58 @@ export function OutcomePanel({
       <div className="flex items-center gap-2">
         <span className={`${ui.badge} ${ui.badgeTone.none}`}>{outcome.kind === "timeout" ? "시간 초과" : "근무표 없음"}</span>
         <h2 className={ui.cardTitle}>
-          {outcome.kind === "timeout" ? "시간 안에 근무표를 만들지 못했어요" : "규칙을 모두 지키는 근무표가 없어요"}
+          {outcome.kind === "timeout" ? "시간 안에 근무표를 만들지 못했어요" : "이 조건으로는 근무표를 만들 수 없어요"}
         </h2>
         {hasResult && <span className={ui.help}>아래는 마지막으로 만든 근무표예요.</span>}
       </div>
 
-      {outcome.kind === "infeasible" &&
-        (explaining && !explanation ? (
-          <p className="flex items-center gap-2 text-sm text-[#66665E]">
-            <Spinner />
-            원인을 분석하는 중…
-          </p>
-        ) : (
-          explanation && (
-            <p className="text-sm leading-relaxed whitespace-pre-line text-[#3D3D38]">
-              {explanation.text}
-              {explanation.fallback && (
-                <span className="text-[#66665E]"> 자동 설명을 만들지 못해 함께 지킬 수 없는 규칙만 보여 줘요.</span>
-              )}
-            </p>
-          )
-        ))}
+      {outcome.kind === "infeasible" && explaining && !explanation && (
+        <p className="flex items-center gap-2 text-sm text-[#66665E]">
+          <Spinner />
+          원인을 분석하는 중…
+        </p>
+      )}
 
       {proposals.length > 0 && (
-        <div className="grid grid-cols-2 gap-4">
-          {proposals.map((p, i) => (
-            <ProposalCard
-              key={i}
-              proposal={p}
-              changes={p.changes.flatMap((ch) => {
-                const c = constraints.find((x) => x.id === ch.constraint_id);
-                if (!c) return [];
-                // 바꾸는 것만 결정적으로 쓴다(값·끄기·반드시/가능하면). 어느 규칙인지는 원문으로 붙인다
-                const quote = `“${c.source_text}”`;
-                if (ch.action === "disable") return [{ change: "이번 근무표에서만 끄기", quote }];
-                if (ch.action === "set_hardness" && ch.hardness)
-                  return [{ change: `${hardnessLabel(c.hardness ?? "hard")} → ${hardnessLabel(ch.hardness)}`, quote }];
-                const v = c.type === "rule" ? c.values?.[ch.name ?? ""] : undefined;
-                return v ? [{ change: `${v.label} ${v.value} → ${ch.value}`, quote }] : [];
-              })}
-              busy={busy}
-              onAccept={() => onAccept(p)}
-              onDismiss={() => setDismissed((d) => [...d, p])}
-            />
-          ))}
+        <div className="flex flex-col gap-1.5">
+          <h3 className="text-[13px] font-semibold text-[#1B1B18]">이렇게 바꾸면 만들 수 있어요</h3>
+          <div className="grid grid-cols-2 gap-4">
+            {proposals.map((p, i) => (
+              <ProposalCard
+                key={i}
+                proposal={p}
+                changes={p.changes.flatMap((ch) => {
+                  const c = constraints.find((x) => x.id === ch.constraint_id);
+                  if (!c) return [];
+                  // 바꾸는 것만 결정적으로 쓴다(값·끄기·반드시/가능하면). 어느 규칙인지는 원문으로 붙인다
+                  const quote = `“${c.source_text}”`;
+                  if (ch.action === "disable") return [{ change: "이번 근무표에서만 끄기", quote }];
+                  if (ch.action === "set_hardness" && ch.hardness)
+                    return [{ change: `${hardnessLabel(c.hardness ?? "hard")} → ${hardnessLabel(ch.hardness)}`, quote }];
+                  const v = c.type === "rule" ? c.values?.[ch.name ?? ""] : undefined;
+                  return v ? [{ change: `${v.label} ${v.value} → ${ch.value}`, quote }] : [];
+                })}
+                busy={busy}
+                onAccept={() => onAccept(p)}
+                onDismiss={() => setDismissed((d) => [...d, p])}
+              />
+            ))}
+          </div>
         </div>
       )}
 
-      {!unknownCause ? (
+      {!unknownCause && ruleConflicts.length > 0 && (
         <div className="flex flex-col gap-1.5">
           <h3 className="text-[13px] font-semibold text-[#1B1B18]">함께 지킬 수 없는 규칙</h3>
+          <p className={ui.help}>하나를 끄면 바로 다시 만들어요. 원래 설정은 그대로 남아요.</p>
           <ul className="flex flex-col">
-            {conflicts.map((c) => {
-              if (isAvailabilityRule(c.constraint_id)) {
-                return (
-                  <li key={c.constraint_id} className="border-b border-[#EFEFEB] py-1.5 text-sm text-[#1B1B18] last:border-b-0">
-                    {c.source_text}
-                  </li>
-                );
-              }
+            {ruleConflicts.map((c) => {
               const found = constraints.find((x) => x.id === c.constraint_id);
               return (
                 <li key={c.constraint_id} className="flex items-center justify-between gap-3 border-b border-[#EFEFEB] py-1.5 last:border-b-0">
                   <span className="flex items-baseline gap-2 text-sm text-[#1B1B18]">
                     <span className="text-xs font-medium text-[#66665E]">{found ? presetName(found) : "규칙"}</span>
-                    “{c.source_text}”
+                    {c.source_text !== COVERAGE_SOURCE_TEXT && <>“{c.source_text}”</>}
                     {found && (
                       <span className="font-mono text-xs text-[#66665E]">{describeRule(found, config, employees, period).text}</span>
                     )}
@@ -690,7 +680,17 @@ export function OutcomePanel({
             })}
           </ul>
         </div>
-      ) : (
+      )}
+
+      {availabilityNames.length > 0 && (
+        <div className="flex flex-col gap-1.5">
+          <h3 className="text-[13px] font-semibold text-[#1B1B18]">가능 시간도 함께 걸려 있어요</h3>
+          <p className="text-sm text-[#1B1B18]">{availabilityNames.join(", ")}</p>
+          <p className={ui.help}>가능 시간은 직원이 정한 것이라 끌 수 없어요. 더 일할 수 있는지 물어보면 해결될 수도 있어요.</p>
+        </div>
+      )}
+
+      {unknownCause && (
         <div className="flex flex-col gap-1.5">
           <p className="text-sm text-[#1B1B18]">
             {outcome.kind === "timeout"
@@ -721,6 +721,18 @@ export function OutcomePanel({
             })}
           </ul>
         </div>
+      )}
+
+      {explanation && (
+        <details className="border-t border-[#EFEFEB] pt-3">
+          <summary className="cursor-pointer text-[13px] font-semibold text-[#1B1B18]">왜 만들 수 없나요?</summary>
+          <p className="mt-1.5 text-sm leading-relaxed whitespace-pre-line text-[#3D3D38]">
+            {explanation.text}
+            {explanation.fallback && (
+              <span className="text-[#66665E]"> 자동 설명을 만들지 못해 함께 지킬 수 없는 규칙만 보여 줘요.</span>
+            )}
+          </p>
+        </details>
       )}
     </section>
   );

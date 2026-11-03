@@ -266,9 +266,7 @@ test("S7. 직원 화면: 드래그 입력과 제출", async ({ browser }) => {
   expect(JSON.stringify(roster), "명단 응답에 직원 id가 없다").not.toContain("employee_id");
   await expectNoDevTerms(p, "직원 화면(이름 고르기)");
   await p.getByRole("button", { name: "박민수", exact: true }).click();
-  await expect(p.getByText("박민수님의 가능 시간")).toBeVisible();
-  await expect(p.getByText("한강 카페")).toBeVisible();
-  await expect(p.getByText(WEEK_RANGE)).toBeVisible();
+  await expect(p.getByRole("heading", { name: "한강 카페 · 박민수님" })).toBeVisible();
   await expect(p.getByRole("banner").getByRole("button", { name: "계정 메뉴" })).toHaveCount(0);
   await expect(p.getByRole("button", { name: "매장 설정", exact: true })).toHaveCount(0);
   await expect(p.getByRole("button", { name: /^\d+월 \d+일 \d{2}:\d{2}~\d{2}:\d{2}$/ })).toHaveCount(7 * 36);
@@ -619,17 +617,17 @@ test("S10. 근무표 없음 → 설명과 검증된 제안", async () => {
   const stale = page.getByRole("status").filter({ hasText: "입력이 바뀌었어요. 다시 만들어 주세요" });
   await expect(stale).toBeVisible();
   expect(await solve(() => stale.getByRole("button", { name: "다시 만들기" }).click())).toBe("infeasible");
-  const panel = page.locator("section").filter({ hasText: "규칙을 모두 지키는 근무표가 없어요" });
+  const panel = page.locator("section").filter({ hasText: "이 조건으로는 근무표를 만들 수 없어요" });
   await expect(panel.getByText("근무표 없음", { exact: true })).toBeVisible();
   await expect(panel.getByRole("heading", { name: "함께 지킬 수 없는 규칙" })).toBeVisible();
   const explanation = panel.locator("p.whitespace-pre-line");
   await expect(explanation).not.toBeEmpty();
   test.info().annotations.push({ type: "충돌 설명", description: await explanation.innerText() });
 
-  // 가능 시간 행은 있을 수도 없을 수도 있고, 있으면 끄는 버튼이 없다
-  const availRows = panel.locator("li").filter({ hasText: /가능 시간$/ });
-  test.info().annotations.push({ type: "가능 시간 행", description: (await availRows.allInnerTexts()).join(" | ") || "없음" });
-  await expect(availRows.getByRole("button")).toHaveCount(0);
+  // 가능 시간은 규칙 목록과 따로 이름만 보여 주고, 끄는 버튼이 없다
+  const availBlock = panel.locator("div").filter({ has: page.getByRole("heading", { name: "가능 시간도 함께 걸려 있어요" }) }).last();
+  test.info().annotations.push({ type: "가능 시간 행", description: (await availBlock.count()) > 0 ? await availBlock.innerText() : "없음" });
+  await expect(availBlock.getByRole("button")).toHaveCount(0);
   await expect(panel.getByRole("button", { name: "이번 근무표에서만 끄기" }).first()).toBeVisible();
 
   // 제안은 가능 시간을 바꾸지 않는다
@@ -657,7 +655,7 @@ test("S10. 근무표 없음 → 설명과 검증된 제안", async () => {
   }
   page.off("response", onResponse);
 
-  await expect(page.getByText("규칙을 모두 지키는 근무표가 없어요")).toHaveCount(0);
+  await expect(page.getByText("이 조건으로는 근무표를 만들 수 없어요")).toHaveCount(0);
   await expect(page.getByText("규칙을 모두 지켰어요", { exact: true })).toBeVisible();
   await expectHardRulesHold(page, WEEK, lastSolve);
   expect(leeLeave(lastSolve!.constraints ?? [])?.enabled, "이영희 휴가가 켜져 있음").not.toBe(false);

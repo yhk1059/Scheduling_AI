@@ -225,7 +225,7 @@ test("S18. 말로 필요 인원 → 근무표 → 사람이 모자란 필요 인
   await page.getByRole("button", { name: "근무표", exact: true }).click();
   await sectionWith("11/2~11/8 근무표").getByRole("button", { name: "근무표 확인하기" }).click();
   expect(await solve(() => page.getByRole("button", { name: "다시 만들기" }).first().click())).toBe("infeasible");
-  const panel = page.locator("section").filter({ hasText: "규칙을 모두 지키는 근무표가 없어요" });
+  const panel = page.locator("section").filter({ hasText: "이 조건으로는 근무표를 만들 수 없어요" });
   await expect(panel.getByText("근무표 없음", { exact: true })).toBeVisible();
   await expect(panel.getByRole("heading", { name: "함께 지킬 수 없는 규칙" })).toBeVisible();
   const explanation = panel.locator("p.whitespace-pre-line");
