@@ -79,7 +79,7 @@ function BlockedFragment() {
     <div className="flex flex-col gap-2.5 rounded-lg border border-[#E8B4AE] bg-white px-[18px] py-4">
       <div className="flex items-center gap-2">
         <span className={`${ui.badge} ${ui.badgeTone.none}`}>근무표 없음</span>
-        <h3 className="text-[13px] font-semibold text-[#1B1B18]">규칙을 모두 지키는 근무표가 없어요</h3>
+        <h3 className="text-[13px] font-semibold text-[#1B1B18]">이 조건으로는 근무표를 만들 수 없어요</h3>
       </div>
       <p className={body}>토요일 마감에 들어올 수 있는 사람이 필요 인원보다 적어요.</p>
       <div className={`${ui.card} flex flex-col gap-2`}>

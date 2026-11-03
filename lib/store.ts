@@ -56,7 +56,7 @@ import type {
 } from "./types.gen";
 
 export const STORAGE_KEY = "shop-scheduler";
-const COVERAGE_SOURCE_TEXT = "필요 인원 설정";
+export const COVERAGE_SOURCE_TEXT = "필요 인원 설정";
 export const MAX_SHIFT_CODES = 8; // backend/domain/constants.py MAX_SHIFT_CODES
 export const MAX_TAGS_PER_EMPLOYEE = 5; // backend/domain/constants.py MAX_TAGS_PER_EMPLOYEE
 export const MAX_TAG_CHARS = 10; // backend/domain/constants.py MAX_TAG_CHARS
