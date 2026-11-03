@@ -34,7 +34,7 @@ import type {
 import { statsFromAssignments } from "@/lib/stats";
 import { describeRule, formatDeviation, hardnessLabel, josa, presetName } from "@/lib/wording";
 
-import RulesStep, { Spinner, today } from "./RulesStep";
+import { Spinner, today } from "./RulesStep";
 import { ui } from "./ui";
 
 export const WEEKDAYS = ["일", "월", "화", "수", "목", "금", "토"];
@@ -432,7 +432,7 @@ export function ScheduleBody({
   );
 }
 
-/** 근무표 작성 ③ 근무표: 예외 입력 패널 → 요약 지표 → 근무표 → 버튼 줄 → 통계. 만들기 전 [근무표 만들기], 만든 뒤 [확정]. 확정하면 확정 근무표 화면으로 간다. */
+/** 근무표 작성 ③ 근무표: 요약 지표 → 근무표 → 버튼 줄 → 통계. 만들기 전 [근무표 만들기], 만든 뒤 [확정]. 확정하면 확정 근무표 화면으로 간다. */
 export default function ScheduleStep() {
   const shop = useAppStore((s) => s.shop);
   const period = useAppStore(currentPeriod);
@@ -514,8 +514,6 @@ export default function ScheduleStep() {
           </button>
         </div>
       )}
-
-      <RulesStep scope="period" />
 
       {sv.toast && <ToastAlert toast={sv.toast} busy={busy} onClose={() => sv.setToast(null)} />}
 

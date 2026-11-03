@@ -490,14 +490,10 @@ test("S8. ② 매장 조건", async () => {
   ruleCount = total;
 });
 
-test("S9. ③ 근무표: 예외 입력과 근무표 만들기", async () => {
-  await page.getByRole("button", { name: "다음", exact: true }).click();
-
-  // S9-a. 이번 근무표 예외 입력
-  await expect(currentStep()).toContainText("근무표");
-  await expect(scheduleTitle(page)).toBeVisible();
-  await expect(workStepper().getByRole("button", { name: /가능 시간/ })).toBeEnabled();
-  await expect(workStepper().getByRole("button", { name: /매장 조건/ })).toBeEnabled();
+test("S9. ② 예외 입력과 ③ 근무표 만들기", async () => {
+  // S9-a. 이번 근무표 예외 입력: ② 아래에 접혀 있다가 펼친다
+  await expect(page.getByRole("textbox", { name: REQUEST_INPUT })).toHaveCount(0);
+  await page.getByRole("button", { name: "+ 이번 근무표에만 적용할 예외 추가" }).click();
   await expect(page.getByRole("textbox", { name: REQUEST_INPUT })).toBeVisible();
 
   const lee = await employeeId(page, "이영희");
@@ -522,7 +518,7 @@ test("S9. ③ 근무표: 예외 입력과 근무표 만들기", async () => {
   await expect(prefCard).toContainText("김철수 ·");
   await expect(prefCard).toContainText("휴무 희망");
   await expectCardChrome(prefCard, "가능하면");
-  await expectNoDevTerms(page, "③ 예외 입력(적용 대기)");
+  await expectNoDevTerms(page, "② 예외 입력(적용 대기)");
 
   await applyAllPending(page);
 
@@ -537,7 +533,13 @@ test("S9. ③ 근무표: 예외 입력과 근무표 만들기", async () => {
   // 되묻기면 입력이 남아 [요청 만들기]가 눌리는 상태로 있다
   await page.getByRole("textbox", { name: REQUEST_INPUT }).fill("");
 
-  // S9-b. 근무표 만들기
+  // S9-b. 근무표 만들기: ③에는 예외 입력이 없다
+  await page.getByRole("button", { name: "다음", exact: true }).click();
+  await expect(currentStep()).toContainText("근무표");
+  await expect(scheduleTitle(page)).toBeVisible();
+  await expect(workStepper().getByRole("button", { name: /가능 시간/ })).toBeEnabled();
+  await expect(workStepper().getByRole("button", { name: /매장 조건/ })).toBeEnabled();
+  await expect(page.getByRole("textbox", { name: REQUEST_INPUT })).toHaveCount(0);
   await expect(page.getByText("가능 시간과 매장 조건으로 근무표를 만들어요")).toBeVisible();
   await expect(primaryButtons(page)).toHaveText("근무표 만들기");
   expect(await solve(() => page.getByRole("button", { name: "근무표 만들기" }).click())).toBe("ok");
@@ -601,6 +603,9 @@ test("S10. 근무표 없음 → 설명과 검증된 제안", async () => {
   };
   page.on("response", onResponse);
 
+  // 예외는 ②에서 적는다. 요청이 있어 예외 패널이 펼쳐져 있다
+  await workStepper().getByRole("button", { name: /매장 조건/ }).click();
+  await expect(page.getByRole("textbox", { name: REQUEST_INPUT })).toBeVisible();
   for (const text of ["이영희, 김철수, 정유진, 최지훈 11월 6일 휴가", "강서연, 임하늘, 한소율 11월 6일 휴가"]) {
     const cards = await interpretOk(page, REQUEST_INPUT, "요청 만들기", text);
     // 사람마다 한 장이어도, 여러 사람을 한 장에 묶어도 휴가 모양이면 된다
@@ -613,6 +618,8 @@ test("S10. 근무표 없음 → 설명과 검증된 제안", async () => {
   const lee = await employeeId(page, "이영희");
   const leeLeave = (list: ConstraintSpec[]) => list.find((c) => leaveOf(c)?.employee_id === lee && leaveOf(c)!.days.includes(2));
   expect(leaveOf(leeLeave(requests)!), "S9의 이영희 11/3~11/5 휴가").toEqual({ employee_id: lee, days: [2, 3, 4] });
+  await page.getByRole("button", { name: "다음", exact: true }).click();
+  await expect(currentStep()).toContainText("근무표");
 
   const stale = page.getByRole("status").filter({ hasText: "입력이 바뀌었어요. 다시 만들어 주세요" });
   await expect(stale).toBeVisible();
