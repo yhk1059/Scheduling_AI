@@ -13,6 +13,7 @@
     "test:e2e": "playwright test",
     "seed": "vite-node scripts/seed.ts",
     "record:demo": "vite-node scripts/record-demo.ts",
+    "record:dining": "vite-node scripts/record-dining.ts",
     "gen:types": "uv run python -m backend.gen_types",
     "gen:demo": "uv run python -m backend.gen_demo",
     "gen:golden": "uv run python -m backend.gen_golden",
