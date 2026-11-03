@@ -225,7 +225,7 @@ async function main() {
     await click(page, leaveCard.getByRole("button", { name: "적용" }));
     await pause(page, 800);
     await click(page, page.getByRole("button", { name: "근무표 만들기" }));
-    const ok = page.getByText("규칙을 모두 지켰어요");
+    const ok = page.getByText("반드시 규칙을 모두 지켰어요");
     const none = page.getByText(/근무표가 없어요|근무표를 만들지 못했어요/);
     await ok.or(none).first().waitFor({ timeout: 120_000 });
     if (await none.isVisible().catch(() => false)) throw new Error("근무표가 안 나왔어요. 시나리오를 확인해 주세요");

@@ -23,6 +23,7 @@ import {
   STORAGE_KEY,
   toScheduleRequest,
   summarizedCoverageIds,
+  tagCoverage,
   viewForPeriod,
   type ShopRemote,
 } from "./store";
@@ -204,6 +205,27 @@ describe("매장", () => {
     expect(coverageRange([saturday, charge], "D", "weekday")).toBeNull();
     const weekday = countCard("w", { days: { kind: "weekday" }, shifts: { in: ["D"] }, per: "day", max: 4 });
     expect(coverageRange([weekday], "D", "weekday")).toEqual({ min: 0, max: 4 });
+  });
+
+  it("tagCoverage는 직급 하나로 고른 평일·주말 필요 인원을 직급별로 읽는다", () => {
+    const hall = countCard("h", { people: { tags: ["홀"] }, days: { kind: "weekday" }, shifts: { in: ["D"] }, per: "day", min: 2, max: 2 });
+    const kitchen = countCard("k", { people: { tags: ["주방"] }, days: { kind: "weekday" }, shifts: { in: ["D"] }, per: "day", min: 1 });
+    const weekend = countCard("we", { people: { tags: ["홀"] }, days: { kind: "weekend" }, shifts: { in: ["D"] }, per: "day", min: 3, max: 3 });
+    // 직급 둘, 빼는 직급, 사람 지정, 다른 근무조는 읽지 않는다
+    const two = countCard("t", { people: { tags: ["홀", "주방"] }, days: { kind: "weekday" }, shifts: { in: ["D"] }, per: "day", min: 1 });
+    const excl = countCard("x", { people: { tags: ["리더"], exclude_tags: ["홀"] }, days: { kind: "weekday" }, shifts: { in: ["D"] }, per: "day", min: 1 });
+    const ids = countCard("i", { people: { ids: ["e01"] }, days: { kind: "weekday" }, shifts: { in: ["D"] }, per: "day", min: 1 });
+    const other = countCard("o", { people: { tags: ["홀"] }, days: { kind: "weekday" }, shifts: { in: ["E"] }, per: "day", min: 1 });
+    const rules = [hall, kitchen, weekend, two, excl, ids, other];
+    // 규칙을 넣은 순서와 관계없이 직급 이름 순이라 평일·주말 칸의 순서가 같다
+    expect(tagCoverage(rules, "D", "weekday")).toEqual([
+      { tag: "주방", min: 1, max: null },
+      { tag: "홀", min: 2, max: 2 },
+    ]);
+    expect(tagCoverage(rules, "D", "weekend")).toEqual([{ tag: "홀", min: 3, max: 3 }]);
+    expect(tagCoverage(rules, "N", "weekday")).toEqual([]);
+    // 직급별 배치는 폼 모양 필요 인원이 아니다
+    expect(coverageRange(rules, "D", "weekday")).toBeNull();
   });
 });
 

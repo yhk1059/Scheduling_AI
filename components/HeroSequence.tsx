@@ -126,7 +126,7 @@ export default function HeroSequence() {
         <div className={`${ui.card} flex flex-col gap-3`}>
           <div className="flex h-[22px] items-center justify-between gap-3">
             <h3 className={ui.cardTitle}>11/2~11/8 근무표</h3>
-            <span className={`hero-badge ${ui.badge} ${ui.badgeTone.applied}`}>규칙을 모두 지켰어요</span>
+            <span className={`hero-badge ${ui.badge} ${ui.badgeTone.applied}`}>반드시 규칙을 모두 지켰어요</span>
           </div>
           <div className="hero-cells">
             <ScheduleGrid

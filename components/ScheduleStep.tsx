@@ -777,7 +777,7 @@ function ProposalCard({
         {s.soft_violation_count > 0 && (
           <>
             {" "}
-            · 못 지킨 규칙 <span className="font-mono">{s.soft_violation_count}</span>
+            · 못 지킨 가능하면 규칙 <span className="font-mono">{s.soft_violation_count}</span>
           </>
         )}
       </p>
@@ -822,7 +822,7 @@ export function SummaryCard({
           {infeasible ? (
             <span className={`${ui.badge} bg-[#FBE9E7] text-[#9F1F14]`}>근무표 없음</span>
           ) : (
-            <span className={`${ui.badge} bg-[#E6F2EA] text-[#1E6B3F]`}>규칙을 모두 지켰어요</span>
+            <span className={`${ui.badge} bg-[#E6F2EA] text-[#1E6B3F]`}>반드시 규칙을 모두 지켰어요</span>
           )}
           {!result.optimal && <span className={`${ui.badge} bg-[#FDF0DC] text-[#7A4506]`}>더 나은 배치가 있을 수 있어요</span>}
           {confirmed && <span className={`${ui.badge} bg-[#E6F2EA] text-[#1E6B3F]`}>확정</span>}
@@ -839,7 +839,7 @@ export function SummaryCard({
             <span className={label}>희망·기피 요청이 걸린 날 중 지킨 날</span>
           </div>
           <div className={item}>
-            <span className={label}>못 지킨 규칙</span>
+            <span className={label}>못 지킨 가능하면 규칙</span>
             <span className={`${value} text-[#A15C07]`}>{summary.soft_violation_count}</span>
           </div>
         </>

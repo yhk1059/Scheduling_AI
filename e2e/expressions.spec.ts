@@ -97,7 +97,7 @@ test("S16. 저장된 매장 열기 → 다시 만들기", async () => {
   await page.getByRole("button", { name: "다음", exact: true }).click();
   await expect(scheduleTitle(page)).toBeVisible();
   expect(await solve(() => page.getByRole("button", { name: "근무표 만들기" }).click())).toBe("ok");
-  await expect(page.getByText("규칙을 모두 지켰어요", { exact: true })).toBeVisible();
+  await expect(page.getByText("반드시 규칙을 모두 지켰어요", { exact: true })).toBeVisible();
   await expectHardRulesHold(page, NOV, lastSolve);
 });
 
@@ -148,7 +148,7 @@ test("S17. 조건부·짝 규칙 → 예시 판정 → 적용 → 값 수정 →
   await sectionWith(NOV_NAME).getByRole("button", { name: "근무표 확인하기" }).click();
   await expect(scheduleTitle(page)).toBeVisible();
   expect(await solve(() => page.getByRole("button", { name: "다시 만들기" }).first().click())).toBe("ok");
-  await expect(page.getByText("규칙을 모두 지켰어요", { exact: true })).toBeVisible();
+  await expect(page.getByText("반드시 규칙을 모두 지켰어요", { exact: true })).toBeVisible();
   const sent = lastSolve!.constraints ?? [];
   const sentMax = sent.find((c) => c.id === "rule-max-run");
   expect(sentMax?.type === "rule" && sentMax.values?.max_len?.value, "최대 연속 근무 값").toBe(6);
@@ -205,7 +205,7 @@ test("S18. 말로 필요 인원 → 근무표 → 사람이 모자란 필요 인
 
   await page.getByRole("button", { name: "다음", exact: true }).click();
   expect(await solve(() => page.getByRole("button", { name: "근무표 만들기" }).click())).toBe("ok");
-  await expect(page.getByText("규칙을 모두 지켰어요", { exact: true })).toBeVisible();
+  await expect(page.getByText("반드시 규칙을 모두 지켰어요", { exact: true })).toBeVisible();
   await expectHardRulesHold(page, WEEK, lastSolve);
   const grid = await readGrid(page, WEEK);
   for (let d = 1; d <= WEEK.length; d++) {
@@ -238,6 +238,6 @@ test("S18. 말로 필요 인원 → 근무표 → 사람이 모자란 필요 인
   if ((await valueChange.count()) === 0) test.info().annotations.push({ type: "확인 필요", description: "값 바꾸기 제안 없음(끄기·가능하면만)" });
   const chosen = (await valueChange.count()) > 0 ? valueChange.first() : proposals.first();
   expect(await solve(() => chosen.getByRole("button", { name: "수락" }).click())).toBe("ok");
-  await expect(page.getByText("규칙을 모두 지켰어요", { exact: true })).toBeVisible();
+  await expect(page.getByText("반드시 규칙을 모두 지켰어요", { exact: true })).toBeVisible();
   await expectHardRulesHold(page, WEEK, lastSolve);
 });

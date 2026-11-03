@@ -188,7 +188,7 @@ test("S15. 피크·더블 근무표 → 다음 근무표 시작일 미루기", a
   await page.getByRole("button", { name: "다음", exact: true }).click();
   await expect(scheduleTitle(page)).toBeVisible();
   expect(await solve(() => page.getByRole("button", { name: "근무표 만들기" }).click())).toBe("ok");
-  await expect(page.getByText("규칙을 모두 지켰어요", { exact: true })).toBeVisible();
+  await expect(page.getByText("반드시 규칙을 모두 지켰어요", { exact: true })).toBeVisible();
   expect(lastSolve!.period).toEqual(FIRST);
   const peak = lastSolve!.config!.shifts.find((s) => s.code === "P");
   expect({ end: peak?.end, hours: peak?.hours }).toEqual({ end: "14:00", hours: 3 });
