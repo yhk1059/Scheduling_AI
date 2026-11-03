@@ -115,7 +115,7 @@ function shiftsLabel(s: Selector, config: ShopConfig): string {
   return rest.length ? `${names(rest)} 말고 다른 근무` : "근무";
 }
 
-/** 사람 고르기: 이름(3명 넘으면 "김OO 외 2명"), "리더 직급", "신입 빼고". 비어 있으면 "". */
+/** 사람 고르기: 이름(3명 넘으면 "김OO 외 2명"), "리더 직급", "신입 빼고", "리더 직급(홀 제외)". 비어 있으면 "". */
 function peopleLabel(p: People | null | undefined, employees: Employee[]): string {
   if (!p) return "";
   const parts: string[] = [];
@@ -123,8 +123,10 @@ function peopleLabel(p: People | null | undefined, employees: Employee[]): strin
     const names = p.ids.map((id) => employeeLabel(id, employees));
     parts.push(names.length > 3 ? `${names[0]} 외 ${names.length - 1}명` : names.join(" "));
   }
-  if (p.tags?.length) parts.push(`${p.tags.join("·")} 직급`);
-  if (p.exclude_tags?.length) parts.push(`${p.exclude_tags.join("·")} 빼고`);
+  const excluded = p.exclude_tags?.join("·");
+  // 고른 직급에서 빼는 직급은 괄호로 붙여 "리더 직급 홀 빼고"처럼 끊어 읽히지 않게 한다
+  if (p.tags?.length) parts.push(`${p.tags.join("·")} 직급${excluded ? `(${excluded} 제외)` : ""}`);
+  else if (excluded) parts.push(`${excluded} 빼고`);
   return parts.join(" ");
 }
 

@@ -8,14 +8,17 @@ import { parseCarryOver, type CellError } from "@/lib/roster-import";
 import { syncAvailabilityLinks, type AvailabilityLink } from "@/lib/supabase";
 import {
   carryOverChanged,
+  type Code,
   coverageCodes,
   coverageRange,
   currentPeriod,
+  type DayKind,
   liveShopRules,
   orphanConstraintIds,
   type PeriodStep,
   prepareNeedsReview,
   rosterChangesFor,
+  tagCoverage,
   useAppStore,
   type WorkPeriod,
 } from "@/lib/store";
@@ -200,7 +203,8 @@ function ConditionsStep({ period, onStep }: { period: WorkPeriod; onStep: (s: Pe
   if (!shop) return null;
   const orphanCount = orphanConstraintIds(shop, null).length;
   const pending = shop.pendingRules.length + shop.pendingConfig.length;
-  const hasStaffing = liveShopRules(shop, period).some((r) => presetName(r) === "필요 인원");
+  // 직급별 배치(홀 오픈 2명 등)도 인원을 맞추는 규칙이다
+  const hasStaffing = liveShopRules(shop, period).some((r) => ["필요 인원", "직급별 배치"].includes(presetName(r)));
   const exceptionCount = period.requests.length + period.pendingRequests.length;
 
   return (
@@ -254,6 +258,11 @@ function CoverageSummary({ period }: { period: WorkPeriod }) {
   const rules = liveShopRules(shop, period);
   const th = "py-1.5 pr-6 text-left text-xs font-medium text-[#66665E]";
   const td = "py-1.5 pr-6 font-mono text-[13px] text-[#1B1B18]";
+  // 전체 필요 인원 뒤에 직급별 필요 인원("홀 2명 · 주방 2명")을 잇는다
+  const need = (code: Code, kind: DayKind) =>
+    [coverageText(coverageRange(rules, code, kind)), ...tagCoverage(rules, code, kind).map((t) => `${t.tag} ${coverageText(t)}`)]
+      .filter(Boolean)
+      .join(" · ");
 
   return (
     <section className={`${ui.card} flex flex-col gap-3`}>
@@ -274,8 +283,8 @@ function CoverageSummary({ period }: { period: WorkPeriod }) {
                 <td className={td}>
                   {s.start}~{s.end}
                 </td>
-                <td className={td}>{coverageText(coverageRange(rules, s.code, "weekday"))}</td>
-                <td className={td}>{coverageText(coverageRange(rules, s.code, "weekend"))}</td>
+                <td className={td}>{need(s.code, "weekday")}</td>
+                <td className={td}>{need(s.code, "weekend")}</td>
               </tr>
             ))}
           </tbody>

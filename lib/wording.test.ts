@@ -127,6 +127,7 @@ describe("presetName / describeRule: 프리셋 모양", () => {
     ["마감 다음 휴무 2일", offAfter(C, 2), "마감 다음 휴무", "마감 다음 날은 휴무 2일"],
     ["주 근무 시간", count({ shifts: WORK, per: "person_week", measure: "hours", max: 52 }), "근무 시간", "모든 사람 주마다 근무 시간 52시간 이하"],
     ["휴무 간격", count({ people: { exclude_tags: ["신입"] }, shifts: OFF, per: "person_window", window: 7, min: 1 }), "휴무 간격", "신입 빼고 7일마다 휴무 1일 이상"],
+    ["고른 직급에서 빼는 직급", count({ people: { tags: ["리더"], exclude_tags: ["홀"] }, shifts: C, per: "day", min: 1 }), "세는 규칙", "매일 리더 직급(홀 제외) 마감 1명 이상"],
     ["휴가", count({ people: { ids: ["e01"] }, days: { days: [3, 4, 5] }, shifts: WORK, per: "person", max: 0 }, hard), "휴가", "이영희 · 11/3~11/5 · 휴무"],
     ["명단에 없는 휴가", count({ people: { ids: ["n1"] }, days: { days: [3, 4, 5] }, shifts: WORK, per: "person", max: 0 }, hard), "휴가", "(명단에 없는 직원) · 11/3~11/5 · 휴무"],
     ["고정 근무", fixedCell("e01", 2, "M"), "고정 근무", "이영희 · 11/2 · 미들 고정"],

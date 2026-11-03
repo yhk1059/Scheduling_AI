@@ -146,9 +146,9 @@ test("S3. 운영 중인 매장: 다음 근무표 작성과 확정", async () => 
 
   // S3-c. 근무표 만들기: 최근 4주 열과 근거 한 줄
   expect(await solve(() => page.getByRole("button", { name: "근무표 만들기" }).click())).toBe("ok");
-  await expect(page.getByText("규칙을 모두 지켰어요", { exact: true })).toBeVisible();
+  await expect(page.getByText("반드시 규칙을 모두 지켰어요", { exact: true })).toBeVisible();
   await expect(page.getByText("희망 반영", { exact: true })).toBeVisible();
-  await expect(page.getByText("못 지킨 규칙", { exact: true })).toBeVisible();
+  await expect(page.getByText("못 지킨 가능하면 규칙", { exact: true })).toBeVisible();
   const stats = sectionWith("개인별 통계");
   await expect(stats.locator("tbody tr")).toHaveCount(EMPLOYEE_COUNT);
   for (const h of ["최근 4주 마감", "최근 4주 주말", "평균보다 많은 근무일"]) {
@@ -251,7 +251,7 @@ test("S4. 확정 근무표: 변경 입력 → 최소 변경 → 다시 확정 ·
     expect(await solve(() => pendingCards(page).first().getByRole("button", { name: "적용" }).click())).toBe("ok");
   }
 
-  await expect(page.getByText("규칙을 모두 지켰어요", { exact: true })).toBeVisible();
+  await expect(page.getByText("반드시 규칙을 모두 지켰어요", { exact: true })).toBeVisible();
   await expect(page.getByText("작성 중", { exact: true })).toBeVisible();
   await expect(page.getByText("확정본에서 바뀐 칸", { exact: true })).toBeVisible();
   const locks = (lastSolve!.constraints ?? []).filter((c) => c.id.startsWith("lock-"));

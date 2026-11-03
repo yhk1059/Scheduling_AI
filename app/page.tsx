@@ -165,7 +165,7 @@ function SummaryFragment() {
       <div className={item}>
         <span className={label}>결과</span>
         <span className="flex h-7 items-center">
-          <span className={`${ui.badge} ${ui.badgeTone.applied}`}>규칙을 모두 지켰어요</span>
+          <span className={`${ui.badge} ${ui.badgeTone.applied}`}>반드시 규칙을 모두 지켰어요</span>
         </span>
       </div>
       <div className={item}>
@@ -173,7 +173,7 @@ function SummaryFragment() {
         <span className={`${ui.bigNumber} text-[#1B1B18]`}>9/9</span>
       </div>
       <div className={item}>
-        <span className={label}>못 지킨 규칙</span>
+        <span className={label}>못 지킨 가능하면 규칙</span>
         <span className={`${ui.bigNumber} text-[#A15C07]`}>0</span>
       </div>
     </div>
