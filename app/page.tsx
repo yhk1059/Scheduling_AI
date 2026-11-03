@@ -74,25 +74,37 @@ function LinkFragment() {
   );
 }
 
+/** 앱의 근무표 없음 패널과 같은 순서: 검증된 제안 먼저, 이유는 [왜 만들 수 없나요?]를 펼친 모양으로 아래에. */
 function BlockedFragment() {
   return (
-    <div className="flex flex-col gap-2.5 rounded-lg border border-[#E8B4AE] bg-white px-[18px] py-4">
+    <div className="flex flex-col gap-3.5 rounded-lg border border-[#E8B4AE] bg-white px-[18px] py-4">
       <div className="flex items-center gap-2">
         <span className={`${ui.badge} ${ui.badgeTone.none}`}>근무표 없음</span>
         <h3 className="text-[13px] font-semibold text-[#1B1B18]">이 조건으로는 근무표를 만들 수 없어요</h3>
       </div>
-      <p className={body}>토요일 마감에 들어올 수 있는 사람이 필요 인원보다 적어요.</p>
-      <div className={`${ui.card} flex flex-col gap-2`}>
-        <div className="flex items-center justify-between gap-3">
-          <h4 className="text-[13px] font-semibold text-[#1B1B18]">토요일 마감 인원 줄이기</h4>
-          <span className={`${ui.badge} ${ui.badgeTone.confirmed}`}>검증됨</span>
+      <div className="flex flex-col gap-1.5">
+        <h4 className="text-[13px] font-semibold text-[#1B1B18]">이렇게 바꾸면 만들 수 있어요</h4>
+        <div className={`${ui.card} flex flex-col gap-2.5`}>
+          <div className="flex items-center justify-between gap-3">
+            <h5 className="text-[13px] font-semibold text-[#1B1B18]">주말 마감 인원 줄이기</h5>
+            <span className={`${ui.badge} ${ui.badgeTone.confirmed}`}>검증됨</span>
+          </div>
+          <div className="flex flex-col gap-0.5">
+            <span className="text-sm font-medium text-[#1B1B18]">주말 마감 최소 3 → 2</span>
+            <span className="text-xs text-[#66665E]">“주말 마감은 3명”</span>
+          </div>
+          <p className="text-xs text-[#66665E]">
+            이렇게 바꾸면 근무표를 만들 수 있어요 · 희망 반영 <span className="font-mono">9/9</span>
+          </p>
+          <div className="flex justify-end gap-1">
+            <span className={ui.textSm}>무시</span>
+            <span className={ui.primarySm}>수락</span>
+          </div>
         </div>
-        <p className="text-sm font-medium text-[#1B1B18]">토요일 마감 인원 3 → 2</p>
-        <p className="text-xs text-[#66665E]">이렇게 바꾸면 근무표를 만들 수 있어요</p>
-        <div className="flex justify-end gap-1">
-          <span className={ui.textSm}>무시</span>
-          <span className={ui.primarySm}>수락</span>
-        </div>
+      </div>
+      <div className="border-t border-[#EFEFEB] pt-3">
+        <p className="text-[13px] font-semibold text-[#1B1B18]">왜 만들 수 없나요?</p>
+        <p className={`mt-1.5 ${body}`}>토요일 마감에 들어올 수 있는 사람이 2명뿐인데, 주말 마감은 3명이 필요해요.</p>
       </div>
     </div>
   );
@@ -311,7 +323,7 @@ export default function Home() {
               ))}
             </div>
             <div className="flex items-center justify-between gap-6">
-              <p className="font-mono text-[13px] text-[#3D3D38]">번역 정확도 [__%] · 매니저 말투 문장 [__개]</p>
+              <p className="font-mono text-[13px] text-[#3D3D38]">번역 정확도 99% · 매니저 말투 문장 100개</p>
               <a href={REPO_URL} className={ui.text}>
                 GitHub에서 자세히 보기
               </a>
