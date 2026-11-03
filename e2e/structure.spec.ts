@@ -28,6 +28,7 @@ import {
   shownLinks,
   solveVia,
   submitFullDay,
+  openStats,
 } from "./test-helpers";
 
 // [요일 종류, 근무 이름, 인원] (D5)
@@ -197,6 +198,7 @@ test("S15. 피크·더블 근무표 → 다음 근무표 시작일 미루기", a
   for (let d = 0; d < FIRST.length; d++) {
     expect(Object.values(grid).filter((row) => row[d] === "P").length, `${d + 1}번째 날 피크`).toBe(1);
   }
+  await openStats(page);
   const stats = page.locator("section").filter({ has: page.getByRole("heading", { name: "개인별 통계", exact: true }) });
   for (const h of ["P", "근무 시간"]) await expect(stats.getByRole("columnheader", { name: h, exact: true })).toBeVisible();
   // 편집 바의 고정 선택지에도 피크가 있다

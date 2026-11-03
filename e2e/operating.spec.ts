@@ -35,6 +35,7 @@ import {
   scheduleTitle,
   seedShop,
   solveVia,
+  openStats,
 } from "./test-helpers";
 
 const OCT: PeriodRange = { start_date: "2026-10-05", length: 28 };
@@ -149,6 +150,7 @@ test("S3. 운영 중인 매장: 다음 근무표 작성과 확정", async () => 
   await expect(page.getByText("반드시 규칙을 모두 지켰어요", { exact: true })).toBeVisible();
   await expect(page.getByText("희망 반영", { exact: true })).toBeVisible();
   await expect(page.getByText("못 지킨 가능하면 규칙", { exact: true })).toBeVisible();
+  await openStats(page);
   const stats = sectionWith("개인별 통계");
   await expect(stats.locator("tbody tr")).toHaveCount(EMPLOYEE_COUNT);
   for (const h of ["최근 4주 마감", "최근 4주 주말", "평균보다 많은 근무일"]) {
@@ -219,6 +221,7 @@ test("S4. 확정 근무표: 변경 입력 → 최소 변경 → 다시 확정 ·
   await expect(page.getByRole("list", { name: "근무표 작성 단계" })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "요청 만들기" })).toHaveClass(/bg-\[#155E75\]/);
   await expect(page.getByRole("button", { name: "CSV 받기" })).toHaveClass(/bg-white/);
+  await openStats(page);
   await expect(sectionWith("개인별 통계").locator("tbody tr")).toHaveCount(EMPLOYEE_COUNT);
 
   // 지난 날짜(10/5~10/27) 잠금

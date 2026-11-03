@@ -27,7 +27,7 @@ import { coverageText, presetName, scheduleName } from "@/lib/wording";
 import AvailabilityOverview from "./AvailabilityOverview";
 import HolidayCalendar from "./HolidayCalendar";
 import RulesStep from "./RulesStep";
-import ScheduleStep, { CELL, codeClass, DayHead } from "./ScheduleStep";
+import ScheduleStep, { CELL, cellText, codeClass, DayHead } from "./ScheduleStep";
 import Stepper from "./Stepper";
 import ShiftTable from "./ShiftTable";
 import { CoverageSection } from "./ShopSettings";
@@ -524,9 +524,9 @@ function CarryOverTable({ period, prev }: { period: WorkPeriod; prev: WorkPeriod
                   <div
                     key={d}
                     aria-label={`${name(r.employee_id)} ${monthDay(prev, d)} ${code}`}
-                    className={`${CELL} ${codeClass(code, isWeekendDay(prev, d, prev.holidays))}`}
+                    className={`${CELL} ${codeClass(code, isWeekendDay(prev, d, prev.holidays), shop?.config)}`}
                   >
-                    {code}
+                    {cellText(code)}
                   </div>
                 );
               })}

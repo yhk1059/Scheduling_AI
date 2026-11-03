@@ -567,8 +567,16 @@ export async function expectCardChrome(card: Locator, hardness: "반드시" | "�
   else await expect(toggle.getByRole("button", { name: hardness })).toHaveAttribute("aria-pressed", "true");
 }
 
+/** 접혀 있는 개인별 통계를 펼친다. 이미 펼쳐져 있으면 그대로 둔다. */
+export async function openStats(page: Page) {
+  const button = page.getByRole("button", { name: "개인별 통계 보기" });
+  if (await button.isVisible()) await button.click();
+  await expect(page.getByRole("heading", { name: "개인별 통계", exact: true })).toBeVisible();
+}
+
 /** 근무표 행 끝의 최근 4주 열과 통계 표의 최근 4주 열을 읽고 서로 같은지 확인한다. */
 export async function readHistoryColumns(page: Page): Promise<Record<string, Load>> {
+  await openStats(page);
   const { grid, stats } = await page.evaluate(() => {
     const grid: Record<string, [string, string]> = {};
     for (const b of document.querySelectorAll("button[aria-label]")) {

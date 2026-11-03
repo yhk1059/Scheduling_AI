@@ -20,7 +20,31 @@ export const DEFAULT_CONFIG: ShopConfig = {
   ],
 };
 
-const SHIFT_TIME_RE = /^(([01][0-9]|2[0-3]):(00|30)|24:00)$/; // backend/domain/models.py ShiftTime
+/** 근무표 칸 색 단계 수(밝음 0 → 진함 TONE_STEPS-1). */
+export const TONE_STEPS = 5;
+/** 칸 색: 단계(0..TONE_STEPS-1), 근무조를 합친 코드 "multi", 휴무 "off". */
+export type ShiftTone = number | "multi" | "off";
+
+/**
+ * 근무 코드별 칸 색. 근무조(합친 코드·휴무 제외, 꺼진 코드 포함)를 시작 시각 순으로 세워
+ * 이른 근무는 밝게, 늦은 근무는 진하게 단계에 고르게 나눈다. 시작 시각이 없는 코드가 있으면 설정 순서를 쓴다.
+ */
+export function shiftTones(config: ShopConfig): Record<string, ShiftTone> {
+  const teams = config.shifts.filter((s) => s.code !== OFF_CODE && !s.parts?.length);
+  const ordered = teams.every((s) => s.start) ? [...teams].sort((a, b) => a.start!.localeCompare(b.start!)) : teams;
+  const last = TONE_STEPS - 1;
+  const tones: Record<string, ShiftTone> = {};
+  ordered.forEach((s, i) => {
+    tones[s.code] = ordered.length === 1 ? Math.floor(last / 2) : Math.round((i * last) / (ordered.length - 1));
+  });
+  for (const s of config.shifts) {
+    if (s.code === OFF_CODE) tones[s.code] = "off";
+    else if (s.parts?.length) tones[s.code] = "multi";
+  }
+  return tones;
+}
+
+const SHIFT_TIME_RE =/^(([01][0-9]|2[0-3]):(00|30)|24:00)$/; // backend/domain/models.py ShiftTime
 
 /** 근무조 시각 입력의 오류 문구. 맞으면 null. "HH:MM" 30분 단위, 끝은 시작보다 늦고 24:00까지(자정을 넘기지 않는다). */
 export function shiftTimesError(start: string, end: string): string | null {
