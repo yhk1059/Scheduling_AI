@@ -130,6 +130,7 @@ export default function HeroSequence() {
           </div>
           <div className="hero-cells">
             <ScheduleGrid
+              legend={false}
               rows={EMPLOYEES}
               result={RESULT}
               period={PERIOD}

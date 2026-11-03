@@ -19,7 +19,7 @@ import { describeRule, describeShiftChange, hardnessLabel, presetName } from "@/
 
 import RuleText from "./RuleText";
 import { previewRange } from "./RulesStep";
-import { codeClass } from "./ScheduleStep";
+import { cellText, codeClass } from "./ScheduleStep";
 import { ui } from "./ui";
 import { QuoteGlyph } from "./Wordmark";
 
@@ -82,6 +82,7 @@ function ExampleStrip({
   range: PeriodRange;
   holidays: number[];
 }) {
+  const config = useAppStore((s) => s.shop?.config);
   const nameOf = (id: string) => employees.find((n) => n.id === id)?.name ?? "직원";
   const marked = (id: string, d: number) => example.marks.some(([m, md]) => m === id && md === d);
   return (
@@ -116,9 +117,9 @@ function ExampleStrip({
                     className="p-0"
                   >
                     <span
-                      className={`${STRIP_CELL} ${codeClass(code, isWeekendDay(range, d, holidays))} ${bad ? "ring-1 ring-[#B42318]" : ""}`}
+                      className={`${STRIP_CELL} ${codeClass(code, isWeekendDay(range, d, holidays), config)} ${bad ? "ring-1 ring-[#B42318]" : ""}`}
                     >
-                      {code}
+                      {cellText(code)}
                     </span>
                   </td>
                 );

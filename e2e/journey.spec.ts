@@ -44,6 +44,7 @@ import {
   solveVia,
   submitAvailability,
   submitFullDay,
+  openStats,
 } from "./test-helpers";
 
 const WEEK: PeriodRange = { start_date: "2026-11-02", length: 7 };
@@ -552,6 +553,9 @@ test("S9. ② 예외 입력과 ③ 근무표 만들기", async () => {
   await expect(page.getByRole("button", { name: "다시 만들기" })).toBeVisible();
   await expect(page.getByRole("button", { name: "CSV 받기" })).toBeVisible();
 
+  // 개인별 통계는 접혀 있다가 버튼으로 펼친다
+  await expect(page.getByRole("heading", { name: "개인별 통계", exact: true })).toHaveCount(0);
+  await openStats(page);
   const stats = sectionWith("개인별 통계");
   await expect(stats.locator("tbody tr")).toHaveCount(EMPLOYEE_COUNT);
   for (const h of ["A", "M", "C", "O", "근무 시간", "주말·공휴일 근무", "최대 연속 근무", "희망 반영률", "평균보다 많은 근무일"]) {

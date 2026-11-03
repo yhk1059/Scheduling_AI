@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { balance, count, fixedCell, forbid, maxRun, minRun, OFF, offAfter, WORK } from "./test-rules";
-import { closingShift, DEFAULT_CONFIG, normalizeRule, ruleShape, shiftTimesError } from "./rules";
+import { closingShift, DEFAULT_CONFIG, normalizeRule, ruleShape, shiftTimesError, shiftTones } from "./rules";
 import type { ConstraintSpec, Rule, Shifts, ShopConfig } from "./types.gen";
 
 const N: Shifts = { in: ["N"] };
@@ -155,5 +155,39 @@ describe("ruleShape: 블록 모양으로 되읽기", () => {
       },
     } as unknown as Rule;
     expect(ruleShape(rule)).toBeNull();
+  });
+});
+
+describe("shiftTones", () => {
+  const shift = (code: string, start?: string, extra: object = {}) => ({ code, name: code, hours: 6, ...(start && { start, end: "23:00" }), ...extra });
+  const config = (...shifts: object[]) => ({ shifts: [...shifts, { code: "O", name: "휴무", hours: 0 }] }) as unknown as ShopConfig;
+
+  it("기본 근무 형태: 오픈 밝게, 마감 진하게, 휴무는 off", () => {
+    expect(shiftTones(DEFAULT_CONFIG)).toEqual({ A: 0, M: 2, C: 4, O: "off" });
+  });
+
+  it("설정 순서가 아니라 시작 시각 순으로 밝은 색부터 칠한다", () => {
+    expect(shiftTones(config(shift("N", "22:00"), shift("D", "07:00"), shift("E", "15:00")))).toEqual({ D: 0, E: 2, N: 4, O: "off" });
+  });
+
+  it("근무조 수에 맞춰 다섯 단계에 고르게 나눈다", () => {
+    expect(shiftTones(config(shift("D", "07:00")))).toEqual({ D: 2, O: "off" });
+    expect(shiftTones(config(shift("D", "07:00"), shift("N", "22:00")))).toEqual({ D: 0, N: 4, O: "off" });
+    expect(shiftTones(config(shift("A", "07:00"), shift("B", "10:00"), shift("C", "14:00"), shift("D", "18:00")))).toEqual({
+      A: 0,
+      B: 1,
+      C: 3,
+      D: 4,
+      O: "off",
+    });
+  });
+
+  it("더블처럼 근무조를 합친 코드는 multi, 꺼진 코드도 색을 받는다", () => {
+    const tones = shiftTones(config(shift("A", "09:00"), shift("C", "17:00", { active: false }), shift("AC", undefined, { parts: ["A", "C"] })));
+    expect(tones).toEqual({ A: 0, C: 4, AC: "multi", O: "off" });
+  });
+
+  it("시작 시각이 없는 코드가 있으면 설정 순서를 쓴다", () => {
+    expect(shiftTones(config(shift("N", "22:00"), shift("D")))).toEqual({ N: 0, D: 4, O: "off" });
   });
 });

@@ -6,7 +6,7 @@ import { ApiError, errorMessage, explain, solve } from "@/lib/api";
 import { toScheduleCsv } from "@/lib/csv";
 import { availabilityFromLinks, isAvailabilityRule, mergeAvailabilityConflicts } from "@/lib/availability";
 import { historyLoadFor, isOperating } from "@/lib/continuity";
-import { closingShift, DEFAULT_CONFIG } from "@/lib/rules";
+import { closingShift, DEFAULT_CONFIG, OFF_CODE, shiftTones } from "@/lib/rules";
 import { dayHeader, dayOfDate, isWeekendDay, monthDay, periodDays, periodEnd } from "@/lib/period";
 import {
   availabilityChanged,
@@ -68,21 +68,32 @@ export function DayHead({
 
 export const CELL =
   "relative w-[30px] h-7 rounded-xs inline-flex items-center justify-center font-mono transition-colors duration-[120ms]";
-const CODE_CLASS: Record<Code, string> = {
-  A: "bg-[#FFF1C2] text-[#5C4300] font-semibold border border-transparent",
-  M: "bg-[#F9CFAE] text-[#6E2A04] font-semibold border border-transparent",
-  C: "bg-[#263248] text-white font-semibold border border-transparent",
-  O: "text-[#6B6B63] font-normal border border-[#E2E2DC]",
-};
+/** 근무조 색 단계(shiftTones): 이른 근무 밝게 → 늦은 근무 진하게. 기본 오픈·미들·마감은 0·2·4. */
+const TONE_CLASS = [
+  "bg-[#FFF1C2] text-[#5C4300]",
+  "bg-[#FCDDA0] text-[#5C3A00]",
+  "bg-[#F9CFAE] text-[#6E2A04]",
+  "bg-[#56657F] text-white",
+  "bg-[#263248] text-white",
+];
+/** 근무조를 합친 코드(더블 등) */
+const MULTI_CLASS = "bg-[#E4DDF4] text-[#3E2A73]";
+/** 근무 형태에 없는 코드 */
+const OTHER_CODE_CLASS = "bg-[#E2E2DC] text-[#1B1B18]";
+const OFF_CLASS = "text-[#6B6B63] font-normal border border-[#E2E2DC]";
 
-/** 기본 4개 외 코드(P, AC 등)는 중립 색 */
-const OTHER_CODE_CLASS = "bg-[#E2E2DC] text-[#1B1B18] font-semibold border border-transparent";
-
-/** 근무 코드 색과 글자 크기(3자 코드는 작게). */
-export function codeClass(code: Code, weekend: boolean): string {
-  const color = code === "O" ? `${CODE_CLASS.O} ${weekend ? "bg-[#F1EEE6]" : "bg-white"}` : (CODE_CLASS[code] ?? OTHER_CODE_CLASS);
+/** 근무 코드 색과 글자 크기(3자 코드는 작게). 색은 근무 형태의 시작 시각 순서로 정한다. */
+export function codeClass(code: Code, weekend: boolean, config: ShopConfig = DEFAULT_CONFIG): string {
+  const tone = shiftTones(config)[code];
+  const color =
+    tone === "off"
+      ? `${OFF_CLASS} ${weekend ? "bg-[#F1EEE6]" : "bg-white"}`
+      : `${tone === "multi" ? MULTI_CLASS : tone === undefined ? OTHER_CODE_CLASS : TONE_CLASS[tone]} font-semibold border border-transparent`;
   return `${color} ${code.length >= 3 ? "text-[11px]" : "text-[13px]"}`;
 }
+
+/** 근무표 칸 글자: 휴무는 빈칸으로 두어 일하는 날만 눈에 띄게 한다(코드는 aria-label에 남는다). */
+export const cellText = (code: Code) => (code === OFF_CODE ? "" : code);
 
 /** 열로 보여 줄 근무 코드: 활성 코드 + 결과에 남은 꺼진 코드(config 순서). */
 function shownCodes(config: ShopConfig, assignments?: ScheduleResult["assignments"]): ShiftDef[] {
@@ -396,6 +407,7 @@ export function ScheduleBody({
             <h2 className={ui.cardTitle}>근무표</h2>
             {selected && (
               <CellEditor
+                config={shop.config}
                 codes={shop.config.shifts.filter((s) => s.active !== false)}
                 label={`${employees.find((n) => n.id === selected.employeeId)?.name ?? selected.employeeId} ${monthDay(period, selected.day)}`}
                 fixed={fixed.get(`${selected.employeeId}-${selected.day}`)}
@@ -861,12 +873,14 @@ export function SummaryCard({
 }
 
 function CellEditor({
+  config,
   codes,
   label,
   fixed,
   onPick,
   onCancel,
 }: {
+  config: ShopConfig;
   /** 고를 수 있는 근무 코드(활성 코드) */
   codes: ShiftDef[];
   label: string;
@@ -887,7 +901,7 @@ function CellEditor({
           aria-label={`${code}로 고정`}
           title={name}
           aria-pressed={fixed === code}
-          className={`${CELL} ${codeClass(code, false)} hover:opacity-80 aria-pressed:outline-2 aria-pressed:outline-[#155E75] aria-pressed:outline-offset-1`}
+          className={`${CELL} ${codeClass(code, false, config)} hover:opacity-80 aria-pressed:outline-2 aria-pressed:outline-[#155E75] aria-pressed:outline-offset-1`}
         >
           {code}
         </button>
@@ -931,6 +945,7 @@ export function ScheduleGrid({
   hideViolations = false,
   cellStyle,
   totalCodes,
+  legend = true,
 }: {
   /** 매장 근무 형태. 합계 열과 하단 합계 행이 이 코드를 따른다 */
   config?: ShopConfig;
@@ -957,6 +972,8 @@ export function ScheduleGrid({
   cellStyle?: (employeeId: string, day: number) => CSSProperties;
   /** 하단 합계 행을 이 근무조로 줄인다. 없으면 모두 */
   totalCodes?: Code[];
+  /** 표 위 근무조 범례(색·이름·시각). 랜딩 시퀀스는 끈다 */
+  legend?: boolean;
 }) {
   const pdays = periodDays(period);
   const codes = shownCodes(config, result.assignments);
@@ -981,105 +998,121 @@ export function ScheduleGrid({
     violations.set(key, [...(violations.get(key) ?? []), v.detail]);
   }
   const total = "flex h-7 items-center justify-center font-mono text-[13px] font-medium text-[#1B1B18]";
+  const swatch = "inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-xs font-mono";
 
   return (
-    <div className="overflow-x-auto">
-      <div className="flex w-max flex-col gap-0.5">
-        <div className={rowClass} style={grid}>
-          <span className="flex items-end text-xs font-medium text-[#66665E]">이름</span>
-          {pdays.map(({ day: d, weekday: w }) => (
-            <DayHead key={d} label={dayHeader(period, d)} weekday={w} holiday={holidays.includes(d)} weekend={isWeekend(d)} today={d === todayDay} />
-          ))}
-          {codes.map(({ code, name }) => (
-            <span key={code} title={name} className="flex items-end justify-center font-mono text-xs font-semibold text-[#66665E]">
-              {code}
-            </span>
-          ))}
-          {/* 누적 부담(최근 4주) */}
-          {showHistory && [`최근 4주\n${closingShift(config)?.name ?? "마감"}`, "최근 4주\n주말"].map((label) => (
-            <span key={label} className="flex items-end justify-center text-center text-[11px] leading-tight font-medium whitespace-pre-line text-[#66665E]">
-              {label}
-            </span>
-          ))}
-        </div>
-
-        {rows.map((n) => {
-          const row = result.assignments[n.id];
-          const s = result.stats[n.id];
-          return (
-            <div key={n.id} className={rowClass} style={grid}>
-              <span className="flex h-7 items-center truncate text-sm text-[#1B1B18]">
-                {n.name}
-                {n.tags?.length ? <span className="ml-1.5 truncate text-xs font-medium text-[#66665E]">{n.tags.join(" · ")}</span> : null}
+    <div className="flex flex-col gap-3">
+      {legend && (
+        <ul aria-label="근무조" className="flex flex-wrap items-center gap-x-4 gap-y-1.5">
+          {codes.map(({ code, name, start, end }) => (
+            <li key={code} className="flex items-center gap-1.5 text-[13px] text-[#3D3D38]">
+              <span aria-hidden="true" className={`${swatch} ${codeClass(code, false, config)}`}>
+                {cellText(code)}
               </span>
-              {row.map((code, i) => {
-                const d = i + 1;
-                const { month: m, dom } = pdays[i];
-                const key = `${n.id}-${d}`;
-                const isSel = selected?.employeeId === n.id && selected.day === d;
-                const warn = violations.get(key);
-                const past = d <= pastDays;
-                if (readOnly) {
-                  return (
-                    <div
-                      key={d}
-                      aria-label={`${n.name} ${m}월 ${dom}일 ${code}`}
-                      title={warn ? warn.join(", ") : undefined}
-                      style={cellStyle?.(n.id, d)}
-                      className={`${CELL} ${codeClass(code, isWeekend(d))}`}
-                    >
-                      {code}
-                      {warn && <span aria-hidden="true" className="absolute bottom-px left-px size-[5px] rounded-full bg-[#A15C07]" />}
-                    </div>
-                  );
-                }
-                return (
-                  <button
-                    key={d}
-                    type="button"
-                    disabled={disabled}
-                    aria-disabled={past || undefined}
-                    onClick={() => !past && onSelect({ employeeId: n.id, day: d })}
-                    aria-label={`${n.name} ${m}월 ${dom}일 ${code}`}
-                    title={past ? "지난 날짜는 바꿀 수 없어요" : warn ? warn.join(", ") : undefined}
-                    style={cellStyle?.(n.id, d)}
-                    className={`${CELL} ${codeClass(code, isWeekend(d))} ${
-                      past ? "cursor-not-allowed opacity-55" : "hover:opacity-80"
-                    } disabled:cursor-wait ${
-                      changed.has(key) ? "shadow-[inset_0_0_0_2px_#D97706]" : ""
-                    } ${isSel ? "outline-2 outline-offset-1 outline-[#155E75]" : ""}`}
-                  >
-                    {code}
-                    {(past || fixed.has(key)) && <LockIcon />}
-                    {warn && <span aria-hidden="true" className="absolute bottom-px left-px size-[5px] rounded-full bg-[#A15C07]" />}
-                  </button>
-                );
-              })}
-              {codes.map(({ code }) => (
-                <span key={code} className={total}>
-                  {s?.counts?.[code] ?? row.filter((x) => x === code).length}
-                </span>
-              ))}
-              {showHistory && (
-                <>
-                  <span className={total}>{history?.get(n.id)?.closings ?? 0}</span>
-                  <span className={total}>{history?.get(n.id)?.weekends ?? 0}</span>
-                </>
-              )}
-            </div>
-          );
-        })}
-
-        {teams.map(({ code }, i) => (
-          <div key={code} className={`${rowClass} ${i === 0 ? "mt-1.5 border-t border-[#EFEFEB] pt-1.5" : ""}`} style={grid}>
-            <span className="flex h-7 items-center text-xs font-medium text-[#66665E]">{code} 합계</span>
-            {dayList.map((d) => (
-              <span key={d} className={`${total} rounded-xs ${weekendBg(d)}`}>
-                {rows.filter((n) => covers(result.assignments[n.id][d - 1], code)).length}
+              {code === OFF_CODE ? "빈칸 휴무" : name}
+              {start && end && <span className="font-mono text-xs text-[#66665E]">{start}~{end}</span>}
+            </li>
+          ))}
+        </ul>
+      )}
+      <div className="overflow-x-auto">
+        <div className="flex w-max flex-col gap-0.5">
+          <div className={rowClass} style={grid}>
+            <span className="flex items-end text-xs font-medium text-[#66665E]">이름</span>
+            {pdays.map(({ day: d, weekday: w }) => (
+              <DayHead key={d} label={dayHeader(period, d)} weekday={w} holiday={holidays.includes(d)} weekend={isWeekend(d)} today={d === todayDay} />
+            ))}
+            {codes.map(({ code, name }) => (
+              <span key={code} title={name} className="flex items-end justify-center font-mono text-xs font-semibold text-[#66665E]">
+                {code}
+              </span>
+            ))}
+            {/* 누적 부담(최근 4주) */}
+            {showHistory && [`최근 4주\n${closingShift(config)?.name ?? "마감"}`, "최근 4주\n주말"].map((label) => (
+              <span key={label} className="flex items-end justify-center text-center text-[11px] leading-tight font-medium whitespace-pre-line text-[#66665E]">
+                {label}
               </span>
             ))}
           </div>
-        ))}
+
+          {rows.map((n) => {
+            const row = result.assignments[n.id];
+            const s = result.stats[n.id];
+            return (
+              <div key={n.id} className={rowClass} style={grid}>
+                <span className="flex h-7 items-center truncate text-sm text-[#1B1B18]">
+                  {n.name}
+                  {n.tags?.length ? <span className="ml-1.5 truncate text-xs font-medium text-[#66665E]">{n.tags.join(" · ")}</span> : null}
+                </span>
+                {row.map((code, i) => {
+                  const d = i + 1;
+                  const { month: m, dom } = pdays[i];
+                  const key = `${n.id}-${d}`;
+                  const isSel = selected?.employeeId === n.id && selected.day === d;
+                  const warn = violations.get(key);
+                  const past = d <= pastDays;
+                  if (readOnly) {
+                    return (
+                      <div
+                        key={d}
+                        aria-label={`${n.name} ${m}월 ${dom}일 ${code}`}
+                        title={warn ? warn.join(", ") : undefined}
+                        style={cellStyle?.(n.id, d)}
+                        className={`${CELL} ${codeClass(code, isWeekend(d), config)}`}
+                      >
+                        {cellText(code)}
+                        {warn && <span aria-hidden="true" className="absolute bottom-px left-px size-[5px] rounded-full bg-[#A15C07]" />}
+                      </div>
+                    );
+                  }
+                  return (
+                    <button
+                      key={d}
+                      type="button"
+                      disabled={disabled}
+                      aria-disabled={past || undefined}
+                      onClick={() => !past && onSelect({ employeeId: n.id, day: d })}
+                      aria-label={`${n.name} ${m}월 ${dom}일 ${code}`}
+                      title={past ? "지난 날짜는 바꿀 수 없어요" : warn ? warn.join(", ") : undefined}
+                      style={cellStyle?.(n.id, d)}
+                      className={`${CELL} ${codeClass(code, isWeekend(d), config)} ${
+                        past ? "cursor-not-allowed opacity-55" : "hover:opacity-80"
+                      } disabled:cursor-wait ${
+                        changed.has(key) ? "shadow-[inset_0_0_0_2px_#D97706]" : ""
+                      } ${isSel ? "outline-2 outline-offset-1 outline-[#155E75]" : ""}`}
+                    >
+                      {cellText(code)}
+                      {(past || fixed.has(key)) && <LockIcon />}
+                      {warn && <span aria-hidden="true" className="absolute bottom-px left-px size-[5px] rounded-full bg-[#A15C07]" />}
+                    </button>
+                  );
+                })}
+                {codes.map(({ code }) => (
+                  <span key={code} className={total}>
+                    {s?.counts?.[code] ?? row.filter((x) => x === code).length}
+                  </span>
+                ))}
+                {showHistory && (
+                  <>
+                    <span className={total}>{history?.get(n.id)?.closings ?? 0}</span>
+                    <span className={total}>{history?.get(n.id)?.weekends ?? 0}</span>
+                  </>
+                )}
+              </div>
+            );
+          })}
+
+          {teams.map(({ code }, i) => (
+            <div key={code} className={`${rowClass} ${i === 0 ? "mt-1.5 border-t border-[#EFEFEB] pt-1.5" : ""}`} style={grid}>
+              <span className="flex h-7 items-center text-xs font-medium text-[#66665E]">{code} 합계</span>
+              {dayList.map((d) => (
+                <span key={d} className={`${total} rounded-xs ${weekendBg(d)}`}>
+                  {rows.filter((n) => covers(result.assignments[n.id][d - 1], code)).length}
+                </span>
+              ))}
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   );
@@ -1104,11 +1137,27 @@ export function StatsTable({
   const th = `${thBase} text-right`;
   const td = "px-3 py-1.5 text-right font-mono text-[13px] font-medium text-[#1B1B18]";
   const showHistory = [...history.values()].some((h) => h.closings > 0 || h.weekends > 0);
+  // 근무표를 먼저 보도록 통계는 접어 두고 버튼으로 펼친다
+  const [open, setOpen] = useState(false);
+  if (!open) {
+    return (
+      <div>
+        <button type="button" aria-expanded={false} onClick={() => setOpen(true)} className={ui.secondary}>
+          개인별 통계 보기
+        </button>
+      </div>
+    );
+  }
   return (
     <section className="flex flex-col gap-3">
       <div className="flex items-baseline justify-between gap-4">
         <h2 className={ui.sectionTitle}>개인별 통계</h2>
-        <p className={ui.help}>“왜 나만 주말이 많아요?”에 보여 줄 근거예요.</p>
+        <div className="flex items-baseline gap-3">
+          <p className={ui.help}>“왜 나만 주말이 많아요?”에 보여 줄 근거예요.</p>
+          <button type="button" aria-expanded onClick={() => setOpen(false)} className={ui.textSm}>
+            접기
+          </button>
+        </div>
       </div>
       <div className={`${ui.card} overflow-x-auto`}>
         <table className="w-full border-collapse">
