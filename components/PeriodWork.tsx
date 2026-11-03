@@ -195,10 +195,13 @@ function LinksSection({ period }: { period: WorkPeriod }) {
 function ConditionsStep({ period, onStep }: { period: WorkPeriod; onStep: (s: PeriodStep) => void }) {
   const shop = useAppStore((s) => s.shop);
   const [blocked, setBlocked] = useState(false);
+  // 이번 근무표 예외는 평소에 접어 두고, 요청이 있으면 펼친다
+  const [exceptionsOpen, setExceptionsOpen] = useState(period.requests.length + period.pendingRequests.length > 0);
   if (!shop) return null;
   const orphanCount = orphanConstraintIds(shop, null).length;
   const pending = shop.pendingRules.length + shop.pendingConfig.length;
   const hasStaffing = liveShopRules(shop, period).some((r) => presetName(r) === "필요 인원");
+  const exceptionCount = period.requests.length + period.pendingRequests.length;
 
   return (
     <>
@@ -210,6 +213,18 @@ function ConditionsStep({ period, onStep }: { period: WorkPeriod; onStep: (s: Pe
         summary={<CoverageSummary period={period} />}
         afterInput={<CoverageSection collapsible />}
       />
+      <div className="flex flex-col gap-3">
+        <div>
+          <button type="button" aria-expanded={exceptionsOpen} onClick={() => setExceptionsOpen((o) => !o)} className={ui.textSm}>
+            {exceptionsOpen
+              ? "예외 접기"
+              : exceptionCount > 0
+                ? `이번 근무표 예외 ${exceptionCount}개 보기`
+                : "+ 이번 근무표에만 적용할 예외 추가"}
+          </button>
+        </div>
+        {exceptionsOpen && <RulesStep key="period" scope="period" />}
+      </div>
       <div className="flex items-center justify-between gap-4">
         <button type="button" onClick={() => onStep(1)} className={ui.secondary}>
           이전

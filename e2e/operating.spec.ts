@@ -123,27 +123,26 @@ test("S3. 운영 중인 매장: 다음 근무표 작성과 확정", async () => 
   await page.getByRole("button", { name: "접기" }).first().click();
   await expect(page.getByRole("button", { name: "링크 복사" })).toHaveCount(1);
 
-  // ② 매장 조건: 요약표(D2)와 적용된 규칙 카드 7장
+  // ② 매장 조건: 요약표(D2)와 적용된 규칙 카드 7장, 그 아래 펼쳐진 예외 패널에 요청 3개
   await page.getByRole("button", { name: "다음", exact: true }).click();
   await expect(stepper.locator('[aria-current="step"]')).toContainText("매장 조건");
   await expect(page.getByRole("heading", { name: "매장 조건", exact: true })).toBeVisible();
   const openRow = page.getByRole("row").filter({ hasText: "오픈" }).first();
   await expect(openRow).toContainText("09:00~15:00");
-  await expect(appliedCards(page)).toHaveCount(7);
-  await expectNoDevTerms(page, "② 매장 조건");
+  await expect(page.getByRole("textbox", { name: "예외 입력" })).toBeVisible();
+  await expect(pendingCards(page)).toHaveCount(0);
+  await expect(appliedCards(page)).toHaveCount(7 + 3);
+  for (const summary of ["이영희 · 11/10~11/12 · 휴무", "박민수 · 주말·공휴일 · 마감 피하기", "정유진 · 11/20 · 오픈 희망"]) {
+    await expect(appliedCards(page).filter({ hasText: summary })).toHaveCount(1);
+  }
+  await expectNoDevTerms(page, "② 매장 조건과 예외 입력");
 
-  // ③ 근무표: 맨 위 예외 입력 패널에 요청 3개
+  // ③ 근무표: 예외 입력 없이 바로 근무표 만들기
   await page.getByRole("button", { name: "다음", exact: true }).click();
   await expect(stepper.locator('[aria-current="step"]')).toContainText("근무표");
   await expect(scheduleTitle(page)).toBeVisible();
   await expect(page.getByText("가능 시간과 매장 조건으로 근무표를 만들어요")).toBeVisible();
-  await expect(page.getByRole("textbox", { name: "예외 입력" })).toBeVisible();
-  await expect(pendingCards(page)).toHaveCount(0);
-  await expect(appliedCards(page)).toHaveCount(3);
-  for (const summary of ["이영희 · 11/10~11/12 · 휴무", "박민수 · 주말·공휴일 · 마감 피하기", "정유진 · 11/20 · 오픈 희망"]) {
-    await expect(appliedCards(page).filter({ hasText: summary })).toHaveCount(1);
-  }
-  await expectNoDevTerms(page, "③ 예외 입력");
+  await expect(page.getByRole("textbox", { name: "예외 입력" })).toHaveCount(0);
 
   // S3-c. 근무표 만들기: 최근 4주 열과 근거 한 줄
   expect(await solve(() => page.getByRole("button", { name: "근무표 만들기" }).click())).toBe("ok");

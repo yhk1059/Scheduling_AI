@@ -56,7 +56,7 @@ export function previewRange(unit: PeriodUnit): PeriodRange {
 type Notice = { kind: "clarify" | "unsupported"; text: string } | null;
 
 /**
- * 말로 적는 입력 바와 카드 목록. scope shop은 매장 조건(작성 ②, 매장 설정), scope period는 이번 근무표 예외(작성 ③, 패널 안 두 열).
+ * 말로 적는 입력 바와 카드 목록. scope shop은 매장 조건(작성 ②, 매장 설정), scope period는 이번 근무표 예외(작성 ② 아래, 패널 안 두 열).
  * pendingNote=false: 화면이 대기 카드 안내를 버튼 옆에 따로 둘 때.
  * step: 단계 화면. 제목을 두고, 요약표에 든 필요 인원은 카드에서 빼고, 이 근무표의 꺼짐과 수정본을 보여 준다.
  * summary, afterInput: 입력 바 위·아래에 놓을 영역.
@@ -304,7 +304,7 @@ export default function RulesStep({
     </p>
   );
 
-  // ③ 예외 입력: 왼쪽 입력, 오른쪽 요청 카드를 패널 하나에 둔다
+  // ② 아래 예외 입력: 왼쪽 입력, 오른쪽 요청 카드를 패널 하나에 둔다
   if (scope === "period") {
     return (
       <section className={`${ui.panel} grid grid-cols-[7fr_5fr] gap-6`}>
