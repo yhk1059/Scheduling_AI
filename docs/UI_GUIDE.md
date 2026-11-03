@@ -454,7 +454,7 @@ relative w-[30px] h-7 rounded-xs inline-flex items-center justify-center font-mo
   - CTA 띠: 강조 면(`bg-[#155E75] py-[72px]`), 왼쪽 32px 제목 두 줄 + 보조, 오른쪽 흰 버튼 [내 매장으로 시작하기] + 테두리 버튼 [데모 영상]
   - 푸터: 회색 마크 + "스케줄링 AI · 포트폴리오 프로토타입", 개인정보처리방침·GitHub 링크
   - 장식 이미지나 근거 없는 수치·후기를 넣지 않는다. 문구는 앱과 같은 "문구" 표를 따르고, 기술 설명은 "만든 방식" 섹션 하나에만 둔다(PRD 핵심 기능 9)
-- 데모 영상 대화상자(`components/DemoVideo.tsx`, ADR-022): 어두운 배경 위 `cardXl` + 그림자, `max-w-[1120px] p-4`. 머리줄은 "데모 영상" 제목 + 보조 한 줄("실제 화면이에요. 직원 링크 → 매장 조건 한 줄 → 근무표 → 확정까지 1분 안에 보여요.") + [닫기] Text. 아래 `<video controls autoplay>`(16:10, `public/demo.mp4`). 열리면 [닫기]에 포커스, Esc로 닫고, 닫히면 연 버튼으로 포커스를 되돌린다(`role="dialog"`, `aria-modal`)
+- 데모 영상 대화상자(`components/DemoVideo.tsx`, ADR-022): 어두운 배경 위 `cardXl` + 그림자, `max-w-[1120px] p-4`. 머리줄은 "데모 영상" 제목 + 보조 한 줄("실제 화면이에요. 직원 링크 → 매장 조건 → 근무표를 못 만들 때의 대안 → 확정까지 2분 안에 보여요.") + [닫기] Text. 아래 `<video controls autoplay>`(16:10, `public/demo.mp4`). 열리면 [닫기]에 포커스, Esc로 닫고, 닫히면 연 버튼으로 포커스를 되돌린다(`role="dialog"`, `aria-modal`)
 
 ## 타이포그래피
 글꼴: 본문·UI는 IBM Plex Sans KR(`font-sans`), 숫자·근무 코드·날짜·해석 결과는 IBM Plex Mono(`font-mono`).

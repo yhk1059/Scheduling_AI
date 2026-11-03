@@ -1,5 +1,5 @@
-// 데모 영상(docs/DEMO_SCENARIO.md, 한강 다이닝) 녹화. 테스트 계정의 매장을 지우고 빈 매장부터 실제 앱을 Playwright로 돌리며 녹화한다.
-// 실행: npm run dev를 띄운 채 npm run record:dining → recordings/hangang-dining.mp4 (ffmpeg 필요).
+// 랜딩 데모 영상(docs/DEMO_SCENARIO.md, 한강 다이닝) 녹화. 테스트 계정의 매장을 지우고 빈 매장부터 실제 앱을 Playwright로 돌리며 녹화한다.
+// 실행: npm run dev를 띄운 채 npm run record:dining → public/demo.mp4 (ffmpeg 필요). 화면이 바뀌면 다시 돌려 영상을 새로 만든다.
 // 직원 17명 입력, 가능 시간 19명 제출, 미리 넣는 매장 조건 8문장, LLM 대기는 녹화 뒤 잘라 낸다.
 import { mkdirSync, renameSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -15,7 +15,7 @@ import { authStorageKey, click, cursorScript, encode, env, paint, pause, type Se
 
 const APP_URL = "http://localhost:3000";
 const SIZE = { width: 1440, height: 900 };
-const OUT = "recordings/hangang-dining.mp4";
+const OUT = "public/demo.mp4";
 const SHOP_NAME = "한강 다이닝";
 
 type Hours = [string, string] | null;
@@ -358,7 +358,7 @@ async function main() {
 
   const webm = await page.video()?.path();
   if (!webm) throw new Error("녹화 파일이 없어요");
-  mkdirSync("recordings", { recursive: true });
+  mkdirSync("public", { recursive: true });
   const tmpOut = join(videoDir, "dining.mp4");
   encode(webm, tmpOut, cuts);
   renameSync(tmpOut, OUT);
