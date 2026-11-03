@@ -1,6 +1,6 @@
 "use client";
 
-// 데모 영상(ADR-022). 랜딩과 로그인 화면의 [데모 영상]가 대화상자로 연다. 영상은 public/demo.mp4(npm run record:demo로 다시 만든다).
+// 데모 영상(ADR-022). 랜딩과 로그인 화면의 [데모 영상]가 대화상자로 연다. 영상은 public/demo.mp4(npm run record:dining으로 다시 만든다).
 import { type ReactNode, useEffect, useRef, useState } from "react";
 
 import { ui } from "./ui";
@@ -53,7 +53,7 @@ function DemoVideoDialog({ onClose }: { onClose: () => void }) {
           <h2 id="demo-video-title" className={ui.sectionTitle}>
             데모 영상
           </h2>
-          <p className={`${ui.help} flex-1`}>실제 화면이에요. 직원 링크 → 매장 조건 한 줄 → 근무표 → 확정까지 1분 안에 보여요.</p>
+          <p className={`${ui.help} flex-1`}>실제 화면이에요. 직원 링크 → 매장 조건 → 근무표를 못 만들 때의 대안 → 확정까지 2분 안에 보여요.</p>
           <button ref={closeRef} type="button" onClick={onClose} className={ui.textSm}>
             닫기
           </button>

@@ -1,4 +1,4 @@
-// 랜딩 데모 영상 녹화. e2e 테스트 계정의 매장을 "한강 카페"(현실 시나리오)로 채우고, 실제 앱을 Playwright로 돌리며 녹화한다.
+// 이전 랜딩 데모 영상(한강 카페) 녹화. 지금 랜딩 영상은 record-dining.ts가 만든다. e2e 테스트 계정의 매장을 "한강 카페"(현실 시나리오)로 채우고, 실제 앱을 Playwright로 돌리며 녹화한다.
 // 실행: npm run dev를 띄운 채 npm run record:demo → public/demo.mp4 (ffmpeg 필요). 화면이 바뀌면 다시 돌려 영상을 새로 만든다.
 // 저니: 매장 홈 → ① 직원 링크 → 직원 화면(가능 시간 칠하기·제출) → ② 규칙 한 줄 → 카드 → 예외 → ③ 근무표 만들기 → 확정.
 import { mkdirSync, renameSync } from "node:fs";

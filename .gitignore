@@ -23,6 +23,3 @@ __pycache__/
 # playwright
 /test-results/
 /playwright-report/
-
-# 데모 영상 녹화 결과 (npm run record:dining)
-/recordings

@@ -244,7 +244,7 @@ export default function Home() {
                 내 매장으로 시작하기
               </Link>
             </div>
-            <p className={ui.help}>1분짜리 실제 화면이에요. 로그인 없이 볼 수 있어요.</p>
+            <p className={ui.help}>2분짜리 실제 화면이에요. 로그인 없이 볼 수 있어요.</p>
           </div>
           <HeroSequence />
         </section>

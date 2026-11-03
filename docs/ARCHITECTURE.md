@@ -16,7 +16,7 @@ lib/
 ├── csv.ts            # CSV 직렬화 (순수 함수)
 ├── types.gen.ts      # Pydantic JSON Schema에서 생성 (직접 수정 금지)
 └── samples/         # shop-12.json(샘플 매장), demo-schedule.json(랜딩 히어로 근무표, npm run gen:demo)
-public/demo.mp4       # 데모 영상 (npm run record:demo, ADR-022)
+public/demo.mp4       # 데모 영상 (npm run record:dining, ADR-022)
 api/index.py          # Vercel Python 함수 진입점 (import만 함)
 backend/              # FastAPI 앱 (무상태)
 ├── routes.py         # HTTP 계층, solver와 llm 오케스트레이션
@@ -30,7 +30,7 @@ backend/              # FastAPI 앱 (무상태)
 eval/                 # dataset.jsonl, run.py, results.md
 e2e/                  # Playwright 데모 저니 (수동 실행, 실제 API, 테스트 전용 계정, ADR-013, ADR-020)
 supabase/migrations/  # shops 테이블 + RLS, availability_links·availability_shares 테이블 + 토큰 DB 함수 (ADR-014, ADR-020, ADR-021)
-scripts/              # harness 전용 + seed.ts(수동 테스트 시드), record-demo.ts(데모 영상 녹화) — 앱 코드를 두지 않음
+scripts/              # harness 전용 + seed.ts(수동 테스트 시드), record-dining.ts(데모 영상 녹화), record-demo.ts(이전 데모 영상) — 앱 코드를 두지 않음
 ```
 
 ## 패턴
