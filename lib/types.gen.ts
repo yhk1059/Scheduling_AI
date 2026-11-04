@@ -1,4 +1,3 @@
-/* eslint-disable */
 // 자동 생성 파일. 직접 수정하지 말고 `npm run gen:types`로 다시 만든다(backend/domain/models.py 기준).
 
 export type SolveResponse = SolveOk | SolveInfeasible | SolveTimeout;
