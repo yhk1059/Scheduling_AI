@@ -20,7 +20,7 @@ from backend.domain.models import (
 
 ROOT = Path(__file__).resolve().parent.parent
 OUT = ROOT / "lib" / "types.gen.ts"
-BANNER = "/* eslint-disable */\n// 자동 생성 파일. 직접 수정하지 말고 `npm run gen:types`로 다시 만든다(backend/domain/models.py 기준)."
+BANNER = "// 자동 생성 파일. 직접 수정하지 말고 `npm run gen:types`로 다시 만든다(backend/domain/models.py 기준)."
 
 TOP_LEVEL: dict[str, Any] = {
     "ScheduleRequest": ScheduleRequest,

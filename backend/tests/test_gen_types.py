@@ -1,6 +1,6 @@
 """gen_types: 최상위 모델과 union이 이름 있는 정의로 스키마에 들어가는지 확인한다."""
 
-from backend.gen_types import build_schema
+from backend.gen_types import BANNER, build_schema
 
 TOP_LEVEL = [
     "ScheduleRequest",
@@ -29,3 +29,8 @@ def test_unions_reference_their_members():
     assert not {"CountRule", "SequenceRule", "BalanceRule", "CountParams"} & set(defs)
     refs = {item["$ref"].rsplit("/", 1)[-1] for item in defs["SolveResponse"]["oneOf"]}
     assert refs == {"SolveOk", "SolveInfeasible", "SolveTimeout"}
+
+
+def test_banner_keeps_eslint_on():
+    # 생성 결과도 린트를 받는다. 쓰이지 않는 disable 주석은 eslint 경고가 된다.
+    assert "eslint-disable" not in BANNER
