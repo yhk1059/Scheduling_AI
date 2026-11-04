@@ -9,7 +9,7 @@ import { Mark } from "@/components/Wordmark";
 import { PRODUCT_NAME } from "@/lib/product";
 
 // 저장소를 옮기면 이 한 줄만 바꾼다.
-const REPO_URL = "https://github.com/yhk1059/harness_framework";
+const REPO_URL = "https://github.com/yhk1059/Scheduling_AI";
 
 const container = "mx-auto w-full max-w-[1360px] px-10";
 const section = "border-t border-[#E2E2DC] py-24";
