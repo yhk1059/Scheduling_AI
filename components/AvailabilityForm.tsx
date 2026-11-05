@@ -62,8 +62,11 @@ export default function AvailabilityForm({ token }: { token: string }) {
   return <LoadMessage kind={load.kind} onRetry={retry} />;
 }
 
-/** 맨 위 줄: 작은 워드마크 + 화면 이름. */
+/** 맨 위 줄: 작은 워드마크 + 화면 이름. 탭 제목도 같은 이름으로 맞춘다(라우트 하나가 가능 시간 입력과 근무표 두 상태를 가진다). */
 export function TopLine({ label = "가능 시간 입력" }: { label?: string }) {
+  useEffect(() => {
+    document.title = `${label} · 스케줄링 AI`;
+  }, [label]);
   return (
     <div className="flex h-5 items-center gap-1.5">
       <Wordmark size="small" />

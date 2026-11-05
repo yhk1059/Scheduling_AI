@@ -147,6 +147,7 @@ function WeekCard({ name, week, shifts, config }: { name: string; week: Employee
                 {WEEKDAYS[d.weekday]} {month}/{dom}
               </span>
               <span
+                role="img"
                 aria-label={`${name} ${month}월 ${dom}일 ${d.code}`}
                 className={`${CELL} ${off ? codeClass(OFF_CODE, d.weekend, config) : codeClass(d.code, d.weekend, config)}`}
               >
