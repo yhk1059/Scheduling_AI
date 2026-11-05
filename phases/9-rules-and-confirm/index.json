@@ -53,7 +53,10 @@
     {
       "step": 6,
       "name": "confirm-dialog",
-      "status": "pending"
+      "status": "completed",
+      "summary": "components/ScheduleStep.tsx만 변경. ScheduleStep: 상태 confirmOpen, ③의 [확정](비활성 조건 busy||blocked||outdated 그대로)은 onConfirm 대신 기존 Dialog를 연다 — 제목 '근무표를 확정할까요?', 본문 한 <p>에 '확정하면 직원 링크가 잠겨요.' <br/> '이후 변경은 변경 입력으로만 할 수 있어요.', secondary [취소](닫기), primary [확정](danger 없음) → onConfirm() 순서(가능 시간 다시 읽기 → 링크 잠금 → confirm) 그대로, 진행 중(confirming)이면 primary 레이블 '확정하는 중…'·비활성. 이제 '확정' 이름 버튼이 화면 [확정]과 대화상자 [확정] 둘이 된다(e2e·record-dining은 마지막 step에서 동기화). role=dialog·aria-modal·Esc·포커스 복귀(닫히면 화면 [확정]으로)는 Dialog 재사용. 실패 시 대화상자는 닫히고 기존 ToastAlert의 [다시 시도]는 대화상자 없이 onConfirm을 다시 부른다. ProposalCard: 검증 결과 줄 아래 text-xs #66665E 새 줄 '이번 근무표에만 적용돼요. 매장 조건은 그대로예요', 버튼 줄([무시]+[수락]) 그대로. ConfirmedPeriod [다시 확정]·Dialog.tsx 변경 없음. 결정: 대화상자는 onConfirm이 끝날 때(.finally — 성공·실패·가능 시간 변경으로 중단 모두) 닫는다(바로 닫으면 '확정하는 중…'이 보이지 않으므로); 진행 중에는 [취소]도 비활성(Esc는 Dialog 규칙대로 닫음, 진행 중 확정은 계속됨). 수동 브라우저 체크는 하지 않음(로그인·seed 필요) — 확인 못 함.",
+      "started_at": "2026-11-05T20:36:41+0900",
+      "completed_at": "2026-11-05T20:38:34+0900"
     },
     {
       "step": 7,
