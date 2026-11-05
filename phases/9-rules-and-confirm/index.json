@@ -29,7 +29,10 @@
     {
       "step": 3,
       "name": "rule-card-edit",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-11-05T20:21:48+0900",
+      "summary": "lib/store.ts: export type Comparison = \"ge\"|\"eq\", comparisonOf(c) → Comparison|null, withRuleComparison(c, op) → ConstraintSpec|null(normalizeRule, then.op와 값 label만 바꿈: eq면 \"최소 \" 접두사 제거, ge면 없을 때 붙임), store 액션 setRuleComparison(id, op)(editShop)·setRequestComparison(periodId, id, op)(editPeriod) — setRuleValue처럼 대기 카드는 inputVersion 없이, 적용된 것은 올리고, 바꿀 수 없으면 무시. 열린 모양: ruleShape kind count + require + when 없음 + then이 Cmp 하나 + offset 없음 + 오른쪽이 values에 있는 값 + op ge·eq(범위·le·최대 연속·순서·고르게·조건부·칸 고정은 null). 테스트: store.test 4개, wording.test 1개(\"평일마다 오픈 2명\" → \"… 2명 이상\"). 화면: ConstraintCard [수정] 폼에서 comparisonOf가 null이 아니면 숫자 입력 오른쪽에 select(sr-only label \"비교\", 옵션 \"이상\"/\"정확히\", ui.input h-8! px-2), 안내 문장 \"값과 이상/정확히만 바꿀 수 있어요. 다른 건 말로 다시 적어 주세요\"(select 없는 카드는 \"바꾸려면 말로 다시 적어 주세요\" 그대로). [저장] 시 값 먼저, op가 바뀌었을 때만 비교를 부름. 결정: 비교를 바꾸면 값 변경처럼 그 카드의 예시 판정을 지운다; select의 초기값은 [수정]을 누를 때의 comparisonOf, [취소]하면 버림. 수동 브라우저 체크는 하지 않음(로그인 필요).",
+      "completed_at": "2026-11-05T20:25:04+0900"
     },
     {
       "step": 4,
