@@ -4,6 +4,7 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
 import type { AvailabilitySlots } from "./availability";
 import type { PeriodRange } from "./period";
+import type { ShiftDef } from "./types.gen";
 
 const URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -225,6 +226,30 @@ export async function getAvailabilityRoster(token: string): Promise<Availability
   if (rows.length === 0) return null;
   const { shop_name, period_start, period_length, locked, shifts } = rows[0];
   return { shop_name, period_start, period_length, locked, shifts: shifts ?? [], employees: rows };
+}
+
+export interface ConfirmedSchedule {
+  shop_name: string;
+  period_start: string;
+  period_length: number;
+  confirmed_at: string;
+  /** 기간 안 인덱스(1..length) */
+  holidays: number[];
+  /** 매장 근무 형태 전부(휴무·꺼진 것·복합 코드 포함) */
+  shifts: ShiftDef[];
+  /** 확정 당시 명단 순서, 배정이 있는 직원만. 직원 id는 없다 */
+  rows: { name: string; codes: string[] }[];
+}
+
+/** 공용 링크로 마지막 확정본을 읽는다. 없는 링크·확정 전이면 null. */
+export async function getConfirmedSchedule(token: string): Promise<ConfirmedSchedule | null> {
+  const { data, error } = await supabase().rpc("get_confirmed_schedule", { p_token: token });
+  // 22P02: 토큰 형식이 아니다
+  if (error?.code === "22P02") return null;
+  if (error) throw new Error(error.message);
+  const row = (data as ConfirmedSchedule[])[0];
+  if (!row) return null;
+  return { ...row, holidays: row.holidays ?? [], shifts: row.shifts ?? [], rows: row.rows ?? [] };
 }
 
 export interface EmployeeAvailability {
