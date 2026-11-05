@@ -42,7 +42,8 @@
     },
     {
       "dir": "9-rules-and-confirm",
-      "status": "pending"
+      "status": "blocked",
+      "blocked_at": "2026-11-05T20:42:12+0900"
     }
   ]
 }
