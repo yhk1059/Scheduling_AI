@@ -10,6 +10,7 @@ import {
   addRoster,
   applyAllPending,
   clearAccount,
+  confirmSchedule,
   EMPLOYEE_COUNT,
   expectHardRulesHold,
   expectNoDevTerms,
@@ -208,7 +209,7 @@ test("S15. 피크·더블 근무표 → 다음 근무표 시작일 미루기", a
   await expectNoDevTerms(page, "③ 근무표(피크·더블)");
 
   // 확정 → 홈: 다음 근무표는 이어지는 날(12/15)부터
-  await page.getByRole("button", { name: "확정", exact: true }).click();
+  await confirmSchedule(page);
   await expect(page.getByRole("button", { name: "확정", exact: true })).toHaveCount(0);
   await page.getByRole("button", { name: "← 근무표 목록" }).click();
   await expect(primaryButtons(page)).toHaveCount(1);

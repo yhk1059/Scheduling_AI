@@ -13,6 +13,8 @@ lib/
 ├── supabase.ts       # Google 로그인, 매장 문서 load/save/delete, 직원 링크 — 얇은 래퍼
 ├── api.ts            # /api/py/* fetch 래퍼
 ├── roster-import.ts  # 지난 근무(이월) 붙여넣기 파싱 (순수 함수)
+├── coverage-conflict.ts # 대기 필요 인원 카드와 함께 지킬 수 없는 기존 필요 인원 규칙 찾기 (순수 함수)
+├── confirmed-view.ts # 직원 확정 근무표 보기: 내 근무 날짜·근무조·주별 합계 (순수 함수)
 ├── csv.ts            # CSV 직렬화 (순수 함수)
 ├── types.gen.ts      # Pydantic JSON Schema에서 생성 (직접 수정 금지)
 └── samples/         # shop-12.json(샘플 매장), demo-schedule.json(랜딩 히어로 근무표, npm run gen:demo)
@@ -29,7 +31,7 @@ backend/              # FastAPI 앱 (무상태)
 └── tests/
 eval/                 # dataset.jsonl, run.py, results.md
 e2e/                  # Playwright 데모 저니 (수동 실행, 실제 API, 테스트 전용 계정, ADR-013, ADR-020)
-supabase/migrations/  # shops 테이블 + RLS, availability_links·availability_shares 테이블 + 토큰 DB 함수 (ADR-014, ADR-020, ADR-021)
+supabase/migrations/  # shops 테이블 + RLS, availability_links·availability_shares 테이블 + 토큰 DB 함수(가능 시간, 확정 근무표) (ADR-014, ADR-020, ADR-021, ADR-023)
 scripts/              # harness 전용 + seed.ts(수동 테스트 시드), record-dining.ts(데모 영상 녹화), record-demo.ts(이전 데모 영상) — 앱 코드를 두지 않음
 ```
 
@@ -47,7 +49,7 @@ scripts/              # harness 전용 + seed.ts(수동 테스트 시드), recor
 - **결정적 대체 경로**: explain이 실패해도 충돌 제약의 `source_text`와 [이번 기간만 끄기]로 진행할 수 있다.
 - **가명 처리**: LLM 호출 전에 직원 이름을 `E01` 같은 가명으로 바꾸고, 응답에서 되돌린다.
 - **가능 시간**: 직원이 입력한 시간대를 `lib/availability.ts`가 근무조 시각과 비교해, 시각을 완전히 덮지 못하는 칸을 금지하는 반드시 규칙으로 바꾼다. 규칙 id는 `avail-`로 시작하고, 요청에 담을 때만 만들며 매장 조건에 저장하지 않는다. LLM을 거치지 않는다. explain은 이 규칙의 완화를 거부한다. 고정 근무처럼 규칙·요청 200개 상한과 따로 세되, 이 모양(사람마다 고른 칸의 수 = 0인 반드시 규칙)일 때만 그렇다. 칸 고정은 가능 시간보다 우선하므로 고정한 칸은 규칙에서 뺀다.
-- **직원 링크**: `availability_shares`에 근무표마다 공용 토큰 한 행을, `availability_links`에 직원·근무표마다 한 행을 둔다. anon에게 테이블 권한을 주지 않고 `security definer` DB 함수 `get_availability_roster(공용 토큰)`, `get_availability(직원 토큰)`, `submit_availability(직원 토큰, slots)`만 연다. 명단 함수는 이름, 직원 토큰, 제출 여부를 돌려주고 칸은 돌려주지 않는다. 제출 함수는 잠긴 행을 거부한다. 매니저는 RLS로 자기 매장 행만 읽고 쓴다.
+- **직원 링크**: `availability_shares`에 근무표마다 공용 토큰 한 행을, `availability_links`에 직원·근무표마다 한 행을 둔다. anon에게 테이블 권한을 주지 않고 `security definer` DB 함수 `get_availability_roster(공용 토큰)`, `get_availability(직원 토큰)`, `submit_availability(직원 토큰, slots)`, `get_confirmed_schedule(공용 토큰)`만 연다. 명단 함수는 이름, 직원 토큰, 제출 여부를 돌려주고 칸은 돌려주지 않는다. 제출 함수는 잠긴 행을 거부한다. 확정 근무표 함수는 `shops.data`에서 그 근무표의 마지막 확정본을 읽어 매장 이름, 날짜, 확정 시각, 공휴일, 근무조, 직원 이름별 근무 코드만 돌려준다(직원 id와 가능 시간 칸은 돌려주지 않는다, ADR-023). 매니저는 RLS로 자기 매장 행만 읽고 쓴다.
 - **수동 조정**: 칸 수정은 "고정 배정" 제약이 된다. 솔버 경로는 하나다.
 - **매장 구조**: 근무 코드(이름, 시작·끝 시각, 실근무 시간, 세는 근무조)는 `ShopConfig`이고 매 요청에 담는다. 칸마다 코드 하나이며, 더블은 복합 코드다. 시작·끝 시각은 솔버가 직접 쓰지 않고 가능 시간 판정, LLM 문맥, 화면에 쓴다. 자정을 넘기는 근무조는 받지 않는다. 시간대 필요 인원은 LLM이 그 시간을 덮는 코드 집합을 세는 규칙으로 세운다(ADR-020). 코드 참조(제약, 이월, 이전 해, 이력)는 모두 `config`로 검증한다.
 - **제약 단일 표현**: 필요 인원(폼이든 말이든)도 날마다 범위의 규칙 식이고 `default: true`(기본 규칙)다. 별도의 staffing 필드는 없다. 모든 제약은 `enabled` 플래그를 가진다. [이번 기간만 끄기]는 그 기간의 꺼진 제약 id 목록에 넣고, 매장 조건 원본은 바꾸지 않는다. 요청을 보낼 때 이 목록으로 `enabled=false`를 채운다.
@@ -71,6 +73,7 @@ scripts/              # harness 전용 + seed.ts(수동 테스트 시드), recor
 가능 시간: 매니저 store → availability_links·availability_shares 행 생성(토큰) → 공용 링크 복사
            직원 /a/{공용 토큰} → 이름 선택(get_availability_roster) → supabase-js rpc(get·submit_availability) → availability_links
            매니저 → RLS로 행 읽기 → lib/availability.ts → avail- 규칙을 요청에 담아 /solve
+           확정 뒤 직원 /a/{공용 토큰} → 이름 선택 → get_confirmed_schedule(shops.data의 마지막 확정본) → lib/confirmed-view.ts
 
 저장:      store ↔ supabase-js ↔ shops(data jsonb, RLS owner_id = auth.uid())
            (backend/는 DB에 접근하지 않는다. 계산 요청은 지금처럼 store 상태를 통째로 보낸다)

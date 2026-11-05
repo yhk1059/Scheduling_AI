@@ -25,7 +25,7 @@ test("S1. 랜딩 → 데모 영상 → 로그인 → 매장 준비", async ({ pa
   page.on("request", onRequest);
 
   await page.goto("/");
-  await expect(page.getByRole("heading", { level: 1 })).toHaveText(/복잡한 근무표,\s*이제 스케줄링 AI에게 맡기세요/);
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText(/매장 조건은 말로,\s*근무표는 버튼 하나로/);
   const demoCta = page.getByRole("button", { name: "데모 영상" });
   const ownCta = page.getByRole("link", { name: "내 매장으로 시작하기" });
   // 첫 화면과 CTA 띠에 같은 버튼이 있고, [내 매장으로 시작하기]는 모두 앱으로 간다

@@ -13,6 +13,7 @@ import {
   CARRY_OVER_DAYS,
   clearAccount,
   confirmedGrid,
+  confirmSchedule,
   EMPLOYEE_COUNT,
   expectedHistory,
   expectHardRulesHold,
@@ -87,7 +88,8 @@ test("S3. 운영 중인 매장: 다음 근무표 작성과 확정", async () => 
   await page.goto("/app");
   await loginAsTestUser(page);
   await expect(page.getByRole("heading", { name: "성수 카페", level: 1 })).toBeVisible();
-  await expect(page.getByRole("main")).toContainText("직원 12명 · 매장 조건 7개 · 4주 단위");
+  // 매장 조건 7개 + 불러올 때 더해지는 기본 규칙 "근무 수는 고르게"(최대 연속 근무는 rule-max-run과 같은 모양이라 더하지 않는다)
+  await expect(page.getByRole("main")).toContainText("직원 12명 · 매장 조건 8개 · 4주 단위");
   const operating = sectionWith(OCT_NAME);
   await expect(operating.getByText("운영 중", { exact: true })).toBeVisible();
   await expect(operating).toContainText("2026.10.5 – 11.1");
@@ -124,7 +126,7 @@ test("S3. 운영 중인 매장: 다음 근무표 작성과 확정", async () => 
   await page.getByRole("button", { name: "접기" }).first().click();
   await expect(page.getByRole("button", { name: "링크 복사" })).toHaveCount(1);
 
-  // ② 매장 조건: 요약표(D2)와 적용된 규칙 카드 7장, 그 아래 펼쳐진 예외 패널에 요청 3개
+  // ② 매장 조건: 요약표(D2)와 적용된 규칙 카드 8장(기본 규칙 "근무 수는 고르게" 포함), 그 아래 펼쳐진 예외 패널에 요청 3개
   await page.getByRole("button", { name: "다음", exact: true }).click();
   await expect(stepper.locator('[aria-current="step"]')).toContainText("매장 조건");
   await expect(page.getByRole("heading", { name: "매장 조건", exact: true })).toBeVisible();
@@ -132,7 +134,7 @@ test("S3. 운영 중인 매장: 다음 근무표 작성과 확정", async () => 
   await expect(openRow).toContainText("09:00~15:00");
   await expect(page.getByRole("textbox", { name: "예외 입력" })).toBeVisible();
   await expect(pendingCards(page)).toHaveCount(0);
-  await expect(appliedCards(page)).toHaveCount(7 + 3);
+  await expect(appliedCards(page)).toHaveCount(8 + 3);
   for (const summary of ["이영희 · 11/10~11/12 · 휴무", "박민수 · 주말·공휴일 · 마감 피하기", "정유진 · 11/20 · 오픈 희망"]) {
     await expect(appliedCards(page).filter({ hasText: summary })).toHaveCount(1);
   }
@@ -189,8 +191,8 @@ test("S3. 운영 중인 매장: 다음 근무표 작성과 확정", async () => 
   await expect(primaryButtons(page)).toHaveText("확정");
   await expectNoDevTerms(page, "③ 근무표");
 
-  // [확정] → 확정 근무표
-  await page.getByRole("button", { name: "확정", exact: true }).click();
+  // [확정] → 확인 대화상자 [확정] → 확정 근무표
+  await confirmSchedule(page);
   await expect(page.getByRole("button", { name: "CSV 받기" })).toBeVisible();
   await expect(page.getByRole("button", { name: "확정", exact: true })).toHaveCount(0);
   await expect(page.getByRole("heading", { level: 1 }).locator("..")).toContainText("확정");
