@@ -627,9 +627,14 @@ test("S10. 근무표 없음 → 설명과 검증된 제안", async () => {
 
   const stale = page.getByRole("status").filter({ hasText: "입력이 바뀌었어요. 다시 만들어 주세요" });
   await expect(stale).toBeVisible();
+  // 지금 조건으로 만든 근무표가 아니면 확정하지 않는다
+  const confirmButton = page.getByRole("button", { name: "확정", exact: true });
+  await expect(confirmButton).toBeDisabled();
+  await expect(page.getByText("지금 조건으로 만든 근무표만 확정할 수 있어요")).toBeVisible();
   expect(await solve(() => stale.getByRole("button", { name: "다시 만들기" }).click())).toBe("infeasible");
   const panel = page.locator("section").filter({ hasText: "이 조건으로는 근무표를 만들 수 없어요" });
   await expect(panel.getByText("근무표 없음", { exact: true })).toBeVisible();
+  await expect(confirmButton).toBeDisabled();
   await expect(panel.getByRole("heading", { name: "함께 지킬 수 없는 규칙" })).toBeVisible();
   const explanation = panel.locator("p.whitespace-pre-line");
   await expect(explanation).not.toBeEmpty();
@@ -668,6 +673,7 @@ test("S10. 근무표 없음 → 설명과 검증된 제안", async () => {
 
   await expect(page.getByText("이 조건으로는 근무표를 만들 수 없어요")).toHaveCount(0);
   await expect(page.getByText("반드시 규칙을 모두 지켰어요", { exact: true })).toBeVisible();
+  await expect(confirmButton).toBeEnabled();
   await expectHardRulesHold(page, WEEK, lastSolve);
   expect(leeLeave(lastSolve!.constraints ?? [])?.enabled, "이영희 휴가가 켜져 있음").not.toBe(false);
   expect((await readGrid(page, WEEK))["이영희"].slice(1, 4)).toEqual(["O", "O", "O"]);
@@ -755,8 +761,10 @@ test("S12. 확정 → 확정 근무표 → 직원 링크 잠김", async ({ brows
   // 잠긴 직원 화면
   const staff = await openFlow(browser, { width: 1280, height: 800 });
   await staff.page.goto(shareLink);
+  await expect(staff.page.getByText("이미 확정된 근무표예요. 입력한 시간은 볼 수만 있어요")).toBeVisible();
   await staff.page.getByRole("button", { name: "박민수 제출함" }).click();
   await expect(staff.page.getByText("이미 확정된 근무표예요")).toBeVisible();
+  await expect(staff.page.getByText("제출한 뒤에도 이 링크로 다시 고칠 수 있어요.")).toHaveCount(0);
   await expect(staff.page.locator('main button[aria-pressed="true"]')).toHaveCount(34);
   await expect(staff.page.getByRole("button", { name: "제출" })).toHaveCount(0);
   const empty = staff.page.getByRole("button", { name: "11월 2일 09:00~09:30" });

@@ -318,9 +318,11 @@ export function ScheduleBody({
   const { resultVersion } = period;
   // 변환 전 결과는 희망 반영률·못 지킨 규칙을 셀 수 없어 숨긴다(★12)
   const legacy = period.result !== null && isLegacyResult(period.result);
-  const result = period.result && withStats(period.result, shop.config, period, holidays);
-  const { outcome } = sv;
   const confirmed = period.versions.at(-1)?.assignments ?? null;
+  const solved = period.result && withStats(period.result, shop.config, period, holidays);
+  // 확정본이 없으면 diff는 직전 결과와의 차이라 "확정본에서 바뀐 칸"으로 보여 주지 않는다
+  const result = solved && confirmed === null ? { ...solved, diff: null } : solved;
+  const { outcome } = sv;
   const history = new Map(historyLoadFor(raw, shop.config).map((h) => [h.employee_id, { closings: h.closings, weekends: h.weekends }]));
   // 운영 중인 기간에서 오늘 이전 날짜는 잠긴다(toScheduleRequest의 pastDayLocks와 같은 범위)
   const todayDay = dayOfDate(period, now);
@@ -449,6 +451,7 @@ export default function ScheduleStep() {
   const shop = useAppStore((s) => s.shop);
   const period = useAppStore(currentPeriod);
   const periods = useAppStore((s) => s.periods);
+  const inputVersion = useAppStore((s) => s.inputVersion);
   const confirm = useAppStore((s) => s.confirm);
   const go = useAppStore((s) => s.go);
   const sv = useSolve(period?.id ?? "");
@@ -502,6 +505,8 @@ export default function ScheduleStep() {
 
   const remake = busy || employees.length === 0;
   const blocked = availabilityChanged(period);
+  // 지금 입력으로 만든 근무표가 아니면(조건이 바뀌었거나, 다시 만들어도 근무표가 없으면) 확정하지 않는다
+  const outdated = period.resultVersion !== inputVersion;
 
   return (
     <div className="flex flex-col gap-5">
@@ -554,7 +559,11 @@ export default function ScheduleStep() {
               </div>
             ) : (
               <div className="flex items-center gap-2">
-                {blocked && <p className={`${ui.help} mr-1`}>가능 시간이 바뀌어 다시 만들어야 확정할 수 있어요</p>}
+                {blocked ? (
+                  <p className={`${ui.help} mr-1`}>가능 시간이 바뀌어 다시 만들어야 확정할 수 있어요</p>
+                ) : (
+                  outdated && <p className={`${ui.help} mr-1`}>지금 조건으로 만든 근무표만 확정할 수 있어요</p>
+                )}
                 <button type="button" onClick={() => downloadCsv(period, employees, result)} disabled={busy} className={ui.text}>
                   CSV 받기
                 </button>
@@ -562,7 +571,7 @@ export default function ScheduleStep() {
                   {loading && <Spinner />}
                   {loading ? "만드는 중…" : "다시 만들기"}
                 </button>
-                <button type="button" onClick={() => void onConfirm()} disabled={busy || blocked} className={ui.primaryLg}>
+                <button type="button" onClick={() => void onConfirm()} disabled={busy || blocked || outdated} className={ui.primaryLg}>
                   확정
                 </button>
               </div>

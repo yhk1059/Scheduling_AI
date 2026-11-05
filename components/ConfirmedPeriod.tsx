@@ -35,6 +35,7 @@ export default function ConfirmedPeriod() {
   const shop = useAppStore((s) => s.shop);
   const period = useAppStore(currentPeriod);
   const periods = useAppStore((s) => s.periods);
+  const inputVersion = useAppStore((s) => s.inputVersion);
   const confirm = useAppStore((s) => s.confirm);
   const revertToConfirmed = useAppStore((s) => s.revertToConfirmed);
   const removeRequest = useAppStore((s) => s.removeRequest);
@@ -64,6 +65,8 @@ export default function ConfirmedPeriod() {
   const lastVersion = period.versions.at(-1);
   const unconfirmed = hasUnconfirmedChanges(period);
   const revertable = canRevertToConfirmed(period);
+  // 지금 입력으로 만든 근무표가 아니면(다시 만들어도 근무표가 없으면) 다시 확정하지 않는다
+  const outdated = period.resultVersion !== inputVersion;
   const ofChange = (c: { id: string }) => changeIds.includes(c.id);
   const changeCards = cardsInOrder(period.pendingRequests.filter(ofChange), period.requests.filter(ofChange), period.cardOrder);
   // 다시 만들기가 끝나 결과에 반영됐을 때만 그렇게 적는다
@@ -222,8 +225,9 @@ export default function ConfirmedPeriod() {
                 <button type="button" onClick={csv} disabled={busy} className={!ended && (unconfirmed || revertable) ? ui.text : ui.secondary}>
                   CSV 받기
                 </button>
+                {!ended && unconfirmed && outdated && <p className={`${ui.help} mr-1`}>지금 조건으로 만든 근무표만 확정할 수 있어요</p>}
                 {!ended && unconfirmed && (
-                  <button type="button" onClick={reconfirm} disabled={busy} className={ui.primaryLg}>
+                  <button type="button" onClick={reconfirm} disabled={busy || outdated} className={ui.primaryLg}>
                     다시 확정
                   </button>
                 )}
