@@ -77,7 +77,10 @@
     {
       "step": 9,
       "name": "e2e-sync",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-11-05T20:55:37+0900",
+      "summary": "e2e 19개 전부 통과(npx tsc·lint·npm test 417·build·test:e2e). test-helpers: confirmSchedule(page)(화면 [확정] → dialog '근무표를 확정할까요?'의 [확정]), readCells(scope, period)(보기 전용 div/span aria-label 칸 읽기, readGrid와 같은 파서 gridFromLabels), applyAllPending의 순서 검사는 '기존 규칙 대체' 카드 수만큼 대체된 카드가 빠지는 것을 허용(남은 카드 순서는 그대로 비교). spec: S3·S15·S12 확정은 대화상자 경유; S3·S16 '매장 조건 7개'→'8개', S3 ② 적용 카드 7+3→8+3, S16 저장 규칙 id = D3 13개 + fair-balance; S8 ② 시작 카드 0→공정성 기본 2장, R2 카드 셀렉터를 원문 '5일 넘게'로(fair-max-run과 '연속 근무'가 겹침), R2가 같은 모양이면 fair-max-run 대체(이번 실행 true, 기록 annotation), 적용 카드 수 = R1~R4 + 남은 fair-*, ruleCount도 같게; S10 제안 카드 안내 줄 검사, 8-b면 '끈 규칙 n개' 배지·'이번 근무표에서 끈 규칙' 칸·disabledIds n개; S12 잠긴 직원 화면은 이름 고르기 문구·'제출함' 없음 → [박민수] → h1 '한강 카페 · 박민수님의 근무표', 가능 시간 칸·[제출] 없음, '내 근무'·'전체 근무표' 칸이 confirmedGrid와 같음(submit_availability P0001 거부 검사 유지); S13 [끄기]/꺼짐 → [매장 조건에서 끄기]/'매장 조건에서 꺼짐'; S1 랜딩 h1 기대값을 '매장 조건은 말로, 근무표는 버튼 하나로'로(이번 phase 전 커밋 4c25d8b가 바꾼 문구, e2e·문서가 안 따라감). S18은 폼으로 9/9(정확히)라 문장 변경 불필요. 앱 코드 수정 없음. scripts/record-dining.ts: [확정] 뒤 대화상자 [확정] 클릭 추가 — public/demo.mp4 재녹화 필요. 문서: BROWSER_TEST_SCENARIOS(테스트 데이터에 '공정성 기본 규칙' 절, D3 14개/8개, S1·S3·S8·S10·S12·S13·S15·S16·S18), UI_GUIDE(③ 확정 대화상자, 잠긴 뒤 직원 화면, 매장 조건 탭 기본 규칙·충돌 경고, 배지 2종, [수정] 이상/정확히, 제안 카드 안내 줄, 꺼진 카드 두 종류와 버튼 순서, 대화상자, 요약 지표 새 칸, 문구 표 행), PRD(기본 규칙 이상/정확히·공정성, J2 직원 열람·③ 확정 확인, J8, MVP 제외에서 직원용 근무표 열람 삭제), ARCHITECTURE(get_confirmed_schedule, 데이터 흐름, coverage-conflict.ts·confirmed-view.ts), ADR-023 추가, README 확정 문장. 남긴 문제: scripts/record-demo.ts(이전 영상)의 [확정] 클릭도 대화상자를 거치지 않아 돌리면 멈춤(범위 밖이라 그대로); EmployeeSchedule '내 근무' 칸은 role 없는 span에 aria-label(e2e는 CSS로 읽어 통과, 접근성 개선 후보). 결정: 실행 전 e2e 로그인 플래그 없이 떠 있던 dev 서버(17:54 시작, next·uvicorn)를 끄고 Playwright가 띄우게 함; R2 대체 여부는 LLM이 근무를 코드 집합으로 세우면 달라질 수 있어 조건부로 기대값을 정함.",
+      "completed_at": "2026-11-05T21:05:56+0900"
     }
   ],
   "created_at": "2026-11-05T20:00:27+0900"
