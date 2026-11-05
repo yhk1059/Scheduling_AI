@@ -60,6 +60,10 @@ body {
 .hero-cells .grid:not(:first-child) > span:not(:first-child) {
   animation: hero-fade 200ms ease-out 5s backwards;
 }
+/* 근무표 카드는 규칙 카드 다음에 나타난다. 그 전까지 바 아래가 비어 있는 것이 "아직 없음"으로 읽힌다 */
+.hero-table {
+  animation: hero-rise 240ms ease-out 2.3s backwards;
+}
 .hero-badge {
   animation: hero-rise 240ms ease-out 5.3s backwards;
 }

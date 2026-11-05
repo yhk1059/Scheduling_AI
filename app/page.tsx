@@ -11,9 +11,9 @@ import { PRODUCT_NAME } from "@/lib/product";
 // 저장소를 옮기면 이 한 줄만 바꾼다.
 const REPO_URL = "https://github.com/yhk1059/Scheduling_AI";
 
-const container = "mx-auto w-full max-w-[1360px] px-10";
-const section = "border-t border-[#E2E2DC] py-24";
-const sectionTitle = "text-[32px] leading-[1.25] font-semibold tracking-[-0.02em] text-[#1B1B18]";
+const container = "mx-auto w-full max-w-[1360px] px-5 lg:px-10";
+const section = "border-t border-[#E2E2DC] py-16 lg:py-24";
+const sectionTitle = "text-[26px] leading-[1.25] lg:text-[32px] font-semibold tracking-[-0.02em] text-[#1B1B18]";
 const lead = "max-w-[640px] text-base leading-relaxed text-[#3D3D38]";
 const body = "text-sm leading-relaxed text-[#3D3D38]";
 
@@ -30,7 +30,7 @@ function SectionHead({ eyebrow, title, children }: { eyebrow: string; title: str
 /** "지금" 쪽: 메신저 말풍선과 메모. 글자만 둔다. */
 function Before({ lines }: { lines: string[] }) {
   return (
-    <div className="flex flex-col items-start gap-2 rounded-lg bg-[#EFEFEB] p-5">
+    <div className="flex flex-col items-start gap-2 self-start rounded-lg bg-[#EFEFEB] p-5">
       <span className="text-xs font-medium text-[#66665E]">지금</span>
       {lines.map((line) => (
         <p key={line} className="rounded-lg bg-white px-3 py-2 text-sm text-[#3D3D38]">
@@ -43,7 +43,7 @@ function Before({ lines }: { lines: string[] }) {
 
 function Arrow() {
   return (
-    <svg aria-hidden="true" viewBox="0 0 24 24" className="size-5 self-center justify-self-center text-[#66665E]" fill="none" stroke="currentColor" strokeWidth={1.8}>
+    <svg aria-hidden="true" viewBox="0 0 24 24" className="size-5 self-center justify-self-center text-[#66665E] max-lg:rotate-90" fill="none" stroke="currentColor" strokeWidth={1.8}>
       <path d="M4 12h16M14 6l6 6-6 6" />
     </svg>
   );
@@ -170,10 +170,10 @@ function BarFragment() {
 }
 
 function SummaryFragment() {
-  const item = "flex flex-col gap-1 border-r border-[#E2E2DC] px-5 py-3.5 last:border-r-0";
+  const item = "flex flex-col gap-1 border-[#E2E2DC] px-5 py-3.5 max-lg:border-b max-lg:last:border-b-0 lg:border-r lg:last:border-r-0";
   const label = "text-xs font-medium text-[#66665E]";
   return (
-    <div className="flex items-stretch rounded-lg border border-[#E2E2DC] bg-white">
+    <div className="flex flex-col rounded-lg border border-[#E2E2DC] bg-white lg:flex-row lg:items-stretch">
       <div className={item}>
         <span className={label}>결과</span>
         <span className="flex h-7 items-center">
@@ -204,7 +204,7 @@ const STEPS = [
     fragment: <BarFragment />,
   },
   {
-    title: "근무표 만들기와 막힌 이유",
+    title: "근무표 만들기",
     body: "버튼 하나로 근무표를 만들어요. 막히면 어떤 규칙끼리 부딪히는지 설명하고, 실제로 근무표가 나오는 해결책만 보여 줘요.",
     fragment: <SummaryFragment />,
   },
@@ -239,24 +239,24 @@ export default function Home() {
       </header>
 
       <main>
-        <section className={`${container} grid grid-cols-[minmax(0,5fr)_minmax(0,7fr)] items-center gap-14 py-[88px]`}>
+        <section className={`${container} grid grid-cols-1 gap-10 py-12 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:items-center lg:gap-14 lg:py-[88px]`}>
           <div className="flex flex-col gap-6">
-            <p className={ui.eyebrow}>{PRODUCT_NAME} · 매장 직원 근무표</p>
-            <h1 className="text-[30px] leading-[1.15] font-bold tracking-[-0.03em] break-keep text-[#1B1B18] xl:text-[38px]">
-              복잡한 근무표,
+            <p className={ui.eyebrow}>카페·음식점 매니저를 위한 근무표</p>
+            <h1 className="text-[34px] leading-[1.15] font-bold tracking-[-0.03em] break-keep text-[#1B1B18] lg:text-[42px] xl:text-[48px]">
+              매장 조건은 말로,
               <br />
-              이제 {PRODUCT_NAME}에게 맡기세요
+              근무표는 버튼 하나로
             </h1>
-            <p className="text-base leading-relaxed text-[#3D3D38]">
+            <p className="text-[17px] leading-relaxed text-[#3D3D38]">
               직원은 링크로 가능 시간을 칠하고, 매니저는 매장 조건을 말로 적어요. 막히면 이유와 해결책을 알려 드려요.
             </p>
-            <div className="flex items-center gap-2">
-              <DemoVideoButton className={ui.secondaryXl}>데모 영상</DemoVideoButton>
+            <div className="flex flex-wrap items-center gap-2">
               <Link href="/app" className={ui.primaryXl}>
                 내 매장으로 시작하기
               </Link>
+              <DemoVideoButton className={ui.secondaryXl}>데모 영상</DemoVideoButton>
             </div>
-            <p className={ui.help}>2분짜리 실제 화면이에요. 로그인 없이 볼 수 있어요.</p>
+            <p className={ui.help}>내 매장은 Google 로그인으로 시작해요. 데모 영상은 2분, 로그인 없이 볼 수 있어요.</p>
           </div>
           <HeroSequence />
         </section>
@@ -270,7 +270,7 @@ export default function Home() {
               {PAIRS.map((p) => (
                 <div key={p.title} className="flex flex-col gap-3">
                   <h3 className="text-[15px] font-semibold text-[#1B1B18]">{p.title}</h3>
-                  <div className="grid grid-cols-[minmax(0,1fr)_56px_minmax(0,1fr)]">
+                  <div className="grid grid-cols-1 gap-2 lg:grid-cols-[minmax(0,1fr)_56px_minmax(0,1fr)] lg:gap-0">
                     <Before lines={p.before} />
                     <Arrow />
                     <After>{p.after}</After>
@@ -278,7 +278,7 @@ export default function Home() {
                 </div>
               ))}
             </div>
-            <div className="grid grid-cols-3 gap-8">
+            <div className="grid grid-cols-1 gap-6 lg:grid-cols-3 lg:gap-8">
               {MORE_PAINS.map((p) => (
                 <div key={p.title} className="flex flex-col gap-2 border-l border-[#C9C9C1] pl-5">
                   <h3 className="text-[15px] font-semibold text-[#1B1B18]">{p.title}</h3>
@@ -296,13 +296,13 @@ export default function Home() {
             </SectionHead>
             <ol className="flex flex-col gap-12">
               {STEPS.map((s, i) => (
-                <li key={s.title} className="grid grid-cols-[96px_minmax(0,5fr)_minmax(0,6fr)] items-start gap-x-8">
-                  <span className="font-mono text-[48px] leading-none font-semibold text-[#155E75]">{i + 1}</span>
+                <li key={s.title} className="grid grid-cols-[56px_minmax(0,1fr)] items-start gap-x-4 gap-y-5 lg:grid-cols-[96px_minmax(0,5fr)_minmax(0,6fr)] lg:gap-x-8 lg:gap-y-0">
+                  <span className="font-mono text-[36px] leading-none font-semibold text-[#155E75] lg:text-[48px]">{i + 1}</span>
                   <div className="flex flex-col gap-2">
                     <h3 className="text-[20px] font-semibold text-[#1B1B18]">{s.title}</h3>
                     <p className={body}>{s.body}</p>
                   </div>
-                  {s.fragment}
+                  <div className="col-span-2 lg:col-span-1">{s.fragment}</div>
                 </li>
               ))}
             </ol>
@@ -314,7 +314,7 @@ export default function Home() {
             <SectionHead eyebrow="03 · 만든 방식" title="말은 LLM이, 계산은 솔버가">
               LLM이 낸 결과는 사람이 확인하거나 서버가 다시 풀어 검증한 것만 근무표에 들어가요.
             </SectionHead>
-            <div className="grid grid-cols-3 gap-5">
+            <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
               {BUILT.map((b) => (
                 <div key={b.title} className={`${ui.card} flex flex-col gap-2`}>
                   <h3 className={ui.cardTitle}>{b.title}</h3>
@@ -322,8 +322,14 @@ export default function Home() {
                 </div>
               ))}
             </div>
-            <div className="flex items-center justify-between gap-6">
-              <p className="font-mono text-[13px] text-[#3D3D38]">번역 정확도 99% · 매니저 말투 문장 100개</p>
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+              <div className={`${ui.card} flex items-center gap-5`}>
+                <span className="font-mono text-[40px] leading-none font-semibold text-[#155E75]">99%</span>
+                <div className="flex flex-col gap-0.5">
+                  <span className={ui.cardTitle}>번역 정확도</span>
+                  <span className={ui.help}>매니저 말투 문장 100개 기준</span>
+                </div>
+              </div>
               <a href={REPO_URL} className={ui.text}>
                 GitHub에서 자세히 보기
               </a>
@@ -331,16 +337,16 @@ export default function Home() {
           </div>
         </section>
 
-        <section className="bg-[#155E75] py-[72px]">
-          <div className={`${container} flex items-center justify-between gap-10`}>
+        <section className="bg-[#155E75] py-14 lg:py-[72px]">
+          <div className={`${container} flex flex-col gap-8 lg:flex-row lg:items-center lg:justify-between lg:gap-10`}>
             <div className="flex flex-col gap-3">
-              <h2 className="text-[32px] leading-[1.25] font-semibold tracking-[-0.02em] text-white">
+              <h2 className="text-[26px] leading-[1.25] font-semibold tracking-[-0.02em] text-white lg:text-[32px]">
                 직원 명단만 넣으면
                 <br />첫 근무표를 시작할 수 있어요
               </h2>
-              <p className="text-base text-[#CFE4EA]">영상은 로그인 없이 볼 수 있어요.</p>
+              <p className="text-base text-[#CFE4EA]">Google 로그인으로 시작해요. 영상은 로그인 없이 볼 수 있어요.</p>
             </div>
-            <div className="flex shrink-0 items-center gap-2">
+            <div className="flex shrink-0 flex-wrap items-center gap-2">
               <Link
                 href="/app"
                 className="inline-flex h-12 items-center rounded-md border border-white bg-white px-[22px] text-[15px] font-medium text-[#155E75] transition-colors duration-[120ms] hover:bg-[#E3F0F3] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
@@ -356,7 +362,7 @@ export default function Home() {
       </main>
 
       <footer>
-        <div className={`${container} flex items-center justify-between py-8 text-xs font-medium text-[#66665E]`}>
+        <div className={`${container} flex flex-col gap-3 py-8 text-xs font-medium text-[#66665E] lg:flex-row lg:items-center lg:justify-between`}>
           <span className="flex items-center gap-2">
             <Mark size={18} tone="muted" />
             {PRODUCT_NAME} · 포트폴리오 프로토타입
