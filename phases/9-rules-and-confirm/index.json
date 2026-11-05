@@ -1,0 +1,60 @@
+{
+  "project": "shop-scheduler",
+  "phase": "9-rules-and-confirm",
+  "steps": [
+    {
+      "step": 0,
+      "name": "coverage-conflict-lib",
+      "status": "completed",
+      "started_at": "2026-11-05T20:00:27+0900",
+      "summary": "lib/coverage-conflict.ts(+test 25개): coverageBounds(c) → {min, max|null}|null, coverageDays(days, period, holidays) → 1..length 날짜, findCoverageConflict(rules, card, period, holidays) → 첫 충돌 규칙|null. 충돌 = 둘 다 반드시·켜짐, 필요 인원 모양(매장, 날마다, 사람 고르기 없음, 개수), stableJson(shifts) 같음, 날짜 하루 이상 겹침, 범위 교차 없음. 결정: weekdays는 0=월(wording·backend와 같음), weekday 종류는 공휴일을 뺀다, 꺼진 card도 null. 화면 변경 없음",
+      "completed_at": "2026-11-05T20:02:55+0900"
+    },
+    {
+      "step": 1,
+      "name": "coverage-conflict-ui",
+      "status": "pending"
+    },
+    {
+      "step": 2,
+      "name": "translator-at-least",
+      "status": "pending"
+    },
+    {
+      "step": 3,
+      "name": "rule-card-edit",
+      "status": "pending"
+    },
+    {
+      "step": 4,
+      "name": "disabled-rules-summary",
+      "status": "pending"
+    },
+    {
+      "step": 5,
+      "name": "default-fairness",
+      "status": "pending"
+    },
+    {
+      "step": 6,
+      "name": "confirm-dialog",
+      "status": "pending"
+    },
+    {
+      "step": 7,
+      "name": "employee-view-db",
+      "status": "pending"
+    },
+    {
+      "step": 8,
+      "name": "employee-view-ui",
+      "status": "pending"
+    },
+    {
+      "step": 9,
+      "name": "e2e-sync",
+      "status": "pending"
+    }
+  ],
+  "created_at": "2026-11-05T20:00:27+0900"
+}
