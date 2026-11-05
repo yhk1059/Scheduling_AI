@@ -6,6 +6,7 @@ import type { Priority } from "@/lib/rules";
 import {
   applyShiftChange,
   type CardPatch,
+  COVERAGE_SOURCE_TEXT,
   currentPeriod,
   type Hardness,
   isLeaveRule,
@@ -15,7 +16,7 @@ import {
 } from "@/lib/store";
 import { dayHeader, isWeekendDay, monthDay, type PeriodRange } from "@/lib/period";
 import type { ConstraintSpec, Employee, RuleExample } from "@/lib/types.gen";
-import { describeRule, describeShiftChange, hardnessLabel, presetName } from "@/lib/wording";
+import { describeRule, describeShiftChange, hardnessLabel, josa, presetName } from "@/lib/wording";
 
 import RuleText from "./RuleText";
 import { previewRange } from "./RulesStep";
@@ -275,6 +276,7 @@ export default function ConstraintCard({
   card,
   pending,
   replaces,
+  conflict,
   onApplied,
   busy = false,
   off = false,
@@ -288,6 +290,8 @@ export default function ConstraintCard({
   pending: boolean;
   /** 적용하면 대체될 기존 제약 */
   replaces?: ConstraintSpec;
+  /** 적용하면 함께 지킬 수 없게 되는 기존 필요 인원 규칙(step 0 findCoverageConflict). 대기 카드에만 */
+  conflict?: ConstraintSpec;
   /** [적용] 직후 호출(③ 운영 중 변경의 재풀이) */
   onApplied?: () => void;
   /** 요청 중이면 [적용]을 막는다 */
@@ -338,6 +342,9 @@ export default function ConstraintCard({
   const isBalance = card.type === "rule" && card.body.kind === "balance";
   const examples = (isRule ? shop.examples : period?.examples)?.[card.id] ?? [];
   const holidays = isRule ? [] : (period?.holidays ?? []);
+  // 폼으로 만든 필요 인원은 원문이 없어 해석 문장으로 가리킨다
+  const conflictName =
+    conflict && (conflict.source_text === COVERAGE_SOURCE_TEXT ? describeRule(conflict, config, employees, range).text : conflict.source_text);
   const hardness: Hardness = alwaysHard(card) ? "hard" : (card.hardness ?? (isBalance ? "soft" : "hard"));
 
   const save = () => {
@@ -413,6 +420,17 @@ export default function ConstraintCard({
         <p className="flex items-center gap-1.5 text-xs font-medium text-[#A15C07]">
           <WarningIcon />
           명단에 없는 직원을 가리켜요. 삭제하거나 명단을 고쳐 주세요.
+        </p>
+      )}
+
+      {pending && conflict && conflictName && (
+        <p className="flex flex-wrap items-center gap-1.5 text-xs font-medium text-[#A15C07]">
+          <WarningIcon />
+          기존 규칙 “{conflictName}”{josa(conflictName, "과", "와")} 함께 지킬 수 없어요
+          <button type="button" onClick={() => store.removeRule(conflict.id)} className={ui.textSm}>
+            기존 규칙 끄기
+          </button>
+          <span className="font-normal text-[#66665E]">매장 조건에서 꺼져요</span>
         </p>
       )}
 
