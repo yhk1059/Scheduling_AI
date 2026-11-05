@@ -39,6 +39,10 @@
       "dir": "8-design",
       "status": "completed",
       "completed_at": "2026-11-01T07:03:42+0900"
+    },
+    {
+      "dir": "9-rules-and-confirm",
+      "status": "pending"
     }
   ]
 }
