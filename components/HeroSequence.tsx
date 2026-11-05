@@ -74,7 +74,14 @@ export function ReplyCard({
   );
 }
 
-// 지난 날짜는 잠기고, 병가가 든 칸과 대신 들어간 칸만 바뀐다.
+// 지난 날짜는 잠기고, 병가가 든 칸과 대신 들어간 칸만 바뀐다. 히어로 근무표와 같은 주(11/2~).
+const CHANGE_DAYS = [
+  { date: "11/2", dow: "월" },
+  { date: "3", dow: "화" },
+  { date: "4", dow: "수" },
+  { date: "5", dow: "목" },
+  { date: "6", dow: "금" },
+];
 const CHANGE_ROWS: { name: string; cells: { code: Code; changed?: boolean }[] }[] = [
   { name: "최지훈", cells: [{ code: "M" }, { code: "A" }, { code: "O", changed: true }, { code: "O", changed: true }, { code: "O", changed: true }] },
   { name: "임하늘", cells: [{ code: "O" }, { code: "C" }, { code: "M", changed: true }, { code: "O" }, { code: "A", changed: true }] },
@@ -84,8 +91,17 @@ const CHANGE_ROWS: { name: string; cells: { code: Code; changed?: boolean }[] }[
 export function ChangeFragment() {
   return (
     <div className={`${ui.card} flex flex-col gap-3`}>
-      <p className="text-sm text-[#1B1B18]">최지훈 · 10/28~10/30 · 휴무</p>
+      <p className="text-sm text-[#1B1B18]">최지훈 · 11/4~11/6 · 병가</p>
       <div className="flex flex-col gap-0.5">
+        <div className="flex items-center gap-0.5">
+          <span className="w-16" />
+          {CHANGE_DAYS.map((d) => (
+            <span key={d.date} className="inline-flex w-[30px] flex-col items-center font-mono text-[11px] leading-tight text-[#66665E]">
+              {d.date}
+              <span>{d.dow}</span>
+            </span>
+          ))}
+        </div>
         {CHANGE_ROWS.map((r) => (
           <div key={r.name} className="flex items-center gap-0.5">
             <span className="w-16 text-sm text-[#1B1B18]">{r.name}</span>
@@ -106,11 +122,11 @@ export default function HeroSequence() {
   // 키를 올리면 시퀀스를 다시 마운트해 애니메이션이 처음부터 돈다. [다시 보기]는 밖에 있어 포커스를 잃지 않는다
   const [run, setRun] = useState(0);
   return (
-    <div className={`${ui.panel} hero-seq flex min-h-[420px] flex-col gap-3.5 p-[22px]!`}>
+    <div className={`${ui.panel} hero-seq flex min-h-[420px] flex-col gap-3.5 p-4! lg:p-[22px]!`}>
       <div key={run} inert className="flex flex-col gap-3.5">
         <div className={ui.bar}>
           <Mark size={18} />
-          <span className="relative min-w-0 flex-1 text-[15px] whitespace-nowrap text-[#1B1B18]">
+          <span className="relative min-w-0 flex-1 overflow-hidden text-[15px] whitespace-nowrap text-[#1B1B18]">
             <span className="relative inline-block">
               <span className="invisible">{TYPED}</span>
               <span className="hero-typing">{TYPED}</span>
@@ -123,12 +139,12 @@ export default function HeroSequence() {
 
         <ReplyCard className="hero-rise" title="금지 순서" quote={TYPED} reading="모든 사람 · 매일 · 마감 다음 날 오픈 금지" />
 
-        <div className={`${ui.card} flex flex-col gap-3`}>
+        <div className={`${ui.card} hero-table flex flex-col gap-3`}>
           <div className="flex h-[22px] items-center justify-between gap-3">
             <h3 className={ui.cardTitle}>11/2~11/8 근무표</h3>
             <span className={`hero-badge ${ui.badge} ${ui.badgeTone.applied}`}>반드시 규칙을 모두 지켰어요</span>
           </div>
-          <div className="hero-cells">
+          <div className="hero-cells overflow-x-auto">
             <ScheduleGrid
               legend={false}
               rows={EMPLOYEES}
@@ -149,8 +165,8 @@ export default function HeroSequence() {
       </div>
 
       <div className="flex items-center justify-between gap-3">
-        <p className={ui.help}>실제 화면이에요. 샘플 매장 12명 중 5명, 첫 주만 보여요.</p>
-        <button type="button" onClick={() => setRun((r) => r + 1)} className={ui.textSm}>
+        <p className={ui.help}>실제 화면이에요. A 오픈 · M 미들 · C 마감. 샘플 매장 12명 중 5명, 첫 주만 보여요.</p>
+        <button type="button" onClick={() => setRun((r) => r + 1)} className={`${ui.textSm} shrink-0`}>
           다시 보기
         </button>
       </div>
