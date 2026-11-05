@@ -61,7 +61,10 @@
     {
       "step": 7,
       "name": "employee-view-db",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-11-05T20:39:01+0900",
+      "summary": "supabase/migrations/20261105000000_confirmed_schedule.sql: public.get_confirmed_schedule(p_token uuid) → table(shop_name text, period_start date, period_length int, confirmed_at timestamptz, holidays jsonb, shifts jsonb, rows jsonb[{name,codes}]) — language sql stable security definer set search_path='', availability_shares 토큰 → shops.data state.periods[]에서 start_date 같고 status confirmed·versions 있는 근무표의 마지막 버전, 직원은 coalesce(snapshot.employees, shop.employees) with ordinality 순서로 assignments에 id가 있는 것만, shifts는 config.shifts 그대로, 직원 id·가능 시간 칸 없음, limit 1, revoke/grant 기존 함수와 같음. lib/supabase.ts: ConfirmedSchedule 타입 + getConfirmedSchedule(token) → ConfirmedSchedule|null(rpc, 22P02→null, 빈 결과→null, holidays/shifts/rows null이면 []). lib/confirmed-view.ts(+test 10개): EmployeeDay{day,date,weekday(0=일, periodDays 그대로),code,label,weekend}, employeeDays(schedule,name)→EmployeeDay[]|null, employeeTotals(days,shifts)→{workDays,hours}, weekPages(days)→7일씩. 결정: label은 '오픈 09:00~15:00', 복합 코드는 '{이름} {parts 이름+}', 시각 없는 근무조는 이름만, 모르는 코드는 코드, codes가 짧으면 code ''·label '—'(근무일·시간에 안 셈). DB 적용 확인: 테스트 프로젝트에서 rpc(0000… 토큰) → [] 오류 없음. 화면 변경 없음, backend 변경 없음.",
+      "completed_at": "2026-11-05T20:51:27+0900"
     },
     {
       "step": 8,
