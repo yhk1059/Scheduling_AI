@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { Fragment, type ReactNode } from "react";
 
 import Link from "next/link";
 
@@ -27,49 +27,128 @@ function SectionHead({ eyebrow, title, children }: { eyebrow: string; title: str
   );
 }
 
-/** "지금" 쪽: 메신저 말풍선과 메모. 글자만 둔다. */
-function Before({ lines }: { lines: string[] }) {
+// 문제 장면: 손으로 짠 엑셀 근무표. 토요일 칸을 고치면(주황 1) 다음 날 칸이 깨진다(빨강 2). 색은 앱 근무표와 같다.
+type Shift = "오픈" | "미들" | "마감" | "휴";
+const SHIFT_CLASS: Record<Shift, string> = {
+  오픈: "bg-[#FFF1C2] text-[#5C4300]",
+  미들: "bg-[#F9CFAE] text-[#6E2A04]",
+  마감: "bg-[#263248] text-white",
+  휴: "bg-white text-[#9A9A92]",
+};
+const SHEET_DAYS = ["2 월", "3 화", "4 수", "5 목", "6 금", "7 토", "8 일"];
+const SHEET_ROWS: { name: string; cells: Shift[] }[] = [
+  { name: "김서연", cells: ["오픈", "미들", "마감", "휴", "오픈", "마감", "미들"] },
+  { name: "박민수", cells: ["미들", "휴", "오픈", "미들", "마감", "휴", "오픈"] },
+  { name: "이준호", cells: ["마감", "오픈", "휴", "마감", "미들", "휴", "마감"] },
+  { name: "최지훈", cells: ["휴", "마감", "마감", "휴", "오픈", "오픈", "휴"] },
+];
+// 고치는 칸(박민수 · 토)과 그 때문에 깨지는 칸(박민수 · 일)
+const FIX = { row: 1, day: 5 };
+const SHEET_CELL = "flex h-10 items-center justify-center border-r border-b border-[#D4D4CE] text-xs lg:h-11 lg:text-sm";
+
+/** 번호 동그라미. 주황은 고친 곳, 빨강은 깨진 곳. */
+function Num({ n, className = "" }: { n: 1 | 2; className?: string }) {
   return (
-    <div className="flex flex-col items-start gap-2 self-start rounded-lg bg-[#EFEFEB] p-5">
-      <span className="text-xs font-medium text-[#66665E]">지금</span>
-      {lines.map((line) => (
-        <p key={line} className="rounded-lg bg-white px-3 py-2 text-sm text-[#3D3D38]">
-          {line}
-        </p>
+    <span className={`inline-flex size-[22px] items-center justify-center rounded-full font-mono text-xs font-medium text-white ${n === 1 ? "bg-[#D97706]" : "bg-[#B42318]"} ${className}`}>
+      {n}
+    </span>
+  );
+}
+
+function HandSheet() {
+  return (
+    <div
+      role="img"
+      aria-label="손으로 짠 엑셀 근무표. 토요일 마감 칸을 채우자 다음 날 오픈 칸이 규칙에 어긋난다."
+      className="problem-sheet grid grid-cols-[72px_repeat(7,minmax(0,1fr))] border-t border-l border-[#D4D4CE] bg-white lg:grid-cols-[96px_repeat(7,64px)]"
+    >
+      <span className={`${SHEET_CELL} h-8! justify-start truncate bg-[#F3F3EF] pl-2.5 font-mono text-[11px] text-[#66665E] lg:h-9! lg:text-xs`}>11월.xlsx</span>
+      {SHEET_DAYS.map((d) => (
+        <span key={d} className={`${SHEET_CELL} h-8! bg-[#F3F3EF] font-mono text-[11px] text-[#66665E] lg:h-9! lg:text-xs`}>
+          {d}
+        </span>
+      ))}
+      {SHEET_ROWS.map((r, ri) => (
+        <Fragment key={r.name}>
+          <span className={`${SHEET_CELL} justify-start pl-2.5 text-[#1B1B18]`}>{r.name}</span>
+          {r.cells.map((c, di) => {
+            const fix = ri === FIX.row && di === FIX.day;
+            const broken = ri === FIX.row && di === FIX.day + 1;
+            return (
+              <span key={di} className={`relative ${SHEET_CELL} ${SHIFT_CLASS[c]}`}>
+                {c}
+                {fix && (
+                  <span className={`problem-fix absolute inset-0 flex items-center justify-center gap-1 shadow-[inset_0_0_0_3px_#D97706] ${SHIFT_CLASS.마감}`}>
+                    <span className="text-[#8A93A6] line-through max-lg:hidden">휴</span>
+                    <span className="font-medium">마감</span>
+                    <Num n={1} className="absolute -top-2.5 -right-2.5 ring-2 ring-white" />
+                  </span>
+                )}
+                {broken && (
+                  <span className="problem-break absolute inset-0 shadow-[inset_0_0_0_3px_#B42318]">
+                    <Num n={2} className="absolute -top-2.5 -right-2.5 ring-2 ring-white" />
+                  </span>
+                )}
+              </span>
+            );
+          })}
+        </Fragment>
       ))}
     </div>
   );
 }
 
-function Arrow() {
-  return (
-    <svg aria-hidden="true" viewBox="0 0 24 24" className="size-5 self-center justify-self-center text-[#66665E] max-lg:rotate-90" fill="none" stroke="currentColor" strokeWidth={1.8}>
-      <path d="M4 12h16M14 6l6 6-6 6" />
-    </svg>
-  );
-}
+/** 문제 쪽 말풍선. 매니저와 직원의 말, 그 아래 말로에서는 누가 맡는지. */
+const CHAT: { who: "매니저" | "직원"; time: string; text: string; answers: [Actor, string][] }[] = [
+  {
+    who: "매니저",
+    time: "일요일 23:10",
+    text: "토요일 마감 채우니까 이번엔 연속 6일이 됐어요… 다시 처음부터.",
+    answers: [["솔버", "336칸을 한 번에 풀어 다 지키는 표를 찾아요."]],
+  },
+  {
+    who: "매니저",
+    time: "월요일 00:40",
+    text: "이 조건으로 되긴 되는 거예요? 어디부터 바꿔야 하지.",
+    answers: [
+      ["솔버", "없으면 “없다”고 증명해요."],
+      ["LLM", "어디를 바꾸면 되는지 설명해요."],
+    ],
+  },
+  {
+    who: "직원",
+    time: "월요일 08:12",
+    text: "아까 말한 시간 바뀌었어요! 그리고 마감 다음 날 오픈은 안 되는 거 맞죠?",
+    answers: [
+      ["LLM", "말을 규칙 카드로 적어요."],
+      ["사람", "맞는지 보고 적용해요."],
+    ],
+  },
+];
 
-function After({ children }: { children: ReactNode }) {
+function ChatPanel() {
   return (
-    <div className="flex flex-col gap-2">
-      <span className="text-xs font-medium text-[#155E75]">{PRODUCT_NAME}에서는</span>
-      {children}
-    </div>
-  );
-}
-
-function LinkFragment() {
-  return (
-    <div className={`${ui.card} flex flex-col gap-3`}>
-      <div className="flex items-center justify-between gap-3">
-        <span className="truncate font-mono text-[13px] text-[#1B1B18]">/a/k7Qm2xPz</span>
-        <span className={ui.secondarySm}>링크 복사</span>
-      </div>
-      <div className="h-1.5 overflow-hidden rounded-xs bg-[#EFEFEB]">
-        <div className="h-full w-3/4 bg-[#155E75]" />
-      </div>
-      <p className="text-[13px] text-[#3D3D38]">12명 중 9명 제출</p>
-      <p className={ui.help}>미제출: 박민수, 서예린, 신도윤</p>
+    <div className="flex flex-col gap-5 rounded-xl bg-[#F4F3EE] p-5 lg:p-6">
+      {CHAT.map((m) => (
+        <div key={m.time} className="flex flex-col gap-2">
+          <span className="flex items-center gap-2 font-mono text-[11px] text-[#66665E]">
+            <span aria-hidden="true" className={`inline-flex size-6 items-center justify-center rounded-full font-sans text-[11px] font-semibold text-white ${m.who === "매니저" ? "bg-[#155E75]" : "bg-[#D97706]"}`}>
+              {m.who[0]}
+            </span>
+            {m.who} · {m.time}
+          </span>
+          <p className="self-start rounded-xl rounded-tl-[3px] border border-[#E2E2DC] bg-white px-3.5 py-2.5 text-[15px] leading-[1.55] text-[#1B1B18]">{m.text}</p>
+          <div className="flex flex-col gap-1.5 rounded-lg bg-[#E3F0F3] px-3 py-2.5">
+            <span className="font-mono text-[11px] text-[#155E75]">{PRODUCT_NAME}에서는</span>
+            {m.answers.map(([actor, text]) => (
+              <span key={actor} className="flex items-start gap-2 text-sm leading-[22px] text-[#1B1B18]">
+                <ActorChip actor={actor} />
+                {text}
+              </span>
+            ))}
+          </div>
+        </div>
+      ))}
     </div>
   );
 }
@@ -110,24 +189,7 @@ function BlockedFragment() {
   );
 }
 
-const PAIRS = [
-  {
-    title: "가능 시간 모으기",
-    before: ["저 화·목 오후만 돼요", "이번 주는 토요일 빼 주세요", "아까 말한 시간 바뀌었어요!"],
-    after: <LinkFragment />,
-  },
-  {
-    title: "머릿속 규칙",
-    before: ["마감 다음 날 오픈은 안 됨", "5일 넘게 연속은 힘들다고 했지", "오픈엔 리더 한 명… 또 뭐였더라"],
-    after: <ReplyCard title="최대 연속 근무" quote="5일 넘게 연속으로 일하지 않게" reading="연속 근무 5일까지" />,
-  },
-  {
-    title: "막힘",
-    before: ["토요일 마감이 또 안 채워져요", "어디부터 바꿔야 하지?"],
-    after: <BlockedFragment />,
-  },
-];
-
+// 02 끝: 근무표가 나간 뒤에도 이어지는 일
 const MORE_PAINS = [
   { title: "“왜 나만 주말이 많아요?”", body: "직원마다 근무 수, 주말·공휴일 근무, 최근 4주 마감을 보여 줘요. 근거를 대기 쉬워요." },
   { title: "확정 뒤에 생긴 병가", body: "확정한 근무표에서 최소한의 칸만 바꾸고 바뀐 칸을 표시해요. 이미 지난 날은 건드리지 않아요." },
@@ -251,7 +313,7 @@ const SCENES: { title: string; body: string; actors: [Actor, string][]; fragment
 
 /** 행위자 칩. 사람만 강조색 면: 결정하는 자리라는 뜻. */
 function ActorChip({ actor }: { actor: Actor }) {
-  return <span className={`${ui.badge} ${actor === "사람" ? "bg-[#155E75] text-white" : ui.badgeTone.draft}`}>{actor}</span>;
+  return <span className={`${ui.badge} shrink-0 whitespace-nowrap ${actor === "사람" ? "bg-[#155E75] text-white" : ui.badgeTone.draft}`}>{actor}</span>;
 }
 
 export default function Home() {
@@ -297,27 +359,20 @@ export default function Home() {
         <section className={section}>
           <div className={`${container} flex flex-col gap-12`}>
             <SectionHead eyebrow="01 · 문제" title="메신저와 엑셀, 머릿속 규칙으로 짜고 있어요">
-              가능 시간을 옮겨 적고, 규칙을 떠올리고, 어디서 막히는지 찾느라 시간이 가요.
+              직원 말은 메신저에, 규칙은 머릿속에, 근무표는 엑셀에 있어요. 한 칸을 고치면 다른 칸이 깨지고, 다 지키는 표가 있는지는 끝까지 알 수 없어요.
             </SectionHead>
-            <div className="flex flex-col gap-10">
-              {PAIRS.map((p) => (
-                <div key={p.title} className="flex flex-col gap-3">
-                  <h3 className="text-[15px] font-semibold text-[#1B1B18]">{p.title}</h3>
-                  <div className="grid grid-cols-1 gap-2 lg:grid-cols-[minmax(0,1fr)_56px_minmax(0,1fr)] lg:gap-0">
-                    <Before lines={p.before} />
-                    <Arrow />
-                    <After>{p.after}</After>
-                  </div>
-                </div>
-              ))}
-            </div>
-            <div className="grid grid-cols-1 gap-6 lg:grid-cols-3 lg:gap-8">
-              {MORE_PAINS.map((p) => (
-                <div key={p.title} className="flex flex-col gap-2 border-l border-[#C9C9C1] pl-5">
-                  <h3 className="text-[15px] font-semibold text-[#1B1B18]">{p.title}</h3>
-                  <p className={body}>{p.body}</p>
-                </div>
-              ))}
+            <div className="grid grid-cols-1 gap-10 lg:grid-cols-[544px_minmax(0,1fr)] lg:items-start lg:gap-12">
+              <div className="flex flex-col gap-4">
+                <HandSheet />
+                <p className="text-[15px] leading-[1.7] text-[#3D3D38]">
+                  <Num n={1} className="mr-1.5 align-[-5px]" />
+                  토요일 마감이 모자라 박민수를 넣었더니
+                  <Num n={2} className="mr-1.5 ml-2 align-[-5px]" />
+                  다음 날 오픈 규칙이 깨져요. 그걸 고치면 연속 근무가 늘어나요. 칸이 서로 묶여 있어서 끝이 없어요.
+                </p>
+                <p className={ui.help}>오픈 · 미들 · 마감 색은 앱의 근무표와 같아요.</p>
+              </div>
+              <ChatPanel />
             </div>
           </div>
         </section>
@@ -339,6 +394,14 @@ export default function Home() {
                 </li>
               ))}
             </ol>
+            <div className="grid grid-cols-1 gap-6 border-t border-[#EFEFEB] pt-10 lg:grid-cols-3 lg:gap-8">
+              {MORE_PAINS.map((p) => (
+                <div key={p.title} className="flex flex-col gap-2 border-l border-[#C9C9C1] pl-5">
+                  <h3 className="text-[15px] font-semibold text-[#1B1B18]">{p.title}</h3>
+                  <p className={body}>{p.body}</p>
+                </div>
+              ))}
+            </div>
           </div>
         </section>
 

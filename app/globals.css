@@ -68,6 +68,34 @@ body {
   animation: hero-rise 240ms ease-out 5.3s backwards;
 }
 
+/* 랜딩 문제 장면. 6초마다 토요일 칸을 고치고(1), 그 뒤 다음 날 칸이 깨진다(2). 기본 스타일이 끝 상태. */
+@keyframes problem-fix {
+  0%,
+  30% {
+    opacity: 0;
+  }
+  34%,
+  100% {
+    opacity: 1;
+  }
+}
+@keyframes problem-break {
+  0%,
+  55% {
+    opacity: 0;
+  }
+  59%,
+  100% {
+    opacity: 1;
+  }
+}
+.problem-fix {
+  animation: problem-fix 6s ease-out infinite;
+}
+.problem-break {
+  animation: problem-break 6s ease-out infinite;
+}
+
 @media (prefers-reduced-motion: reduce) {
   * {
     transition-duration: 0.01ms !important;
@@ -75,7 +103,8 @@ body {
   }
   /* 지연까지 없애 끝 상태를 바로 보인다 */
   .hero-seq,
-  .hero-seq * {
+  .hero-seq *,
+  .problem-sheet * {
     animation: none !important;
   }
 }
