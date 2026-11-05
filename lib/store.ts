@@ -52,6 +52,7 @@ import type {
   ScheduleResult,
   ShiftChange,
   ShiftDef,
+  Shifts,
   ShopConfig,
 } from "./types.gen";
 
@@ -281,11 +282,47 @@ function emptyShop(): Shop {
     config: DEFAULT_CONFIG,
     employees: [],
     nextEmployeeNo: 1,
-    rules: [],
+    rules: defaultFairnessRules(),
     pendingRules: [],
     pendingConfig: [],
     unconverted: [],
   };
+}
+
+export const FAIRNESS_RULE_IDS = { maxRun: "fair-max-run", balance: "fair-balance" } as const;
+const WORK_SHIFTS: Shifts = { not_in: [OFF_CODE] };
+
+/** 공정성 기본 규칙 두 개(가능하면): 최대 연속 근무 5일(보통), 근무 수 고르게(낮음). normalizeRule을 거친 모양. */
+export function defaultFairnessRules(): ConstraintSpec[] {
+  const base = { type: "rule", scope: "shop", hardness: "soft", default: true } as const;
+  return [
+    normalizeRule({
+      ...base,
+      id: FAIRNESS_RULE_IDS.maxRun,
+      priority: "normal",
+      source_text: "연속 근무는 5일까지",
+      values: { max_len: { value: 5, label: "최대 연속 근무" } },
+      body: {
+        kind: "require",
+        for_each: { per: "person_window", window: 6 },
+        then: { left: { shifts: WORK_SHIFTS }, op: "le", right: { value: "max_len" } },
+      },
+    } as ConstraintSpec),
+    normalizeRule({
+      ...base,
+      id: FAIRNESS_RULE_IDS.balance,
+      priority: "low",
+      source_text: "근무 수는 고르게",
+      values: { max_gap: { value: 1, label: "최대 차이" } },
+      body: { kind: "balance", people: {}, days: { kind: "all" }, shifts: WORK_SHIFTS, measure: "count", with_history: true, max_gap: { value: "max_gap" } },
+    } as ConstraintSpec),
+  ];
+}
+
+/** 공정성 기본 규칙이 없으면 뒤에 더한다(같은 id나 같은 모양의 규칙이 있으면 더하지 않는다). 더할 것이 없으면 그대로. */
+export function withDefaultRules(shop: Shop): Shop {
+  const missing = defaultFairnessRules().filter((d) => !shop.rules.some((c) => c.id === d.id) && !findReplaced(shop.rules, d));
+  return missing.length === 0 ? shop : { ...shop, rules: [...shop.rules, ...missing] };
 }
 
 export function newPeriod(range: PeriodRange): WorkPeriod {
@@ -888,7 +925,7 @@ const persisted = (s: Data): Data => ({
 /** 불러온 문서: Data 필드만 가져오고 옛 화면 상태를 바꾼다. */
 const loaded = (s: Data): Data => {
   const d = persisted(s);
-  return { ...d, view: normalizeView(d) };
+  return { ...d, shop: d.shop && withDefaultRules(d.shop), view: normalizeView(d) };
 };
 
 export function createAppStore(getStorage: () => Storage, now: () => Date = () => new Date(), remote?: ShopRemote) {

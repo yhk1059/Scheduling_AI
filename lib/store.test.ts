@@ -10,7 +10,9 @@ import {
   coverageRule,
   createAppStore,
   currentPeriod,
+  defaultFairnessRules,
   disabledRulesFor,
+  FAIRNESS_RULE_IDS,
   findReplaced,
   hasCoverage,
   hasUnconfirmedChanges,
@@ -27,12 +29,15 @@ import {
   summarizedCoverageIds,
   tagCoverage,
   viewForPeriod,
+  withDefaultRules,
   withRuleComparison,
   type ShopRemote,
 } from "./store";
 import type { AvailabilitySlots } from "./availability";
 import { dateOfDay } from "./period";
-import { DEFAULT_CONFIG, normalizeRule, STORAGE_VERSION } from "./rules";
+import octDoc from "../e2e/fixtures/shop-oct.json";
+import { DEFAULT_CONFIG, normalizeRule, ruleShape, STORAGE_VERSION } from "./rules";
+import { describeRule, presetName, shopRuleCount } from "./wording";
 import { balance, count, DEN_CONFIG, fixedCell, forbid as forbidRule, maxRun, OFF, WORK } from "./test-rules";
 import type { ConstraintSpec, Rule, RuleExample, ScheduleResult } from "./types.gen";
 
@@ -104,10 +109,10 @@ function fresh(storage: Storage = new MemoryStorage()) {
   return createAppStore(() => storage, () => CONFIRMED_AT);
 }
 
-/** 코드 이름과 주기가 뜻을 갖지 않는 테스트의 매장: 한 달 단위, D/E/N. */
+/** 코드 이름과 주기가 뜻을 갖지 않는 테스트의 매장: 한 달 단위, D/E/N, 공정성 기본 규칙 없음. */
 function startDenShop(store: ReturnType<typeof fresh>) {
   store.getState().startShop();
-  store.setState((s) => ({ shop: { ...s.shop!, unit: "month", config: DEN_CONFIG } }));
+  store.setState((s) => ({ shop: { ...s.shop!, unit: "month", config: DEN_CONFIG, rules: [] } }));
 }
 
 /** 이 브라우저에 남은 캐시: 매장(이영희 e01, 박민수 e02, 월 단위) + 첫 기간. */
@@ -146,9 +151,9 @@ describe("매장", () => {
     store.getState().startShop();
     const s = store.getState();
     expect(s.shop).toMatchObject({ name: "", unit: "1w", employees: [], nextEmployeeNo: 1, pendingConfig: [], unconverted: [] });
-    // 기본 근무 형태, 기본 규칙 없음
+    // 기본 근무 형태, 공정성 기본 규칙만
     expect(s.shop!.config).toEqual(DEFAULT_CONFIG);
-    expect(s.shop!.rules).toEqual([]);
+    expect(s.shop!.rules).toEqual(defaultFairnessRules());
     expect(s.view).toEqual({ screen: "setup" });
     expect(s.hasInput()).toBe(true);
     expect(s.inputVersion).toBe(1);
@@ -1295,7 +1300,7 @@ describe("persist", () => {
     expect(saved.state).not.toHaveProperty("storageAvailable");
 
     const b = fresh(storage).getState();
-    expect(b.shop).toEqual(a.getState().shop);
+    expect(b.shop).toEqual(withDefaultRules(a.getState().shop!));
     expect(b.periods).toEqual(a.getState().periods);
     expect(b.view).toEqual(a.getState().view);
     expect(b.inputVersion).toBe(a.getState().inputVersion);
@@ -1589,7 +1594,7 @@ describe("옛 pendingAfterLogin 필드", () => {
 
     const b = fresh(storage).getState();
     expect(b.resetNotice).toBe(false);
-    expect(b.shop).toEqual(a.getState().shop);
+    expect(b.shop).toEqual(withDefaultRules(a.getState().shop!));
     expect(b.periods).toEqual(a.getState().periods);
     expect(b).not.toHaveProperty("pendingAfterLogin");
   });
@@ -2091,5 +2096,102 @@ describe("시작일", () => {
     const { store, id, period } = withPeriod();
     expect(store.getState().postponeStart(id, "2026-10-20")).toBe(true);
     expect([period().start_date, period().length]).toEqual(["2026-10-20", 31]);
+  });
+});
+
+describe("공정성 기본 규칙", () => {
+  const { maxRun: MAX_RUN, balance: BALANCE } = FAIRNESS_RULE_IDS;
+  const ids = (rules: ConstraintSpec[]) => rules.map((c) => c.id);
+  /** 서버 문서의 매장 규칙을 바꾼 문서. */
+  const docWithRules = (rules: (shop: Record<string, unknown>) => ConstraintSpec[]) => {
+    const doc = serverDoc();
+    const shop = doc.state.shop as unknown as Record<string, unknown>;
+    return { ...doc, state: { ...doc.state, shop: { ...shop, rules: rules(shop) } } };
+  };
+  const loadDoc = async (data: unknown) => {
+    const store = synced(fakeRemote({ data, updatedAt: SERVER_AT }).remote);
+    await store.getState().signedIn(USER);
+    return store;
+  };
+
+  it("최대 연속 근무 5일(가능하면·보통)과 근무 수 고르게(가능하면·낮음)", () => {
+    const [run, fair] = defaultFairnessRules();
+    expect(run).toEqual(maxRun(WORK, 5, undefined, { id: MAX_RUN, scope: "shop", hardness: "soft", priority: "normal", default: true, source_text: "연속 근무는 5일까지" }));
+    expect(ruleShape(run)?.kind).toBe("max_run");
+    expect(presetName(run)).toBe("최대 연속 근무");
+    expect(fair).toEqual(
+      balance({ people: {}, days: { kind: "all" }, shifts: WORK, with_history: true, max_gap: 1 }, { id: BALANCE, scope: "shop", hardness: "soft", priority: "low", default: true, source_text: "근무 수는 고르게" }),
+    );
+    expect((fair as Rule).body.kind).toBe("balance");
+    expect(presetName(fair)).toBe("고르게 규칙");
+    expect(describeRule(fair, DEFAULT_CONFIG, [], { start_date: "2026-11-02", length: 7 }).text).toMatch(/^근무 수를 고르게\(최근 4주 포함\)/);
+    expect([run, fair].map((c) => [c.hardness, c.enabled, (c as Rule).default])).toEqual([
+      ["soft", true, true],
+      ["soft", true, true],
+    ]);
+  });
+
+  it("새 매장에 두 규칙이 있고 매장 조건 수에 들어간다", () => {
+    const store = fresh();
+    store.getState().startShop();
+    const { rules } = store.getState().shop!;
+    expect(ids(rules)).toEqual([MAX_RUN, BALANCE]);
+    expect(shopRuleCount(rules)).toBe(2);
+  });
+
+  it("있으면 그대로, 같은 모양의 사용자 규칙이 있으면 더하지 않는다", () => {
+    const store = fresh();
+    store.getState().startShop();
+    const shop = store.getState().shop!;
+    expect(withDefaultRules(shop)).toBe(shop);
+    const user = { ...shop, rules: [maxWork("c1", 6)] };
+    expect(ids(withDefaultRules(user).rules)).toEqual(["c1", BALANCE]);
+  });
+
+  it("기본 규칙이 없는 서버 문서를 불러오면 뒤에 더한다", async () => {
+    const store = await loadDoc(docWithRules(() => [minOff("m", 8)]));
+    expect(ids(store.getState().shop!.rules)).toEqual(["m", MAX_RUN, BALANCE]);
+  });
+
+  it("localStorage 캐시에서 되살릴 때도 더한다", () => {
+    const storage = new MemoryStorage();
+    storage.setItem(STORAGE_KEY, JSON.stringify(docWithRules(() => [])));
+    expect(ids(fresh(storage).getState().shop!.rules)).toEqual([MAX_RUN, BALANCE]);
+  });
+
+  it("끈 기본 규칙은 꺼진 채로 불러오고 다시 더하지 않는다", async () => {
+    const off = defaultFairnessRules().map((c) => ({ ...c, enabled: false }));
+    const store = await loadDoc(docWithRules(() => off));
+    expect(store.getState().shop!.rules).toEqual(off);
+  });
+
+  it("같은 모양의 rule-max-run이 있는 매장(D3)은 고르게만 더한다", async () => {
+    const store = await loadDoc(octDoc);
+    const rules = store.getState().shop!.rules;
+    expect(ids(rules)).not.toContain(MAX_RUN);
+    expect(ids(rules).slice(-1)).toEqual([BALANCE]);
+    expect(rules).toHaveLength(octDoc.state.shop.rules.length + 1);
+  });
+
+  it("removeRule은 지우지 않고 끄고, 값을 바꾸면 창도 바뀐다", () => {
+    const store = fresh();
+    store.getState().startShop();
+    store.getState().setRuleValue(MAX_RUN, "max_len", 6);
+    const run = byId(store.getState().shop!.rules, MAX_RUN) as Rule;
+    expect(val(run, "max_len")).toBe(6);
+    expect(run.body.kind === "require" && run.body.for_each.window).toBe(7);
+    store.getState().removeRule(MAX_RUN);
+    expect(byId(store.getState().shop!.rules, MAX_RUN).enabled).toBe(false);
+  });
+
+  it("요청에 두 규칙이 켜진 채 들어간다", () => {
+    const store = fresh();
+    store.getState().startShop();
+    store.getState().addEmployees(rows);
+    const id = store.getState().createPeriod(TODAY)!;
+    const period = store.getState().periods.find((p) => p.id === id)!;
+    const req = toScheduleRequest(store.getState().shop!, period, store.getState().periods, TODAY);
+    const got = req.constraints!.filter((c) => c.id === MAX_RUN || c.id === BALANCE);
+    expect(got).toEqual(defaultFairnessRules());
   });
 });
