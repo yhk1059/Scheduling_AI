@@ -37,7 +37,10 @@
     {
       "step": 4,
       "name": "disabled-rules-summary",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-11-05T20:25:31+0900",
+      "summary": "lib/store.ts: disabledRulesFor(shop, period) → 끈 매장 규칙·요청(disabledIds 순, 매장 규칙은 ruleOverrides 수정본 우선, 확정이면 basis()로 snapshot 규칙에서 찾음, 없는 id 건너뜀) + store.test 2개. 화면 ConstraintCard: 기본 규칙 버튼 '끄기' → '매장 조건에서 끄기'(다시 켜기 그대로), 배지 '꺼짐' → '매장 조건에서 꺼짐'; ②(onToggleOff 있음)에서 영구 끄기 버튼 title '매장 설정에서도 꺼져요. 다음 근무표에도 적용돼요', 매장 조건에서 꺼진 카드의 배지 옆 ui.help 보조 줄 '매장 설정에서도 꺼졌어요. 다음 근무표에도 적용돼요'(매장 설정 탭에는 없음). 적용된 카드(readOnly 아님) 버튼 줄 순서: [삭제](Danger, 기본 규칙 아니면, 맨 왼쪽) → [이번 근무표에서만 끄기]/[다시 켜기] → [수정] → [매장 조건에서 끄기]/[다시 켜기](기본 규칙). ScheduleStep SummaryCard: disabled prop({name,text}[], 기본 []) — '결과' 칸에서 '반드시 규칙을 모두 지켰어요'/'근무표 없음' 배지 옆에 주의 배지 '끈 규칙 {n}개', 새 칸 '이번 근무표에서 끈 규칙'(값 '{n}개' mono, 목록 text-xs '{presetName} · {describeRule.text}' 3개까지 + '외 {n−3}개')을 '못 지킨 가능하면 규칙' 뒤·'확정본에서 바뀐 칸' 앞에. ScheduleBody가 disabledRulesFor를 넘기므로 확정 근무표에도 같다. 결정: 이전에는 적용된 비 readOnly 카드에 [이번 근무표에서만 끄기]가 꺼졌을 때의 [다시 켜기]만 있었는데, ②·③ 예외 카드에서 켜진 상태에도 [이번 근무표에서만 끄기]를 보이게 함(두 끄기가 나란히 보이도록); 매장 조건에서 꺼진 기본 규칙에는 [이번 근무표에서만 끄기]를 숨김; 보조 줄은 '직후'만이 아니라 ②에서 매장 조건에서 꺼진 동안 계속 보임; 끈 규칙 목록은 결과를 만든 시점이 아니라 지금의 disabledIds로 그림. e2e/journey.spec.ts:811-812(S13 '끄기'/'꺼짐')는 마지막 step에서 동기화 필요. 수동 브라우저 체크는 하지 않음(로그인·LLM 필요).",
+      "completed_at": "2026-11-05T20:29:05+0900"
     },
     {
       "step": 5,
