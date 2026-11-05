@@ -469,7 +469,11 @@ export default function ConstraintCard({
           {off ? (
             <span className={`${ui.badge} bg-[#FDF0DC] text-[#7A4506]`}>이번 근무표에서 꺼짐</span>
           ) : shopOff ? (
-            <span className={`${ui.badge} bg-[#EFEFEB] text-[#66665E]`}>꺼짐</span>
+            <>
+              <span className={`${ui.badge} bg-[#EFEFEB] text-[#66665E]`}>매장 조건에서 꺼짐</span>
+              {/* 매장 설정 탭에서는 그 화면이 곧 매장 설정이라 두지 않는다 */}
+              {onToggleOff && <span className={ui.help}>매장 설정에서도 꺼졌어요. 다음 근무표에도 적용돼요</span>}
+            </>
           ) : pending ? (
             <span className={`${ui.badge} bg-[#FDF0DC] text-[#7A4506]`}>적용 대기</span>
           ) : (
@@ -528,9 +532,15 @@ export default function ConstraintCard({
             )
           ) : (
             <>
-              {off && onToggleOff && (
-                <button type="button" disabled={busy} onClick={() => onToggleOff(false)} className={ui.textSm}>
-                  다시 켜기
+              {!isDefault && (
+                <button type="button" onClick={() => removeCard(card.id)} className={ui.danger}>
+                  삭제
+                </button>
+              )}
+              {/* 매장 조건에서 꺼진 규칙은 이번 근무표만 끌 것이 없다 */}
+              {onToggleOff && (off || !shopOff) && (
+                <button type="button" disabled={busy} onClick={() => onToggleOff(!off)} className={ui.textSm}>
+                  {off ? "다시 켜기" : "이번 근무표에서만 끄기"}
                 </button>
               )}
               {editable && (
@@ -545,17 +555,14 @@ export default function ConstraintCard({
                   수정
                 </button>
               )}
-              {isDefault ? (
+              {isDefault && (
                 <button
                   type="button"
                   onClick={() => (shopOff ? store.enableRule(card.id) : removeCard(card.id))}
+                  title={onToggleOff && !shopOff ? "매장 설정에서도 꺼져요. 다음 근무표에도 적용돼요" : undefined}
                   className={ui.textSm}
                 >
-                  {shopOff ? "다시 켜기" : "끄기"}
-                </button>
-              ) : (
-                <button type="button" onClick={() => removeCard(card.id)} className={ui.danger}>
-                  삭제
+                  {shopOff ? "다시 켜기" : "매장 조건에서 끄기"}
                 </button>
               )}
             </>

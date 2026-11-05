@@ -10,6 +10,7 @@ import {
   coverageRule,
   createAppStore,
   currentPeriod,
+  disabledRulesFor,
   findReplaced,
   hasCoverage,
   hasUnconfirmedChanges,
@@ -743,6 +744,27 @@ describe("이번 기간만 끄기와 제안 수락", () => {
     expect(p.disabledIds).toEqual(["l"]);
     expect(p.requests[1]).toMatchObject({ hardness: "hard", weight: 10 });
     expect(Object.keys(p.ruleOverrides)).toEqual(["r"]);
+  });
+
+  it("disabledRulesFor는 끈 매장 규칙·요청을 disabledIds 순으로, 수정본을 반영해 돌려주고 없는 id는 건너뛴다", () => {
+    const { store, id, period } = setup();
+    store.getState().applyChanges(id, [{ action: "set_value", constraint_id: "r", name: "max_len", value: 4 }]);
+    store.getState().setDisabled(id, "p", true);
+    store.getState().setDisabled(id, "없음", true);
+    store.getState().setDisabled(id, "r", true);
+    const out = disabledRulesFor(store.getState().shop!, period());
+    expect(out.map((c) => c.id)).toEqual(["p", "r"]);
+    expect(val(out[1], "max_len")).toBe(4);
+  });
+
+  it("disabledRulesFor는 확정 근무표면 snapshot의 매장 규칙에서 찾는다", () => {
+    const { store, id, period } = setup();
+    store.getState().setDisabled(id, "r", true);
+    store.getState().setResult(id, result({ e01: ["D"], e02: ["O"] }), []);
+    store.getState().confirm(id);
+    store.getState().removeRule("r");
+    expect(store.getState().shop!.rules.some((r) => r.id === "r")).toBe(false);
+    expect(disabledRulesFor(store.getState().shop!, period()).map((c) => c.id)).toEqual(["r"]);
   });
 });
 
