@@ -45,7 +45,10 @@
     {
       "step": 5,
       "name": "default-fairness",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-11-05T20:29:33+0900",
+      "summary": "lib/store.ts: FAIRNESS_RULE_IDS = {maxRun:'fair-max-run', balance:'fair-balance'}, defaultFairnessRules() → ConstraintSpec[](normalizeRule 거침), withDefaultRules(shop) → Shop(같은 id나 findReplaced 같은 모양이 있으면 더하지 않음, 더할 것 없으면 같은 객체, rules 뒤에 붙이고 cardOrder 그대로). 규칙: fair-max-run 원문 '연속 근무는 5일까지' = maxRun(WORK,5) 모양(person_window window 6, not_in O le max_len, values max_len 5 label '최대 연속 근무'), soft·normal·default; fair-balance 원문 '근무 수는 고르게' = balance(people {}, days all, not_in O, count, with_history, max_gap 값 1 label '최대 차이'), soft·low·default. 카드: 제목 '최대 연속 근무' / 해석 '연속 근무 5일까지', 제목 '고르게 규칙' / 해석 '근무 수를 고르게(최근 4주 포함)', 둘 다 '기본' 배지와 [매장 조건에서 끄기]. 새 매장의 홈 요약 '매장 조건 N개'가 2(새 매장 0→2), D3(shop-oct)은 rule-max-run과 같은 모양이라 fair-balance만 더해져 7→8개. 적용 경로: emptyShop()(startShop·매장 준비·삭제 뒤 빈 매장) + loaded()에서 shop && withDefaultRules — loaded는 signedIn(서버 문서)과 persist merge(localStorage 캐시 되살리기) 둘 다 쓰는 유일한 불러오기 경로라 onRehydrateStorage는 없음. 끈 기본 규칙(enabled:false)은 id가 있어 꺼진 채 유지. removeRule은 기존 default 분기로 끔. withRuleValue가 이미 max_run 창을 값+1로 바꿈(setRuleValue 6 → window 7 확인, 고치지 않음). toScheduleRequest에 두 규칙이 enabled:true로 들어감(테스트). STORAGE_VERSION·backend·샘플/fixture JSON·scripts/seed.ts·컴포넌트 변경 없음. 테스트: store.test '공정성 기본 규칙' 9개; 기존 테스트 도우미 startDenShop은 rules: []로 시작(D/E/N 매장 테스트가 규칙 목록을 정확히 비교하므로), startShop 기대값을 defaultFairnessRules()로, persist 복원 비교 2곳을 withDefaultRules(a.shop)로. 결정: 고르게 규칙은 balance 빌더와 같게 max_gap 값(label '최대 차이')을 가져 [수정]에서 '최대 차이'를 바꿀 수 있음(문서의 '값이 없어 [수정]이 없다'와 다름, 식 모양을 따름). 수동 브라우저 체크(seed·dev·로그인)는 하지 않음. 주의(e2e 마지막 step): 모든 매장에 soft 규칙 2개가 더해져 e2e 근무표 결과·'매장 조건 N개'(S3·S16 '7개' → '8개', S12 N+2)·매장 조건 카드 수·S13 기본 규칙 카드 수가 달라질 수 있음.",
+      "completed_at": "2026-11-05T20:36:13+0900"
     },
     {
       "step": 6,
