@@ -102,7 +102,13 @@ function NamePicker({ roster, onPick }: { roster: AvailabilityRoster; onPick: (t
         <h1 className={ui.pageTitle}>{roster.shop_name} · 가능 시간 입력</h1>
         <span className="font-mono text-sm text-[#66665E]">{formatRange(range)}</span>
       </header>
-      <p className="text-sm text-[#7A4506] md:hidden">PC에서 입력해 주세요. 휴대폰에서는 드래그할 수 없어요</p>
+      {roster.locked ? (
+        <p role="status" className="text-sm text-[#3D3D38]">
+          이미 확정된 근무표예요. 입력한 시간은 볼 수만 있어요
+        </p>
+      ) : (
+        <p className="text-sm text-[#7A4506] md:hidden">PC에서 입력해 주세요. 휴대폰에서는 드래그할 수 없어요</p>
+      )}
       <section className="flex flex-col gap-3">
         <h2 className={ui.sectionTitle}>내 이름을 골라 주세요</h2>
         <div className="flex flex-wrap gap-2.5">
@@ -324,10 +330,12 @@ function Calendar({
           <aside className="flex min-h-0 flex-col gap-3 overflow-y-auto">
             <PaintedSummary days={shown} cells={cells} />
             {shifts.length > 0 && <ShiftsCard shifts={shifts} />}
-            <div className="flex flex-col gap-1 px-1 text-xs font-medium text-[#66665E]">
-              <p>제출한 뒤에도 이 링크로 다시 고칠 수 있어요.</p>
-              <p>근무표가 확정되면 잠겨요.</p>
-            </div>
+            {!locked && (
+              <div className="flex flex-col gap-1 px-1 text-xs font-medium text-[#66665E]">
+                <p>제출한 뒤에도 이 링크로 다시 고칠 수 있어요.</p>
+                <p>근무표가 확정되면 잠겨요.</p>
+              </div>
+            )}
           </aside>
         </div>
       </main>
