@@ -651,13 +651,13 @@ export function upcomingRange(unit: PeriodUnit, periods: WorkPeriod[], today: st
 
 export type NextPeriodState = { state: "none" } | { state: "draft" | "confirmed"; period: WorkPeriod };
 
-/** 매장 홈: 운영 중 기간, 오늘 이후 시작하는 가장 이른 기간, 최근 기간(시작일 내림차순). */
+/** 매장 홈: 운영 중 기간, 오늘 이후 시작하는 가장 늦은 기간(지금 할 일), 최근 기간(시작일 내림차순). */
 export function homeSummary(
   periods: WorkPeriod[],
   today: string,
 ): { operating: WorkPeriod | null; next: NextPeriodState; recent: WorkPeriod[] } {
   const recent = [...periods].sort((a, b) => b.start_date.localeCompare(a.start_date));
-  const upcoming = recent.filter((p) => p.start_date > today).at(-1);
+  const upcoming = recent.find((p) => p.start_date > today);
   return {
     operating: periods.find((p) => isOperating(p, today)) ?? null,
     next: upcoming ? { state: upcoming.status, period: upcoming } : { state: "none" },
