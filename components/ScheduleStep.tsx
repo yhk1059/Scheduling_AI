@@ -35,6 +35,7 @@ import type {
 import { statsFromAssignments } from "@/lib/stats";
 import { describeRule, formatDeviation, hardnessLabel, josa, presetName } from "@/lib/wording";
 
+import Dialog from "./Dialog";
 import { Spinner, today } from "./RulesStep";
 import { ui } from "./ui";
 
@@ -462,6 +463,7 @@ export default function ScheduleStep() {
   const sv = useSolve(period?.id ?? "");
   const { setToast } = sv;
   const [confirming, setConfirming] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
   const stepPeriodId = period?.id ?? "";
 
   // ③에 들어오면 가능 시간을 다시 읽는다. 달라졌으면 아래 배너가 뜬다
@@ -576,7 +578,7 @@ export default function ScheduleStep() {
                   {loading && <Spinner />}
                   {loading ? "만드는 중…" : "다시 만들기"}
                 </button>
-                <button type="button" onClick={() => void onConfirm()} disabled={busy || blocked || outdated} className={ui.primaryLg}>
+                <button type="button" onClick={() => setConfirmOpen(true)} disabled={busy || blocked || outdated} className={ui.primaryLg}>
                   확정
                 </button>
               </div>
@@ -584,6 +586,26 @@ export default function ScheduleStep() {
           </div>
         }
       />
+
+      {/* 확정은 되돌릴 수 없어(직원 링크 잠김) 한 번 묻는다. 끝나면(성공·실패) 닫는다 */}
+      {confirmOpen && (
+        <Dialog
+          title="근무표를 확정할까요?"
+          onClose={() => setConfirmOpen(false)}
+          secondary={{ label: "취소", onClick: () => setConfirmOpen(false), disabled: confirming }}
+          primary={{
+            label: confirming ? "확정하는 중…" : "확정",
+            onClick: () => void onConfirm().finally(() => setConfirmOpen(false)),
+            disabled: confirming,
+          }}
+        >
+          <p>
+            확정하면 직원 링크가 잠겨요.
+            <br />
+            이후 변경은 변경 입력으로만 할 수 있어요.
+          </p>
+        </Dialog>
+      )}
     </div>
   );
 }
@@ -807,6 +829,7 @@ function ProposalCard({
           </>
         )}
       </p>
+      <p className="text-xs text-[#66665E]">이번 근무표에만 적용돼요. 매장 조건은 그대로예요</p>
       <div className="flex justify-end gap-1">
         <button type="button" onClick={onDismiss} className={ui.textSm}>
           무시
