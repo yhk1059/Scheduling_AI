@@ -69,7 +69,10 @@
     {
       "step": 8,
       "name": "employee-view-ui",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-11-05T20:51:55+0900",
+      "summary": "components/EmployeeSchedule.tsx(새, store 안 씀, getConfirmedSchedule만 호출): 로딩·오류는 LoadMessage(label '근무표'), null이면 주의 배너 '확정 근무표를 아직 불러올 수 없어요. 잠시 뒤 다시 열어 주세요' + [다시 시도]; 화면 = TopLine '· 근무표' → h1 '{매장 이름} · {이름}님의 근무표' + 날짜 범위(mono) + '확정 {M/D HH:MM}'(ShopHome shortTime) + 오른쪽 [이름 다시 고르기] Text → h2 '내 근무'(weekPages 주마다 ui.card 세로로 쌓음, 머리 '근무 {n}일 · {h}시간'(그 주의 employeeTotals), grid-cols-7 칸마다 '월 11/2'(mono, 토 청록·일/공휴일 빨강, 주말·공휴일 칸 bg-[#F1EEE6]) + 근무 셀(CELL+codeClass, 휴무는 빈 셀, aria-label '{이름} {M}월 {D}일 {코드}') + label('오픈 09:00~15:00'/'휴무')) → h2 '전체 근무표'(ui.card 안 ScheduleGrid readOnly·disabled·legend·hideViolations, 행 id=이름, 자기 행 이름 칸 강조) → 개인정보처리방침 링크. ScheduleGrid: 선택 prop highlightId 추가(이름 칸 rounded-xs bg-[#F0F6F8] px-1.5 font-semibold), 기존 동작 그대로. AvailabilityForm: picked = {kind:'availability',token}|{kind:'schedule',name}; TopLine({label}), LoadMessage({label}), PAGE export; 잠긴 이름 고르기는 TopLine '· 근무표', h1 '{매장 이름} · 근무표', 문장 '확정된 근무표예요. 내 이름을 고르면 근무표를 볼 수 있어요', '제출함' 배지 없음, 이름을 누르면 확인 없이 근무표; 제출 중 잠김(또는 이름 고른 뒤 잠김)이면 캘린더 하단 줄 '그사이 근무표가 확정됐어요. 이름 고르기로 돌아가면 근무표를 볼 수 있어요'(role=status). 없어진 것: 잠긴 링크의 보기 전용 캘린더 진입, '제출함' 배지(잠긴 뒤), '이미 확정된 근무표예요. 입력한 시간은 볼 수만 있어요', 하단 '이미 확정된 근무표예요'. e2e S12 11~13단계(잠긴 직원 화면: 문구, '박민수 제출함' 버튼 이름 → '박민수', 칠한 칸 34칸 보기 전용, 칸 클릭)는 마지막 step에서 근무표 보기로 바꿔야 함(14 submit 거부는 그대로). 결정: 전체 근무표 ScheduleResult는 HeroSequence처럼 빈 summary·stats로 채워 타입을 좁히지 않음; shifts가 비면 DEFAULT_CONFIG; 확정본에 그 이름 행이 없으면 내 근무에 '이 근무표에는 {이름}님의 근무가 없어요.'; 잠긴 하단 줄에는 [이름 다시 고르기]를 따로 두지 않음(머리 줄에 이미 있어 같은 이름 버튼 중복 방지); 확정본에 없는 날(code '')은 휴무처럼 빈 셀 + '—'. metadata.title '가능 시간 입력' 그대로(제안: 확정 뒤 상태를 위해 '근무표·가능 시간'처럼 중립적 이름 검토). 수동 브라우저 체크(테스트 Supabase·seed)는 하지 않음 — 확인 못 함.",
+      "completed_at": "2026-11-05T20:55:10+0900"
     },
     {
       "step": 9,
