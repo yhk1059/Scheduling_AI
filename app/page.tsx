@@ -292,11 +292,11 @@ type Actor = "사람" | "LLM" | "솔버";
 function AccuracyNote() {
   return (
     <div className="flex items-center gap-4 rounded-lg border border-[#E2E2DC] bg-white px-4 py-3">
-      <span className="font-mono text-[28px] leading-none font-semibold text-[#155E75]">99%</span>
+      <span className="font-mono text-[28px] leading-none font-semibold text-[#155E75]">97%</span>
       <div className="flex flex-col gap-0.5">
         <span className="text-[13px] font-semibold text-[#1B1B18]">번역 정확도</span>
         <span className={ui.help}>
-          매니저 말투 문장 100개 기준 ·{" "}
+          매니저 말투 문장 102개 기준 ·{" "}
           <a href={EVAL_URL} className="underline underline-offset-2 hover:text-[#1B1B18]">
             평가 결과 보기
           </a>

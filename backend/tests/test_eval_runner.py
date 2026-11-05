@@ -403,7 +403,7 @@ def test_real_dataset_has_cross_month_cases():
 def test_real_dataset_valid():
     cases = run.load_dataset(run.DATASET)
     assert run.validate_dataset(cases) == []
-    assert 80 <= len(cases) <= 100
+    assert 80 <= len(cases) <= 110
     sets = Counter(c["set"] for c in cases)
     assert sets["time-window"] >= 10
     assert sets["hours"] >= 5

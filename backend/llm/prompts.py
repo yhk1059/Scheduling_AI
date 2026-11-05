@@ -112,8 +112,8 @@ TRANSLATE_EXAMPLES: list[tuple[str, dict]] = [
     (
         "평일 오픈 2명, 주말은 3명",
         {"rules": [
-            _rule({"per": "day", "days": {"kind": "weekday"}}, _cmp(_n(A), "eq", _ref("min")), values={"min": _val(2, "인원")}),
-            _rule({"per": "day", "days": {"kind": "weekend"}}, _cmp(_n(A), "eq", _ref("min")), values={"min": _val(3, "인원")}),
+            _rule({"per": "day", "days": {"kind": "weekday"}}, _cmp(_n(A), "ge", _ref("min")), values={"min": _val(2, "최소 인원")}),
+            _rule({"per": "day", "days": {"kind": "weekend"}}, _cmp(_n(A), "ge", _ref("min")), values={"min": _val(3, "최소 인원")}),
         ]},
     ),
     (
@@ -281,7 +281,7 @@ TRANSLATE_EXAMPLES: list[tuple[str, dict]] = [
             "config_changes": [{"action": "add", "shift": {"code": "P", "name": "피크", "hours": 3, "start": "11:00", "end": "14:00"}}],
             "rules": [
                 _rule({"per": "day", "days": {"kind": "weekday"}}, _cmp(_n(A), "ge", _ref("min")), values={"min": _val(2, "최소 인원")}),
-                _rule({"per": "day", "days": {"kind": "weekend"}}, _cmp(_n(A), "eq", _ref("min")), values={"min": _val(3, "인원")}),
+                _rule({"per": "day", "days": {"kind": "weekend"}}, _cmp(_n(A), "ge", _ref("min")), values={"min": _val(3, "최소 인원")}),
             ],
         },
     ),
@@ -359,7 +359,8 @@ TRANSLATE_SYSTEM = f"""\
 - "e01"처럼 쓴 사람은 context 명단의 가명 id다. "리더", "신입" 태그는 context.known_tags에 있을 때만 쓴다.
 - 금지 순서는 패턴마다 규칙을 하나씩 낸다. 최소·최대 연속처럼 두 가지를 함께 말하면 규칙 두 개로 낸다.
 - 매장 소개 문장(근무 형태와 필요 인원 여러 개를 한 번에)은 config_changes와 필요 인원 규칙 여러 개로 낸다.
-- 필요 인원은 범위를 받는다: "3~4명"은 all[ge min, le max], "3명 이상"은 ge, "3명", "딱 3명"은 eq.
+- 필요 인원은 범위를 받는다: "3~4명"은 all[ge min, le max], "3명", "3명 이상", "최소 3명"은 ge(값 이름 min, label "최소 인원"),
+  "정확히 3명", "딱 3명"처럼 같음을 분명히 말할 때만 eq(label "인원").
 매장 조건(scope "shop")은 모든 기간에 적용되고, 요청(scope "period")은 이번 기간에만 적용되는 요청이다. scope는 서버가 정하므로 출력하지 않는다.
 한 문장에 규칙이 여러 개면 규칙을 여러 개 낸다. 한 사람이 여러 근무를 요청하면 각각 낸다.
 "주말엔 오픈만 하고 싶대요"처럼 "X만"은 X 희망 하나만 낸다. 말하지 않은 다른 근무의 기피를 덧붙이지 않는다.
@@ -385,7 +386,7 @@ context.config.shifts의 근무조에는 start, end(HH:MM)가 있다. 근무조 
 4. 나뉜 구간 중 하나라도 덮는 근무조가 없으면 rules를 비우고 clarification_question으로 되묻는다.
 5. 시각 없이 "점심시간", "피크 때"처럼 말하면 근무조 이름과 정확히 맞는 말이 아닌 한 되묻는다.
 - 복합 코드는 start, end가 없다. 코드 집합에 넣지 않아도 parts의 근무조를 셀 때 함께 세어진다. active가 false인 근무조는 쓰지 않는다.
-- 인원 표현은 필요 인원과 같다("최소 3명"은 ge, "3명"은 eq, "3~4명"은 all). 태그를 말하면 Count의 who에 넣는다.
+- 인원 표현은 필요 인원과 같다("3명", "최소 3명"은 ge, "정확히 3명", "딱 3명"만 eq, "3~4명"은 all). 태그를 말하면 Count의 who에 넣는다.
 예시. 근무조가 A 09:00~15:00, M 12:00~18:00, C 17:00~23:00일 때:
 {_examples(TIME_WINDOW_EXAMPLES)}
   ("14시~18시"는 14~15시를 A, M이, 15~17시를 M이, 17~18시를 M, C가 덮어서 규칙이 3개다.)
