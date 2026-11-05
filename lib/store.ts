@@ -407,6 +407,16 @@ export function liveShopRules(shop: Shop, period: WorkPeriod | null): Constraint
     .filter((r) => r.enabled !== false && !period?.disabledIds.includes(r.id));
 }
 
+/** 이번 근무표에서 끈 규칙·요청(disabledIds 순). 확정 근무표는 snapshot의 매장 규칙에서, 아니면 shop.rules에서 찾는다. 없는 id는 건너뛴다. */
+export function disabledRulesFor(shop: Shop, period: WorkPeriod): ConstraintSpec[] {
+  const { rules } = basis(shop, period);
+  return period.disabledIds.flatMap((id) => {
+    const rule = rules.find((r) => r.id === id);
+    const c = rule ? (period.ruleOverrides[id] ?? rule) : period.requests.find((r) => r.id === id);
+    return c ? [c] : [];
+  });
+}
+
 /** 근무조·필요 인원 요약표에 든 규칙 id. 이 규칙들은 ②에서 카드로 다시 보여 주지 않는다. */
 export function summarizedCoverageIds(shop: Shop, period: WorkPeriod | null): string[] {
   const rules = liveShopRules(shop, period);

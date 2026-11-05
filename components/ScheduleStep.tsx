@@ -14,6 +14,7 @@ import {
   type Code,
   COVERAGE_SOURCE_TEXT,
   currentPeriod,
+  disabledRulesFor,
   toScheduleRequest,
   useAppStore,
   type WorkPeriod,
@@ -352,6 +353,10 @@ export function ScheduleBody({
   const stale = !busy && shownVersion !== null && shownVersion !== inputVersion;
   const evidence = result ? historyEvidence(rows, result, history, shop.config) : null;
   const care = result ? closingCare(rows, result, history, shop.config) : null;
+  const disabledRules = disabledRulesFor(shop, period).map((c) => ({
+    name: presetName(c),
+    text: describeRule(c, shop.config, employees, period).text,
+  }));
   const outcomePanel = outcome && (
     <OutcomePanel
       outcome={outcome}
@@ -393,7 +398,7 @@ export function ScheduleBody({
         <>
           <div className="flex flex-wrap items-end justify-between gap-6">
             {summaryLead}
-            <SummaryCard result={result} infeasible={outcome !== null} confirmed={isConfirmed} draft={isDraft} legacy={legacy} care={care} />
+            <SummaryCard result={result} infeasible={outcome !== null} confirmed={isConfirmed} draft={isDraft} legacy={legacy} care={care} disabled={disabledRules} />
             {hint}
           </div>
           {legacy && <p className="-mt-2 text-sm text-[#66665E]">변환 전에 확정한 근무표예요. 희망 반영과 못 지킨 규칙은 보여 주지 않아요.</p>}
@@ -821,6 +826,7 @@ export function SummaryCard({
   draft,
   legacy = false,
   care = null,
+  disabled = [],
 }: {
   result: ScheduleResult;
   infeasible: boolean;
@@ -830,6 +836,8 @@ export function SummaryCard({
   legacy?: boolean;
   /** "최근 4주 마감 배려" 칸. 없으면 그리지 않는다 */
   care?: { label: string; text: string } | null;
+  /** 이번 근무표에서 끈 규칙(제목 · 해석 문장). 비어 있으면 칸을 그리지 않는다 */
+  disabled?: { name: string; text: string }[];
 }) {
   const { summary } = result;
   const item = "flex flex-col gap-1 border-r border-[#E2E2DC] px-5 py-3.5 last:border-r-0";
@@ -845,6 +853,7 @@ export function SummaryCard({
           ) : (
             <span className={`${ui.badge} bg-[#E6F2EA] text-[#1E6B3F]`}>반드시 규칙을 모두 지켰어요</span>
           )}
+          {disabled.length > 0 && <span className={`${ui.badge} bg-[#FDF0DC] text-[#7A4506]`}>끈 규칙 {disabled.length}개</span>}
           {!result.optimal && <span className={`${ui.badge} bg-[#FDF0DC] text-[#7A4506]`}>더 나은 배치가 있을 수 있어요</span>}
           {confirmed && <span className={`${ui.badge} bg-[#E6F2EA] text-[#1E6B3F]`}>확정</span>}
           {draft && <span className={`${ui.badge} border border-[#C9C9C1] bg-white text-[#3D3D38]`}>작성 중</span>}
@@ -864,6 +873,20 @@ export function SummaryCard({
             <span className={`${value} text-[#A15C07]`}>{summary.soft_violation_count}</span>
           </div>
         </>
+      )}
+      {disabled.length > 0 && (
+        <div className={item}>
+          <span className={label}>이번 근무표에서 끈 규칙</span>
+          <span className={`${value} text-[#1B1B18]`}>{disabled.length}개</span>
+          <ul className="flex flex-col text-xs text-[#3D3D38]">
+            {disabled.slice(0, 3).map((d, i) => (
+              <li key={i}>
+                {d.name} · {d.text}
+              </li>
+            ))}
+            {disabled.length > 3 && <li>외 {disabled.length - 3}개</li>}
+          </ul>
+        </div>
       )}
       {result.diff && (
         <div className={item}>
