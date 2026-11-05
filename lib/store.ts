@@ -215,6 +215,8 @@ export interface AppState extends Data {
   updateRule: (id: string, patch: CardPatch) => void;
   /** 조정 가능한 값 하나를 바꾼다. 이름이 없거나 값이 0보다 작으면 아무것도 하지 않는다. */
   setRuleValue: (id: string, name: string, value: number) => void;
+  /** 이상·정확히를 바꾼다(comparisonOf가 null이 아닌 규칙만). 바꿀 수 없으면 아무것도 하지 않는다. */
+  setRuleComparison: (id: string, op: Comparison) => void;
   /** 설정 카드를 지우면 딸린 대기 규칙 카드도 지운다. 기본 규칙은 지우지 않고 끈다. */
   removeRule: (id: string) => void;
   /** 끈 매장 규칙(기본 규칙)을 다시 켠다. */
@@ -242,6 +244,7 @@ export interface AppState extends Data {
   applyRequest: (periodId: string, id: string) => void;
   updateRequest: (periodId: string, id: string, patch: CardPatch) => void;
   setRequestValue: (periodId: string, id: string, name: string, value: number) => void;
+  setRequestComparison: (periodId: string, id: string, op: Comparison) => void;
   removeRequest: (periodId: string, id: string) => void;
   /** 이 기간의 disabledIds만 바꾼다. 매장 규칙·요청 원본은 그대로 둔다. */
   setDisabled: (periodId: string, constraintId: string, disabled: boolean) => void;
@@ -483,6 +486,40 @@ export function withRuleValue(c: ConstraintSpec, name: string, value: number): C
     next = { ...next, body: { ...c.body, for_each: { ...c.body.for_each, window: value + 1 } } };
   }
   return normalizeRule(next);
+}
+
+export type Comparison = "ge" | "eq";
+
+/** 비교를 고를 수 있는 규칙의 then(비교 하나, 오른쪽이 조정 가능한 값, op ge·eq, offset 없음). 세는 모양이 아니면 null. */
+function comparisonCmp(c: ConstraintSpec): (Cmp & { right: { value: string } }) | null {
+  if (c.type !== "rule" || ruleShape(c)?.kind !== "count") return null;
+  const r = normalizeRule(c) as Rule;
+  if (r.body.kind !== "require" || r.body.when) return null;
+  const then = r.body.then;
+  if (!("left" in then) || then.left.offset || (then.op !== "ge" && then.op !== "eq")) return null;
+  const right = then.right;
+  if (typeof right !== "object" || !("value" in right) || "shifts" in right || !r.values?.[right.value]) return null;
+  return then as Cmp & { right: { value: string } };
+}
+
+/** [수정] 폼에서 고를 수 있는 비교. then이 비교 하나이고 오른쪽이 조정 가능한 값이며 op가 ge·eq인 세기 규칙만. 아니면 null. */
+export function comparisonOf(c: ConstraintSpec): Comparison | null {
+  return (comparisonCmp(c)?.op as Comparison | undefined) ?? null;
+}
+
+/** 비교를 바꾼 규칙(normalizeRule 적용). 바꿀 수 없는 규칙이면 null. 값 label은 "최소 인원" ↔ "인원"처럼 "최소 " 접두사를 넣고 뺀다. */
+export function withRuleComparison(c: ConstraintSpec, op: Comparison): ConstraintSpec | null {
+  const then = comparisonCmp(c);
+  if (!then || c.type !== "rule" || c.body.kind !== "require") return null;
+  const r = normalizeRule(c) as Rule;
+  const name = then.right.value;
+  const v = r.values![name];
+  const label = op === "eq" ? v.label.replace(/^최소 /, "") : v.label.startsWith("최소 ") ? v.label : `최소 ${v.label}`;
+  return normalizeRule({
+    ...r,
+    values: { ...r.values, [name]: { ...v, label } },
+    body: { ...(r.body as typeof c.body), then: { ...then, op } },
+  });
 }
 
 /** 검증된 제안 변경 하나(set_value·set_hardness)를 규칙에 반영한다. 반영할 수 없으면 그대로. */
@@ -1124,6 +1161,16 @@ export function createAppStore(getStorage: () => Storage, now: () => Date = () =
             if (pending) editShop((w) => ({ ...w, pendingRules: swap(w.pendingRules), examples: withoutExamples(w.examples, [id]) }), false);
             else editShop((w) => ({ ...w, rules: swap(w.rules), examples: withoutExamples(w.examples, [id]) }));
           },
+          setRuleComparison: (id, op) => {
+            const w = get().shop;
+            const pending = w?.pendingRules.find((c) => c.id === id);
+            const applied = w?.rules.find((c) => c.id === id);
+            const next = (pending ?? applied) && withRuleComparison((pending ?? applied)!, op);
+            if (!next) return;
+            const swap = (list: ConstraintSpec[]) => list.map((c) => (c.id === id ? next : c));
+            if (pending) editShop((w) => ({ ...w, pendingRules: swap(w.pendingRules), examples: withoutExamples(w.examples, [id]) }), false);
+            else editShop((w) => ({ ...w, rules: swap(w.rules), examples: withoutExamples(w.examples, [id]) }));
+          },
           removeRule: (id) => {
             const w = get().shop;
             const config = w?.pendingConfig.find((c) => c.id === id);
@@ -1270,6 +1317,17 @@ export function createAppStore(getStorage: () => Storage, now: () => Date = () =
             const pending = period?.pendingRequests.find((c) => c.id === id);
             const applied = period?.requests.find((c) => c.id === id);
             const next = (pending ?? applied) && withRuleValue((pending ?? applied)!, name, value);
+            if (!next) return;
+            const swap = (list: ConstraintSpec[]) => list.map((c) => (c.id === id ? next : c));
+            if (pending)
+              editPeriod(periodId, (p) => ({ ...p, pendingRequests: swap(p.pendingRequests), examples: withoutExamples(p.examples, [id]) }), false);
+            else editPeriod(periodId, (p) => ({ ...p, requests: swap(p.requests), examples: withoutExamples(p.examples, [id]) }));
+          },
+          setRequestComparison: (periodId, id, op) => {
+            const period = get().periods.find((p) => p.id === periodId);
+            const pending = period?.pendingRequests.find((c) => c.id === id);
+            const applied = period?.requests.find((c) => c.id === id);
+            const next = (pending ?? applied) && withRuleComparison((pending ?? applied)!, op);
             if (!next) return;
             const swap = (list: ConstraintSpec[]) => list.map((c) => (c.id === id ? next : c));
             if (pending)

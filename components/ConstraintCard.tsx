@@ -6,6 +6,8 @@ import type { Priority } from "@/lib/rules";
 import {
   applyShiftChange,
   type CardPatch,
+  type Comparison,
+  comparisonOf,
   COVERAGE_SOURCE_TEXT,
   currentPeriod,
   type Hardness,
@@ -64,6 +66,27 @@ function FieldInput({ field, value, onChange }: { field: Field; value: string; o
     <label className="flex flex-col gap-1">
       <span className={ui.label}>{field.label}</span>
       <input inputMode="decimal" value={value} onChange={(e) => onChange(e.target.value)} className={`${ui.input} h-8! w-20 font-mono`} />
+    </label>
+  );
+}
+
+const COMPARISONS: { value: Comparison; label: string }[] = [
+  { value: "ge", label: "이상" },
+  { value: "eq", label: "정확히" },
+];
+
+/** 비교 하나에 값이 걸린 세기 규칙만 이상·정확히를 고른다(식 구조에서 연 유일한 예외). */
+function ComparisonSelect({ value, onChange }: { value: Comparison; onChange: (op: Comparison) => void }) {
+  return (
+    <label className="flex flex-col gap-1">
+      <span className="sr-only">비교</span>
+      <select value={value} onChange={(e) => onChange(e.target.value as Comparison)} className={`${ui.input} h-8! px-2`}>
+        {COMPARISONS.map((c) => (
+          <option key={c.value} value={c.value}>
+            {c.label}
+          </option>
+        ))}
+      </select>
     </label>
   );
 }
@@ -313,6 +336,7 @@ export default function ConstraintCard({
   const period = useAppStore(currentPeriod);
 
   const [draft, setDraft] = useState<Draft | null>(null);
+  const [op, setOp] = useState<Comparison | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [showExamples, setShowExamples] = useState(false);
 
@@ -328,6 +352,8 @@ export default function ConstraintCard({
     isRule ? store.updateRule(id, patch) : store.updateRequest(period!.id, id, patch);
   const setValue = (id: string, name: string, value: number) =>
     isRule ? store.setRuleValue(id, name, value) : store.setRequestValue(period!.id, id, name, value);
+  const setComparison = (id: string, op: Comparison) =>
+    isRule ? store.setRuleComparison(id, op) : store.setRequestComparison(period!.id, id, op);
   const removeCard = (id: string) => (isRule ? store.removeRule(id) : store.removeRequest(period!.id, id));
   // 기본 규칙(필요 인원)은 [삭제] 대신 [끄기]다. 매장 규칙 원본에서 끈 것(enabled=false)
   const isDefault = card.type === "rule" && card.default === true;
@@ -355,6 +381,8 @@ export default function ConstraintCard({
       return;
     }
     for (const [name, value] of Object.entries(out.values)) setValue(card.id, name, value);
+    // 값 먼저, 비교 다음
+    if (op && op !== comparisonOf(card)) setComparison(card.id, op);
     setDraft(null);
     setError(null);
   };
@@ -392,9 +420,10 @@ export default function ConstraintCard({
               {fields.map((f) => (
                 <FieldInput key={f.key} field={f} value={draft[f.key]} onChange={(v) => setDraft({ ...draft, [f.key]: v })} />
               ))}
+              {op && <ComparisonSelect value={op} onChange={setOp} />}
             </div>
             {error && <p className={ui.error}>{error}</p>}
-            <p className={ui.help}>바꾸려면 말로 다시 적어 주세요</p>
+            <p className={ui.help}>{op ? "값과 이상/정확히만 바꿀 수 있어요. 다른 건 말로 다시 적어 주세요" : "바꾸려면 말로 다시 적어 주세요"}</p>
           </div>
         )}
 
@@ -505,7 +534,14 @@ export default function ConstraintCard({
                 </button>
               )}
               {editable && (
-                <button type="button" onClick={() => setDraft(toDraft(card))} className={ui.textSm}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setDraft(toDraft(card));
+                    setOp(comparisonOf(card));
+                  }}
+                  className={ui.textSm}
+                >
                   수정
                 </button>
               )}

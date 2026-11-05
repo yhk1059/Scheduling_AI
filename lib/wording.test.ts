@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { DEFAULT_CONFIG } from "./rules";
 import { balance, count, fixedCell, forbid, maxRun, minRun, OFF, offAfter, WORK } from "./test-rules";
-import { isLeaveRule, type Shop, type WorkPeriod } from "./store";
+import { isLeaveRule, withRuleComparison, type Shop, type WorkPeriod } from "./store";
 import type { ConstraintSpec, Employee, Rule, Shifts, ShopConfig } from "./types.gen";
 import {
   describeRule,
@@ -269,6 +269,12 @@ describe("describeRule: 조정 가능한 값의 위치(parts)", () => {
     expect(s.text).toBe("평일마다 오픈 3~4명");
     expect(s.parts).toEqual([{ text: "평일마다 오픈 " }, { value: "min", text: "3" }, { text: "~" }, { value: "max", text: "4" }, { text: "명" }]);
     expect(s.parts.map((p) => p.text).join("")).toBe(s.text);
+  });
+
+  it("[수정]에서 정확히를 이상으로 바꾸면 문장도 따라 바뀐다", () => {
+    const exact = count({ days: { kind: "weekday" }, shifts: A, per: "day", min: 2, max: 2 });
+    expect(text(exact)).toBe("평일마다 오픈 2명");
+    expect(text(withRuleComparison(exact, "ge")!)).toBe("평일마다 오픈 2명 이상");
   });
 
   it("최대 연속·고르게 차이도 값, 구조 숫자(휴무 일수 offset)는 값이 아니다", () => {
