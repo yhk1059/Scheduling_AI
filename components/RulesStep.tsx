@@ -3,11 +3,13 @@
 import { useState, type ReactNode } from "react";
 
 import { ApiError, errorMessage, translate } from "@/lib/api";
+import { findCoverageConflict } from "@/lib/coverage-conflict";
 import { firstPeriodStart, periodFrom, type PeriodRange, type PeriodUnit } from "@/lib/period";
 import {
   cardsInOrder,
   currentPeriod,
   findReplaced,
+  liveShopRules,
   summarizedCoverageIds,
   toScheduleRequest,
   useAppStore,
@@ -119,6 +121,21 @@ export default function RulesStep({
     )
     .map(({ x }) => x);
 
+  // 대기 매장 규칙 카드가 적용되면 함께 지킬 수 없는 기존 필요 인원 규칙. 대체될 규칙은 [기존 규칙 대체]로 안내하므로 뺀다
+  const conflictOf = (c: ConstraintSpec) => {
+    if (scope !== "shop") return undefined;
+    const replaced = findReplaced(shop.rules, c);
+    const live = stepPeriod ? liveShopRules(shop, stepPeriod) : shop.rules.filter((r) => r.enabled !== false);
+    return (
+      findCoverageConflict(
+        live.filter((r) => r.id !== replaced?.id),
+        c,
+        stepPeriod ?? previewRange(shop.unit),
+        stepPeriod?.holidays ?? [],
+      ) ?? undefined
+    );
+  };
+
   const renderCard = (c: ConstraintSpec, isPending: boolean) =>
     isPending ? (
       <ConstraintCard
@@ -126,6 +143,7 @@ export default function RulesStep({
         card={c}
         pending
         replaces={findReplaced(scope === "shop" ? shop.rules : period!.requests, c)}
+        conflict={conflictOf(c)}
         compact={scope === "period"}
       />
     ) : scope === "period" ? (
@@ -285,6 +303,7 @@ export default function RulesStep({
                         card={c}
                         pending
                         replaces={findReplaced(shop.rules, c)}
+                        conflict={conflictOf(c)}
                         withConfig={cfg.change.shift.code}
                       />
                     </div>
