@@ -5,6 +5,7 @@ import {
   canRevertToConfirmed,
   carryOverChanged,
   cardsInOrder,
+  comparisonOf,
   coverageRange,
   coverageRule,
   createAppStore,
@@ -25,11 +26,12 @@ import {
   summarizedCoverageIds,
   tagCoverage,
   viewForPeriod,
+  withRuleComparison,
   type ShopRemote,
 } from "./store";
 import type { AvailabilitySlots } from "./availability";
 import { dateOfDay } from "./period";
-import { DEFAULT_CONFIG, STORAGE_VERSION } from "./rules";
+import { DEFAULT_CONFIG, normalizeRule, STORAGE_VERSION } from "./rules";
 import { balance, count, DEN_CONFIG, fixedCell, forbid as forbidRule, maxRun, OFF, WORK } from "./test-rules";
 import type { ConstraintSpec, Rule, RuleExample, ScheduleResult } from "./types.gen";
 
@@ -315,6 +317,64 @@ describe("매장 규칙 카드", () => {
     expect(store.getState().inputVersion).toBe(v + 1);
   });
 
+  it("comparisonOf: 조정 가능한 값 하나에 건 이상·정확히 세기 규칙만 연다", () => {
+    const exact = countCard("x", { days: { kind: "weekday" }, shifts: { in: ["D"] }, per: "day", min: 2, max: 2 });
+    const atLeast = countCard("y", { shifts: { in: ["D"] }, per: "day", min: 2 });
+    expect(comparisonOf(exact)).toBe("eq");
+    expect(comparisonOf(atLeast)).toBe("ge");
+    expect(comparisonOf(minOff("m", 8))).toBe("ge");
+    // 범위·이하·최대 연속·순서·고르게·칸 고정은 열지 않는다
+    expect(comparisonOf(countCard("r", { shifts: { in: ["D"] }, per: "day", min: 1, max: 2 }))).toBeNull();
+    expect(comparisonOf(countCard("le", { shifts: { in: ["D"] }, per: "day", max: 2 }))).toBeNull();
+    expect(comparisonOf(maxWork("w", 5))).toBeNull();
+    expect(comparisonOf(forbid("f", "N", "D"))).toBeNull();
+    expect(comparisonOf(nightFair("b"))).toBeNull();
+    expect(comparisonOf(fixed("fx", "e01", 3, "D"))).toBeNull();
+    // 조건부(when)도 열지 않는다
+    const cond = { ...(atLeast as Rule), body: { ...(atLeast as Rule).body, when: ((atLeast as Rule).body as { then: unknown }).then } } as ConstraintSpec;
+    expect(comparisonOf(cond)).toBeNull();
+    // 오른쪽이 숫자면(조정 가능한 값이 아니면) 열지 않는다
+    const literal = { ...(atLeast as Rule), body: { ...(atLeast as Rule).body, then: { ...((atLeast as Rule).body as { then: object }).then, right: 2 } } } as ConstraintSpec;
+    expect(comparisonOf(literal)).toBeNull();
+  });
+
+  it("withRuleComparison: op와 값 label만 바꾸고 나머지는 그대로 둔다", () => {
+    const exact = countCard("x", { days: { kind: "weekday" }, shifts: { in: ["D"] }, per: "day", min: 2, max: 2 }, { default: true, hardness: "soft" });
+    const ge = withRuleComparison(exact, "ge") as Rule;
+    expect(ge).toMatchObject({ id: "x", hardness: "soft", default: true, values: { min: { value: 2, label: "최소 인원" } } });
+    expect(ge.body).toMatchObject({ kind: "require", for_each: { per: "day", days: { kind: "weekday" } }, then: { op: "ge", right: { value: "min" } } });
+    expect(comparisonOf(ge)).toBe("ge");
+    const back = withRuleComparison(ge, "eq") as Rule;
+    expect(back.values!.min.label).toBe("인원");
+    expect(back.body).toEqual((exact as Rule).body);
+    // "최소 휴무 일수" → "휴무 일수" → "최소 휴무 일수", 이미 맞으면 그대로
+    const off = withRuleComparison(withRuleComparison(minOff("m", 8), "eq")!, "ge") as Rule;
+    expect(off.values!.min).toEqual({ value: 8, label: "최소 휴무 일수" });
+    expect((withRuleComparison(minOff("m", 8), "ge") as Rule).values!.min.label).toBe("최소 휴무 일수");
+    expect(withRuleComparison(maxWork("w", 5), "eq")).toBeNull();
+    expect(withRuleComparison(countCard("r", { shifts: { in: ["D"] }, per: "day", min: 1, max: 2 }), "eq")).toBeNull();
+  });
+
+  it("setRuleComparison: 대기 카드는 inputVersion 없이, 적용된 규칙은 올리며 원본을 바꾼다", () => {
+    const store = fresh();
+    startDenShop(store);
+    const exact = (id: string) => countCard(id, { shifts: { in: ["D"] }, per: "day", min: 2, max: 2 });
+    store.getState().addPendingRules([exact("p"), exact("q")]);
+    store.getState().applyRule("q");
+    const v = store.getState().inputVersion;
+    store.getState().setRuleComparison("p", "ge");
+    expect(comparisonOf(store.getState().shop!.pendingRules[0])).toBe("ge");
+    expect(store.getState().inputVersion).toBe(v);
+    store.getState().setRuleComparison("q", "ge");
+    expect(comparisonOf(byId(store.getState().shop!.rules, "q"))).toBe("ge");
+    expect(store.getState().inputVersion).toBe(v + 1);
+    store.getState().addPendingRules([maxWork("w", 5)]);
+    store.getState().setRuleComparison("w", "eq");
+    store.getState().setRuleComparison("없음", "eq");
+    expect(byId(store.getState().shop!.pendingRules, "w")).toEqual(normalizeRule(maxWork("w", 5)));
+    expect(store.getState().inputVersion).toBe(v + 1);
+  });
+
   it("removeRule: 기본 규칙은 지우지 않고 끈다", () => {
     const store = fresh();
     startDenShop(store);
@@ -581,6 +641,22 @@ describe("기간 입력", () => {
     store.getState().removeRequest(id, "l1");
     expect(period().requests.map((c) => c.id)).toEqual(["l2"]);
     expect(store.getState().inputVersion).toBe(v + 8);
+  });
+
+  it("setRequestComparison: 요청의 이상·정확히를 바꾸고 inputVersion을 올린다", () => {
+    const { store, id, period } = withPeriod();
+    const wish = countCard("w", { people: { ids: ["e01"] }, shifts: OFF, per: "person", min: 3 }, { scope: "period", hardness: "soft" });
+    store.getState().addPendingRequests(id, [wish]);
+    const v = store.getState().inputVersion;
+    store.getState().setRequestComparison(id, "w", "eq");
+    expect(comparisonOf(period().pendingRequests[0])).toBe("eq");
+    expect(store.getState().inputVersion).toBe(v);
+    store.getState().applyRequest(id, "w");
+    const v2 = store.getState().inputVersion;
+    store.getState().setRequestComparison(id, "w", "ge");
+    expect(period().requests[0]).toMatchObject({ values: { min: { value: 3, label: "최소 휴무 일수" } } });
+    expect(comparisonOf(period().requests[0])).toBe("ge");
+    expect(store.getState().inputVersion).toBe(v2 + 1);
   });
 
   it("setFixed는 같은 칸의 고정을 교체하고 원문의 M/D는 실제 날짜, clearFixed는 그 칸만 지운다", () => {
