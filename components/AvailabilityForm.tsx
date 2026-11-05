@@ -8,24 +8,27 @@ import { formatRange, periodDays, type PeriodDay } from "@/lib/period";
 import { getAvailability, getAvailabilityRoster, submitAvailability, type AvailabilityRoster, type EmployeeAvailability, type RosterShift } from "@/lib/supabase";
 
 import { ui } from "./ui";
+import EmployeeSchedule from "./EmployeeSchedule";
 import Wordmark from "./Wordmark";
 
 const WEEKDAYS = ["일", "월", "화", "수", "목", "금", "토"];
 const DAYS_PER_PAGE = 7;
 const SLOTS = Array.from({ length: SLOT_COUNT }, (_, i) => i);
-const PAGE = "mx-auto flex w-full max-w-[1360px] px-10";
+export const PAGE = "mx-auto flex w-full max-w-[1360px] px-10";
 const HEAD_HEIGHT = 44;
 /** 머리 행 + 칸 16px × 36 + 테두리. 화면이 이보다 낮으면 칸이 14px까지 줄어든다. */
 const CALENDAR_MAX_HEIGHT = HEAD_HEIGHT + 16 * SLOT_COUNT + 2;
 
 type Load = { kind: "loading" } | { kind: "error" } | { kind: "not_found" } | { kind: "ok"; link: EmployeeAvailability };
 type RosterLoad = { kind: "loading" } | { kind: "error" } | { kind: "not_found" } | { kind: "ok"; roster: AvailabilityRoster };
+/** 고른 이름: 확정 전에는 그 직원 토큰으로 가능 시간 입력, 확정 뒤에는 이름으로 근무표 보기. */
+type Picked = { kind: "availability"; token: string } | { kind: "schedule"; name: string };
 
-/** 직원 가능 시간 입력(/a/{공용 토큰}). 이름을 고른 뒤 캘린더로 간다. 로그인을 요구하지 않고 store를 쓰지 않는다. */
+/** 직원 가능 시간 입력(/a/{공용 토큰}). 이름을 고른 뒤 캘린더로 간다. 확정된 근무표면 이름을 고른 뒤 근무표를 본다. 로그인을 요구하지 않고 store를 쓰지 않는다. */
 export default function AvailabilityForm({ token }: { token: string }) {
   const [load, setLoad] = useState<RosterLoad>({ kind: "loading" });
   const [attempt, setAttempt] = useState(0);
-  const [picked, setPicked] = useState<string | null>(null);
+  const [picked, setPicked] = useState<Picked | null>(null);
 
   useEffect(() => {
     let live = true;
@@ -42,36 +45,37 @@ export default function AvailabilityForm({ token }: { token: string }) {
   }, [token, attempt]);
 
   const retry = () => setAttempt((n) => n + 1);
+  const back = () => {
+    setPicked(null);
+    retry();
+  };
+  if (picked?.kind === "schedule") return <EmployeeSchedule key={picked.name} token={token} name={picked.name} onBack={back} />;
   if (picked)
+    return <EmployeeForm key={picked.token} token={picked.token} shifts={load.kind === "ok" ? load.roster.shifts : []} onBack={back} />;
+  if (load.kind === "ok")
     return (
-      <EmployeeForm
-        key={picked}
-        token={picked}
-        shifts={load.kind === "ok" ? load.roster.shifts : []}
-        onBack={() => {
-          setPicked(null);
-          retry();
-        }}
+      <NamePicker
+        roster={load.roster}
+        onPick={(e) => setPicked(load.roster.locked ? { kind: "schedule", name: e.employee_name } : { kind: "availability", token: e.link_token })}
       />
     );
-  if (load.kind === "ok") return <NamePicker roster={load.roster} onPick={setPicked} />;
   return <LoadMessage kind={load.kind} onRetry={retry} />;
 }
 
 /** 맨 위 줄: 작은 워드마크 + 화면 이름. */
-function TopLine() {
+export function TopLine({ label = "가능 시간 입력" }: { label?: string }) {
   return (
     <div className="flex h-5 items-center gap-1.5">
       <Wordmark size="small" />
-      <span className="text-[13px] text-[#66665E]">· 가능 시간 입력</span>
+      <span className="text-[13px] text-[#66665E]">· {label}</span>
     </div>
   );
 }
 
-function LoadMessage({ kind, onRetry }: { kind: "loading" | "error" | "not_found"; onRetry: () => void }) {
+export function LoadMessage({ kind, onRetry, label }: { kind: "loading" | "error" | "not_found"; onRetry: () => void; label?: string }) {
   return (
     <main className={`${PAGE} flex-col gap-4 py-6`}>
-      <TopLine />
+      <TopLine label={label} />
       {kind === "loading" && (
         <p role="status" className="text-sm text-[#3D3D38]">
           불러오는 중…
@@ -90,21 +94,25 @@ function LoadMessage({ kind, onRetry }: { kind: "loading" | "error" | "not_found
   );
 }
 
-/** 이름 고르기. 이미 제출한 이름은 다른 사람 입력을 덮어쓰지 않게 한 번 더 묻는다. */
-function NamePicker({ roster, onPick }: { roster: AvailabilityRoster; onPick: (token: string) => void }) {
-  const [confirming, setConfirming] = useState<AvailabilityRoster["employees"][number] | null>(null);
+type RosterEmployee = AvailabilityRoster["employees"][number];
+
+/** 이름 고르기. 이미 제출한 이름은 다른 사람 입력을 덮어쓰지 않게 한 번 더 묻는다. 확정 뒤에는 묻지 않고 근무표로 간다. */
+function NamePicker({ roster, onPick }: { roster: AvailabilityRoster; onPick: (employee: RosterEmployee) => void }) {
+  const [confirming, setConfirming] = useState<RosterEmployee | null>(null);
   const range = { start_date: roster.period_start, length: roster.period_length };
 
   return (
     <main className={`${PAGE} flex-col gap-5 py-6`}>
-      <TopLine />
+      <TopLine label={roster.locked ? "근무표" : undefined} />
       <header className="flex flex-col gap-1">
-        <h1 className={ui.pageTitle}>{roster.shop_name} · 가능 시간 입력</h1>
+        <h1 className={ui.pageTitle}>
+          {roster.shop_name} · {roster.locked ? "근무표" : "가능 시간 입력"}
+        </h1>
         <span className="font-mono text-sm text-[#66665E]">{formatRange(range)}</span>
       </header>
       {roster.locked ? (
         <p role="status" className="text-sm text-[#3D3D38]">
-          이미 확정된 근무표예요. 입력한 시간은 볼 수만 있어요
+          확정된 근무표예요. 내 이름을 고르면 근무표를 볼 수 있어요
         </p>
       ) : (
         <p className="text-sm text-[#7A4506] md:hidden">PC에서 입력해 주세요. 휴대폰에서는 드래그할 수 없어요</p>
@@ -116,18 +124,18 @@ function NamePicker({ roster, onPick }: { roster: AvailabilityRoster; onPick: (t
             <button
               key={e.link_token}
               type="button"
-              onClick={() => (e.submitted && !roster.locked ? setConfirming(e) : onPick(e.link_token))}
+              onClick={() => (e.submitted && !roster.locked ? setConfirming(e) : onPick(e))}
               className="inline-flex h-11 items-center gap-2 rounded-full border border-[#C9C9C1] bg-white px-[18px] text-[15px] font-medium text-[#1B1B18] transition-colors duration-[120ms] hover:bg-[#EFEFEB] active:bg-[#E2E2DC] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#155E75]"
             >
               {e.employee_name}{" "}
-              {e.submitted && <span className={`${ui.badge} ${ui.badgeTone.confirmed}`}>제출함</span>}
+              {e.submitted && !roster.locked && <span className={`${ui.badge} ${ui.badgeTone.confirmed}`}>제출함</span>}
             </button>
           ))}
         </div>
         {confirming && (
           <div role="alert" className={ui.banner}>
             <span className="min-w-0 flex-1">{confirming.employee_name}님은 이미 제출했어요. 본인이 맞으면 이어서 고칠 수 있어요</span>
-            <button type="button" onClick={() => onPick(confirming.link_token)} className={`${ui.textSm} shrink-0 whitespace-nowrap`}>
+            <button type="button" onClick={() => onPick(confirming)} className={`${ui.textSm} shrink-0 whitespace-nowrap`}>
               이어서 고치기
             </button>
             <button type="button" onClick={() => setConfirming(null)} className={`${ui.textSm} shrink-0 whitespace-nowrap`}>
@@ -346,7 +354,10 @@ function Calendar({
             개인정보처리방침
           </Link>
           {locked ? (
-            <p className="text-sm text-[#3D3D38]">이미 확정된 근무표예요</p>
+            // [이름 다시 고르기]는 머리 줄에 이미 있다
+            <p role="status" className="text-sm text-[#3D3D38]">
+              그사이 근무표가 확정됐어요. 이름 고르기로 돌아가면 근무표를 볼 수 있어요
+            </p>
           ) : (
             <>
               {status === "saved" && (

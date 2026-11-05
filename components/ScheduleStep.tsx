@@ -1001,6 +1001,7 @@ export function ScheduleGrid({
   cellStyle,
   totalCodes,
   legend = true,
+  highlightId,
 }: {
   /** 매장 근무 형태. 합계 열과 하단 합계 행이 이 코드를 따른다 */
   config?: ShopConfig;
@@ -1029,6 +1030,8 @@ export function ScheduleGrid({
   totalCodes?: Code[];
   /** 표 위 근무조 범례(색·이름·시각). 랜딩 시퀀스는 끈다 */
   legend?: boolean;
+  /** 이름 칸을 강조할 행(직원 화면의 자기 행) */
+  highlightId?: string;
 }) {
   const pdays = periodDays(period);
   const codes = shownCodes(config, result.assignments);
@@ -1095,7 +1098,9 @@ export function ScheduleGrid({
             const s = result.stats[n.id];
             return (
               <div key={n.id} className={rowClass} style={grid}>
-                <span className="flex h-7 items-center truncate text-sm text-[#1B1B18]">
+                <span
+                  className={`flex h-7 items-center truncate text-sm text-[#1B1B18] ${n.id === highlightId ? "rounded-xs bg-[#F0F6F8] px-1.5 font-semibold" : ""}`}
+                >
                   {n.name}
                   {n.tags?.length ? <span className="ml-1.5 truncate text-xs font-medium text-[#66665E]">{n.tags.join(" · ")}</span> : null}
                 </span>
