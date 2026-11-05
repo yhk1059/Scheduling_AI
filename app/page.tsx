@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 import Link from "next/link";
 
 import DemoVideoButton from "@/components/DemoVideo";
-import HeroSequence, { ChangeFragment, ReplyCard } from "@/components/HeroSequence";
+import HeroSequence, { ChangeFragment, ReplyCard, ScheduleFragment } from "@/components/HeroSequence";
 import { ui } from "@/components/ui";
 import { Mark } from "@/components/Wordmark";
 import { PRODUCT_NAME } from "@/lib/product";
@@ -215,11 +215,44 @@ const STEPS = [
   },
 ];
 
-const BUILT = [
-  { title: "말은 LLM이", body: "매니저의 말을 규칙 식으로 세우고 막힌 이유를 설명해요. 근무를 직접 배정하지 않아요." },
-  { title: "계산은 솔버가", body: "OR-Tools CP-SAT 솔버가 규칙을 모두 지키는 근무표를 찾거나, 없다는 것을 증명해요." },
-  { title: "검증은 재풀이로", body: "해결책은 실제로 다시 풀어 근무표가 나오는 것만 보여 줘요. 규칙은 사람이 [적용]해야 반영돼요." },
+type Actor = "사람" | "LLM" | "솔버";
+
+/** 만든 방식의 세 장면. 근무표에 들어가는 길은 세 곳(적용·확정·수락)이고, 셋 다 사람이 연다. */
+const SCENES: { title: string; body: string; actors: [Actor, string][]; fragment: ReactNode }[] = [
+  {
+    title: "말은 LLM이 읽어요",
+    body: "매니저의 말을 규칙 식으로 세우고 “이렇게 읽었어요”로 되돌려 줘요. 식이 검증을 통과하지 못하면 카드 대신 되물어요. [적용]을 누르기 전에는 아무것도 반영되지 않아요.",
+    actors: [
+      ["LLM", "읽어요"],
+      ["사람", "적용해요"],
+    ],
+    fragment: <ReplyCard title="금지 순서" quote="마감 다음 날 오픈은 안 되게" reading="모든 사람 · 매일 · 마감 다음 날 오픈 금지" pending />,
+  },
+  {
+    title: "계산은 솔버가 해요",
+    body: "OR-Tools CP-SAT 솔버가 규칙 식만 받아, 모두 지키는 근무표를 찾거나 없다는 것을 증명해요. LLM은 근무표의 칸을 하나도 채우지 않아요. 확정하면 직원 링크가 잠겨요.",
+    actors: [
+      ["솔버", "계산하고 증명해요"],
+      ["사람", "확정해요"],
+    ],
+    fragment: <ScheduleFragment />,
+  },
+  {
+    title: "막히면 셋이 함께 풀어요",
+    body: "솔버가 “없다”고 증명하면, LLM이 어떤 규칙끼리 부딪히는지 설명하고 바꿀 곳을 제안해요. 제안은 솔버가 다시 풀어 실제로 근무표가 나오는 것만 남겨요. 그중에서 고르는 건 사람이에요.",
+    actors: [
+      ["LLM", "설명·제안"],
+      ["솔버", "다시 풀어 검증"],
+      ["사람", "수락해요"],
+    ],
+    fragment: <BlockedFragment />,
+  },
 ];
+
+/** 행위자 칩. 사람만 강조색 면: 결정하는 자리라는 뜻. */
+function ActorChip({ actor }: { actor: Actor }) {
+  return <span className={`${ui.badge} ${actor === "사람" ? "bg-[#155E75] text-white" : ui.badgeTone.draft}`}>{actor}</span>;
+}
 
 export default function Home() {
   return (
@@ -311,14 +344,26 @@ export default function Home() {
 
         <section className={section}>
           <div className={`${container} flex flex-col gap-8`}>
-            <SectionHead eyebrow="03 · 만든 방식" title="말은 LLM이, 계산은 솔버가">
-              LLM이 낸 결과는 사람이 확인하거나 서버가 다시 풀어 검증한 것만 근무표에 들어가요.
+            <SectionHead eyebrow="03 · 만든 방식" title="말은 LLM이, 계산은 솔버가, 결정은 사람이">
+              근무표에 들어가는 길은 세 곳뿐이고, 셋 다 사람이 버튼을 눌러야 열려요. LLM이 낸 것은 사람이 확인하거나 서버가 다시 풀어 검증한 것만 반영돼요.
             </SectionHead>
-            <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
-              {BUILT.map((b) => (
-                <div key={b.title} className={`${ui.card} flex flex-col gap-2`}>
-                  <h3 className={ui.cardTitle}>{b.title}</h3>
-                  <p className={body}>{b.body}</p>
+            <div className="grid grid-cols-1 gap-10 lg:grid-cols-3 lg:items-start lg:gap-8">
+              {SCENES.map((s) => (
+                <div key={s.title} className="flex flex-col gap-5">
+                  {s.fragment}
+                  <div className="flex flex-col gap-2">
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      {s.actors.map(([actor, verb], i) => (
+                        <span key={actor} className="flex items-center gap-1.5">
+                          {i > 0 && <span className="text-[13px] text-[#8A8A80]">→</span>}
+                          <ActorChip actor={actor} />
+                          <span className="text-[13px] text-[#3D3D38]">{verb}</span>
+                        </span>
+                      ))}
+                    </div>
+                    <h3 className="text-[20px] font-semibold text-[#1B1B18]">{s.title}</h3>
+                    <p className={body}>{s.body}</p>
+                  </div>
                 </div>
               ))}
             </div>

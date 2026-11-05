@@ -43,12 +43,15 @@ export function ReplyCard({
   quote,
   reading,
   hardness = "hard",
+  pending = false,
   className = "",
 }: {
   title: string;
   quote: string;
   reading: ReactNode;
   hardness?: "hard" | "soft";
+  /** [적용]을 누르기 전 모양(버튼 줄). 기본은 적용된 뒤의 배지. */
+  pending?: boolean;
   className?: string;
 }) {
   return (
@@ -67,10 +70,56 @@ export function ReplyCard({
         <span className="font-mono text-[11px] text-[#155E75]">이렇게 읽었어요</span>
         <span className="text-sm text-[#1B1B18]">{reading}</span>
       </div>
-      <div>
-        <span className={`${ui.badge} ${ui.badgeTone.applied}`}>적용됨</span>
-      </div>
+      {pending ? (
+        <div className="flex justify-end gap-1">
+          <span className={ui.textSm}>다시 말하기</span>
+          <span className={ui.primarySm}>적용</span>
+        </div>
+      ) : (
+        <div>
+          <span className={`${ui.badge} ${ui.badgeTone.applied}`}>적용됨</span>
+        </div>
+      )}
     </article>
+  );
+}
+
+/** 만든 방식 장면: 히어로와 같은 샘플 근무표를 멈춘 채로, 요약 줄과 [확정]과 함께. */
+export function ScheduleFragment() {
+  return (
+    <div className={`${ui.card} flex flex-col gap-3`}>
+      <div className="flex h-[22px] items-center justify-between gap-3">
+        <h3 className={ui.cardTitle}>11/2~11/8 근무표</h3>
+        <span className={`${ui.badge} ${ui.badgeTone.applied}`}>반드시 규칙을 모두 지켰어요</span>
+      </div>
+      <div className="overflow-x-auto">
+        <ScheduleGrid
+          legend={false}
+          rows={EMPLOYEES}
+          result={RESULT}
+          period={PERIOD}
+          holidays={[]}
+          isWeekend={isWeekend}
+          fixed={NO_FIXED}
+          selected={null}
+          disabled={false}
+          readOnly
+          onSelect={() => {}}
+          totalCodes={["C"]}
+        />
+      </div>
+      <div className="flex items-center gap-4 border-t border-[#EFEFEB] pt-3">
+        <span className="flex flex-col gap-0.5">
+          <span className={ui.help}>희망 반영</span>
+          <span className={`${ui.bigNumber} text-[#1B1B18]`}>9/9</span>
+        </span>
+        <span className="flex flex-col gap-0.5">
+          <span className={ui.help}>못 지킨 가능하면 규칙</span>
+          <span className={`${ui.bigNumber} text-[#1B1B18]`}>0</span>
+        </span>
+        <span className={`${ui.primarySm} ml-auto`}>확정</span>
+      </div>
+    </div>
   );
 }
 
