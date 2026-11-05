@@ -84,29 +84,69 @@ export function ReplyCard({
   );
 }
 
-/** 만든 방식 장면: 히어로와 같은 샘플 근무표를 멈춘 채로, 요약 줄과 [확정]과 함께. */
+// 히어로 근무표의 한 주(11/2 월 ~ 11/8 일). 조각 그리드의 열 머리.
+const WEEK_DAYS = [
+  { date: "11/2", dow: "월" },
+  { date: "3", dow: "화" },
+  { date: "4", dow: "수" },
+  { date: "5", dow: "목" },
+  { date: "6", dow: "금" },
+  { date: "7", dow: "토", weekend: true },
+  { date: "8", dow: "일", weekend: true },
+];
+type MiniCell = { code: Code; changed?: boolean };
+
+/** 랜딩 조각용 작은 근무표(이름 + 날짜 칸). 앱 그리드는 518px라 세 칼럼 안에 들어가지 않는다. */
+function MiniGrid({ days, rows, totals }: { days: typeof WEEK_DAYS; rows: { name: string; cells: MiniCell[] }[]; totals?: { label: string; values: number[] } }) {
+  const dayColor = (d: (typeof WEEK_DAYS)[number]) => (d.dow === "일" ? "text-[#B42318]" : d.dow === "토" ? "text-[#155E75]" : "text-[#66665E]");
+  return (
+    <div className="flex w-max flex-col gap-0.5">
+      <div className="flex items-center gap-0.5">
+        <span className="w-16" />
+        {days.map((d) => (
+          <span key={d.date} className={`inline-flex w-[30px] flex-col items-center rounded-xs font-mono text-[11px] leading-tight ${d.weekend ? "bg-[#F1EEE6]" : ""} ${dayColor(d)}`}>
+            {d.date}
+            <span>{d.dow}</span>
+          </span>
+        ))}
+      </div>
+      {rows.map((r) => (
+        <div key={r.name} className="flex items-center gap-0.5">
+          <span className="w-16 truncate text-sm text-[#1B1B18]">{r.name}</span>
+          {r.cells.map((c, i) => (
+            <span key={i} className={`${CELL} ${codeClass(c.code, !!days[i].weekend)} ${c.changed ? "shadow-[inset_0_0_0_2px_#D97706]" : ""}`}>
+              {c.code === "O" ? "" : c.code}
+            </span>
+          ))}
+        </div>
+      ))}
+      {totals && (
+        <div className="mt-1.5 flex items-center gap-0.5 border-t border-[#EFEFEB] pt-2">
+          <span className="w-16 text-xs font-medium text-[#66665E]">{totals.label}</span>
+          {totals.values.map((v, i) => (
+            <span key={i} className={`flex h-7 w-[30px] items-center justify-center rounded-xs font-mono text-[13px] font-medium text-[#1B1B18] ${days[i].weekend ? "bg-[#F1EEE6]" : ""}`}>
+              {v}
+            </span>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+const SCENE_ROWS = EMPLOYEES.map((n) => ({ name: n.name, cells: ROWS[n.id].map((code) => ({ code })) }));
+const C_TOTALS = WEEK_DAYS.map((_, i) => EMPLOYEES.filter((n) => ROWS[n.id][i] === "C").length);
+
+/** 만든 방식 장면: 히어로와 같은 샘플 근무표를 작게 멈춘 채로, 요약 줄과 [확정]과 함께. */
 export function ScheduleFragment() {
   return (
     <div className={`${ui.card} flex flex-col gap-3`}>
-      <div className="flex h-[22px] items-center justify-between gap-3">
-        <h3 className={ui.cardTitle}>11/2~11/8 근무표</h3>
-        <span className={`${ui.badge} ${ui.badgeTone.applied}`}>반드시 규칙을 모두 지켰어요</span>
+      <div className="flex min-h-[22px] flex-wrap items-center justify-between gap-x-3 gap-y-1.5">
+        <h3 className={`${ui.cardTitle} whitespace-nowrap`}>11/2~11/8 근무표</h3>
+        <span className={`${ui.badge} ${ui.badgeTone.applied} whitespace-nowrap`}>반드시 규칙을 모두 지켰어요</span>
       </div>
       <div className="overflow-x-auto">
-        <ScheduleGrid
-          legend={false}
-          rows={EMPLOYEES}
-          result={RESULT}
-          period={PERIOD}
-          holidays={[]}
-          isWeekend={isWeekend}
-          fixed={NO_FIXED}
-          selected={null}
-          disabled={false}
-          readOnly
-          onSelect={() => {}}
-          totalCodes={["C"]}
-        />
+        <MiniGrid days={WEEK_DAYS} rows={SCENE_ROWS} totals={{ label: "C 합계", values: C_TOTALS }} />
       </div>
       <div className="flex items-center gap-4 border-t border-[#EFEFEB] pt-3">
         <span className="flex flex-col gap-0.5">
@@ -124,14 +164,8 @@ export function ScheduleFragment() {
 }
 
 // 지난 날짜는 잠기고, 병가가 든 칸과 대신 들어간 칸만 바뀐다. 히어로 근무표와 같은 주(11/2~).
-const CHANGE_DAYS = [
-  { date: "11/2", dow: "월" },
-  { date: "3", dow: "화" },
-  { date: "4", dow: "수" },
-  { date: "5", dow: "목" },
-  { date: "6", dow: "금" },
-];
-const CHANGE_ROWS: { name: string; cells: { code: Code; changed?: boolean }[] }[] = [
+const CHANGE_DAYS = WEEK_DAYS.slice(0, 5);
+const CHANGE_ROWS: { name: string; cells: MiniCell[] }[] = [
   { name: "최지훈", cells: [{ code: "M" }, { code: "A" }, { code: "O", changed: true }, { code: "O", changed: true }, { code: "O", changed: true }] },
   { name: "임하늘", cells: [{ code: "O" }, { code: "C" }, { code: "M", changed: true }, { code: "O" }, { code: "A", changed: true }] },
 ];
@@ -141,27 +175,7 @@ export function ChangeFragment() {
   return (
     <div className={`${ui.card} flex flex-col gap-3`}>
       <p className="text-sm text-[#1B1B18]">최지훈 · 11/4~11/6 · 병가</p>
-      <div className="flex flex-col gap-0.5">
-        <div className="flex items-center gap-0.5">
-          <span className="w-16" />
-          {CHANGE_DAYS.map((d) => (
-            <span key={d.date} className="inline-flex w-[30px] flex-col items-center font-mono text-[11px] leading-tight text-[#66665E]">
-              {d.date}
-              <span>{d.dow}</span>
-            </span>
-          ))}
-        </div>
-        {CHANGE_ROWS.map((r) => (
-          <div key={r.name} className="flex items-center gap-0.5">
-            <span className="w-16 text-sm text-[#1B1B18]">{r.name}</span>
-            {r.cells.map((c, i) => (
-              <span key={i} className={`${CELL} ${codeClass(c.code, false)} ${c.changed ? "shadow-[inset_0_0_0_2px_#D97706]" : ""}`}>
-                {c.code}
-              </span>
-            ))}
-          </div>
-        ))}
-      </div>
+      <MiniGrid days={CHANGE_DAYS} rows={CHANGE_ROWS} />
       <p className="text-[13px] text-[#7A4506]">2명, 5칸 변경 · 주황 테두리 칸이 바뀐 곳이에요.</p>
     </div>
   );
@@ -174,8 +188,10 @@ export default function HeroSequence() {
     <div className={`${ui.panel} hero-seq flex min-h-[420px] flex-col gap-3.5 p-4! lg:p-[22px]!`}>
       <div key={run} inert className="flex flex-col gap-3.5">
         <div className={ui.bar}>
-          <Mark size={18} />
-          <span className="relative min-w-0 flex-1 overflow-hidden text-[15px] whitespace-nowrap text-[#1B1B18]">
+          <span className="flex max-sm:hidden">
+            <Mark size={18} />
+          </span>
+          <span className="relative min-w-0 flex-1 overflow-hidden text-sm whitespace-nowrap text-[#1B1B18] sm:text-[15px]">
             <span className="relative inline-block">
               <span className="invisible">{TYPED}</span>
               <span className="hero-typing">{TYPED}</span>
@@ -189,9 +205,9 @@ export default function HeroSequence() {
         <ReplyCard className="hero-rise" title="금지 순서" quote={TYPED} reading="모든 사람 · 매일 · 마감 다음 날 오픈 금지" />
 
         <div className={`${ui.card} hero-table flex flex-col gap-3`}>
-          <div className="flex h-[22px] items-center justify-between gap-3">
-            <h3 className={ui.cardTitle}>11/2~11/8 근무표</h3>
-            <span className={`hero-badge ${ui.badge} ${ui.badgeTone.applied}`}>반드시 규칙을 모두 지켰어요</span>
+          <div className="flex min-h-[22px] flex-wrap items-center justify-between gap-x-3 gap-y-1.5">
+            <h3 className={`${ui.cardTitle} whitespace-nowrap`}>11/2~11/8 근무표</h3>
+            <span className={`hero-badge ${ui.badge} ${ui.badgeTone.applied} whitespace-nowrap`}>반드시 규칙을 모두 지켰어요</span>
           </div>
           <div className="hero-cells overflow-x-auto">
             <ScheduleGrid

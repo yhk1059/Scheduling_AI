@@ -157,8 +157,8 @@ function ChatPanel() {
 function BlockedFragment() {
   return (
     <div className="flex flex-col gap-3.5 rounded-lg border border-[#E8B4AE] bg-white px-[18px] py-4">
-      <div className="flex items-center gap-2">
-        <span className={`${ui.badge} ${ui.badgeTone.none}`}>근무표 없음</span>
+      <div className="flex flex-wrap items-center gap-2">
+        <span className={`${ui.badge} ${ui.badgeTone.none} whitespace-nowrap`}>근무표 없음</span>
         <h3 className="text-[13px] font-semibold text-[#1B1B18]">이 조건으로는 근무표를 만들 수 없어요</h3>
       </div>
       <div className="flex flex-col gap-1.5">
@@ -166,7 +166,7 @@ function BlockedFragment() {
         <div className={`${ui.card} flex flex-col gap-2.5`}>
           <div className="flex items-center justify-between gap-3">
             <h5 className="text-[13px] font-semibold text-[#1B1B18]">주말 마감 인원 줄이기</h5>
-            <span className={`${ui.badge} ${ui.badgeTone.confirmed}`}>검증됨</span>
+            <span className={`${ui.badge} ${ui.badgeTone.confirmed} shrink-0`}>검증됨</span>
           </div>
           <div className="flex flex-col gap-0.5">
             <span className="text-sm font-medium text-[#1B1B18]">주말 마감 최소 3 → 2</span>
@@ -410,9 +410,9 @@ export default function Home() {
             <SectionHead eyebrow="03 · 만든 방식" title="말은 LLM이, 계산은 솔버가, 결정은 사람이">
               근무표에 들어가는 길은 세 곳뿐이고, 셋 다 사람이 버튼을 눌러야 열려요. LLM이 낸 것은 사람이 확인하거나 서버가 다시 풀어 검증한 것만 반영돼요.
             </SectionHead>
-            <div className="grid grid-cols-1 gap-10 lg:grid-cols-3 lg:items-start lg:gap-8">
+            <div className="grid grid-cols-1 gap-10 xl:grid-cols-3 xl:items-start xl:gap-8">
               {SCENES.map((s) => (
-                <div key={s.title} className="flex flex-col gap-5">
+                <div key={s.title} className="flex max-w-[560px] flex-col gap-5 xl:max-w-none">
                   {s.fragment}
                   <div className="flex flex-col gap-2">
                     <div className="flex flex-wrap items-center gap-1.5">
