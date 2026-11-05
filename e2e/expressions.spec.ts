@@ -82,14 +82,15 @@ test("S16. 저장된 매장 열기 → 다시 만들기", async () => {
 
   const { shop } = await readState(page);
   const savedRules = shopOct.state.shop.rules;
-  expect(shop.rules.map((r) => r.id), "규칙 수와 id가 같다").toEqual(savedRules.map((r) => r.id));
+  // 불러올 때 기본 규칙 "근무 수는 고르게"가 뒤에 더해진다. 최대 연속 근무는 rule-max-run과 같은 모양이라 더하지 않는다
+  expect(shop.rules.map((r) => r.id), "규칙 수와 id가 같다").toEqual([...savedRules.map((r) => r.id), "fair-balance"]);
   expect(shop.rules.every((r) => r.type === "rule"), "모두 식 규칙").toBe(true);
   const savedNov = shopOct.state.periods.find((p) => p.start_date === NOV.start_date)!;
   const nov = await periodByStart(page, NOV.start_date);
   expect(nov.requests.map((r) => r.id), "요청도 같은 id").toEqual(savedNov.requests.map((r) => r.id));
   expect(namesWithTag(shop, "리더")).toEqual(["이영희", "강서연", "윤지민"]);
   expect(namesWithTag(shop, "신입")).toEqual(["서예린", "신도윤"]);
-  await expect(page.getByRole("main")).toContainText("직원 12명 · 매장 조건 7개 · 4주 단위");
+  await expect(page.getByRole("main")).toContainText("직원 12명 · 매장 조건 8개 · 4주 단위");
   await expectNoDevTerms(page, "매장 홈");
 
   await sectionWith(NOV_NAME).getByRole("button", { name: "이어서 하기" }).click();

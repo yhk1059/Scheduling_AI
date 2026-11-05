@@ -12,6 +12,8 @@ import {
   applyAllPending,
   clearAccount,
   type Code,
+  confirmedGrid,
+  confirmSchedule,
   deleteAllPending,
   dragCells,
   EMPLOYEE_COUNT,
@@ -35,6 +37,7 @@ import {
   pendingCards,
   periodByStart,
   primaryButtons,
+  readCells,
   readGrid,
   readState,
   ROSTER,
@@ -422,8 +425,9 @@ test("S8. ② 매장 조건", async () => {
     COVERAGE.map(([kind, shift, min, max]) => `${kind === "평일" ? "weekday" : "weekend"}-${SHIFT_CODE[shift]}:${min}~${max}`).sort(),
   );
 
-  // S8-b. 규칙 만들기와 적용
-  await expect(page.locator("article")).toHaveCount(0);
+  // S8-b. 규칙 만들기와 적용. 요약표에 든 필요 인원은 카드로 다시 보이지 않고, 공정성 기본 규칙 2장(최대 연속 근무, 근무 수 고르게)만 있다
+  await expect(page.locator("article")).toHaveCount(2);
+  await expect(appliedCards(page)).toHaveCount(2);
   await page.getByRole("button", { name: "마감 다음 날 오픈은 안 되게" }).click();
   await expect(page.getByRole("textbox", { name: RULE_INPUT })).toHaveValue("마감 다음 날 오픈은 안 되게");
 
@@ -432,7 +436,11 @@ test("S8. ② 매장 조건", async () => {
   await expect(pendingCards(page).first()).toContainText("마감 다음 날 오픈 금지");
   const r2 = await interpretOk(page, RULE_INPUT, "규칙 만들기", "5일 넘게 연속으로 일하지 않게");
   expect(r2.length).toBeGreaterThan(0);
-  const r2Card = page.locator("article").filter({ hasText: "연속 근무" });
+  // 기본 규칙 "연속 근무는 5일까지"(가능하면)와 같은 모양이면 적용할 때 그 카드를 대체한다. 근무를 코드 집합으로 세우면 따로 남는다
+  const r2Card = page.locator("article").filter({ hasText: "5일 넘게" });
+  await expect(r2Card).toContainText("적용 대기");
+  const r2Replaces = (await r2Card.getByText("기존 규칙 대체").count()) > 0;
+  test.info().annotations.push({ type: "R2 기본 규칙 대체", description: String(r2Replaces) });
   await expect(r2Card).toContainText("연속 근무 5일까지");
   const r3 = await interpretOk(page, RULE_INPUT, "규칙 만들기", "오픈에는 리더가 꼭 1명 있어야 해");
   expect(r3.length).toBeGreaterThan(0);
@@ -466,7 +474,10 @@ test("S8. ② 매장 조건", async () => {
   await expect(toggle.getByRole("button", { name: "반드시" })).toHaveAttribute("aria-pressed", "true");
 
   await applyAllPending(page);
-  await expect(appliedCards(page)).toHaveCount(total);
+  // R2가 기본 규칙 최대 연속 근무를 대체하면 공정성 기본 규칙은 근무 수 고르게만 남는다
+  const fairLeft = (await readState(page)).shop.rules.filter((r) => r.id.startsWith("fair-")).map((r) => r.id);
+  expect(fairLeft, "남은 공정성 기본 규칙").toEqual(r2Replaces ? ["fair-balance"] : ["fair-max-run", "fair-balance"]);
+  await expect(appliedCards(page)).toHaveCount(total + fairLeft.length);
   await expect(page.getByText(/적용하지 않은 규칙/)).toHaveCount(0);
 
   // S8-c. 적용된 카드 수정: 조정 가능한 값(밑줄)만 고친다. 값 이름은 LLM이 붙여 입력칸은 카드 안의 하나로 찾는다
@@ -487,8 +498,8 @@ test("S8. ② 매장 조건", async () => {
     if (body.status !== "clarify") test.info().annotations.push({ type: "확인 필요", description: `"${text}" 기대 clarify, 실제 ${body.status}` });
     await deleteAllPending(page);
   }
-  await expect(page.locator("article")).toHaveCount(total);
-  ruleCount = total;
+  ruleCount = total + fairLeft.length;
+  await expect(page.locator("article")).toHaveCount(ruleCount);
 });
 
 test("S9. ② 예외 입력과 ③ 근무표 만들기", async () => {
@@ -656,18 +667,25 @@ test("S10. 근무표 없음 → 설명과 검증된 제안", async () => {
     const first = proposals.first();
     await expect(first).toContainText(/이렇게 바꾸면 근무표를 만들 수 있어요 · 희망 반영 \d+\/\d+/);
     await expect(first).toContainText(/\S+ → \S+|이번 근무표에서만 끄기/);
+    await expect(first).toContainText("이번 근무표에만 적용돼요. 매장 조건은 그대로예요");
     await expect(first).not.toContainText("가능 시간");
     test.info().annotations.push({ type: "S10 분기", description: `8-a 제안 수락: ${await first.innerText()}` });
     expect(await solve(() => first.getByRole("button", { name: "수락" }).click())).toBe("ok");
   } else {
     test.info().annotations.push({ type: "S10 분기", description: "8-b 이번 근무표에서만 끄기" });
+    let offCount = 0;
     for (let tries = 0; ; tries++) {
       expect(tries, "이번 근무표에서만 끄기 반복").toBeLessThan(8);
       const rows = panel.locator("li").filter({ has: page.getByRole("button", { name: "이번 근무표에서만 끄기" }) });
       const leaveRow = rows.filter({ hasText: "11/6" });
       const row = (await leaveRow.count()) > 0 ? leaveRow.first() : rows.first();
+      offCount++;
       if ((await solve(() => row.getByRole("button", { name: "이번 근무표에서만 끄기" }).click())) === "ok") break;
     }
+    // 요약 지표: 결과 배지 옆 "끈 규칙 n개"와 "이번 근무표에서 끈 규칙" 칸
+    await expect(page.getByText(`끈 규칙 ${offCount}개`, { exact: true })).toBeVisible();
+    await expect(page.getByText("이번 근무표에서 끈 규칙", { exact: true })).toBeVisible();
+    expect((await periodByStart(page, WEEK.start_date)).disabledIds, "이번 근무표에서 끈 규칙").toHaveLength(offCount);
   }
   page.off("response", onResponse);
 
@@ -722,7 +740,7 @@ test("S11. 칸 고정 후 다시 만들기", async () => {
 });
 
 test("S12. 확정 → 확정 근무표 → 직원 링크 잠김", async ({ browser }) => {
-  await page.getByRole("button", { name: "확정", exact: true }).click();
+  await confirmSchedule(page);
   await expect(page.getByRole("button", { name: "CSV 받기" })).toBeVisible();
   await expect(page.getByRole("button", { name: "확정", exact: true })).toHaveCount(0);
   await expect(workStepper()).toHaveCount(0);
@@ -758,19 +776,26 @@ test("S12. 확정 → 확정 근무표 → 직원 링크 잠김", async ({ brows
   const rows = await linkRows(WEEK.start_date);
   expect(rows.every((r) => r.locked_at), "링크 12행 잠김").toBe(true);
 
-  // 잠긴 직원 화면
+  // 잠긴 직원 화면: 이름을 고르면 가능 시간 입력 대신 확정 근무표를 본다
   const staff = await openFlow(browser, { width: 1280, height: 800 });
   await staff.page.goto(shareLink);
-  await expect(staff.page.getByText("이미 확정된 근무표예요. 입력한 시간은 볼 수만 있어요")).toBeVisible();
-  await staff.page.getByRole("button", { name: "박민수 제출함" }).click();
-  await expect(staff.page.getByText("이미 확정된 근무표예요")).toBeVisible();
-  await expect(staff.page.getByText("제출한 뒤에도 이 링크로 다시 고칠 수 있어요.")).toHaveCount(0);
-  await expect(staff.page.locator('main button[aria-pressed="true"]')).toHaveCount(34);
+  await expect(staff.page.getByText("확정된 근무표예요. 내 이름을 고르면 근무표를 볼 수 있어요")).toBeVisible();
+  await expect(staff.page.getByText("제출함", { exact: true })).toHaveCount(0);
+  await expectNoDevTerms(staff.page, "잠긴 직원 화면(이름 고르기)");
+  await staff.page.getByRole("button", { name: "박민수", exact: true }).click();
+  await expect(staff.page.getByRole("heading", { level: 1 })).toHaveText("한강 카페 · 박민수님의 근무표");
+  await expect(staff.page.getByRole("button", { name: "이어서 고치기" })).toHaveCount(0);
   await expect(staff.page.getByRole("button", { name: "제출" })).toHaveCount(0);
-  const empty = staff.page.getByRole("button", { name: "11월 2일 09:00~09:30" });
-  await empty.click({ force: true });
-  await expect(empty).toHaveAttribute("aria-pressed", "false");
-  await expectNoDevTerms(staff.page, "잠긴 직원 화면");
+  await expect(staff.page.getByRole("button", { name: /^\d+월 \d+일 \d{2}:\d{2}~\d{2}:\d{2}$/ })).toHaveCount(0);
+  const mine = staff.page.locator("section").filter({ has: staff.page.getByRole("heading", { name: "내 근무", exact: true }) });
+  const whole = staff.page.locator("section").filter({ has: staff.page.getByRole("heading", { name: "전체 근무표", exact: true }) });
+  await expect(mine).toBeVisible();
+  await expect(whole).toBeVisible();
+  // 칸 코드가 매니저가 확정한 근무표와 같다. 직원 id는 응답과 화면에 없다
+  const confirmed = await confirmedGrid(page, WEEK.start_date);
+  expect(await readCells(mine, WEEK), "내 근무").toEqual({ 박민수: confirmed["박민수"] });
+  expect(await readCells(whole, WEEK), "전체 근무표").toEqual(confirmed);
+  await expectNoDevTerms(staff.page, "잠긴 직원 화면(확정 근무표)");
   await expectNoProblems(staff.page, staff.problems);
   await staff.context.close();
 
@@ -808,8 +833,8 @@ test("S13. 저장과 다시 들어오기", async () => {
     .filter({ has: page.getByText("기본", { exact: true }) })
     .filter({ hasText: /평일.*오픈/ })
     .first();
-  await weekdayOpen.getByRole("button", { name: "끄기" }).click();
-  await expect(weekdayOpen.getByText("꺼짐", { exact: true })).toBeVisible();
+  await weekdayOpen.getByRole("button", { name: "매장 조건에서 끄기" }).click();
+  await expect(weekdayOpen.getByText("매장 조건에서 꺼짐", { exact: true })).toBeVisible();
   await weekdayOpen.getByRole("button", { name: "다시 켜기" }).click();
   await expect(weekdayOpen.getByText("적용됨", { exact: true })).toBeVisible();
 });

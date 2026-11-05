@@ -246,10 +246,20 @@ const CODE = "[A-Z0-9]{1,3}";
 
 /** 근무 칸 버튼의 aria-label("{이름} {M}월 {D}일 {코드}")로 근무표를 읽는다. */
 export async function readGrid(page: Page, period: PeriodRange): Promise<Grid> {
-  const index = Object.fromEntries(periodDays(period).map((d) => [`${d.month}-${d.dom}`, d.day]));
   const labels = await page.evaluate(() =>
     [...document.querySelectorAll("button[aria-label]")].map((b) => b.getAttribute("aria-label") ?? ""),
   );
+  return gridFromLabels(labels, period);
+}
+
+/** 범위 안의 보기 전용 근무 칸(aria-label이 있는 요소, 버튼이 아니어도)으로 근무표를 읽는다. */
+export async function readCells(scope: Locator, period: PeriodRange): Promise<Grid> {
+  const labels = await scope.locator("[aria-label]").evaluateAll((els) => els.map((e) => e.getAttribute("aria-label") ?? ""));
+  return gridFromLabels(labels, period);
+}
+
+function gridFromLabels(labels: string[], period: PeriodRange): Grid {
+  const index = Object.fromEntries(periodDays(period).map((d) => [`${d.month}-${d.dom}`, d.day]));
   const grid: Grid = {};
   for (const label of labels) {
     const m = new RegExp(`^(.+) (\\d+)월 (\\d+)일 (${CODE})$`).exec(label);
@@ -547,14 +557,29 @@ async function cardOrder(page: Page): Promise<string[]> {
     .evaluateAll((els) => els.map((e) => `${e.querySelector("h3")?.textContent} ${e.querySelector("p")?.textContent}`));
 }
 
-/** 대기 카드를 모두 적용한다. 2개 이상이면 [모두 적용]을 쓰고, 적용해도 카드 순서가 그대로인지 본다. */
+/**
+ * 대기 카드를 모두 적용한다. 2개 이상이면 [모두 적용]을 쓰고, 적용해도 카드 순서가 그대로인지 본다.
+ * "기존 규칙 대체" 카드가 대신하는 기존 카드(같은 모양의 기본 규칙 등)만 목록에서 빠진다.
+ */
 export async function applyAllPending(page: Page) {
   const before = await cardOrder(page);
+  const replacing = await pendingCards(page).filter({ hasText: "기존 규칙 대체" }).count();
   const count = await pendingCards(page).count();
   if (count >= 2) await page.getByRole("button", { name: "모두 적용" }).click();
   else if (count === 1) await pendingCards(page).first().getByRole("button", { name: "적용" }).click();
   await expect(pendingCards(page)).toHaveCount(0);
-  expect(await cardOrder(page), "적용해도 카드 순서가 그대로").toEqual(before);
+  const after = await cardOrder(page);
+  expect(after.length, "대체된 카드만 빠진다").toBe(before.length - replacing);
+  expect(after, "적용해도 카드 순서가 그대로").toEqual(before.filter((c) => after.includes(c)));
+}
+
+/** 근무표 화면의 [확정]을 누르고 확인 대화상자의 [확정]으로 확정한다. */
+export async function confirmSchedule(page: Page) {
+  await page.getByRole("button", { name: "확정", exact: true }).click();
+  const dialog = page.getByRole("dialog", { name: "근무표를 확정할까요?" });
+  await expect(dialog).toContainText("확정하면 직원 링크가 잠겨요.");
+  await dialog.getByRole("button", { name: "확정", exact: true }).click();
+  await expect(dialog).toHaveCount(0);
 }
 
 /** 대기 카드의 배지·버튼과 반드시/가능하면 토글. 휴가 카드는 토글이 없다(null). */
