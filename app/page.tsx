@@ -10,6 +10,14 @@ import { PRODUCT_NAME } from "@/lib/product";
 
 // 저장소를 옮기면 이 한 줄만 바꾼다.
 const REPO_URL = "https://github.com/yhk1059/Scheduling_AI";
+const EVAL_URL = `${REPO_URL}/blob/main/eval/results.md`;
+
+// 헤더에서 가는 섹션. 폰에서는 숨긴다(워드마크와 GitHub만 남는다).
+const SECTIONS = [
+  { id: "problem", label: "문제" },
+  { id: "how", label: "동작 방식" },
+  { id: "made", label: "만든 방식" },
+];
 
 const container = "mx-auto w-full max-w-[1360px] px-5 lg:px-10";
 const section = "border-t border-[#E2E2DC] py-16 lg:py-24";
@@ -33,7 +41,7 @@ const SHIFT_CLASS: Record<Shift, string> = {
   오픈: "bg-[#FFF1C2] text-[#5C4300]",
   미들: "bg-[#F9CFAE] text-[#6E2A04]",
   마감: "bg-[#263248] text-white",
-  휴: "bg-white text-[#9A9A92]",
+  휴: "bg-white text-[#6B6B63]",
 };
 const SHEET_DAYS = ["2 월", "3 화", "4 수", "5 목", "6 금", "7 토", "8 일"];
 const SHEET_ROWS: { name: string; cells: Shift[] }[] = [
@@ -280,7 +288,25 @@ const STEPS = [
 type Actor = "사람" | "LLM" | "솔버";
 
 /** 만든 방식의 세 장면. 근무표에 들어가는 길은 세 곳(적용·확정·수락)이고, 셋 다 사람이 연다. */
-const SCENES: { title: string; body: string; actors: [Actor, string][]; fragment: ReactNode }[] = [
+/** 번역 정확도 한 줄. 수치의 근거(평가 결과)로 바로 간다. */
+function AccuracyNote() {
+  return (
+    <div className="flex items-center gap-4 rounded-lg border border-[#E2E2DC] bg-white px-4 py-3">
+      <span className="font-mono text-[28px] leading-none font-semibold text-[#155E75]">99%</span>
+      <div className="flex flex-col gap-0.5">
+        <span className="text-[13px] font-semibold text-[#1B1B18]">번역 정확도</span>
+        <span className={ui.help}>
+          매니저 말투 문장 100개 기준 ·{" "}
+          <a href={EVAL_URL} className="underline underline-offset-2 hover:text-[#1B1B18]">
+            평가 결과 보기
+          </a>
+        </span>
+      </div>
+    </div>
+  );
+}
+
+const SCENES: { title: string; body: string; actors: [Actor, string][]; fragment: ReactNode; note?: ReactNode }[] = [
   {
     title: "말은 LLM이 읽어요",
     body: "매니저의 말을 규칙 식으로 세우고 “이렇게 읽었어요”로 되돌려 줘요. 식이 검증을 통과하지 못하면 카드 대신 되물어요. [적용]을 누르기 전에는 아무것도 반영되지 않아요.",
@@ -289,6 +315,7 @@ const SCENES: { title: string; body: string; actors: [Actor, string][]; fragment
       ["사람", "적용해요"],
     ],
     fragment: <ReplyCard title="금지 순서" quote="마감 다음 날 오픈은 안 되게" reading="모든 사람 · 매일 · 마감 다음 날 오픈 금지" pending />,
+    note: <AccuracyNote />,
   },
   {
     title: "계산은 솔버가 해요",
@@ -326,6 +353,11 @@ export default function Home() {
             {PRODUCT_NAME}
           </Link>
           <nav className="flex items-center gap-1">
+            {SECTIONS.map((s) => (
+              <a key={s.id} href={`#${s.id}`} className={`${ui.text} max-md:hidden`}>
+                {s.label}
+              </a>
+            ))}
             <a href={REPO_URL} className={ui.text}>
               GitHub
             </a>
@@ -356,7 +388,7 @@ export default function Home() {
           <HeroSequence />
         </section>
 
-        <section className={section}>
+        <section id="problem" className={section}>
           <div className={`${container} flex flex-col gap-12`}>
             <SectionHead eyebrow="01 · 문제" title="메신저와 엑셀, 머릿속 규칙으로 짜고 있어요">
               직원 말은 메신저에, 규칙은 머릿속에, 근무표는 엑셀에 있어요. 한 칸을 고치면 다른 칸이 깨지고, 다 지키는 표가 있는지는 끝까지 알 수 없어요.
@@ -377,7 +409,7 @@ export default function Home() {
           </div>
         </section>
 
-        <section className={section}>
+        <section id="how" className={section}>
           <div className={`${container} flex flex-col gap-12`}>
             <SectionHead eyebrow="02 · 동작 방식" title="링크 하나, 말 한 줄, 버튼 하나">
               근무표마다 같은 순서예요. 한 번 적은 매장 조건은 다음 근무표에도 그대로 써요.
@@ -405,8 +437,8 @@ export default function Home() {
           </div>
         </section>
 
-        <section className={section}>
-          <div className={`${container} flex flex-col gap-8`}>
+        <section id="made" className={section}>
+          <div className={`${container} flex flex-col gap-12`}>
             <SectionHead eyebrow="03 · 만든 방식" title="말은 LLM이, 계산은 솔버가, 결정은 사람이">
               근무표에 들어가는 길은 세 곳뿐이고, 셋 다 사람이 버튼을 눌러야 열려요. LLM이 낸 것은 사람이 확인하거나 서버가 다시 풀어 검증한 것만 반영돼요.
             </SectionHead>
@@ -427,20 +459,9 @@ export default function Home() {
                     <h3 className="text-[20px] font-semibold text-[#1B1B18]">{s.title}</h3>
                     <p className={body}>{s.body}</p>
                   </div>
+                  {s.note}
                 </div>
               ))}
-            </div>
-            <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-              <div className={`${ui.card} flex items-center gap-5`}>
-                <span className="font-mono text-[40px] leading-none font-semibold text-[#155E75]">99%</span>
-                <div className="flex flex-col gap-0.5">
-                  <span className={ui.cardTitle}>번역 정확도</span>
-                  <span className={ui.help}>매니저 말투 문장 100개 기준</span>
-                </div>
-              </div>
-              <a href={REPO_URL} className={ui.text}>
-                GitHub에서 자세히 보기
-              </a>
             </div>
           </div>
         </section>
@@ -476,10 +497,10 @@ export default function Home() {
             {PRODUCT_NAME} · 포트폴리오 프로토타입
           </span>
           <span className="flex items-center gap-4">
-            <Link href="/privacy" className="hover:text-[#1B1B18]">
+            <Link href="/privacy" className="-my-3 inline-flex h-10 items-center hover:text-[#1B1B18]">
               개인정보처리방침
             </Link>
-            <a href={REPO_URL} className="hover:text-[#1B1B18]">
+            <a href={REPO_URL} className="-my-3 inline-flex h-10 items-center hover:text-[#1B1B18]">
               GitHub
             </a>
           </span>
