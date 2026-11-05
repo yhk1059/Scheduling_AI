@@ -13,7 +13,10 @@
     {
       "step": 1,
       "name": "coverage-conflict-ui",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-11-05T20:03:26+0900",
+      "summary": "ConstraintCard에 conflict prop 추가, RulesStep(scope=shop)의 대기 카드와 설정 변경에 딸린 카드에 findCoverageConflict 결과를 넘김. 화면: 적용 대기 카드의 해석 아래·버튼 줄 위(명단 없는 직원 경고 다음 줄)에 주의 색 한 줄 '⚠ 기존 규칙 “{원문}”과/와 함께 지킬 수 없어요' + Text 버튼 [기존 규칙 끄기](ui.textSm, removeRule → 기본 규칙은 enabled:false) + 보조 글자 '매장 조건에서 꺼져요'. 원문이 '필요 인원 설정'이면 describeRule 해석 문장을 쓰고 조사는 josa로. role=status·aria-live 없음, 확인 대화상자 없음. 비교 대상: 작성 ②는 liveShopRules(shop, stepPeriod), 매장 설정은 enabled!==false인 shop.rules, 둘 다 findReplaced 대상 제외; period=stepPeriod ?? previewRange, holidays=stepPeriod?.holidays ?? []. 결정: 경고 줄은 flex-wrap(긴 원문 줄바꿈), 보조 글자는 font-normal #66665E. 수동 브라우저 체크는 하지 않음(로그인·LLM 필요). 참고: 문서의 수동 예 '주말 오픈 2명 이상'은 기존 주말 오픈 규칙과 같은 모양이라 findReplaced로 [기존 규칙 대체]가 되고 충돌 경고는 뜨지 않음 — 경고는 날짜 종류가 다른 규칙(예: '매일 오픈 3명 이상' vs 평일 오픈 1~2명)에서 보인다.",
+      "completed_at": "2026-11-05T20:05:36+0900"
     },
     {
       "step": 2,
