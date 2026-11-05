@@ -181,8 +181,8 @@ function TaskPanel() {
   const draft = next.state === "draft" ? next.period : null;
   const share = useShareStatus(draft);
   const create = () => createPeriod(now);
-  // 다음 근무표가 확정됐고 그 뒤에 만든 근무표가 없으면 그다음 근무표를 만들 수 있다
-  const canCreateAfter = next.state === "confirmed" && periods.at(-1)?.id === next.period.id;
+  // 다음 근무표(오늘 이후 가장 늦은 근무표)가 확정됐으면 그다음 근무표를 만들 수 있다
+  const canCreateAfter = next.state === "confirmed";
   const afterName = scheduleName(upcomingRange(shop.unit, periods, now), shop.unit);
   const submittedText = share.url ? `${share.total}명 중 ${share.total - share.missing.length}명이 가능 시간을 제출했어요.` : "";
 
@@ -255,13 +255,74 @@ export default function ShopHome() {
 
   const ready = isShopReady(shop);
   const employeeCount = shop.employees.filter((n) => n.active).length;
-  const { operating, next, recent } = homeSummary(periods, today());
+  const now = today();
+  const { operating, next, recent } = homeSummary(periods, now);
   const open = (p: WorkPeriod) => go(viewForPeriod(p));
   const name = (p: WorkPeriod) => scheduleName(p, shop.unit);
   // 운영 중 카드·지금 할 일 카드에 나온 근무표는 다시 보여 주지 않는다
   const shown = new Set([operating?.id, next.state === "none" ? undefined : next.period.id]);
-  const past = recent.filter((p) => p.status === "confirmed" && !shown.has(p.id));
+  const rest = recent.filter((p) => p.status === "confirmed" && !shown.has(p.id));
+  // 오늘 이후에 시작하는 확정 근무표는 지난 근무표가 아니라 다가오는 근무표다
+  const upcoming = rest.filter((p) => p.start_date > now);
+  const past = rest.filter((p) => p.start_date <= now);
   const operatingAt = operating?.versions.at(-1)?.confirmed_at;
+
+  const table = (rows: WorkPeriod[]) => (
+    <table className="w-full border-collapse text-[13px]">
+      <thead>
+        <tr className="border-b border-[#E2E2DC] text-left text-xs font-medium text-[#66665E]">
+          <th className="py-2 pr-4 font-medium">근무표</th>
+          <th className="py-2 pr-4 font-medium">기간</th>
+          <th className="py-2 pr-4 font-medium">확정</th>
+          <th className="py-2 pr-4 font-medium">마감 횟수 차이</th>
+          <th className="py-2 font-medium">
+            <span className="sr-only">열기</span>
+          </th>
+        </tr>
+      </thead>
+      <tbody>
+        {rows.map((p) => {
+          const last = p.versions.at(-1);
+          const again = p.versions.length - 1;
+          const spread = last
+            ? closingSpread(last.assignments, shop.config, (p.snapshot?.employees ?? shop.employees).filter((n) => n.active).map((n) => n.id))
+            : null;
+          return (
+            <tr
+              key={p.id}
+              onClick={() => open(p)}
+              className="cursor-pointer border-b border-[#EFEFEB] transition-colors duration-[120ms] last:border-b-0 hover:bg-[#F6F6F3]"
+            >
+              <td className="py-1.5 pr-4 font-medium text-[#1B1B18]">{name(p)}</td>
+              <td className="py-1.5 pr-4 font-mono text-[#3D3D38]">{formatRange(p)}</td>
+              <td className="py-1.5 pr-4 text-[#3D3D38]">
+                <span className="font-mono">{last ? shortTime(last.confirmed_at) : "—"}</span>
+                {again > 0 && (
+                  <>
+                    {" · "}
+                    <span className="font-mono">{again}</span>번 다시 확정
+                  </>
+                )}
+              </td>
+              <td className="py-1.5 pr-4 font-mono text-[#3D3D38]">{spread ? `${spread.min} ~ ${spread.max}` : "—"}</td>
+              <td className="py-1.5 text-right">
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    open(p);
+                  }}
+                  className={ui.textSm}
+                >
+                  열기 →
+                </button>
+              </td>
+            </tr>
+          );
+        })}
+      </tbody>
+    </table>
+  );
 
   return (
     <div className="flex flex-col gap-5">
@@ -322,66 +383,16 @@ export default function ShopHome() {
 
           <TaskPanel />
 
+          {upcoming.length > 0 && (
+            <section className={`${ui.card} flex flex-col gap-3`}>
+              <h2 className={ui.cardTitle}>다가오는 근무표</h2>
+              {table(upcoming)}
+            </section>
+          )}
+
           <section className={`${ui.card} flex flex-col gap-3`}>
             <h2 className={ui.cardTitle}>지난 근무표</h2>
-            {past.length === 0 ? (
-              <p className="text-sm text-[#3D3D38]">확정한 근무표가 여기에 쌓여요.</p>
-            ) : (
-              <table className="w-full border-collapse text-[13px]">
-                <thead>
-                  <tr className="border-b border-[#E2E2DC] text-left text-xs font-medium text-[#66665E]">
-                    <th className="py-2 pr-4 font-medium">근무표</th>
-                    <th className="py-2 pr-4 font-medium">기간</th>
-                    <th className="py-2 pr-4 font-medium">확정</th>
-                    <th className="py-2 pr-4 font-medium">마감 횟수 차이</th>
-                    <th className="py-2 font-medium">
-                      <span className="sr-only">열기</span>
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {past.map((p) => {
-                    const last = p.versions.at(-1);
-                    const again = p.versions.length - 1;
-                    const spread = last
-                      ? closingSpread(last.assignments, shop.config, (p.snapshot?.employees ?? shop.employees).filter((n) => n.active).map((n) => n.id))
-                      : null;
-                    return (
-                      <tr
-                        key={p.id}
-                        onClick={() => open(p)}
-                        className="cursor-pointer border-b border-[#EFEFEB] transition-colors duration-[120ms] last:border-b-0 hover:bg-[#F6F6F3]"
-                      >
-                        <td className="py-1.5 pr-4 font-medium text-[#1B1B18]">{name(p)}</td>
-                        <td className="py-1.5 pr-4 font-mono text-[#3D3D38]">{formatRange(p)}</td>
-                        <td className="py-1.5 pr-4 text-[#3D3D38]">
-                          <span className="font-mono">{last ? shortTime(last.confirmed_at) : "—"}</span>
-                          {again > 0 && (
-                            <>
-                              {" · "}
-                              <span className="font-mono">{again}</span>번 다시 확정
-                            </>
-                          )}
-                        </td>
-                        <td className="py-1.5 pr-4 font-mono text-[#3D3D38]">{spread ? `${spread.min} ~ ${spread.max}` : "—"}</td>
-                        <td className="py-1.5 text-right">
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              open(p);
-                            }}
-                            className={ui.textSm}
-                          >
-                            열기 →
-                          </button>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            )}
+            {past.length === 0 ? <p className="text-sm text-[#3D3D38]">확정한 근무표가 여기에 쌓여요.</p> : table(past)}
           </section>
         </>
       )}

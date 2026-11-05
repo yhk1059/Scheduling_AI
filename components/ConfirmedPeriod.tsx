@@ -188,7 +188,7 @@ export default function ConfirmedPeriod() {
         readOnly={ended}
         summaryLead={
           diff.length > 0 && (
-            <p role="status" className={`${ui.banner} flex-1 justify-start! self-stretch`}>
+            <p role="status" className={`${ui.banner} min-w-[360px] flex-1 justify-start! self-stretch`}>
               <span aria-hidden="true" className="size-4 shrink-0 rounded-xs bg-white shadow-[inset_0_0_0_2px_#D97706]" />
               <span>
                 <strong className="font-semibold">

@@ -1120,6 +1120,21 @@ describe("homeSummary", () => {
     h = homeSummary(store.getState().periods, during);
     expect(h.next).toMatchObject({ state: "confirmed", period: { id: nextId } });
   });
+
+  it("오늘 이후 기간이 둘이면 다음 기간은 가장 늦은 기간이다(그다음 기간을 만들 수 있게)", () => {
+    const { store, id } = withPeriod();
+    store.getState().setResult(id, result({ e01: fill(30, "D"), e02: fill(30, "O") }), []);
+    store.getState().confirm(id);
+    const secondId = store.getState().createPeriod(TODAY)!;
+    let h = homeSummary(store.getState().periods, TODAY);
+    expect(h.next).toMatchObject({ state: "draft", period: { id: secondId } });
+
+    store.getState().setResult(secondId, result({ e01: fill(31, "D"), e02: fill(31, "O") }), []);
+    store.getState().confirm(secondId);
+    h = homeSummary(store.getState().periods, TODAY);
+    expect(h.next).toMatchObject({ state: "confirmed", period: { id: secondId } });
+    expect(h.recent.map((p) => p.id)).toEqual([secondId, id]);
+  });
 });
 
 describe("rosterChangesFor", () => {
