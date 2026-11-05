@@ -170,6 +170,10 @@ async function main() {
     await page.mouse.wheel(0, 360);
     await pause(page, 2000);
     await click(page, page.getByRole("button", { name: "확정", exact: true }));
+    // 확인 대화상자의 [확정]
+    const confirmDialog = page.getByRole("dialog", { name: "근무표를 확정할까요?" });
+    await pause(page, 1500);
+    await click(page, confirmDialog.getByRole("button", { name: "확정", exact: true }));
     await page.getByRole("heading", { name: "변경 입력" }).waitFor();
     await pause(page, 3000);
     mark("확정");
