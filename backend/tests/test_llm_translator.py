@@ -626,6 +626,18 @@ def test_prompt_examples_cover_shapes():
         assert shape in texts, shape
 
 
+def test_bare_staffing_number_means_at_least():
+    # 숫자만 있는 필요 인원은 이상(ge), "정확히"·"딱"을 말할 때만 같음(eq)
+    assert "정확히" in TRANSLATE_SYSTEM and "딱" in TRANSLATE_SYSTEM
+    examples = dict(TRANSLATE_EXAMPLES)
+    for text in ("평일 오픈 2명, 주말은 3명", "오픈 평일 2명 이상, 주말 3명, 피크 P 11시부터 14시까지 3시간도 있어"):
+        for r in examples[text]["rules"]:
+            assert r["body"]["then"]["op"] == "ge", text
+            assert r["values"]["min"]["label"] == "최소 인원", text
+    exact = examples["금요일엔 미들 딱 2명"]["rules"][0]
+    assert exact["body"]["then"]["op"] == "eq"
+
+
 def test_system_prompt_covers_rules():
     for word in ("모델러", "실행 코드", "무조건", "가능하면", "clarification_question", "unsupported_reason", "다음 주", "3주차"):
         assert word in TRANSLATE_SYSTEM
