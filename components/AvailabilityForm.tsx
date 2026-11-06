@@ -215,17 +215,17 @@ function Calendar({
   const startDrag = (date: string, slot: number) => {
     drag.current = { base: cells, date, start: slot };
     setDragSpan({ date, start: slot, end: slot });
-    setCells(applyDrag(cells, date, slot, slot));
+    setCells(applyDrag(cells, [date], slot, slot));
     setStatus("idle");
   };
   const moveDrag = (date: string, slot: number) => {
     const d = drag.current;
     if (d?.date !== date) return;
     setDragSpan({ date, start: d.start, end: slot });
-    setCells(applyDrag(d.base, date, d.start, slot));
+    setCells(applyDrag(d.base, [date], d.start, slot));
   };
   const toggle = (date: string, slot: number) => {
-    setCells(applyDrag(cells, date, slot, slot));
+    setCells(applyDrag(cells, [date], slot, slot));
     setStatus("idle");
   };
 

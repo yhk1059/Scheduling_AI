@@ -7,6 +7,7 @@ import {
   availabilityRules,
   cellKey,
   cellsFromSlots,
+  copyDay,
   coversShift,
   isAvailabilityRule,
   mergeAvailabilityConflicts,
@@ -188,23 +189,81 @@ describe("applyDrag", () => {
   const keys = (...slots: number[]) => slots.map((i) => cellKey(DAY, i));
 
   it("빈 칸에서 시작하면 범위를 칠한다. 위로 끌어도 같다", () => {
-    expect([...applyDrag(new Set(), DAY, 2, 4)].sort()).toEqual(keys(2, 3, 4).sort());
-    expect([...applyDrag(new Set(), DAY, 4, 2)].sort()).toEqual(keys(2, 3, 4).sort());
+    expect([...applyDrag(new Set(), [DAY], 2, 4)].sort()).toEqual(keys(2, 3, 4).sort());
+    expect([...applyDrag(new Set(), [DAY], 4, 2)].sort()).toEqual(keys(2, 3, 4).sort());
   });
 
   it("칠한 칸에서 시작하면 범위를 지운다", () => {
-    expect([...applyDrag(new Set(keys(2, 3, 4, 5)), DAY, 3, 4)].sort()).toEqual(keys(2, 5).sort());
+    expect([...applyDrag(new Set(keys(2, 3, 4, 5)), [DAY], 3, 4)].sort()).toEqual(keys(2, 5).sort());
   });
 
   it("빈 칸에서 시작해 칠한 칸을 지나도 칠한 채로 둔다", () => {
-    expect([...applyDrag(new Set(keys(3)), DAY, 2, 4)].sort()).toEqual(keys(2, 3, 4).sort());
+    expect([...applyDrag(new Set(keys(3)), [DAY], 2, 4)].sort()).toEqual(keys(2, 3, 4).sort());
   });
 
   it("원본과 다른 날은 건드리지 않는다", () => {
     const base = new Set([cellKey("2026-11-02", 2)]);
-    const next = applyDrag(base, DAY, 2, 2);
+    const next = applyDrag(base, [DAY], 2, 2);
     expect(next.has(cellKey("2026-11-02", 2))).toBe(true);
     expect(base.size).toBe(1);
+  });
+
+  const DATES = ["2026-11-02", "2026-11-03", "2026-11-04"];
+  const rect = (dates: string[], ...slots: number[]) => dates.flatMap((d) => slots.map((i) => cellKey(d, i))).sort();
+
+  it("열 셋을 건너면 날짜 × 시간 직사각형을 칠한다", () => {
+    expect([...applyDrag(new Set(), DATES, 2, 5)].sort()).toEqual(rect(DATES, 2, 3, 4, 5));
+  });
+
+  it("시작 칸이 칠해져 있으면 직사각형을 지운다. 일부만 칠해져 있어도 모두 지운다", () => {
+    const outside = cellKey("2026-11-05", 3);
+    const base = new Set([cellKey(DATES[0], 2), cellKey(DATES[2], 4), outside]);
+    expect([...applyDrag(base, DATES, 2, 5)]).toEqual([outside]);
+    expect([...applyDrag(new Set([...rect(DATES, 2, 3, 4, 5), outside]), DATES, 2, 5)]).toEqual([outside]);
+  });
+
+  it("시작 칸이 비어 있으면 칠한 칸이 섞여 있어도 모두 칠한다", () => {
+    const base = new Set([cellKey(DATES[1], 3)]);
+    expect([...applyDrag(base, DATES, 2, 5)].sort()).toEqual(rect(DATES, 2, 3, 4, 5));
+  });
+
+  it("왼쪽 위로 끌어도(뒤집힌 순서) 같은 직사각형이다", () => {
+    const reversed = [...DATES].reverse();
+    expect([...applyDrag(new Set(), reversed, 5, 2)].sort()).toEqual(rect(DATES, 2, 3, 4, 5));
+  });
+
+  it("지우기 판정은 시작 열(dates[0])의 시작 칸으로 한다", () => {
+    const base = new Set([cellKey(DATES[2], 5)]);
+    expect([...applyDrag(base, [...DATES].reverse(), 5, 2)]).toEqual([]);
+    expect([...applyDrag(base, DATES, 5, 2)].sort()).toEqual(rect(DATES, 2, 3, 4, 5));
+  });
+});
+
+describe("copyDay", () => {
+  const [MON, TUE, WED] = ["2026-11-02", "2026-11-03", "2026-11-04"];
+  const keysOf = (cells: Set<string>, date: string) => [...cells].filter((k) => k.startsWith(`${date}@`)).sort();
+
+  it("월요일 09:00~15:00을 화·수에 더하고 화요일의 기존 칸은 남긴다", () => {
+    const cells = cellsFromSlots({ [MON]: [["09:00", "15:00"]], [TUE]: [["18:00", "20:00"]] });
+    const next = copyDay(cells, MON, [TUE, WED]);
+    expect(slotsFromCells(next)).toEqual({
+      [MON]: [["09:00", "15:00"]],
+      [TUE]: [["09:00", "15:00"], ["18:00", "20:00"]],
+      [WED]: [["09:00", "15:00"]],
+    });
+    expect(cells.size).toBe(16);
+  });
+
+  it("from이 비어 있으면 그대로다", () => {
+    const cells = cellsFromSlots({ [TUE]: [["18:00", "20:00"]] });
+    expect([...copyDay(cells, MON, [TUE, WED])].sort()).toEqual([...cells].sort());
+  });
+
+  it("from이 to에 있어도 된다", () => {
+    const cells = cellsFromSlots({ [MON]: [["09:00", "10:00"]] });
+    const next = copyDay(cells, MON, [MON, TUE]);
+    expect(keysOf(next, MON)).toEqual(keysOf(cells, MON));
+    expect(slotsFromCells(next)[TUE]).toEqual([["09:00", "10:00"]]);
   });
 });
 
