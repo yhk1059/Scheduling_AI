@@ -5,19 +5,12 @@ import Link from "next/link";
 import DemoVideoButton from "@/components/DemoVideo";
 import HeroSequence, { ChangeFragment, ReplyCard, ScheduleFragment } from "@/components/HeroSequence";
 import { ui } from "@/components/ui";
-import { Mark } from "@/components/Wordmark";
+import Wordmark, { Mark } from "@/components/Wordmark";
 import { PRODUCT_NAME } from "@/lib/product";
 
 // 저장소를 옮기면 이 한 줄만 바꾼다.
 const REPO_URL = "https://github.com/yhk1059/Scheduling_AI";
 const EVAL_URL = `${REPO_URL}/blob/main/eval/results.md`;
-
-// 헤더에서 가는 섹션. 폰에서는 숨긴다(워드마크와 GitHub만 남는다).
-const SECTIONS = [
-  { id: "problem", label: "문제" },
-  { id: "how", label: "동작 방식" },
-  { id: "made", label: "만든 방식" },
-];
 
 const container = "mx-auto w-full max-w-[1360px] px-5 lg:px-10";
 const section = "border-t border-[#E2E2DC] py-16 lg:py-24";
@@ -353,11 +346,6 @@ export default function Home() {
             {PRODUCT_NAME}
           </Link>
           <nav className="flex items-center gap-1">
-            {SECTIONS.map((s) => (
-              <a key={s.id} href={`#${s.id}`} className={`${ui.text} max-md:hidden`}>
-                {s.label}
-              </a>
-            ))}
             <a href={REPO_URL} className={ui.text}>
               GitHub
             </a>
@@ -368,14 +356,17 @@ export default function Home() {
       <main>
         <section className={`${container} grid grid-cols-1 gap-10 py-12 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:items-center lg:gap-14 lg:py-[88px]`}>
           <div className="flex flex-col gap-6">
-            <p className={ui.eyebrow}>카페·음식점 매니저를 위한 근무표</p>
+            <Wordmark size="hero" />
+            <p className={ui.eyebrow}>스케줄링 매니저를 위한 근무표</p>
             <h1 className="text-[34px] leading-[1.15] font-bold tracking-[-0.03em] break-keep text-[#1B1B18] lg:text-[42px] xl:text-[48px]">
               매장 조건은 말로,
               <br />
               근무표는 버튼 하나로
             </h1>
-            <p className="text-[17px] leading-relaxed text-[#3D3D38]">
-              직원은 링크로 가능 시간을 칠하고, 매니저는 매장 조건을 말로 적어요. 막히면 이유와 해결책을 알려 드려요.
+            <p className="text-[17px] leading-relaxed break-keep text-[#3D3D38]">
+              직원은 링크로 가능 시간을 칠하고, 매니저는 매장 조건을 말로 적어요.
+              <br />
+              막히면 이유와 해결책을 알려 드려요.
             </p>
             <div className="flex flex-wrap items-center gap-2">
               <Link href="/app" className={ui.primaryXl}>
