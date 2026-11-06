@@ -69,7 +69,10 @@
     {
       "step": 8,
       "name": "notices",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-11-06T12:34:02+0900",
+      "summary": "lib/wording.ts ruleQuote(rule, siblings, config, employees, period): 폼 규칙(source_text=COVERAGE_SOURCE_TEXT)은 해석 문장만, 같은 source_text가 siblings에 둘 이상이면 '“원문” (해석 문장)', 아니면 '“원문”'. ConstraintCard 충돌 경고가 ruleQuote(conflict, shop.rules, …)를 쓰고 JSX 따옴표를 빼 '기존 규칙 {quote}{josa(quote,과,와)} 함께 지킬 수 없어요'(예: 기존 규칙 “매일 오픈, 미들, 마감 각각 1명씩” (매일 미들 1명)과 함께 지킬 수 없어요, 폼 규칙은 따옴표 없이 '기존 규칙 평일마다 오픈 1~2명과 …'). lib/availability.ts unsubmittedCause(conflictIds, submittedIds, activeIds): 활성 0명 false, 활성 중 제출 0명 true, 아니면 충돌의 avail- id에서 마지막 '-' 앞을 직원 id로 뽑아 하나 이상이고 모두 미제출이면 true. 테스트 wording 3개·availability 7개 추가. ScheduleStep: unsubmittedFor(shop, period, conflicts)(status=confirmed면 false라 확정 근무표 화면은 늘 기존 패널)를 useSolve와 ScheduleBody가 함께 쓴다. useSolve는 해 없음이고 미제출 원인이면 explain을 부르지 않는다(explaining false). OutcomePanel에 unsubmitted·noneSubmitted·onGoAvailability props: unsubmitted면 제목('이 조건으로는 근무표를 만들 수 없어요')·배지 아래에 '아직 가능 시간을 제출한 직원이 없어요. ①에서 링크를 보내고 제출을 기다려 주세요'(제출 0명) 또는 '{이름, 이름}의 가능 시간이 아직 없어요. 제출을 기다리거나 ①에서 확인해 주세요'(걸린 직원만 미제출)와 Text 버튼 [① 가능 시간으로](go period step 1)만 보이고, 분석 중·제안·함께 지킬 수 없는 규칙·가능 시간도 함께 걸려 있어요·원인 못 찾음 목록·왜 만들 수 없나요?를 숨긴다(끄기 버튼 없음). 미제출이 아니면 패널 순서 그대로. ConfirmedPeriod 제목 줄 '마지막 확정 {시각} · 직원 링크는 잠겼어요. 직원은 같은 링크에서 근무표를 봐요'. 문구 훑기: components/ShopHome.tsx 지난·다가오는 근무표 표의 열 머리 '기간' → '날짜'로 고침. 그 밖 components/에 없음(app/page.tsx '만든 방식'의 '다시 풀어'와 개인정보처리방침의 '보관 위치와 기간'·'해석'은 기술 설명·법적 문서라 그대로). backend 무변경. e2e 영향: S10·S18은 모두 제출한 상태라 미제출 안내가 뜨지 않아 기존 패널 그대로. 충돌 경고 인용 꼴과 확정 화면 문장(S12 3 '직원 링크는 잠겼어요'는 부분 일치면 통과)이 바뀜. 결정: 이름 목록은 병합된 가능 시간 충돌의 source_text에서 얻는다('…의'라 조사 변형 없음). 결정: 제출자 판정은 활성 직원만 센다(비활성 직원의 제출은 무시). 결정: UI_GUIDE 지난 근무표 표의 열 이름 '기간'은 문서 수정을 마지막 step에 맡긴다. 수동 체크: 확인 못 함(브라우저 저니 미실행).",
+      "completed_at": "2026-11-06T12:38:44+0900"
     },
     {
       "step": 9,
