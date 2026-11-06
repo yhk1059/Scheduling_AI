@@ -494,7 +494,7 @@ export default function Home() {
         <div className={`${container} flex flex-col gap-3 py-8 text-xs font-medium text-[#66665E] lg:flex-row lg:items-center lg:justify-between`}>
           <span className="flex items-center gap-2">
             <Mark size={18} tone="muted" />
-            {PRODUCT_NAME} · 포트폴리오 프로토타입
+            {PRODUCT_NAME}
           </span>
           <span className="flex items-center gap-4">
             <Link href="/privacy" className="-my-3 inline-flex h-10 items-center hover:text-[#1B1B18]">
