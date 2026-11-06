@@ -21,7 +21,10 @@
     {
       "step": 2,
       "name": "coverage-table",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-11-06T12:13:28+0900",
+      "summary": "lib/coverage-conflict.ts에 DayKind(store.ts는 import type 후 re-export)와 effectiveCoverage(rules, code, kind, period, holidays) 추가: 켜진 반드시 필요 인원 모양 규칙 중 shifts.in이 [code]이고(not_in·복합 코드 제외) 그 요일 종류의 모든 날을 덮는 규칙의 min 최댓값·max 최솟값(상한 없는 규칙만이면 null), 없으면 null. 테스트 10개 추가. ② CoverageSummary의 need()가 coverageRange 대신 effectiveCoverage(liveShopRules, …, period.holidays)를 쓰고 직급별(tagCoverage)은 그대로 잇는다. 바뀐 화면 문구: 요약표 아래 ui.help 한 줄 '켜진 반드시 필요 인원 규칙을 합친 값이에요. 일부 날짜에만 적용되는 규칙은 카드에서 봐요'. 카드에서 빼는 규칙(isCoverageRule·summarizedCoverageIds)은 그대로라 말로 만든 '매일 오픈 1명 이상'은 표에도 나오고 카드로도 남는다(UI_GUIDE 문장 수정은 마지막 step). hasStaffing은 presetName(필요 인원·직급별 배치)으로 말로 만든 규칙도 이미 세므로 그대로. 폼(setCoverage·CoverageForm)·저장 모양 무변경. e2e 영향: S8-a 요약표 값이 폼 규칙뿐 아니라 말로 만든 날마다 필요 인원 규칙(매일·평일·주말, 코드 하나)에도 반응한다(S18 6의 요약표 오픈 행 등). 결정: 합친 결과 min > max여도 그대로 보여 준다(예: '3~2명', 함께 지킬 수 없음이 드러남). 결정: 요일 고르기(토·일)나 특정일이라도 그 요일 종류의 날을 모두 덮으면 표에 넣는다(공휴일이 있으면 토·일 규칙은 주말 칸에서 빠진다). 수동 체크: 확인 못 함(브라우저 저니 미실행).",
+      "completed_at": "2026-11-06T12:16:10+0900"
     },
     {
       "step": 3,
