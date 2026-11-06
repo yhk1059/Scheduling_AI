@@ -298,7 +298,8 @@ function describeShape(s: Shape, hardness: string, config: ShopConfig, employees
     const p = s.pattern;
     text = [`${p.length === 2 ? `${label(p[0])} 다음 날 ${label(p[1])}` : p.map(label).join(" → ")} 금지`];
   } else if (s.kind === "off_after") {
-    text = [`${label(s.after)} 다음 날은 휴무 ${s.then_off}일`];
+    const after = label(s.after);
+    text = [`${after}${josa(after, "이", "가")} 끝나면 휴무 ${s.then_off}일 (연속 ${after}은 가능)`];
   } else if (s.kind === "max_run") {
     text = anyWork(s.run) ? ["연속 근무 ", num(s.max_len), "일까지"] : [`${label(s.run)} 연속 `, num(s.max_len), "일까지"];
   } else {

@@ -679,6 +679,14 @@ def test_bare_staffing_number_means_at_least():
     assert exact["body"]["then"]["op"] == "eq"
 
 
+def test_system_prompt_after_close_rest_allows_consecutive_closing():
+    # "마감 다음 날 쉬게"도 연속 마감이 끝난 다음 날로 본다(w01). 예시 모양과 같아야 한다
+    assert "마감 다음 날은 쉬게" in TRANSLATE_SYSTEM and "연속 마감" in TRANSLATE_SYSTEM
+    examples = dict(TRANSLATE_EXAMPLES)
+    when = examples["마감 끝나면 다음 날은 무조건 쉬게"]["rules"][0]["body"]["when"]["all"]
+    assert when[1]["left"] == {"offset": [1, 1], "shifts": {"not_in": ["C"]}}
+
+
 def test_system_prompt_covers_rules():
     for word in ("모델러", "실행 코드", "무조건", "가능하면", "clarification_question", "unsupported_reason", "다음 주", "3주차"):
         assert word in TRANSLATE_SYSTEM

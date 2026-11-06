@@ -181,8 +181,9 @@ describe("presetName / describeRule: 프리셋 모양", () => {
     ["블록 길이", minRun(C, 2), "최소 연속 마감", "마감은 2일 이상씩 이어서"],
     ["최소 휴무", count({ shifts: OFF, per: "person", min: 8 }), "최소 휴무 일수", "모든 사람 근무표마다 휴무 8일 이상"],
     ["꺼진 규칙", count({ shifts: OFF, per: "person", min: 8 }, { enabled: false }), "최소 휴무 일수", "모든 사람 근무표마다 휴무 8일 이상"],
-    ["마감 다음 휴무 1일", offAfter(C, 1), "마감 다음 휴무", "마감 다음 날은 휴무 1일"],
-    ["마감 다음 휴무 2일", offAfter(C, 2), "마감 다음 휴무", "마감 다음 날은 휴무 2일"],
+    // 연속 마감 중에는 적용되지 않는다는 것을 카드에서 보이게 한다
+    ["마감 다음 휴무 1일", offAfter(C, 1), "마감 다음 휴무", "마감이 끝나면 휴무 1일 (연속 마감은 가능)"],
+    ["마감 다음 휴무 2일", offAfter(C, 2), "마감 다음 휴무", "마감이 끝나면 휴무 2일 (연속 마감은 가능)"],
     ["주 근무 시간", count({ shifts: WORK, per: "person_week", measure: "hours", max: 52 }), "근무 시간", "모든 사람 주마다 근무 시간 52시간 이하"],
     ["휴무 간격", count({ people: { exclude_tags: ["신입"] }, shifts: OFF, per: "person_window", window: 7, min: 1 }), "휴무 간격", "신입 빼고 7일마다 휴무 1일 이상"],
     ["고른 직급에서 빼는 직급", count({ people: { tags: ["리더"], exclude_tags: ["홀"] }, shifts: C, per: "day", min: 1 }), "세는 규칙", "매일 리더 직급(홀 제외) 마감 1명 이상"],
