@@ -15,6 +15,7 @@ import {
   COVERAGE_SOURCE_TEXT,
   currentPeriod,
   disabledRulesFor,
+  scheduleInputs,
   toScheduleRequest,
   useAppStore,
   type WorkPeriod,
@@ -33,7 +34,7 @@ import type {
   ShopConfig,
 } from "@/lib/types.gen";
 import { statsFromAssignments } from "@/lib/stats";
-import { describeRule, formatDeviation, hardnessLabel, josa, presetName } from "@/lib/wording";
+import { describeRule, formatDeviation, hardnessLabel, josa, presetName, scheduleInputsText } from "@/lib/wording";
 
 import Dialog from "./Dialog";
 import { Spinner, today } from "./RulesStep";
@@ -558,7 +559,17 @@ export default function ScheduleStep() {
             </button>
             {!result ? (
               <div className="flex items-center gap-3">
-                <p className="text-sm text-[#3D3D38]">가능 시간과 매장 조건으로 근무표를 만들어요</p>
+                <p className="max-w-[420px] text-right text-sm leading-relaxed text-[#3D3D38]">
+                  {scheduleInputsText(scheduleInputs(shop, period, periods)).map((p, i) =>
+                    "value" in p ? (
+                      <span key={i} className="font-mono">
+                        {p.text}
+                      </span>
+                    ) : (
+                      p.text
+                    ),
+                  )}
+                </p>
                 <button type="button" onClick={sv.run} disabled={remake} className={ui.primaryLg}>
                   {loading && <Spinner />}
                   {loading ? "만드는 중…" : "근무표 만들기"}

@@ -405,6 +405,34 @@ export function shopRuleCount(rules: ConstraintSpec[]): number {
   return rules.filter((r) => presetName(r) !== "필요 인원").length;
 }
 
+/** ③ 만들기 전 요약에 쓰는 수(lib/store.ts scheduleInputs가 센다). */
+export interface ScheduleInputs {
+  /** 가능 시간을 제출한 직원 수(활성 직원 중) */
+  submitted: number;
+  /** 새 근무표에 들어가는 직원 수(활성) */
+  employees: number;
+  /** 켜진 반드시 규칙·요청 수(가능 시간 규칙·칸 고정 제외) */
+  hard: number;
+  /** 켜진 가능하면 규칙·요청 수 */
+  soft: number;
+  /** 이번 근무표에서 끈 규칙·요청 수 */
+  disabled: number;
+  /** 이어받는 지난 근무 일수(0이면 없음) */
+  carryDays: number;
+}
+
+/** ③ 만들기 전 한 줄: "제출 10/12명 · 반드시 6개 · 가능하면 2개 · 이번 근무표에서 끈 규칙 1개 · 지난 근무 7일 이어받아요". 끈 규칙 0·지난 근무 0은 뺀다. */
+export function scheduleInputsText(i: ScheduleInputs): SentencePart[] {
+  const items: Phrase[] = [
+    ["제출 ", { value: "submitted", text: `${i.submitted}/${i.employees}` }, "명"],
+    ["반드시 ", { value: "hard", text: fmt(i.hard) }, "개"],
+    ["가능하면 ", { value: "soft", text: fmt(i.soft) }, "개"],
+    i.disabled > 0 && ["이번 근무표에서 끈 규칙 ", { value: "disabled", text: fmt(i.disabled) }, "개"],
+    i.carryDays > 0 && ["지난 근무 ", { value: "carryDays", text: fmt(i.carryDays) }, "일 이어받아요"],
+  ].filter((x): x is Phrase => !!x);
+  return sentence(joined(" · ", ...items)).parts;
+}
+
 /** 평균보다 많은 근무일: 2.6 → "+3일", -0.4 → "0일", -1.6 → "−2일". */
 export function formatDeviation(d: number): string {
   const n = Math.round(Math.abs(d));

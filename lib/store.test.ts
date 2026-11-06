@@ -24,6 +24,7 @@ import {
   prepareNeedsReview,
   rosterChangesFor,
   SAVE_DEBOUNCE_MS,
+  scheduleInputs,
   STORAGE_KEY,
   toScheduleRequest,
   summarizedCoverageIds,
@@ -2241,5 +2242,38 @@ describe("공정성 기본 규칙", () => {
     const req = toScheduleRequest(store.getState().shop!, period, store.getState().periods, TODAY);
     const got = req.constraints!.filter((c) => c.id === MAX_RUN || c.id === BALANCE);
     expect(got).toEqual(defaultFairnessRules());
+  });
+});
+
+describe("scheduleInputs", () => {
+  const loadOct = async () => {
+    const store = synced(fakeRemote({ data: octDoc, updatedAt: SERVER_AT }).remote);
+    await store.getState().signedIn(USER);
+    const { shop, periods } = store.getState();
+    return { shop: shop!, periods, draft: periods.find((p) => p.start_date === "2026-11-02")! };
+  };
+
+  it("D3 11/2~11/29: 제출 12/12, 반드시 12(필요 인원 6 + 매장 조건 5 + 휴가), 가능하면 5, 지난 근무 7일", async () => {
+    const { shop, periods, draft } = await loadOct();
+    expect(scheduleInputs(shop, draft, periods)).toEqual({ submitted: 12, employees: 12, hard: 12, soft: 5, disabled: 0, carryDays: 7 });
+  });
+
+  it("이번 근무표에서 끈 규칙은 켜진 수에서 빠지고 끈 수로 센다", async () => {
+    const { shop, periods, draft } = await loadOct();
+    const period = { ...draft, disabledIds: ["rule-no-close-open", "req-avoid-e02"] };
+    expect(scheduleInputs(shop, period, periods)).toMatchObject({ hard: 11, soft: 4, disabled: 2 });
+  });
+
+  it("제출 수는 활성 직원 중 가능 시간이 있는 직원만 센다", async () => {
+    const { shop, periods, draft } = await loadOct();
+    const [first, second] = shop.employees;
+    const availability = Object.fromEntries(Object.entries(draft.availability).filter(([id]) => id !== first.id));
+    const s = { ...shop, employees: shop.employees.map((n) => (n.id === second.id ? { ...n, active: false } : n)) };
+    expect(scheduleInputs(s, { ...draft, availability }, periods)).toMatchObject({ submitted: 10, employees: 11 });
+  });
+
+  it("지난 확정 근무표가 없고 직접 입력도 없으면 지난 근무 0일", async () => {
+    const { shop, draft } = await loadOct();
+    expect(scheduleInputs(shop, draft, [draft]).carryDays).toBe(0);
   });
 });
