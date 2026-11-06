@@ -82,13 +82,28 @@ export function slotsFromCells(cells: Set<string>): AvailabilitySlots {
   return slots;
 }
 
-/** 드래그 한 번의 결과. 시작 칸이 비어 있으면 범위를 칠하고, 칠해져 있으면 지운다. base는 드래그를 시작할 때의 칸이다. */
-export function applyDrag(base: Set<string>, date: string, start: number, end: number): Set<string> {
-  const erase = base.has(cellKey(date, start));
+/**
+ * 드래그 한 번의 결과. 시작 칸(dates[0], start)이 비어 있으면 dates × [start..end] 직사각형을 칠하고, 칠해져 있으면 지운다.
+ * dates는 시작 열부터 지금 열까지의 날짜(화면에 보이는 순서, 시작 열이 뒤에 있으면 뒤집힌 순서라도 된다). base는 드래그를 시작할 때의 칸이다.
+ */
+export function applyDrag(base: Set<string>, dates: string[], start: number, end: number): Set<string> {
+  const erase = base.has(cellKey(dates[0], start));
   const next = new Set(base);
-  for (let slot = Math.min(start, end); slot <= Math.max(start, end); slot++) {
-    if (erase) next.delete(cellKey(date, slot));
-    else next.add(cellKey(date, slot));
+  for (const date of dates) {
+    for (let slot = Math.min(start, end); slot <= Math.max(start, end); slot++) {
+      if (erase) next.delete(cellKey(date, slot));
+      else next.add(cellKey(date, slot));
+    }
+  }
+  return next;
+}
+
+/** from 날의 칠한 구간을 to 날들에 더한다(합집합. to의 기존 칸은 남긴다). from이 비어 있으면 그대로. from이 to에 있어도 된다. */
+export function copyDay(cells: Set<string>, from: string, to: string[]): Set<string> {
+  const next = new Set(cells);
+  for (let slot = 0; slot < SLOT_COUNT; slot++) {
+    if (!cells.has(cellKey(from, slot))) continue;
+    for (const date of to) next.add(cellKey(date, slot));
   }
   return next;
 }
