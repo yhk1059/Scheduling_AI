@@ -1067,7 +1067,7 @@ describe("기간 연속성: 요청 조립", () => {
     const { store } = withConfirmed(e01);
     const nextId = store.getState().createPeriod(TODAY)!;
     const next = store.getState().periods.find((p) => p.id === nextId)!;
-    expect([next.start_date, next.length, next.holidays]).toEqual(["2026-12-01", 31, []]);
+    expect([next.start_date, next.length, next.holidays]).toEqual(["2026-12-01", 31, [25]]); // 12/25 자동
     expect(next.carryOver).toEqual([]);
 
     const req = toScheduleRequest(store.getState().shop!, next, store.getState().periods, TODAY);
@@ -1183,6 +1183,54 @@ describe("기간 연속성: 확정 버전과 이월 변경", () => {
     store.getState().confirm(nextId);
     expect(next().status).toBe("confirmed");
     expect(carryOverChanged(next(), store.getState().periods)).toBe(true);
+  });
+});
+
+describe("공휴일 자동 채우기", () => {
+  function shopWith(unit: "month" | "1w" | "2w") {
+    const store = fresh();
+    startDenShop(store);
+    store.getState().addEmployees(rows);
+    store.getState().setUnit(unit);
+    return store;
+  }
+  const first = (store: ReturnType<typeof fresh>) => store.getState().periods[0];
+
+  it("근무표를 만들면 그 기간의 한국 공휴일이 체크돼 있다", () => {
+    const store = shopWith("month");
+    store.getState().createPeriod(TODAY, "2026-12-15");
+    // 12/15~1/14: 12/25(11일째), 1/1(18일째)
+    expect([first(store).length, first(store).holidays]).toEqual([31, [11, 18]]);
+
+    const week = shopWith("1w");
+    week.getState().createPeriod(TODAY, "2026-11-02");
+    expect(first(week).holidays).toEqual([]);
+  });
+
+  it("다음 근무표도 그 기간의 공휴일로 시작한다", () => {
+    const { store } = withConfirmed();
+    const nextId = store.getState().createPeriod(TODAY)!;
+    const next = store.getState().periods.find((p) => p.id === nextId)!;
+    // 12/1~12/31: 12/25
+    expect([next.start_date, next.holidays]).toEqual(["2026-12-01", [25]]);
+  });
+
+  it("매니저가 뺀 공휴일은 그대로 빠져 있다", () => {
+    const store = shopWith("month");
+    const id = store.getState().createPeriod(TODAY, "2026-12-15")!;
+    store.getState().toggleHoliday(id, 11);
+    expect(first(store).holidays).toEqual([18]);
+  });
+
+  it("시작일을 미루면 옮긴 공휴일과 새 기간의 공휴일을 합친다", () => {
+    const store = shopWith("2w");
+    const id = store.getState().createPeriod(TODAY, "2026-12-21")!;
+    // 12/21~1/3: 12/25(5), 1/1(12). 12/28(8)을 직접 체크
+    expect(first(store).holidays).toEqual([5, 12]);
+    store.getState().toggleHoliday(id, 8);
+    expect(store.getState().postponeStart(id, "2026-12-28")).toBe(true);
+    // 12/28~1/10: 직접 체크한 12/28(1), 옮긴 1/1과 새로 든 1/1(5)
+    expect([first(store).start_date, first(store).holidays]).toEqual(["2026-12-28", [1, 5]]);
   });
 });
 
@@ -2078,13 +2126,13 @@ describe("시작일", () => {
     const { store } = withConfirmed();
     const nextId = store.getState().createPeriod(TODAY)!;
     const next = () => store.getState().periods.find((p) => p.id === nextId)!;
-    store.getState().toggleHoliday(nextId, 25); // 12/25
+    store.getState().toggleHoliday(nextId, 10); // 12/10 직접 체크 (12/25는 자동)
     store.getState().setResult(nextId, result({ e01: fill(31, "D") }), []);
     expect(store.getState().postponeStart(nextId, "2026-11-30")).toBe(false);
     expect(store.getState().postponeStart(nextId, "2026-12-29")).toBe(false); // 달력 월은 1~28일
     const v = store.getState().inputVersion;
     expect(store.getState().postponeStart(nextId, "2026-12-08")).toBe(true);
-    expect(next()).toMatchObject({ start_date: "2026-12-08", length: 31, holidays: [18], result: null, resultVersion: null });
+    expect(next()).toMatchObject({ start_date: "2026-12-08", length: 31, holidays: [3, 18, 25], result: null, resultVersion: null });
     expect(store.getState().inputVersion).toBe(v + 1);
     // 이어지지 않으므로 지난 근무가 자동으로 채워지지 않는다
     expect(toScheduleRequest(store.getState().shop!, next(), store.getState().periods, TODAY).carry_over).toEqual([]);

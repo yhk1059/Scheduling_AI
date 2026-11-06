@@ -1,5 +1,6 @@
 "use client";
 
+import { holidayName } from "@/lib/holidays";
 import { periodDays } from "@/lib/period";
 import { useAppStore, type WorkPeriod } from "@/lib/store";
 
@@ -66,6 +67,7 @@ export default function HolidayCalendar({ period }: { period: WorkPeriod }) {
                     aria-pressed={holiday}
                     aria-current={isToday ? "date" : undefined}
                     aria-label={`${month}월 ${dom}일 공휴일${holiday ? " 해제" : " 지정"}`}
+                    title={holidayName(`${key}-${String(dom).padStart(2, "0")}`) ?? undefined}
                     onClick={() => toggleHoliday(period.id, day)}
                     className={`h-8 rounded-xs border font-mono text-[13px] transition-colors duration-[120ms] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#155E75] ${
                       holiday

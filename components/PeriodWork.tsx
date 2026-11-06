@@ -350,7 +350,7 @@ function PrepareSummary({ period }: { period: WorkPeriod }) {
             <DatesSection period={period} />
             <div className="flex flex-col gap-1">
               <h3 className="text-[13px] font-semibold text-[#1B1B18]">공휴일</h3>
-              <p className={ui.help}>날짜를 누르면 공휴일로 체크돼요. 주말과 같은 인원 기준을 써요.</p>
+              <p className={ui.help}>한국 공휴일은 자동으로 체크돼요. 날짜를 누르면 바꿀 수 있어요. 주말과 같은 인원 기준을 써요.</p>
             </div>
             <HolidayCalendar period={period} />
           </section>
