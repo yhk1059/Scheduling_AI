@@ -272,7 +272,7 @@ export default function ShopHome() {
       <thead>
         <tr className="border-b border-[#E2E2DC] text-left text-xs font-medium text-[#66665E]">
           <th className="py-2 pr-4 font-medium">근무표</th>
-          <th className="py-2 pr-4 font-medium">기간</th>
+          <th className="py-2 pr-4 font-medium">날짜</th>
           <th className="py-2 pr-4 font-medium">확정</th>
           <th className="py-2 pr-4 font-medium">마감 횟수 차이</th>
           <th className="py-2 font-medium">

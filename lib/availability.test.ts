@@ -17,6 +17,7 @@ import {
   slotLabel,
   slotsFromCells,
   type AvailabilitySlots,
+  unsubmittedCause,
 } from "./availability";
 import { DEFAULT_CONFIG } from "./rules";
 import type { Rule, ShopConfig } from "./types.gen";
@@ -312,5 +313,32 @@ describe("availableCount", () => {
 
   it("그날 칠하지 않았거나 비어 있으면 세지 않는다", () => {
     expect(availableCount([{}, { "2026-11-03": FULL }], DATE, shift("A"), CONFIG)).toBe(0);
+  });
+});
+
+describe("unsubmittedCause", () => {
+  const ACTIVE = ["e01", "e02", "e03"];
+  it("제출한 직원이 없으면 충돌과 무관하게 true", () => {
+    expect(unsubmittedCause(["cov-a"], [], ACTIVE)).toBe(true);
+    expect(unsubmittedCause([], [], ACTIVE)).toBe(true);
+  });
+  it("충돌에 걸린 가능 시간 직원이 모두 미제출이면 true", () => {
+    expect(unsubmittedCause(["cov-a", "avail-e01-A", "avail-e02-M"], ["e03"], ACTIVE)).toBe(true);
+  });
+  it("걸린 직원 중 하나라도 제출했으면 false", () => {
+    expect(unsubmittedCause(["avail-e01-A", "avail-e02-M"], ["e02"], ACTIVE)).toBe(false);
+  });
+  it("충돌에 가능 시간 규칙이 없고 제출자가 있으면 false", () => {
+    expect(unsubmittedCause(["cov-a", "rule-x"], ["e01"], ACTIVE)).toBe(false);
+  });
+  it("활성 직원이 없으면 false", () => {
+    expect(unsubmittedCause(["cov-a"], [], [])).toBe(false);
+  });
+  it("직원 id에 -가 있어도 마지막 - 뒤를 코드로 본다", () => {
+    expect(unsubmittedCause(["avail-emp-1-AC"], ["e01"], ["emp-1", "e01"])).toBe(true);
+    expect(unsubmittedCause(["avail-emp-1-AC"], ["emp-1"], ["emp-1", "e01"])).toBe(false);
+  });
+  it("제출자 판정은 활성 직원만 센다", () => {
+    expect(unsubmittedCause(["cov-a"], ["e99"], ACTIVE)).toBe(true);
   });
 });

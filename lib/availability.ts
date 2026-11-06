@@ -15,6 +15,18 @@ export function isAvailabilityRule(id: string): boolean {
   return id.startsWith(AVAILABILITY_RULE_PREFIX);
 }
 
+/** 근무표 없음의 원인이 미제출인지: 활성 직원 중 제출한 사람이 없거나, 충돌에 걸린 가능 시간 규칙의 직원이 모두 미제출이면 true. */
+export function unsubmittedCause(conflictIds: string[], submittedIds: string[], activeIds: string[]): boolean {
+  if (activeIds.length === 0) return false;
+  const submitted = new Set(submittedIds);
+  if (!activeIds.some((id) => submitted.has(id))) return true;
+  // avail-{직원 id}-{코드}: 마지막 - 뒤가 코드
+  const blocked = conflictIds
+    .filter(isAvailabilityRule)
+    .map((id) => id.slice(AVAILABILITY_RULE_PREFIX.length, id.lastIndexOf("-")));
+  return blocked.length > 0 && blocked.every((id) => !submitted.has(id));
+}
+
 /** 충돌 목록의 가능 시간은 근무 코드마다 규칙이 달라도 직원마다 한 줄로 묶는다. */
 export function mergeAvailabilityConflicts(conflicts: Conflict[]): Conflict[] {
   const seen = new Set<string>();

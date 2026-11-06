@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { DEFAULT_CONFIG } from "./rules";
 import { balance, count, fixedCell, forbid, maxRun, minRun, OFF, offAfter, WORK } from "./test-rules";
-import { isLeaveRule, withRuleComparison, type Shop, type WorkPeriod } from "./store";
+import { COVERAGE_SOURCE_TEXT, isLeaveRule, withRuleComparison, type Shop, type WorkPeriod } from "./store";
 import type { ConstraintSpec, Employee, Rule, Shifts, ShopConfig } from "./types.gen";
 import {
   describeRule,
@@ -20,6 +20,7 @@ import {
   unitShort,
   shopRuleCount,
   scheduleInputsText,
+  ruleQuote,
 } from "./wording";
 
 const NOV = { start_date: "2026-11-01", length: 30 };
@@ -583,5 +584,26 @@ describe("scheduleInputsText", () => {
       .filter((p) => "value" in p)
       .map((p) => p.text);
     expect(values).toEqual(["0/5", "1", "2", "3", "2"]);
+  });
+});
+
+describe("ruleQuote", () => {
+  const SRC = "매일 오픈, 미들, 마감 각각 1명씩";
+  const open = count({ shifts: A, per: "day", min: 1, max: 1 }, { id: "c-a", source_text: SRC });
+  const mid = count({ shifts: M, per: "day", min: 1, max: 1 }, { id: "c-m", source_text: SRC });
+  const close = count({ shifts: C, per: "day", min: 1, max: 1 }, { id: "c-c", source_text: SRC });
+
+  it("폼 규칙(원문 없음)은 해석 문장만", () => {
+    const form = count({ days: { kind: "weekday" }, shifts: A, per: "day", min: 3, max: 4 }, { id: "cov-a", source_text: COVERAGE_SOURCE_TEXT });
+    expect(ruleQuote(form, [form], DEFAULT_CONFIG, EMPLOYEES, NOV)).toBe("평일마다 오픈 3~4명");
+  });
+
+  it("원문이 하나뿐이면 따옴표 원문", () => {
+    const r = count({ shifts: M, per: "day", min: 1, max: 1 }, { id: "x", source_text: "미들 1명" });
+    expect(ruleQuote(r, [r, open], DEFAULT_CONFIG, EMPLOYEES, NOV)).toBe("“미들 1명”");
+  });
+
+  it("같은 원문이 둘 이상이면 원문 (해석 문장)", () => {
+    expect(ruleQuote(mid, [open, mid, close], DEFAULT_CONFIG, EMPLOYEES, NOV)).toBe(`“${SRC}” (매일 미들 1명)`);
   });
 });

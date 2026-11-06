@@ -4,7 +4,7 @@ import { useEffect, useState, type CSSProperties, type ReactNode } from "react";
 
 import { ApiError, errorMessage, explain, solve } from "@/lib/api";
 import { toScheduleCsv } from "@/lib/csv";
-import { availabilityFromLinks, isAvailabilityRule, mergeAvailabilityConflicts } from "@/lib/availability";
+import { availabilityFromLinks, isAvailabilityRule, mergeAvailabilityConflicts, unsubmittedCause } from "@/lib/availability";
 import { historyLoadFor, isOperating } from "@/lib/continuity";
 import { closingShift, DEFAULT_CONFIG, OFF_CODE, shiftTones } from "@/lib/rules";
 import { dayHeader, dayOfDate, isWeekendDay, monthDay, periodDays, periodEnd } from "@/lib/period";
@@ -16,6 +16,7 @@ import {
   currentPeriod,
   disabledRulesFor,
   scheduleInputs,
+  type Shop,
   toScheduleRequest,
   useAppStore,
   type WorkPeriod,
@@ -225,6 +226,10 @@ export function useSolve(periodId: string) {
       } else {
         setOutcome({ kind: "infeasible", version: res.input_version, conflicts: res.conflicts, explanation: null });
         setLoading(false);
+        // 원인이 미제출이면 설명을 부르지 않는다(안내는 OutcomePanel이 한다)
+        const s = useAppStore.getState();
+        const p = s.periods.find((x) => x.id === periodId)!;
+        if (unsubmittedFor(s.shop!, p, res.conflicts)) return;
         await runExplain(req, res.conflicts, res.input_version);
       }
     } catch (e) {
@@ -247,6 +252,17 @@ export function useSolve(periodId: string) {
 }
 
 export type Solve = ReturnType<typeof useSolve>;
+
+/** 근무표 없음의 원인이 미제출인지. 확정한 근무표는 링크가 잠겨 제출이 끝났으므로 false. */
+function unsubmittedFor(shop: Shop, period: WorkPeriod, conflicts: Conflict[]): boolean {
+  if (period.status === "confirmed") return false;
+  const active = shop.employees.filter((n) => n.active).map((n) => n.id);
+  return unsubmittedCause(
+    conflicts.map((c) => c.constraint_id),
+    Object.keys(period.availability),
+    active,
+  );
+}
 
 export function downloadCsv(period: WorkPeriod, employees: Employee[], result: ScheduleResult) {
   const config = useAppStore.getState().shop?.config ?? DEFAULT_CONFIG;
@@ -312,6 +328,7 @@ export function ScheduleBody({
   const clearFixed = useAppStore((s) => s.clearFixed);
   const setDisabled = useAppStore((s) => s.setDisabled);
   const applyChanges = useAppStore((s) => s.applyChanges);
+  const go = useAppStore((s) => s.go);
   const [selected, setSelected] = useState<Cell | null>(null);
 
   if (!shop) return null;
@@ -359,9 +376,14 @@ export function ScheduleBody({
     name: presetName(c),
     text: describeRule(c, shop.config, employees, period).text,
   }));
+  const unsubmitted = outcome?.kind === "infeasible" && unsubmittedFor(shop, period, outcome.conflicts);
+  const noneSubmitted = !employees.some((n) => n.id in period.availability);
   const outcomePanel = outcome && (
     <OutcomePanel
       outcome={outcome}
+      unsubmitted={unsubmitted}
+      noneSubmitted={noneSubmitted}
+      onGoAvailability={() => go({ screen: "period", periodId, step: 1 })}
       explaining={sv.explaining}
       busy={busy}
       constraints={constraints}
@@ -633,6 +655,9 @@ export function InlineLock() {
 
 export function OutcomePanel({
   outcome,
+  unsubmitted = false,
+  noneSubmitted = false,
+  onGoAvailability,
   explaining,
   busy,
   constraints,
@@ -644,6 +669,11 @@ export function OutcomePanel({
   onToggle,
 }: {
   outcome: NonNullable<Outcome>;
+  /** 원인이 미제출이면 안내와 [① 가능 시간으로]만 보인다 */
+  unsubmitted?: boolean;
+  /** 활성 직원 중 제출한 사람이 없음 */
+  noneSubmitted?: boolean;
+  onGoAvailability?: () => void;
   explaining: boolean;
   busy: boolean;
   constraints: ConstraintSpec[];
@@ -676,6 +706,23 @@ export function OutcomePanel({
         {hasResult && <span className={ui.help}>아래는 마지막으로 만든 근무표예요.</span>}
       </div>
 
+      {unsubmitted && (
+        <div className="flex flex-col items-start gap-1.5">
+          <p className="text-sm text-[#1B1B18]">
+            {noneSubmitted
+              ? "아직 가능 시간을 제출한 직원이 없어요. ①에서 링크를 보내고 제출을 기다려 주세요"
+              : `${availabilityNames.join(", ")}의 가능 시간이 아직 없어요. 제출을 기다리거나 ①에서 확인해 주세요`}
+          </p>
+          {onGoAvailability && (
+            <button type="button" onClick={onGoAvailability} className={ui.textSm}>
+              ① 가능 시간으로
+            </button>
+          )}
+        </div>
+      )}
+
+      {!unsubmitted && (
+        <>
       {outcome.kind === "infeasible" && explaining && !explanation && (
         <p className="flex items-center gap-2 text-sm text-[#66665E]">
           <Spinner />
@@ -790,6 +837,8 @@ export function OutcomePanel({
             )}
           </p>
         </details>
+      )}
+        </>
       )}
     </section>
   );
