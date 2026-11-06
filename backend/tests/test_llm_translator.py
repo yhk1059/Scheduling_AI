@@ -29,7 +29,7 @@ from backend.llm.client import (
 )
 from backend.llm.prompts import TIME_WINDOW_EXAMPLES, TRANSLATE_EXAMPLES, TRANSLATE_SYSTEM, TRANSLATE_TOOL, RuleDraft, TranslatorOutput
 from backend.llm.pseudonym import restore
-from backend.llm.translator import translate
+from backend.llm.translator import resolve_dates, translate
 
 EMPLOYEES = [
     Employee(id="e01", name="이영희"),
@@ -106,9 +106,10 @@ def val(value: float, label: str = "값") -> dict:
     return {"value": value, "label": label}
 
 
-def leave(employee_id: str, days: list[int], source_text: str = "원문") -> dict:
+def leave(employee_id: str, dates: list[str], source_text: str = "원문") -> dict:
+    # LLM은 날짜를 달력 날짜(dates)로 쓰고, translator가 기간 안 인덱스(days)로 바꾼다
     return rule(
-        {"per": "person", "people": {"ids": [employee_id]}, "days": {"days": days}},
+        {"per": "person", "people": {"ids": [employee_id]}, "days": {"dates": dates}},
         cmp(n(NOT_OFF), "le", {"value": "max"}),
         values={"max": val(0, "최대 횟수")},
         source_text=source_text,
@@ -236,11 +237,12 @@ def test_default_hardness_and_priority():
 
 
 def test_leave_rule_and_pseudonym_restored():
-    client = FakeClient(ok({"rules": [leave("e01", [15, 16, 17], "e01 15~17일 휴가")]}))
+    client = FakeClient(ok({"rules": [leave("e01", ["2026-11-15", "2026-11-16", "2026-11-17"], "e01 15~17일 휴가")]}))
     res = translate(request("이영희 15~17일 휴가"), client)
     (r,) = res.constraints
     assert r.type == "rule" and r.hardness == "hard" and r.scope == "period"
     assert r.body.for_each.people.ids == ["e01"] and r.values["max"].value == 0
+    assert r.body.for_each.days.days == [15, 16, 17]
     assert r.source_text == "이영희 15~17일 휴가"  # 가명 복원
 
 
@@ -339,7 +341,7 @@ def test_config_change_over_code_limit_clarify():
 
 
 def test_pseudonymized_request_and_context():
-    client = FakeClient(ok({"rules": [leave("e01", [15], "e01 15일 휴가")]}))
+    client = FakeClient(ok({"rules": [leave("e01", ["2026-11-15"], "e01 15일 휴가")]}))
     translate(request("이영희 15일 휴가"), client)
     call = client.calls[0]
     sent = json.dumps(call["messages"], ensure_ascii=False) + call["system"]
@@ -400,7 +402,7 @@ def test_max_tokens_retries():
 
 
 def test_unknown_employee_clarify():
-    res, _ = retry_then_clarify({"rules": [leave("e99", [3])]}, request("홍길동 3일 휴가"))
+    res, _ = retry_then_clarify({"rules": [leave("e99", ["2026-11-03"])]}, request("홍길동 3일 휴가"))
     assert "명단" in res.question
     assert res.input_version == 7
 
@@ -477,7 +479,7 @@ def test_empty_scope_people_clarify():
 
 def test_empty_days_clarify():
     # 11/2(월)·11/3(화) 중 토요일 → 0일
-    bad = staffing(A, 1, days={"days": [2, 3], "weekdays": [5]})
+    bad = staffing(A, 1, days={"dates": ["2026-11-02", "2026-11-03"], "weekdays": [5]})
     res, _ = retry_then_clarify({"rules": [bad]}, request("2~3일 토요일 오픈 1명", "period"))
     assert "날이 없어요" in res.question
 
@@ -507,22 +509,56 @@ def test_staffing_contradiction_ignores_any_and_when():
 
 
 def test_out_of_range_day_retry_then_clarify():
-    res, retry = retry_then_clarify({"rules": [leave("e02", [32])]}, request("박민수 32일 휴가"))
-    assert "32" in res.question
-    assert "32" in retry
+    res, retry = retry_then_clarify({"rules": [leave("e02", ["2026-12-02"])]}, request("박민수 12월 2일 휴가"))
+    assert "12/2" in res.question and "기간" in res.question
+    assert "2026-12-02" in retry and "2026-11-01~2026-11-30" in retry
 
 
 def test_day_outside_cross_month_period_clarify():
-    res, retry = retry_then_clarify({"rules": [leave("e03", [15])]}, request("김민수 15일 휴가", period=CROSS, holidays=[]))
-    assert "15" in res.question and "기간" in res.question
-    assert "1..14" in retry
+    res, retry = retry_then_clarify({"rules": [leave("e03", ["2026-12-15"])]}, request("김민수 15일 휴가", period=CROSS, holidays=[]))
+    assert "12/15" in res.question and "기간" in res.question
+    assert "2026-11-23~2026-12-06" in retry
 
 
 def test_out_of_range_day_then_fixed():
-    client = FakeClient(ok({"rules": [leave("e02", [31])]}), ok({"rules": [leave("e02", [30])]}))
+    client = FakeClient(ok({"rules": [leave("e02", ["2026-12-01"])]}), ok({"rules": [leave("e02", ["2026-11-30"])]}))
     res = translate(request("박민수 말일 휴가"), client)
     assert isinstance(res, TranslateOk)
     assert res.constraints[0].body.for_each.days.days == [30]
+
+
+def test_dates_become_period_day_indices_across_months():
+    # 기간이 11/23부터면 12/1은 9번째 날이다(m01: 달력의 일을 인덱스로 착각하던 오류)
+    client = FakeClient(ok({"rules": [leave("e03", ["2026-12-02", "2026-12-01", "2026-12-01"])]}))
+    res = translate(request("김민수 12월 1~2일 휴가", period=CROSS, holidays=[]), client)
+    assert isinstance(res, TranslateOk)
+    assert res.constraints[0].body.for_each.days.days == [9, 10]
+
+
+def test_dates_in_count_days_converted():
+    # 세기(Count)의 days도 같은 셀렉터다
+    left = n(A, who={"ids": ["e01"]}, days={"dates": ["2026-11-24"]})
+    out = {"rules": [rule({"per": "period"}, cmp(left, "ge", 1))]}
+    res = translate(request("이영희 11/24 오픈", period=CROSS, holidays=[]), FakeClient(ok(out)))
+    assert isinstance(res, TranslateOk)
+    assert res.constraints[0].body.then.left.days.days == [2]
+
+
+def test_index_days_from_llm_retried():
+    # 인덱스를 직접 쓰면 받지 않고 dates로 다시 쓰게 한다
+    bad = {"rules": [rule({"per": "person", "people": {"ids": ["e01"]}, "days": {"days": [15]}}, cmp(n(NOT_OFF), "le", 0))]}
+    client = FakeClient(ok(bad), ok({"rules": [leave("e01", ["2026-11-15"])]}))
+    res = translate(request("이영희 15일 휴가"), client)
+    assert isinstance(res, TranslateOk)
+    assert res.constraints[0].body.for_each.days.days == [15]
+    assert "dates" in last_user_text(client.calls[1])
+
+
+def test_invalid_date_retried():
+    client = FakeClient(ok({"rules": [leave("e01", ["2026-11-31"])]}), ok({"rules": [leave("e01", ["2026-11-30"])]}))
+    res = translate(request("이영희 말일 휴가"), client)
+    assert isinstance(res, TranslateOk)
+    assert "2026-11-31" in last_user_text(client.calls[1])
 
 
 # --- clarify / unsupported ---
@@ -595,6 +631,10 @@ def test_tool_schema_generated_from_models():
         assert f'"{old}"' not in text
     draft = schema["$defs"]["RuleDraft"]["properties"]
     assert set(draft) == {"hardness", "priority", "values", "body", "source_text"}
+    # 날짜 셀렉터는 LLM에게 인덱스 대신 달력 날짜를 받는다
+    days = schema["$defs"]["Days"]["properties"]
+    assert set(days) == {"kind", "weekdays", "dates"}
+    assert days["dates"]["anyOf"][0]["items"] == {"type": "string", "format": "date"}
     assert "discriminator" not in text and '"title"' not in text
 
 
@@ -611,7 +651,8 @@ def test_tool_schema_is_not_recursive():
 def test_prompt_examples_are_valid_rules():
     assert len(TRANSLATE_EXAMPLES) >= 20
     for text, output in ALL_EXAMPLES:
-        out = TranslatorOutput.model_validate({**output, "rules": [{**r, "source_text": text} for r in output["rules"]]})
+        resolved = resolve_dates({**output, "rules": [{**r, "source_text": text} for r in output["rules"]]}, NOV)
+        out = TranslatorOutput.model_validate(resolved)
         for draft in out.rules:
             data = draft.model_dump(mode="json", exclude_none=True)
             Rule.model_validate({**data, "id": "x", "type": "rule", "scope": "shop"})
