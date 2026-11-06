@@ -135,15 +135,18 @@ function WeekCard({ name, week, shifts, config }: { name: string; week: Employee
       <p className="text-[13px] font-medium text-[#3D3D38]">
         근무 <span className="font-mono">{workDays}</span>일 · <span className="font-mono">{hours}</span>시간
       </p>
-      <ul className="grid grid-cols-7 gap-2">
+      <ul className="flex flex-col gap-1 sm:grid sm:grid-cols-7 sm:gap-2">
         {week.map((d) => {
           const [, month, dom] = d.date.split("-").map(Number);
           const holiday = d.weekend && d.weekday !== 0 && d.weekday !== 6;
           const color = d.weekday === 0 || holiday ? "text-[#B42318]" : d.weekday === 6 ? "text-[#155E75]" : "text-[#3D3D38]";
           const off = d.code === "" || d.code === OFF_CODE;
           return (
-            <li key={d.date} className={`flex flex-col items-center gap-1.5 rounded-md py-2 ${d.weekend ? "bg-[#F1EEE6]" : ""}`}>
-              <span className={`font-mono text-xs font-medium ${color}`}>
+            <li
+              key={d.date}
+              className={`flex items-center gap-3 rounded-md px-2 py-1.5 sm:flex-col sm:gap-1.5 sm:px-0 sm:py-2 ${d.weekend ? "bg-[#F1EEE6]" : ""}`}
+            >
+              <span className={`w-14 font-mono text-xs font-medium sm:w-auto ${color}`}>
                 {WEEKDAYS[d.weekday]} {month}/{dom}
               </span>
               <span
@@ -153,7 +156,7 @@ function WeekCard({ name, week, shifts, config }: { name: string; week: Employee
               >
                 {cellText(d.code)}
               </span>
-              <span className={`text-center text-xs ${off ? "text-[#66665E]" : "text-[#1B1B18]"}`}>{d.label}</span>
+              <span className={`text-xs sm:text-center ${off ? "text-[#66665E]" : "text-[#1B1B18]"}`}>{d.label}</span>
             </li>
           );
         })}
