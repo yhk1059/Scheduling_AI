@@ -5,7 +5,7 @@
 import { create } from "zustand";
 import { persist, type PersistStorage, type StorageValue } from "zustand/middleware";
 
-import { availabilityRules, sameAvailability, type AvailabilitySlots } from "./availability";
+import { availabilityRules, isAvailabilityRule, sameAvailability, type AvailabilitySlots } from "./availability";
 import type { DayKind } from "./coverage-conflict";
 import { holidayDays } from "./holidays";
 import {
@@ -40,6 +40,7 @@ import {
   type PeriodUnit,
 } from "./period";
 import { deleteShop, loadShop, saveShop, supabaseConfigured, type AuthUser } from "./supabase";
+import type { ScheduleInputs } from "./wording";
 import type {
   CarryOverRow,
   Cmp,
@@ -698,6 +699,25 @@ export function toScheduleRequest(
     carry_over: prev ? carryOverFrom(prev, activeIds) : period.carryOver.filter((r) => ids.has(r.employee_id)),
     history: historyFor(periods, period, activeIds),
     ...(previous && { previous }),
+  };
+}
+
+/** ③ 만들기 전 요약에 쓰는 수. toScheduleRequest와 같은 직원·규칙·carry_over 기준으로 센다. */
+export function scheduleInputs(shop: Shop, period: WorkPeriod, periods: WorkPeriod[]): ScheduleInputs {
+  // 오늘은 지난 날짜 잠금(칸 고정)에만 쓰이고 칸 고정은 세지 않으므로 시작일로 둔다
+  const req = toScheduleRequest(shop, period, periods, period.start_date);
+  const ids = new Set(req.employees.map((n) => n.id));
+  const rules = (req.constraints ?? []).filter(
+    (c) => c.type !== "fixed_assignment" && !isAvailabilityRule(c.id) && c.enabled !== false,
+  );
+  const isHard = (c: ConstraintSpec) => isLeaveRule(c) || normalizeRule(c).hardness === "hard";
+  return {
+    submitted: Object.keys(period.availability).filter((id) => ids.has(id)).length,
+    employees: ids.size,
+    hard: rules.filter(isHard).length,
+    soft: rules.filter((c) => !isHard(c)).length,
+    disabled: disabledRulesFor(shop, period).length,
+    carryDays: Math.max(0, ...(req.carry_over ?? []).map((r) => r.shifts.length)),
   };
 }
 

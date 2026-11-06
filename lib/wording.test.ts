@@ -18,6 +18,7 @@ import {
   unitName,
   unitShort,
   shopRuleCount,
+  scheduleInputsText,
 } from "./wording";
 
 const NOV = { start_date: "2026-11-01", length: 30 };
@@ -507,3 +508,24 @@ describe("taskDoneSteps", () => {
   });
 });
 
+
+describe("scheduleInputsText", () => {
+  const text = (i: Parameters<typeof scheduleInputsText>[0]) => scheduleInputsText(i).map((p) => p.text).join("");
+
+  it("모든 항목: 제출 · 반드시 · 가능하면 · 끈 규칙 · 지난 근무", () => {
+    expect(text({ submitted: 10, employees: 12, hard: 6, soft: 2, disabled: 1, carryDays: 7 })).toBe(
+      "제출 10/12명 · 반드시 6개 · 가능하면 2개 · 이번 근무표에서 끈 규칙 1개 · 지난 근무 7일 이어받아요",
+    );
+  });
+
+  it("끈 규칙 0개와 지난 근무 0일은 뺀다", () => {
+    expect(text({ submitted: 12, employees: 12, hard: 3, soft: 0, disabled: 0, carryDays: 0 })).toBe("제출 12/12명 · 반드시 3개 · 가능하면 0개");
+  });
+
+  it("숫자는 값 조각으로 따로 둔다(화면이 mono로 그린다)", () => {
+    const values = scheduleInputsText({ submitted: 0, employees: 5, hard: 1, soft: 2, disabled: 3, carryDays: 2 })
+      .filter((p) => "value" in p)
+      .map((p) => p.text);
+    expect(values).toEqual(["0/5", "1", "2", "3", "2"]);
+  });
+});
