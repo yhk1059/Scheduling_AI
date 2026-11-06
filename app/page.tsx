@@ -352,8 +352,8 @@ export default function Home() {
       <main>
         <section className={`${container} grid grid-cols-1 gap-10 py-12 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:items-center lg:gap-14 lg:py-[88px]`}>
           <div className="flex flex-col gap-6">
-            <Wordmark size="hero" />
-            <p className={ui.eyebrow}>스케줄링 매니저를 위한 근무표</p>
+            <Wordmark size="landing" />
+            <p className={ui.eyebrow}>스케줄링 매니저를 위한 근무표 작성 서비스</p>
             <h1 className="text-[34px] leading-[1.15] font-bold tracking-[-0.03em] break-keep text-[#1B1B18] lg:text-[42px] xl:text-[48px]">
               매장 조건은 말로,
               <br />
