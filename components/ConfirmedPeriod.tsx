@@ -136,7 +136,7 @@ export default function ConfirmedPeriod() {
             )}
             {lastVersion && (
               <span className={ui.help}>
-                마지막 확정 <span className="font-mono">{shortTime(lastVersion.confirmed_at)}</span> · 직원 링크는 잠겼어요
+                마지막 확정 <span className="font-mono">{shortTime(lastVersion.confirmed_at)}</span> · 직원 링크는 잠겼어요. 직원은 같은 링크에서 근무표를 봐요
               </span>
             )}
           </div>

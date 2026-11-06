@@ -8,7 +8,6 @@ import {
   type CardPatch,
   type Comparison,
   comparisonOf,
-  COVERAGE_SOURCE_TEXT,
   currentPeriod,
   type Hardness,
   isLeaveRule,
@@ -18,7 +17,7 @@ import {
 } from "@/lib/store";
 import { dayHeader, isWeekendDay, monthDay, type PeriodRange } from "@/lib/period";
 import type { ConstraintSpec, Employee, RuleExample } from "@/lib/types.gen";
-import { describeRule, describeShiftChange, hardnessLabel, josa, presetName } from "@/lib/wording";
+import { describeRule, describeShiftChange, hardnessLabel, josa, presetName, ruleQuote } from "@/lib/wording";
 
 import RuleText from "./RuleText";
 import { previewRange } from "./RulesStep";
@@ -368,9 +367,8 @@ export default function ConstraintCard({
   const isBalance = card.type === "rule" && card.body.kind === "balance";
   const examples = (isRule ? shop.examples : period?.examples)?.[card.id] ?? [];
   const holidays = isRule ? [] : (period?.holidays ?? []);
-  // 폼으로 만든 필요 인원은 원문이 없어 해석 문장으로 가리킨다
-  const conflictName =
-    conflict && (conflict.source_text === COVERAGE_SOURCE_TEXT ? describeRule(conflict, config, employees, range).text : conflict.source_text);
+  // 폼으로 만든 필요 인원은 해석 문장, 원문 하나가 카드 여럿이면 원문과 해석 문장으로 가리킨다
+  const conflictName = conflict && ruleQuote(conflict, shop.rules, config, employees, range);
   const hardness: Hardness = alwaysHard(card) ? "hard" : (card.hardness ?? (isBalance ? "soft" : "hard"));
 
   const save = () => {
@@ -455,7 +453,7 @@ export default function ConstraintCard({
       {pending && conflict && conflictName && (
         <p className="flex flex-wrap items-center gap-1.5 text-xs font-medium text-[#A15C07]">
           <WarningIcon />
-          기존 규칙 “{conflictName}”{josa(conflictName, "과", "와")} 함께 지킬 수 없어요
+          기존 규칙 {conflictName}{josa(conflictName, "과", "와")} 함께 지킬 수 없어요
           <button type="button" onClick={() => store.removeRule(conflict.id)} className={ui.textSm}>
             기존 규칙 끄기
           </button>

@@ -1,7 +1,7 @@
 // 화면 문구를 만드는 순수 함수(UI_GUIDE "문구"). 데이터 이름(period, hard 등)은 그대로 두고 화면에 보이는 말만 여기서 만든다.
 import { monthDay, type PeriodRange, type PeriodUnit } from "./period";
 import { normalizeRule, ruleShape, type Bound } from "./rules";
-import { homeSummary, upcomingRange, type Shop, type WorkPeriod } from "./store";
+import { COVERAGE_SOURCE_TEXT, homeSummary, upcomingRange, type Shop, type WorkPeriod } from "./store";
 import type { Cmp, ConstraintSpec, Count, Days, Employee, People, Rule, ShiftChange, Shifts, ShopConfig } from "./types.gen";
 
 /** "11월 근무표"(1일에 시작하는 달력 월) / "11/2~11/15 근무표"(주 단위, 1일이 아닌 날에 시작하는 달력 월). */
@@ -414,6 +414,14 @@ export function describeRule(c: ConstraintSpec, config: ShopConfig, employees: E
   const s = ruleShape(c);
   if (s) return sentence(describeShape(s, c.hardness ?? (c.body.kind === "balance" ? "soft" : "hard"), config, employees, period));
   return sentence(describeGeneric(normalizeRule(c) as Rule, config, employees, period));
+}
+
+/** 충돌 경고에서 기존 규칙을 가리키는 말. 폼 규칙(원문 없음)은 해석 문장, 같은 원문의 규칙이 둘 이상이면 "원문 (해석 문장)", 아니면 원문. */
+export function ruleQuote(rule: ConstraintSpec, siblings: ConstraintSpec[], config: ShopConfig, employees: Employee[], period: PeriodRange): string {
+  const reading = () => describeRule(rule, config, employees, period).text;
+  if (rule.source_text === COVERAGE_SOURCE_TEXT) return reading();
+  const same = siblings.filter((r) => r.source_text === rule.source_text).length;
+  return same > 1 ? `“${rule.source_text}” (${reading()})` : `“${rule.source_text}”`;
 }
 
 /** 매장 규칙 수. 필요 인원은 세지 않는다. */
