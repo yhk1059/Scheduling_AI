@@ -1,5 +1,5 @@
 // 새 필요 인원 카드와 함께 지킬 수 없는 기존 필요 인원 규칙 찾기. 범위 비교와 날짜 겹침만 본다(솔버를 부르지 않는다).
-import { periodDays, type PeriodRange } from "./period";
+import { isWeekendDay, periodDays, type PeriodRange } from "./period";
 import { ruleShape, stableJson } from "./rules";
 import type { ConstraintSpec, Days, Shifts } from "./types.gen";
 
@@ -72,4 +72,37 @@ export function findCoverageConflict(
       );
     }) ?? null
   );
+}
+
+/** 요약표의 요일 종류. store의 DayKind는 이 타입이다. */
+export type DayKind = "weekday" | "weekend";
+
+/**
+ * 요약표 한 칸: 켜진 반드시 필요 인원 규칙(사람 고르기 없음, shifts.in이 코드 하나) 중
+ * 그 요일 종류(평일 / 주말·공휴일)의 모든 날에 적용되는 규칙을 합친 범위.
+ * min은 가장 큰 min, max는 가장 작은 max(상한 없는 규칙만 있으면 null). 그런 규칙이 없으면 null.
+ * 일부 날에만 적용되는 규칙("토요일만 3명")은 넣지 않는다(그 규칙은 카드로 남는다).
+ */
+export function effectiveCoverage(
+  rules: ConstraintSpec[],
+  code: string,
+  kind: DayKind,
+  period: PeriodRange,
+  holidays: number[],
+): { min: number; max: number | null } | null {
+  const want = periodDays(period)
+    .map(({ day }) => day)
+    .filter((day) => isWeekendDay(period, day, holidays) === (kind === "weekend"));
+  if (want.length === 0) return null;
+  let out: { min: number; max: number | null } | null = null;
+  for (const r of rules) {
+    const cov = isHard(r) ? coverage(r) : null;
+    if (!cov || cov.shifts.not_in || cov.shifts.in?.length !== 1 || cov.shifts.in[0] !== code) continue;
+    const days = new Set(coverageDays(cov.days, period, holidays));
+    if (!want.every((d) => days.has(d))) continue;
+    out = out
+      ? { min: Math.max(out.min, cov.min), max: out.max === null ? cov.max : cov.max === null ? out.max : Math.min(out.max, cov.max) }
+      : { min: cov.min, max: cov.max };
+  }
+  return out;
 }

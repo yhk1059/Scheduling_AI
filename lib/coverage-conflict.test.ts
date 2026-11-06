@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { count, forbid } from "./test-rules";
-import { coverageBounds, coverageDays, findCoverageConflict } from "./coverage-conflict";
+import { coverageBounds, coverageDays, effectiveCoverage, findCoverageConflict } from "./coverage-conflict";
 import type { PeriodRange } from "./period";
 import type { ConstraintSpec, Days, Shifts } from "./types.gen";
 
@@ -112,5 +112,59 @@ describe("findCoverageConflict", () => {
     const old = cov("old", { days: [3] }, A, 1, 1);
     expect(findCoverageConflict([old], weekend2, WEEK, [])).toBeNull();
     expect(findCoverageConflict([old], weekend2, WEEK, [3])?.id).toBe("old");
+  });
+});
+
+describe("effectiveCoverage", () => {
+  const formWeekday = cov("f-wd", { kind: "weekday" }, A, 1, 2);
+  const formWeekend = cov("f-we", { kind: "weekend" }, A, 2, 2);
+  const daily = cov("daily", { kind: "all" }, A, 1);
+
+  it("폼 규칙만 있으면 그 범위", () => {
+    expect(effectiveCoverage([formWeekday, formWeekend], "A", "weekday", WEEK, [])).toEqual({ min: 1, max: 2 });
+    expect(effectiveCoverage([formWeekday, formWeekend], "A", "weekend", WEEK, [])).toEqual({ min: 2, max: 2 });
+  });
+  it("규칙이 없으면 null", () => {
+    expect(effectiveCoverage([], "A", "weekday", WEEK, [])).toBeNull();
+    expect(effectiveCoverage([formWeekday], "C", "weekday", WEEK, [])).toBeNull();
+  });
+  it("매일 오픈 1명 이상 + 평일 오픈 1~2명", () => {
+    expect(effectiveCoverage([daily, formWeekday], "A", "weekday", WEEK, [])).toEqual({ min: 1, max: 2 });
+    expect(effectiveCoverage([daily, formWeekday], "A", "weekend", WEEK, [])).toEqual({ min: 1, max: null });
+  });
+  it("min은 가장 큰 값, max는 가장 작은 값", () => {
+    const r1 = cov("r1", { kind: "all" }, A, 2, 5);
+    const r2 = cov("r2", { kind: "weekday" }, A, 1, 3);
+    expect(effectiveCoverage([r1, r2], "A", "weekday", WEEK, [])).toEqual({ min: 2, max: 3 });
+  });
+  it("일부 날에만 적용되는 규칙은 넣지 않는다", () => {
+    const sat = cov("sat", { weekdays: [5] }, A, 3);
+    const some = cov("some", { days: [7] }, A, 3);
+    expect(effectiveCoverage([sat, some], "A", "weekend", WEEK, [])).toBeNull();
+    expect(effectiveCoverage([daily, sat], "A", "weekend", WEEK, [])).toEqual({ min: 1, max: null });
+  });
+  it("토·일 고르기는 공휴일이 없을 때 주말 전부를 덮는다", () => {
+    const satSun = cov("ss", { weekdays: [5, 6] }, A, 3);
+    expect(effectiveCoverage([satSun], "A", "weekend", WEEK, [])).toEqual({ min: 3, max: null });
+    expect(effectiveCoverage([satSun], "A", "weekend", WEEK, [4])).toBeNull();
+  });
+  it("가능하면 규칙과 꺼진 규칙은 무시", () => {
+    expect(effectiveCoverage([{ ...daily, hardness: "soft" }], "A", "weekday", WEEK, [])).toBeNull();
+    expect(effectiveCoverage([{ ...daily, enabled: false }], "A", "weekday", WEEK, [])).toBeNull();
+  });
+  it("복합 코드·제외 집합·사람 고르기는 무시", () => {
+    const multi = cov("m", { kind: "all" }, { in: ["A", "M"] }, 3);
+    const notIn = cov("n", { kind: "all" }, { not_in: ["O"] }, 3);
+    const leaders = count({ per: "day", people: { tags: ["리더"] }, shifts: A, min: 1 }, { id: "l" });
+    expect(effectiveCoverage([multi, notIn, leaders], "A", "weekday", WEEK, [])).toBeNull();
+  });
+  it("공휴일로 주말 날이 늘어도 매일 규칙은 전부 덮는다", () => {
+    expect(effectiveCoverage([daily], "A", "weekend", WEEK, [3, 4])).toEqual({ min: 1, max: null });
+    expect(effectiveCoverage([daily], "A", "weekday", WEEK, [3, 4])).toEqual({ min: 1, max: null });
+  });
+  it("그 요일 종류의 날이 없는 기간은 null", () => {
+    const monday: PeriodRange = { start_date: "2026-11-02", length: 1 };
+    expect(effectiveCoverage([daily], "A", "weekend", monday, [])).toBeNull();
+    expect(effectiveCoverage([daily], "A", "weekday", monday, [])).toEqual({ min: 1, max: null });
   });
 });
