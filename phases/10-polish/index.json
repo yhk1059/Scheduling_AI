@@ -45,7 +45,10 @@
     {
       "step": 5,
       "name": "restore-josa",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-11-06T12:23:37+0900",
+      "summary": "backend/llm/pseudonym.py에 _PARTICLES(이에요/예요, 으로/로, 이/가, 은/는, 을/를, 과/와, 긴 것 먼저), has_final_consonant(word)->bool|None, fix_particle(name, following) 추가하고 restore(시그니처·호출처 그대로)가 id를 이름으로 바꾼 뒤 바로 뒤(공백 없이)의 조사를 이름 받침에 맞게 고친다(조사 다음이 한글·영숫자면 그대로, '으로'는 ㄹ 받침 뒤 '로'). 받침 표는 lib/wording.ts josa와 같다(끝 ” \" ’ ' ) 」 』 ] 공백 건너뜀, 숫자 0·3·6 받침·1·7·8 ㄹ, 영문 L·R ㄹ·M·N 받침). explainer의 text·제안 title·description, translator의 source_text·clarification_question·unsupported_reason이 모두 restore를 지나 같은 혜택을 받는다. pseudonymize·prompts·explainer·translator·requirements 무변경. test_pseudonym.py 테스트 5개 추가, 옛 버그를 기대하던 기대값 4곳 갱신(test_pseudonym test_restore '이영희는'·'라마바와', test_llm_explainer '이영희와', test_routes '이영희가'). eval 영향 없음 확인: eval/run.py는 source_text를 비교에서 뺀다(_DUMP_EXCLUDE), 실행하지 않음. 결정: 받침을 판단 못 하는 이름 끝 글자(기호 등)면 TS josa처럼 '받침 없음'으로 보지 않고 조사를 그대로 둔다(LLM이 쓴 것 유지). 결정: '은요'처럼 조사 뒤에 한글이 이어지면 고치지 않는다.",
+      "completed_at": "2026-11-06T12:27:13+0900"
     },
     {
       "step": 6,
