@@ -3,6 +3,9 @@
 import calendar
 import json
 import uuid
+from datetime import date
+from typing import Any
+
 from pydantic import ValidationError
 
 from backend.domain.constants import LLM_MAX_RETRIES, OFF_CODE
@@ -14,6 +17,7 @@ from backend.domain.models import (
     Days,
     Employee,
     People,
+    Period,
     Require,
     Rule,
     ShiftChange,
@@ -74,6 +78,61 @@ def _context_message(req: TranslateRequest, text: str) -> str:
         "known_tags": _known_tags(ctx),
     }
     return f"<context>\n{json.dumps(context, ensure_ascii=False)}\n</context>\n<input>\n{text}\n</input>"
+
+
+def _md(d: date) -> str:
+    return f"{d.month}/{d.day}"
+
+
+def resolve_dates(data: dict, period: Period) -> dict:
+    """날짜 셀렉터의 dates(YYYY-MM-DD)를 기간 안 인덱스 days로 바꾼 사본. 인덱스 계산은 LLM에 맡기지 않는다."""
+    index = {period.date_of(d): d for d in range(1, period.days + 1)}
+    first, last = period.start_date, period.date_of(period.days)
+    errors: list[str] = []
+    outside: list[date] = []
+
+    def selector(sel: dict, loc: str) -> dict:
+        sel = dict(sel)
+        if "days" in sel:
+            errors.append(f"{loc}: days(인덱스) 대신 dates에 달력 날짜(YYYY-MM-DD)를 쓰세요")
+            return sel
+        dates = sel.pop("dates", None)
+        if dates is None:
+            return sel
+        days = set()
+        for s in dates:
+            try:
+                d = date.fromisoformat(s)
+            except (TypeError, ValueError):
+                errors.append(f"{loc}.dates: 날짜가 아닌 값 {s!r}")
+                continue
+            if d in index:
+                days.add(index[d])
+            else:
+                errors.append(f"{loc}.dates: 기간({first.isoformat()}~{last.isoformat()}) 밖 날짜 {d.isoformat()}")
+                outside.append(d)
+        sel["days"] = sorted(days)
+        return sel
+
+    def walk(node: Any, loc: str) -> Any:
+        if isinstance(node, list):
+            return [walk(v, f"{loc}.{i}") for i, v in enumerate(node)]
+        if not isinstance(node, dict):
+            return node
+        return {
+            k: selector(v, f"{loc}.{k}".lstrip(".")) if k == "days" and isinstance(v, dict) else walk(v, f"{loc}.{k}".lstrip("."))
+            for k, v in node.items()
+        }
+
+    out = walk(data, "")
+    if errors:
+        if outside:
+            labels = ", ".join(_md(d) for d in sorted(set(outside)))
+            clarify = f"{labels}은 이번 근무표 기간({_md(first)}~{_md(last)}) 밖이에요. 날짜를 확인해 주세요."
+        else:
+            clarify = "날짜를 이해하지 못했어요. 날짜를 다시 적어 주세요."
+        raise _OutputError("; ".join(errors), clarify=clarify)
+    return out
 
 
 def _format_errors(e: ValidationError) -> str:
@@ -198,7 +257,6 @@ def _to_specs(output: TranslatorOutput, req: TranslateRequest) -> list[Rule]:
     ctx = req.context
     ids = {n.id for n in ctx.employees}
     known_tags = set(_known_tags(ctx))
-    days = ctx.period.days
     config, errors = _apply_config_changes(output.config_changes, ctx.config)
     questions = ["근무 형태 변경을 이해하지 못했어요. 근무 이름과 시간을 다시 적어 주세요."] if errors else []
     codes = config.codes if config else ctx.config.codes | {c.shift.code for c in output.config_changes}
@@ -217,7 +275,7 @@ def _to_specs(output: TranslatorOutput, req: TranslateRequest) -> list[Rule]:
             continue
         specs.append(rule)
         before = len(errors)
-        employee_ids, cdays = _constraint_refs(rule)
+        employee_ids, _ = _constraint_refs(rule)
         for employee_id in sorted({n for n in employee_ids if n not in ids}):
             errors.append(f"rules.{i}: 명단에 없는 id {employee_id}")
             questions.append(f"명단에 없는 직원({employee_id})이 포함되어 있습니다. 이름을 확인해 주세요.")
@@ -225,10 +283,6 @@ def _to_specs(output: TranslatorOutput, req: TranslateRequest) -> list[Rule]:
         if tags:
             errors.append(f"rules.{i}: known_tags에 없는 태그 {tags}")
             questions.append(f"명단에 없는 직급({', '.join(tags)})이에요. 직급을 확인해 주세요.")
-        out = sorted({d for d in cdays if not 1 <= d <= days})
-        if out:
-            errors.append(f"rules.{i}: 1..{days} 범위 밖 날짜 {out}")
-            questions.append(f"{out}일은 이번 기간(1~{days}일) 밖입니다. 날짜를 확인해 주세요.")
         unknown = sorted(set(_constraint_codes(rule)) - codes)
         if unknown:
             errors.append(f"rules.{i}: 근무 형태에 없는 코드 {unknown}. 새 근무면 config_changes로 추가하세요")
@@ -248,7 +302,7 @@ def _parse(result: ToolCallResult, req: TranslateRequest) -> TranslateResult:
     if result.tool_input is None:
         raise _OutputError("submit_constraints tool 호출이 없습니다.")
     try:
-        output = TranslatorOutput.model_validate(result.tool_input)
+        output = TranslatorOutput.model_validate(resolve_dates(result.tool_input, req.context.period))
     except ValidationError as e:
         raise _OutputError(_format_errors(e)) from e
 

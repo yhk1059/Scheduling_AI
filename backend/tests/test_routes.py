@@ -193,7 +193,7 @@ LEAVE_DRAFT = {
     "values": {"max": {"value": 0, "label": "최대 횟수"}},
     "body": {
         "kind": "require",
-        "for_each": {"per": "person", "people": {"ids": ["e01"]}, "days": {"days": [15, 16, 17]}},
+        "for_each": {"per": "person", "people": {"ids": ["e01"]}, "days": {"dates": ["2026-11-15", "2026-11-16", "2026-11-17"]}},
         "then": {"left": {"shifts": {"not_in": ["O"]}}, "op": "le", "right": {"value": "max"}},
     },
     "source_text": "e01 15~17일 휴가",
@@ -805,7 +805,7 @@ def test_500_internal_hides_stack(monkeypatch, capsys):
 
 
 def test_log_line_for_llm_request_without_raw_text(llm, capsys):
-    for_each = {**LEAVE_DRAFT["body"]["for_each"], "days": {"days": [40]}}
+    for_each = {**LEAVE_DRAFT["body"]["for_each"], "days": {"dates": ["2026-12-10"]}}
     bad = ok({"rules": [{**LEAVE_DRAFT, "body": {**LEAVE_DRAFT["body"], "for_each": for_each}, "source_text": "x"}]})
     good = ok({"rules": [{**LEAVE_DRAFT, "source_text": "e01 15일 휴가"}]})
     llm.responses = [bad, good]

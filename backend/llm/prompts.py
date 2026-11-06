@@ -61,10 +61,18 @@ def _strip(node: Any) -> Any:
     return node
 
 
+def _calendar_dates(schema: dict) -> dict:
+    """날짜 셀렉터를 인덱스(days) 대신 달력 날짜(dates)로 받는다. 인덱스로는 translator가 바꾼다."""
+    props = schema["$defs"]["Days"]["properties"]
+    del props["days"]
+    props["dates"] = {"anyOf": [{"items": {"type": "string", "format": "date"}, "type": "array"}, {"type": "null"}], "default": None}
+    return schema
+
+
 TRANSLATE_TOOL: dict[str, Any] = {
     "name": "submit_constraints",
     "description": "스케줄 매니저의 자연어 규칙·요청을 규칙 식(rules)과 근무 형태 변경(config_changes)으로 세운 결과를 제출한다.",
-    "input_schema": _strip(TranslatorOutput.model_json_schema()),
+    "input_schema": _calendar_dates(_strip(TranslatorOutput.model_json_schema())),
 }
 
 
@@ -142,7 +150,7 @@ TRANSLATE_EXAMPLES: list[tuple[str, dict]] = [
     (
         "e01 15~17일 휴가",
         {"rules": [_rule(
-            {"per": "person", "people": {"ids": ["e01"]}, "days": {"days": [15, 16, 17]}},
+            {"per": "person", "people": {"ids": ["e01"]}, "days": {"dates": ["2026-11-15", "2026-11-16", "2026-11-17"]}},
             _cmp(_n(WORK), "le", _ref("max")),
             values={"max": _val(0, "최대 횟수")},
             hardness="hard",
@@ -151,7 +159,7 @@ TRANSLATE_EXAMPLES: list[tuple[str, dict]] = [
     (
         "e02 20일 오픈 희망",
         {"rules": [_rule(
-            {"per": "person", "people": {"ids": ["e02"]}, "days": {"days": [20]}},
+            {"per": "person", "people": {"ids": ["e02"]}, "days": {"dates": ["2026-11-20"]}},
             _cmp(_n(A), "ge", _ref("min")),
             values={"min": _val(1, "최소 횟수")},
             hardness="soft",
@@ -169,7 +177,7 @@ TRANSLATE_EXAMPLES: list[tuple[str, dict]] = [
     (
         "e03 25일 마감으로 고정",
         {"rules": [_rule(
-            {"per": "person", "people": {"ids": ["e03"]}, "days": {"days": [25]}},
+            {"per": "person", "people": {"ids": ["e03"]}, "days": {"dates": ["2026-11-25"]}},
             _cmp(_n(C), "ge", _ref("min")),
             values={"min": _val(1, "최소 횟수")},
             hardness="hard",
@@ -320,8 +328,8 @@ TRANSLATE_SYSTEM = f"""\
 ## 고르기(셀렉터). 조건은 모두 AND이고, 비우면 전체다
 - people {{ids, tags, exclude_tags}}: 직원. ids는 명단 id, tags는 이 태그 중 하나라도 가진 사람.
   태그는 context.known_tags에 있는 것만 쓴다.
-- days {{kind: all|weekday|weekend|holiday, weekdays, days}}: 날짜. weekend는 토·일·공휴일, weekday는 그 나머지, holiday는 공휴일만.
-  weekdays는 요일 번호(0=월 … 6=일), days는 기간 안 날짜 인덱스 목록.
+- days {{kind: all|weekday|weekend|holiday, weekdays, dates}}: 날짜. weekend는 토·일·공휴일, weekday는 그 나머지, holiday는 공휴일만.
+  weekdays는 요일 번호(0=월 … 6=일), dates는 달력 날짜(YYYY-MM-DD) 목록.
 - shifts {{in}} 또는 {{not_in}} 둘 중 하나만: 근무. in은 그 근무들, not_in은 그 근무들을 뺀 모두.
   "근무", "일하는 날"은 not_in ["O"]로 쓴다. "그 밖의 모든 근무"를 막는 규칙은 in [A, M] 대신 not_in [C, O]처럼 써서 나중에 생기는 근무에도 적용되게 한다.
 
@@ -354,7 +362,7 @@ TRANSLATE_SYSTEM = f"""\
   식에서는 {{"value": 이름}}으로 참조한다. values는 {MAX_RULE_VALUES}개까지이고, 식에서 쓰지 않는 값은 두지 않는다.
 - 식의 구조를 이루는 숫자(금지의 0, "~면"의 1 이상, 짝 규칙의 1 이하, window, offset)는 숫자 그대로 쓴다.
 
-### 모양별 예시 (tool 입력에서 source_text는 생략했다. 실제로는 규칙마다 넣는다)
+### 모양별 예시 (tool 입력에서 source_text는 생략했다. 실제로는 규칙마다 넣는다. 날짜가 있는 예시는 기간이 2026년 11월일 때다)
 {_examples(TRANSLATE_EXAMPLES)}
 - "e01"처럼 쓴 사람은 context 명단의 가명 id다. "리더", "신입" 태그는 context.known_tags에 있을 때만 쓴다.
 - 금지 순서는 패턴마다 규칙을 하나씩 낸다. 최소·최대 연속처럼 두 가지를 함께 말하면 규칙 두 개로 낸다.
@@ -365,6 +373,7 @@ TRANSLATE_SYSTEM = f"""\
 한 문장에 규칙이 여러 개면 규칙을 여러 개 낸다. 한 사람이 여러 근무를 요청하면 각각 낸다.
 "주말엔 오픈만 하고 싶대요"처럼 "X만"은 X 희망 하나만 낸다. 말하지 않은 다른 근무의 기피를 덧붙이지 않는다.
 희망은 대상 날짜 수만큼 ge, 기피는 le 0이다. 기간 전체면 for_each.days를 생략한다.
+대상 날짜 수는 dates면 그 개수, 주말이면 context.weekend_and_holiday_days의 개수, 그 밖이면 context.days에서 고른 날의 개수다.
 
 ## hard/soft와 priority
 - "무조건", "절대", "반드시", "꼭" → hardness "hard"
@@ -409,12 +418,11 @@ context.config.shifts의 근무조에는 start, end(HH:MM)가 있다. 근무조 
 - 근무 코드는 O를 포함해 최대 {MAX_SHIFT_CODES}개다. 코드 삭제는 하지 않는다(설정 화면에서만 한다).
 
 ## 날짜 해석
-- days 셀렉터의 days는 기간 안의 날짜 인덱스(1..period.length) 정수다. 달력의 일(日)이 아니다.
+- 날짜 셀렉터에는 dates에 달력 날짜(YYYY-MM-DD)를 쓴다. 기간 안 인덱스(day)로 바꾸지 않는다. 바꾸는 일은 서버가 한다.
 - context.days에 기간의 모든 날이 {{day, date, weekday, weekend}}로 있다. 기간은 월 경계를 넘을 수 있다.
-- 사용자가 말한 날짜를 달력 날짜로 정한 뒤, 그 날짜와 date가 같은 항목의 day를 쓴다.
-  예: 기간이 2026-11-23부터 14일이면 "12월 1일" → date 2026-12-01 → day 9.
-- "15일"처럼 월이 없으면 days 중 date의 일(日)이 15인 항목이 하나뿐일 때만 그 day로 본다. 둘 이상이거나 없으면 clarification_question으로 되묻는다.
-- "15~17일" → 각 날짜를 위 규칙으로 바꾼 day 목록. "다음 주 수요일"은 오늘(today) 기준 다음 주(월요일 시작)의 수요일 날짜를 구한 뒤 day로 바꾼다.
+  예: 기간이 2026-11-23부터 14일이면 "12월 1일" → dates ["2026-12-01"].
+- "15일"처럼 월이 없으면 context.days 중 date의 일(日)이 15인 항목이 하나뿐일 때만 그 date로 본다. 둘 이상이거나 없으면 clarification_question으로 되묻는다.
+- "15~17일" → 각 날짜를 위 규칙으로 정한 date 목록. "다음 주 수요일"은 오늘(today) 기준 다음 주(월요일 시작)의 수요일 날짜다.
 - "3주차"는 기간 안의 셋째 주(월요일 시작, 기간 첫날이 속한 주가 1주차)이며 기간 안의 날짜만 포함한다.
 - 결과 날짜가 기간 밖이면(context.days에 없으면) 규칙을 만들지 말고 clarification_question으로 묻는다.
 - "주말"은 days {{kind weekend}}로 쓴다(weekend_and_holiday_days는 토·일·공휴일인 day 목록이다). "기간 전체"는 days를 생략한다.

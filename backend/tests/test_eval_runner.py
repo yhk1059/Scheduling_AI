@@ -1,7 +1,9 @@
 """eval/run.py: 의미 기준 채점, 데이터셋 검증, mock 클라이언트 실행 집계, 게이트. 네트워크를 쓰지 않는다."""
 
+import copy
 import importlib.util
 from collections import Counter
+from datetime import date, timedelta
 from pathlib import Path
 
 import pytest
@@ -475,6 +477,14 @@ def leave_draft(employee_id: str, days) -> dict:
     return draft(leave(employee_id, days))
 
 
+def leave_llm(employee_id: str, days) -> dict:
+    """LLM 응답 모양: 날짜 셀렉터를 샘플 기간(11/2부터)의 달력 날짜(dates)로 쓴다."""
+    out = copy.deepcopy(leave_draft(employee_id, days))
+    sel = out["body"]["for_each"]["days"]
+    sel["dates"] = [(date(2026, 11, 1) + timedelta(days=d)).isoformat() for d in sel.pop("days")]
+    return out
+
+
 _SERVER_FIELDS = {"id", "scope", "enabled", "default", "type", "weight"}
 NF_DRAFT = draft(R.balance("nf", C_, hardness="hard"))
 
@@ -501,7 +511,7 @@ def test_run_cases_aggregates():
     ]
     client = FakeClient(
         ok({"rules": [BAD_RULE]}),  # 스키마 위반 → 재시도
-        ok({"rules": [leave_draft("e01", [16, 15]), NF_DRAFT]}),
+        ok({"rules": [leave_llm("e01", [16, 15]), NF_DRAFT]}),
         ok({"unsupported_reason": "템플릿 없음"}),
     )
     results = run.run_cases(cases, client)
@@ -528,7 +538,7 @@ def test_run_cases_exact_and_error():
         case("b", {"status": "ok", "constraints": [leave("e02", [3])]}),
     ]
     bad = ok({"rules": [BAD_RULE]})
-    client = FakeClient(ok({"rules": [leave_draft("e01", [15])]}), bad, bad, bad)
+    client = FakeClient(ok({"rules": [leave_llm("e01", [15])]}), bad, bad, bad)
     results = run.run_cases(cases, client)
     m = run.aggregate(results)
 
@@ -542,7 +552,7 @@ def test_run_cases_exact_and_error():
 
 def test_write_results(tmp_path):
     cases = [case("a", {"status": "clarify"})]
-    results = run.run_cases(cases, FakeClient(ok({"rules": [leave_draft("e01", [1])]})))
+    results = run.run_cases(cases, FakeClient(ok({"rules": [leave_llm("e01", [1])]})))
     out = tmp_path / "results.md"
     run.write_results(out, run.aggregate(results), results, model="fake-model", by_set=run.aggregate_by_set(results))
     text = out.read_text(encoding="utf-8")
@@ -569,7 +579,7 @@ def test_aggregate_by_set_and_gate():
         case("c", {"status": "unsupported"}, set="time-window"),
     ]
     client = FakeClient(
-        ok({"rules": [leave_draft("e01", [15])]}),
+        ok({"rules": [leave_llm("e01", [15])]}),
         ok({"clarification_question": "누구?"}),
         ok({"clarification_question": "뭐?"}),
     )
