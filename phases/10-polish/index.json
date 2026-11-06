@@ -1,0 +1,60 @@
+{
+  "project": "shop-scheduler",
+  "phase": "10-polish",
+  "steps": [
+    {
+      "step": 0,
+      "name": "holidays-lib",
+      "status": "completed",
+      "started_at": "2026-11-06T12:07:36+0900",
+      "summary": "lib/holidays.ts 추가: KR_HOLIDAYS(2026·2027년 관공서 공휴일, 대체공휴일·선거일 포함, 표 그대로), holidayDays(period: PeriodRange): number[](기간 안 인덱스 오름차순, 상수 없는 연도 제외), holidayName(date): string | null. lib/period.ts의 dateOfDay만 사용(타임존 무관). lib/holidays.test.ts 9개. 결정: 표의 날짜를 요일로 검산해 고칠 곳 없음",
+      "completed_at": "2026-11-06T12:09:48+0900"
+    },
+    {
+      "step": 1,
+      "name": "holidays-apply",
+      "status": "pending"
+    },
+    {
+      "step": 2,
+      "name": "coverage-table",
+      "status": "pending"
+    },
+    {
+      "step": 3,
+      "name": "pre-summary",
+      "status": "pending"
+    },
+    {
+      "step": 4,
+      "name": "josa-lib",
+      "status": "pending"
+    },
+    {
+      "step": 5,
+      "name": "restore-josa",
+      "status": "pending"
+    },
+    {
+      "step": 6,
+      "name": "availability-drag-lib",
+      "status": "pending"
+    },
+    {
+      "step": 7,
+      "name": "availability-drag-ui",
+      "status": "pending"
+    },
+    {
+      "step": 8,
+      "name": "notices",
+      "status": "pending"
+    },
+    {
+      "step": 9,
+      "name": "e2e-sync",
+      "status": "pending"
+    }
+  ],
+  "created_at": "2026-11-06T12:07:36+0900"
+}
