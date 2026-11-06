@@ -33,6 +33,7 @@ export function QuoteGlyph({ size }: { size: number }) {
 const SIZES = {
   bar: { mark: 22, text: "gap-2 text-[18px] font-bold tracking-[-0.02em]" },
   hero: { mark: 36, text: "gap-3 text-[32px] font-bold" },
+  landing: { mark: 72, text: "gap-4 text-[52px] font-bold tracking-[-0.03em] lg:text-[72px]" },
   small: { mark: 18, text: "gap-1.5 text-[13px] font-semibold" },
 };
 
@@ -42,7 +43,7 @@ export default function Wordmark({
   href,
   tone = "accent",
 }: {
-  size: "bar" | "hero" | "small";
+  size: "bar" | "hero" | "landing" | "small";
   href?: string;
   tone?: "accent" | "inverse";
 }) {
