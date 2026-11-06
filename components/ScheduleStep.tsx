@@ -964,7 +964,7 @@ function CellEditor({
           key={code}
           type="button"
           onClick={() => onPick(code)}
-          aria-label={`${code}로 고정`}
+          aria-label={`${code}${josa(code, "으로", "로")} 고정`}
           title={name}
           aria-pressed={fixed === code}
           className={`${CELL} ${codeClass(code, false, config)} hover:opacity-80 aria-pressed:outline-2 aria-pressed:outline-[#155E75] aria-pressed:outline-offset-1`}

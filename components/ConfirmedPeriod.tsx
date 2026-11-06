@@ -15,7 +15,7 @@ import {
   toScheduleRequest,
   useAppStore,
 } from "@/lib/store";
-import { scheduleName } from "@/lib/wording";
+import { josa, scheduleName } from "@/lib/wording";
 
 import { takeConfirmedEntry } from "./confirmedEntry";
 import ConstraintCard from "./ConstraintCard";
@@ -207,7 +207,8 @@ export default function ConfirmedPeriod() {
               <span className="font-mono">
                 {todayInfo.month}/{todayInfo.dom}
               </span>{" "}
-              {WEEKDAYS[todayInfo.weekday]}예요. 지난 날짜는 <InlineLock /> 자동으로 고정돼요.
+              {WEEKDAYS[todayInfo.weekday]}
+              {josa(WEEKDAYS[todayInfo.weekday], "이에요", "예요")}. 지난 날짜는 <InlineLock /> 자동으로 고정돼요.
             </p>
           )
         }

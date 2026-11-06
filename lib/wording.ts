@@ -85,10 +85,26 @@ const OFF = "O";
 const WEEKDAY_NAMES = ["월", "화", "수", "목", "금", "토", "일"]; // 0=월
 const KIND_NAMES: Record<NonNullable<Days["kind"]>, string> = { all: "", weekday: "평일", weekend: "주말·공휴일", holiday: "공휴일" };
 
-/** 받침이 있으면 a, 없으면 b(은/는, 을/를). */
+// 숫자·영문자를 읽는 소리의 받침: 0 영, 1 일(ㄹ), 3 삼, 6 육, 7 칠(ㄹ), 8 팔(ㄹ) / 엘·알(ㄹ), 엠, 엔.
+const DIGIT_FINAL: Record<string, "final" | "rieul"> = { "0": "final", "1": "rieul", "3": "final", "6": "final", "7": "rieul", "8": "rieul" };
+const LETTER_FINAL: Record<string, "final" | "rieul"> = { L: "rieul", R: "rieul", M: "final", N: "final" };
+const RIEUL = 8; // 종성 ㄹ
+
+/**
+ * 앞말의 받침에 맞는 조사: 받침이 있으면 a, 없으면 b(은/는, 을/를, 이/가, 과/와, 이에요/예요).
+ * a가 "으로"면 ㄹ 받침 뒤에서도 b("로")다. 끝의 닫는 따옴표·괄호·공백은 건너뛰고, 숫자·영문자는 읽는 소리로 본다.
+ */
 export function josa(word: string, a: string, b: string): string {
-  const ch = word.charCodeAt(word.length - 1);
-  return ch >= 0xac00 && ch <= 0xd7a3 && (ch - 0xac00) % 28 !== 0 ? a : b;
+  const last = word.replace(/[”"’')」』\]\s]+$/u, "").slice(-1);
+  let final: "none" | "final" | "rieul" = "none";
+  const ch = last.charCodeAt(0);
+  if (ch >= 0xac00 && ch <= 0xd7a3) {
+    const jong = (ch - 0xac00) % 28;
+    final = jong === 0 ? "none" : jong === RIEUL ? "rieul" : "final";
+  } else if (/[0-9]/.test(last)) final = DIGIT_FINAL[last] ?? "none";
+  else if (/[a-z]/i.test(last)) final = LETTER_FINAL[last.toUpperCase()] ?? "none";
+  if (final === "none") return b;
+  return final === "rieul" && a === "으로" ? b : a;
 }
 
 const sameSet = (codes: string[] | null | undefined, want: string[]) =>
