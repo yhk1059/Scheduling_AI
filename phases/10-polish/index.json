@@ -53,7 +53,10 @@
     {
       "step": 6,
       "name": "availability-drag-lib",
-      "status": "pending"
+      "status": "completed",
+      "summary": "lib/availability.ts: applyDrag(base, dates: string[], start, end)가 dates × [min..max] 직사각형을 칠하거나 지운다(지우기 판정은 base의 시작 칸 (dates[0], start) 하나로만, 섞여 있어도 전부 칠하거나 전부 지움), copyDay(cells, from, to: string[])가 from 날의 칠한 칸을 to 날들에 합집합으로 더한다(새 Set 반환, 원본 불변). AvailabilityForm은 호출만 [date]로 바꿔 화면 동작은 그대로(열 하나). slotsFromCells·cellsFromSlots·제출 형식·DB 함수 무변경. availability.test.ts: 기존 applyDrag 4개를 새 시그니처로 옮기고 applyDrag 5개(열 셋 칠하기, 지우기 일부 칠함 포함, 섞여도 칠하기, 뒤집힌 순서, 시작 열 기준 판정) + copyDay 3개 추가. 결정: dates의 순서는 판정에만 쓰이고(dates[0]이 시작 열) 칠하는 범위는 순서와 무관하다. 결정: copyDay는 시간 칸(0..SLOT_COUNT-1)을 그대로 옮기며 from 날의 구간 사이 빈칸은 to에서 지우지 않는다.",
+      "started_at": "2026-11-06T12:27:45+0900",
+      "completed_at": "2026-11-06T12:30:06+0900"
     },
     {
       "step": 7,
