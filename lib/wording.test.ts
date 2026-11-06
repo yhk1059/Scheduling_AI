@@ -9,6 +9,7 @@ import {
   describeShiftChange,
   formatDeviation,
   hardnessLabel,
+  josa,
   nextTask,
   presetName,
   scheduleName,
@@ -84,6 +85,61 @@ describe("describeShiftChange", () => {
     expect(describeShiftChange({ action: "update", shift: { code: "M", name: "미들", hours: 9 } }, DEFAULT_CONFIG)).toBe(
       "근무 코드 수정 · M 미들 · 9시간",
     );
+  });
+  it("ㄹ 받침 뒤는 '로', 이름 없는 코드는 읽는 소리로", () => {
+    const config: ShopConfig = { ...DEFAULT_CONFIG, shifts: [...DEFAULT_CONFIG.shifts, { code: "H", name: "홀", hours: 6 }] };
+    expect(describeShiftChange({ action: "add", shift: { code: "AH", name: "더블", hours: 12, parts: ["A", "H"] } }, config)).toBe(
+      "근무 코드 추가 · AH 더블 · 12시간 · 오픈과 홀로 세요",
+    );
+    expect(describeShiftChange({ action: "add", shift: { code: "XM", name: "더블", hours: 12, parts: ["X", "M2"] } }, DEFAULT_CONFIG)).toBe(
+      "근무 코드 추가 · XM 더블 · 12시간 · X와 M2로 세요",
+    );
+  });
+});
+
+describe("josa", () => {
+  it("한글 받침", () => {
+    expect(josa("마감", "과", "와")).toBe("과");
+    expect(josa("오픈", "과", "와")).toBe("과");
+    expect(josa("휴무", "과", "와")).toBe("와");
+    expect(josa("월", "이에요", "예요")).toBe("이에요");
+    expect(josa("화", "이에요", "예요")).toBe("예요");
+  });
+  it("ㄹ 받침 뒤 으로/로는 '로'", () => {
+    expect(josa("일", "으로", "로")).toBe("로");
+    expect(josa("일", "이", "가")).toBe("이");
+    expect(josa("오픈 1명", "으로", "로")).toBe("으로");
+  });
+  it("닫는 따옴표·괄호와 끝 공백을 건너뛴다", () => {
+    expect(josa("“오픈”", "과", "와")).toBe("과");
+    expect(josa("“마감”", "과", "와")).toBe("과");
+    expect(josa("더블(D)", "과", "와")).toBe("와");
+    expect(josa("'휴무' ", "과", "와")).toBe("와");
+    expect(josa("[마감]", "을", "를")).toBe("을");
+  });
+  it("숫자는 읽는 소리로", () => {
+    expect(josa("11/17", "과", "와")).toBe("과");
+    expect(josa("11/17", "으로", "로")).toBe("로");
+    expect(josa("3", "으로", "로")).toBe("으로");
+    expect(josa("2", "으로", "로")).toBe("로");
+    expect(josa("10", "이", "가")).toBe("이");
+    expect(josa("6", "으로", "로")).toBe("으로");
+    expect(josa("8", "으로", "로")).toBe("로");
+    expect(josa("9", "과", "와")).toBe("와");
+  });
+  it("영문자는 읽는 소리로(대소문자 같게)", () => {
+    expect(josa("M", "과", "와")).toBe("과");
+    expect(josa("M", "으로", "로")).toBe("으로");
+    expect(josa("A", "과", "와")).toBe("와");
+    expect(josa("C", "으로", "로")).toBe("로");
+    expect(josa("L", "으로", "로")).toBe("로");
+    expect(josa("r", "이", "가")).toBe("이");
+    expect(josa("n", "이", "가")).toBe("이");
+  });
+  it("그 밖의 글자는 b", () => {
+    expect(josa("", "과", "와")).toBe("와");
+    expect(josa("”", "과", "와")).toBe("와");
+    expect(josa("·", "을", "를")).toBe("를");
   });
 });
 
