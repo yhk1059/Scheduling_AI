@@ -340,11 +340,7 @@ export default function Home() {
   return (
     <div className="flex flex-1 flex-col">
       <header className="border-b border-[#E2E2DC]">
-        <div className={`${container} flex h-[60px] items-center justify-between`}>
-          <Link href="/" aria-label={`${PRODUCT_NAME} 홈`} className="inline-flex items-center gap-2 text-[19px] font-bold tracking-[-0.02em] text-[#1B1B18]">
-            <Mark size={24} />
-            {PRODUCT_NAME}
-          </Link>
+        <div className={`${container} flex h-[60px] items-center justify-end`}>
           <nav className="flex items-center gap-1">
             <a href={REPO_URL} className={ui.text}>
               GitHub
