@@ -37,7 +37,10 @@
     {
       "step": 4,
       "name": "josa-lib",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-11-06T12:20:01+0900",
+      "summary": "lib/wording.ts josa(word,a,b) 확장(시그니처 그대로): 끝의 ” \" ’ ' ) 」 』 ] 와 공백을 건너뛰고, 한글은 받침(ㄹ 받침이면 a='으로'일 때 b), 숫자는 읽는 소리(0·3·6 받침, 1·7·8 ㄹ), 영문자는 L·R(ㄹ)·M·N만 받침(대소문자 무관), 그 밖·빈 문자열은 b. wording.test.ts에 josa 6개 + describeShiftChange 1개(ㄹ·코드 이름) 추가. 바뀐 접근 가능한 이름: ScheduleStep 칸 편집 바 버튼 `${code}로 고정` → `${code}${josa(code,'으로','로')} 고정`이라 'M로 고정'이 'M으로 고정'이 된다(A·C·O·P로는 그대로, L·R은 '로', N은 '으로'). e2e/journey.spec.ts:711의 `${code}로 고정` 루프(A,M,C,O)가 M에서 깨지므로 마지막 step이 맞춘다. 고친 문장: ConfirmedPeriod 근무표 위 '오늘은 M/D {요일}예요' → 월·일·목·금은 '이에요'(예: '11/4 수예요' 그대로, '11/2 월이에요'); describeShiftChange 더블 '…{이름}으로/로 세요'가 ㄹ 받침 이름(예: 홀)이면 '홀로 세요', 이름 없는 코드는 읽는 소리(X와 M2로). 그 밖의 기존 josa 호출(규칙 비교 문장, 고르게, 최근 4주 근거, 기존 규칙 충돌 안내)은 새 규칙을 그대로 따른다. 결정: wording.ts ifPhrase의 고정 '이면'은 앞말이 항상 이상·이하·명·번·일·시간(받침 있음)·같음/없음(별도 처리)이라 그대로 둔다. 결정: ShopHome '{task.name}를 만들 차례예요'는 task.name이 늘 '…근무표'라 그대로 둔다. 결정: 변수 뒤 조사 grep 결과 남은 곳 없음(테스트 이름 제외). 수동 체크: 확인 못 함(브라우저 저니 미실행).",
+      "completed_at": "2026-11-06T12:23:08+0900"
     },
     {
       "step": 5,
