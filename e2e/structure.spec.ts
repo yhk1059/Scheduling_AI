@@ -218,6 +218,9 @@ test("S15. 피크·더블 근무표 → 다음 근무표 시작일 미루기", a
   await expect(page.getByRole("heading", { level: 1 })).toHaveText("12/15~1/14 근무표");
   await expect(stepper().locator('[aria-current="step"]')).toContainText("가능 시간");
   await expect(page.getByRole("main")).toContainText("지난 근무표에서 이어져요");
+  // 한국 공휴일이 자동으로 들어간다: 12/25 성탄절(11번째 날), 1/1 신정(18번째 날)
+  await expect(page.getByRole("main")).toContainText("2026.12.15 – 2027.1.14 · 공휴일 2일");
+  expect((await readState(page)).periods.find((p) => p.start_date === "2026-12-15")?.holidays).toEqual([11, 18]);
   await expect(page.getByRole("button", { name: "링크 복사" })).toHaveCount(1);
   expect((await shownLinks(page)).filter((l) => firstLinks.includes(l)), "링크는 근무표마다 새로 만든다").toEqual([]);
 
@@ -232,6 +235,9 @@ test("S15. 피크·더블 근무표 → 다음 근무표 시작일 미루기", a
   await expect(page.getByRole("heading", { level: 1 })).toHaveText("12/20~1/19 근무표");
   await expect(page.getByText("지난 근무표와 이어지지 않아서 지난 근무를 직접 입력해요")).toBeVisible();
   await expect(page.getByRole("main")).toContainText("지난 근무 없음");
+  // 미뤄도 공휴일은 날짜를 따라간다(12/25가 6번째 날, 1/1이 13번째 날)
+  await expect(page.getByRole("main")).toContainText("공휴일 2일");
+  await expect.poll(async () => (await readState(page)).periods.find((p) => p.start_date === "2026-12-20")?.holidays, { message: "미룬 근무표 공휴일" }).toEqual([6, 13]);
   await expect.poll(async () => (await savedDoc())?.state.periods.map((p) => p.start_date), { message: "저장된 시작일" }).toEqual([
     FIRST.start_date,
     "2026-12-20",

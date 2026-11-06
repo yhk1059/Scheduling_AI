@@ -144,7 +144,7 @@ test("S3. 운영 중인 매장: 다음 근무표 작성과 확정", async () => 
   await page.getByRole("button", { name: "다음", exact: true }).click();
   await expect(stepper.locator('[aria-current="step"]')).toContainText("근무표");
   await expect(scheduleTitle(page)).toBeVisible();
-  await expect(page.getByText("가능 시간과 매장 조건으로 근무표를 만들어요")).toBeVisible();
+  await expect(page.getByRole("main")).toContainText("제출 12/12명 · 반드시 12개 · 가능하면 5개 · 지난 근무 7일 이어받아요");
   await expect(page.getByRole("textbox", { name: "예외 입력" })).toHaveCount(0);
 
   // S3-c. 근무표 만들기: 최근 4주 열과 근거 한 줄
