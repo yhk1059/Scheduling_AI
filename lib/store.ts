@@ -6,6 +6,7 @@ import { create } from "zustand";
 import { persist, type PersistStorage, type StorageValue } from "zustand/middleware";
 
 import { availabilityRules, sameAvailability, type AvailabilitySlots } from "./availability";
+import type { DayKind } from "./coverage-conflict";
 import { holidayDays } from "./holidays";
 import {
   carryOverFrom,
@@ -64,7 +65,7 @@ export const MAX_TAGS_PER_EMPLOYEE = 5; // backend/domain/constants.py MAX_TAGS_
 export const MAX_TAG_CHARS = 10; // backend/domain/constants.py MAX_TAG_CHARS
 export const SAVE_DEBOUNCE_MS = 1000;
 
-export type DayKind = "weekday" | "weekend";
+export type { DayKind };
 export type Assignments = ScheduleResult["assignments"];
 export type Hardness = "hard" | "soft";
 /** 근무 코드. 매장 근무 형태(config)가 정한다 */

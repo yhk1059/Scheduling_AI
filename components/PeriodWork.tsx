@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 
 import { carryOverFrom, previousConfirmedPeriod } from "@/lib/continuity";
+import { effectiveCoverage } from "@/lib/coverage-conflict";
 import { dateOfDay, dayHeader, formatRange, isWeekendDay, MAX_MONTH_START_DAY, monthDay, periodDays, periodEnd, validStart } from "@/lib/period";
 import { parseCarryOver, type CellError } from "@/lib/roster-import";
 import { syncAvailabilityLinks, type AvailabilityLink } from "@/lib/supabase";
@@ -10,7 +11,6 @@ import {
   carryOverChanged,
   type Code,
   coverageCodes,
-  coverageRange,
   currentPeriod,
   type DayKind,
   liveShopRules,
@@ -260,7 +260,7 @@ function CoverageSummary({ period }: { period: WorkPeriod }) {
   const td = "py-1.5 pr-6 font-mono text-[13px] text-[#1B1B18]";
   // 전체 필요 인원 뒤에 직급별 필요 인원("홀 2명 · 주방 2명")을 잇는다
   const need = (code: Code, kind: DayKind) =>
-    [coverageText(coverageRange(rules, code, kind)), ...tagCoverage(rules, code, kind).map((t) => `${t.tag} ${coverageText(t)}`)]
+    [coverageText(effectiveCoverage(rules, code, kind, period, period.holidays)), ...tagCoverage(rules, code, kind).map((t) => `${t.tag} ${coverageText(t)}`)]
       .filter(Boolean)
       .join(" · ");
 
@@ -293,6 +293,7 @@ function CoverageSummary({ period }: { period: WorkPeriod }) {
           {open ? "접기" : "바꾸기"}
         </button>
       </div>
+      <p className={ui.help}>켜진 반드시 필요 인원 규칙을 합친 값이에요. 일부 날짜에만 적용되는 규칙은 카드에서 봐요</p>
       {open && <ShiftTable />}
     </section>
   );
