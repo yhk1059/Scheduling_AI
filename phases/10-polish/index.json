@@ -13,7 +13,10 @@
     {
       "step": 1,
       "name": "holidays-apply",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-11-06T12:10:16+0900",
+      "summary": "newPeriod가 holidays: holidayDays(range)로 시작해 createPeriod(첫·다음 근무표)에 한국 공휴일이 자동 체크된다. postponeStart는 옮긴 공휴일과 새 기간 holidayDays의 합집합(오름차순). toggleHoliday·불러오기·확정본은 그대로, 저장 문서 모양 불변, backend 무변경. HolidayCalendar 공휴일 버튼에 title=holidayName(date), 도움말을 '한국 공휴일은 자동으로 체크돼요. 날짜를 누르면 바꿀 수 있어요. 주말과 같은 인원 기준을 써요.'로 바꿈(aria-label 그대로). lib/holidays.ts 머리 메모에 '2027년 안에 추가'. store.test.ts에 '공휴일 자동 채우기' 4개 추가, 기존 2개 기대값 갱신(다음 근무표 12/1~ holidays [25], postponeStart 테스트는 12/10 직접 체크로 바꿔 [3,18,25]). e2e 영향: UI로 만든 근무표에 공휴일이 자동으로 들어가므로 12/25·1/1이 든 기간(S15 다음 근무표 12/15~1/14·12/20~1/19 등)과 2026-11 밖 기간의 주말·공휴일 칸 수·필요 인원이 달라질 수 있다. 11월 기간(S6 11/2~11/8, D4·D6)은 공휴일 없음 그대로. 달력 도움말 문구 변경. 결정: 매니저가 뺀 공휴일은 시작일을 미루면 다시 들어올 수 있다(추적하지 않음). 결정: 시드(lib/seed-scenarios.ts)도 newPeriod를 써서 시드한 첫 주에 공휴일이 자동으로 들어간다(시드 파일은 고치지 않음). 수동 체크: 확인 못 함(브라우저 저니 미실행).",
+      "completed_at": "2026-11-06T12:12:59+0900"
     },
     {
       "step": 2,
