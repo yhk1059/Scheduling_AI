@@ -61,7 +61,10 @@
     {
       "step": 7,
       "name": "availability-drag-ui",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-11-06T12:30:34+0900",
+      "summary": "components/AvailabilityForm.tsx Calendar: 드래그 상태를 {base,startDate,start}로 바꾸고 moveDrag(col,slot)가 이번 주 shown 안에서 시작 열~지금 열(순서 무관) 날짜로 applyDrag를 불러 열을 건너 직사각형을 칠하거나 지운다. dragSpan은 {fromCol,toCol,start,end}이고 그림자 span이 gridColumn '{시작열+2} / {끝열+3}'로 여러 열을 덮는다. [이전 주]/[다음 주]는 goPage로 드래그 상태를 버린다. 키보드 토글(detail 0)·한 칸 클릭·window mouseup 종료·칸 button의 aria-pressed/aria-label·submitAvailability·제출 형식 무변경, store 미사용. PaintedSummary에 onCopy prop: 구간이 있는 날 줄 오른쪽(ml-auto)에 Text 버튼 [모든 날에 복사](ui.textSm, aria-label '{M}월 {D}일 칠한 시간을 모든 날에 복사')가 생기고 copyDay(cells, 그날, 기간 전체 날짜)로 바꾼 뒤 status idle. 잠기면(locked) onCopy를 넘기지 않아 버튼 없음, 구간 없는 날도 없음. 오른쪽 안내 묶음 맨 위에 새 줄 '여러 날을 가로질러 드래그하면 한 번에 칠해져요'(잠긴 뒤 없음). 아래 고정 줄 합계는 기간 전체 그대로. e2e 영향: S7의 dragCells는 같은 열 드래그라 dates=[그 날짜]로 전과 같게 통한다. 오른쪽 카드 줄에 '모든 날에 복사' 버튼이 생겨 텍스트 검사에 걸리면 맞춘다. 새 시나리오 줄(열 건너 드래그, 모든 날에 복사)은 마지막 step이 더할지 정한다. 결정: applyDrag의 칠하기/지우기 판정이 dates[0]이라 시작 열을 dates 맨 앞에 둔다. 결정: 복사 버튼이 h-8이라 카드 줄 높이가 늘지만 aside가 overflow-y-auto라 그대로 둔다. 결정: 복사 뒤 '복사했어요' 피드백 없음(칸이 바로 칠해짐). 수동 체크: 확인 못 함(브라우저 저니 미실행).",
+      "completed_at": "2026-11-06T12:33:35+0900"
     },
     {
       "step": 8,
