@@ -349,7 +349,7 @@ def test_explain_returns_only_verified_proposals(llm):
     body = r.json()
     assert body["fallback"] is False
     assert body["input_version"] == 5
-    assert body["text"] == "이영희이 5일에 두 근무로 고정되어 있습니다."
+    assert body["text"] == "이영희가 5일에 두 근무로 고정되어 있습니다."
     assert [p["title"] for p in body["proposals"]] == ["f1 해제"]
     assert body["proposals"][0]["verified_summary"] is not None
 
