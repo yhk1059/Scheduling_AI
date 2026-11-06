@@ -252,7 +252,7 @@ def test_names_restored_in_text_title_description():
     client = FakeClient(ok({"text": "e01과 e02가 겹칩니다. e03은 무관합니다.", "proposals": props}))
     text, proposals = explain(REQUEST, CONFLICTS, client)
 
-    assert text == "이영희과 박민수가 겹칩니다. 김지훈은 무관합니다."
+    assert text == "이영희와 박민수가 겹칩니다. 김지훈은 무관합니다."
     assert proposals[0].title == "이영희 휴가를 가능하면으로"
     assert proposals[0].description == "이영희의 14일을 근무로 돌릴 수 있게 합니다."
     assert proposals[0].changes[0].constraint_id == "lv1"
