@@ -6,6 +6,7 @@ import { create } from "zustand";
 import { persist, type PersistStorage, type StorageValue } from "zustand/middleware";
 
 import { availabilityRules, sameAvailability, type AvailabilitySlots } from "./availability";
+import { holidayDays } from "./holidays";
 import {
   carryOverFrom,
   diffAssignments,
@@ -329,7 +330,7 @@ export function newPeriod(range: PeriodRange): WorkPeriod {
   return {
     ...range,
     id: `p-${range.start_date}`,
-    holidays: [],
+    holidays: holidayDays(range),
     requests: [],
     pendingRequests: [],
     disabledIds: [],
@@ -1299,10 +1300,13 @@ export function createAppStore(getStorage: () => Storage, now: () => Date = () =
             editPeriod(periodId, (p) => ({
               ...p,
               ...range,
-              // 공휴일은 같은 날짜를 새 인덱스로 옮긴다
-              holidays: p.holidays
-                .map((d) => dayOfDate(range, dateOfDay(p, d)))
-                .filter((d): d is number => d !== null),
+              // 공휴일은 같은 날짜를 새 인덱스로 옮기고, 새로 든 날짜의 공휴일을 더한다
+              holidays: [
+                ...new Set([
+                  ...p.holidays.map((d) => dayOfDate(range, dateOfDay(p, d))).filter((d): d is number => d !== null),
+                  ...holidayDays(range),
+                ]),
+              ].sort((a, b) => a - b),
               result: null,
               resultVersion: null,
               carryOverUsed: null,
