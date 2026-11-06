@@ -48,7 +48,8 @@
     },
     {
       "dir": "10-polish",
-      "status": "pending"
+      "status": "completed",
+      "completed_at": "2026-11-06T12:58:21+0900"
     }
   ]
 }
