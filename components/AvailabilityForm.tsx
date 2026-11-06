@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 
-import { applyDrag, cellKey, cellsFromSlots, SLOT_COUNT, slotLabel, slotsFromCells } from "@/lib/availability";
+import { applyDrag, cellKey, copyDay, cellsFromSlots, SLOT_COUNT, slotLabel, slotsFromCells } from "@/lib/availability";
 import { formatRange, periodDays, type PeriodDay } from "@/lib/period";
 import { getAvailability, getAvailabilityRoster, submitAvailability, type AvailabilityRoster, type EmployeeAvailability, type RosterShift } from "@/lib/supabase";
 
@@ -199,9 +199,16 @@ function Calendar({
   const [cells, setCells] = useState(() => cellsFromSlots(link.slots));
   const [locked, setLocked] = useState(link.locked);
   const [status, setStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
-  // 드래그 중: 시작할 때의 칸과 시작 칸. 지나간 범위는 언제나 base에서 다시 계산한다
-  const drag = useRef<{ base: Set<string>; date: string; start: number } | null>(null);
-  const [dragSpan, setDragSpan] = useState<{ date: string; start: number; end: number } | null>(null);
+  // 드래그 중: 시작할 때의 칸과 시작 칸. 지나간 범위(시작 열~지금 열 × 시작 칸~지금 칸)는 언제나 base에서 다시 계산한다
+  const drag = useRef<{ base: Set<string>; startDate: string; start: number } | null>(null);
+  const [dragSpan, setDragSpan] = useState<{ fromCol: number; toCol: number; start: number; end: number } | null>(null);
+
+  const goPage = (next: number) => {
+    // 주를 넘기면 드래그를 버린다(시작 열이 화면에서 사라진다)
+    drag.current = null;
+    setDragSpan(null);
+    setPage(next);
+  };
 
   useEffect(() => {
     const end = () => {
@@ -212,17 +219,26 @@ function Calendar({
     return () => window.removeEventListener("mouseup", end);
   }, []);
 
-  const startDrag = (date: string, slot: number) => {
-    drag.current = { base: cells, date, start: slot };
-    setDragSpan({ date, start: slot, end: slot });
+  const startDrag = (col: number, slot: number) => {
+    const date = shown[col].date;
+    drag.current = { base: cells, startDate: date, start: slot };
+    setDragSpan({ fromCol: col, toCol: col, start: slot, end: slot });
     setCells(applyDrag(cells, [date], slot, slot));
     setStatus("idle");
   };
-  const moveDrag = (date: string, slot: number) => {
+  const moveDrag = (col: number, slot: number) => {
     const d = drag.current;
-    if (d?.date !== date) return;
-    setDragSpan({ date, start: d.start, end: slot });
-    setCells(applyDrag(d.base, [date], d.start, slot));
+    if (!d) return;
+    const from = shown.findIndex((day) => day.date === d.startDate);
+    if (from < 0) return;
+    // 시작 열을 맨 앞에 둔다: applyDrag는 dates[0]의 시작 칸으로 칠할지 지울지 정한다
+    const dates = [d.startDate, ...shown.slice(Math.min(from, col), Math.max(from, col) + 1).map((day) => day.date).filter((date) => date !== d.startDate)];
+    setDragSpan({ fromCol: from, toCol: col, start: d.start, end: slot });
+    setCells(applyDrag(d.base, dates, d.start, slot));
+  };
+  const copyToAll = (date: string) => {
+    setCells(copyDay(cells, date, days.map((d) => d.date)));
+    setStatus("idle");
   };
   const toggle = (date: string, slot: number) => {
     setCells(applyDrag(cells, [date], slot, slot));
@@ -257,13 +273,13 @@ function Calendar({
           </h1>
           {pages > 1 && (
             <>
-              <button type="button" disabled={page === 0} onClick={() => setPage((p) => p - 1)} className={`${ui.textSm} disabled:text-[#9A9A91]`}>
+              <button type="button" disabled={page === 0} onClick={() => goPage(page - 1)} className={`${ui.textSm} disabled:text-[#9A9A91]`}>
                 이전 주
               </button>
               <span className="font-mono text-xs text-[#66665E]">
                 {page + 1}/{pages}
               </span>
-              <button type="button" disabled={page === pages - 1} onClick={() => setPage((p) => p + 1)} className={`${ui.textSm} disabled:text-[#9A9A91]`}>
+              <button type="button" disabled={page === pages - 1} onClick={() => goPage(page + 1)} className={`${ui.textSm} disabled:text-[#9A9A91]`}>
                 다음 주
               </button>
             </>
@@ -310,10 +326,10 @@ function Calendar({
                     onMouseDown={(e) => {
                       if (locked || e.button !== 0) return;
                       e.preventDefault();
-                      startDrag(d.date, slot);
+                      startDrag(col, slot);
                     }}
                     onMouseEnter={() => {
-                      if (!locked) moveDrag(d.date, slot);
+                      if (!locked) moveDrag(col, slot);
                     }}
                     onClick={(e) => {
                       // 마우스는 mousedown에서 처리했다. detail 0은 키보드(Space·Enter)다
@@ -326,12 +342,12 @@ function Calendar({
                 );
               }),
             )}
-            {dragSpan && shown.some((d) => d.date === dragSpan.date) && (
+            {dragSpan && (
               <span
                 aria-hidden="true"
                 className={`pointer-events-none z-10 ${ui.shadow}`}
                 style={{
-                  gridColumn: shown.findIndex((d) => d.date === dragSpan.date) + 2,
+                  gridColumn: `${Math.min(dragSpan.fromCol, dragSpan.toCol) + 2} / ${Math.max(dragSpan.fromCol, dragSpan.toCol) + 3}`,
                   gridRow: `${Math.min(dragSpan.start, dragSpan.end) + 2} / ${Math.max(dragSpan.start, dragSpan.end) + 3}`,
                 }}
               />
@@ -339,10 +355,11 @@ function Calendar({
           </div>
 
           <aside className="flex min-h-0 flex-col gap-3 overflow-y-auto">
-            <PaintedSummary days={shown} cells={cells} />
+            <PaintedSummary days={shown} cells={cells} onCopy={locked ? undefined : copyToAll} />
             {shifts.length > 0 && <ShiftsCard shifts={shifts} />}
             {!locked && (
               <div className="flex flex-col gap-1 px-1 text-xs font-medium text-[#66665E]">
+                <p>여러 날을 가로질러 드래그하면 한 번에 칠해져요</p>
                 <p>제출한 뒤에도 이 링크로 다시 고칠 수 있어요.</p>
                 <p>근무표가 확정되면 잠겨요.</p>
               </div>
@@ -387,8 +404,8 @@ function Calendar({
   );
 }
 
-/** 지금 보이는 주에 칠한 시간. 이어진 칸은 구간 하나로 보여 준다. */
-function PaintedSummary({ days, cells }: { days: PeriodDay[]; cells: Set<string> }) {
+/** 지금 보이는 주에 칠한 시간. 이어진 칸은 구간 하나로 보여 준다. onCopy가 있으면(잠기지 않음) 구간이 있는 날마다 [모든 날에 복사]를 둔다. */
+function PaintedSummary({ days, cells, onCopy }: { days: PeriodDay[]; cells: Set<string>; onCopy?: (date: string) => void }) {
   const slots = slotsFromCells(cells);
   const hours = days.reduce((sum, d) => sum + (slots[d.date] ?? []).reduce((n, [from, to]) => n + hoursBetween(from, to), 0), 0);
   return (
@@ -398,7 +415,7 @@ function PaintedSummary({ days, cells }: { days: PeriodDay[]; cells: Set<string>
         {days.map((d) => {
           const ranges = slots[d.date];
           return (
-            <li key={d.date} className="flex gap-1.5">
+            <li key={d.date} className="flex items-center gap-1.5">
               <span className="shrink-0">
                 {WEEKDAYS[d.weekday]}{" "}
                 <span className="font-mono">
@@ -407,9 +424,19 @@ function PaintedSummary({ days, cells }: { days: PeriodDay[]; cells: Set<string>
                 ·
               </span>
               {ranges ? (
-                <span className="font-mono">{ranges.map(([from, to]) => `${from}~${to}`).join(", ")}</span>
+                <span className="min-w-0 font-mono">{ranges.map(([from, to]) => `${from}~${to}`).join(", ")}</span>
               ) : (
                 <span className="text-[#66665E]">없음</span>
+              )}
+              {ranges && onCopy && (
+                <button
+                  type="button"
+                  onClick={() => onCopy(d.date)}
+                  aria-label={`${d.month}월 ${d.dom}일 칠한 시간을 모든 날에 복사`}
+                  className={`${ui.textSm} ml-auto shrink-0 whitespace-nowrap`}
+                >
+                  모든 날에 복사
+                </button>
               )}
             </li>
           );
