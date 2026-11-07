@@ -1,6 +1,6 @@
 "use client";
 
-// 데모 영상(ADR-022). 랜딩과 로그인 화면의 [데모 영상]가 대화상자로 연다. 영상은 public/demo.mp4(npm run record:dining으로 다시 만든다).
+// 데모 영상(ADR-022). 랜딩 상단 바의 [데모 영상]이 대화상자로 연다. 영상은 public/demo.mp4(npm run record:dining으로 다시 만든다).
 import { type ReactNode, useEffect, useRef, useState } from "react";
 
 import { ui } from "./ui";
