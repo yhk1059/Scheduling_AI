@@ -17,6 +17,7 @@
     "og": "node scripts/og.mjs",
     "gen:types": "uv run python -m backend.gen_types",
     "gen:demo": "uv run python -m backend.gen_demo",
+    "gen:demo-shop": "vite-node scripts/gen-demo-shop.ts",
     "gen:golden": "uv run python -m backend.gen_golden",
     "bench": "uv run python -m backend.bench"
   },
