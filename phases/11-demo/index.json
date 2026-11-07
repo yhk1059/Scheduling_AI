@@ -1,0 +1,50 @@
+{
+  "project": "shop-scheduler",
+  "phase": "11-demo",
+  "steps": [
+    {
+      "step": 0,
+      "name": "demo-doc-lib",
+      "status": "completed",
+      "started_at": "2026-11-07T15:39:23+0900",
+      "summary": "lib/demo.ts + lib/demo.test.ts: DemoDoc{version, shop, base, availability, explanation{signature, response}|null}, demoData(doc, today): Data, requestSignature(req): string, demoExplanation(doc, req, inputVersion): ExplainResponse|null, demoLinkRows(availability, employees, submittedAt): AvailabilityLink[]. 결정: demoData는 shop에 withDefaultRules를 거친다(step 1의 문서 shop.rules에 공정성 기본 규칙을 넣어 두어야 signature가 맞는다), requestSignature는 id 문자열 비교로 정렬, demoLinkRows의 미제출 직원 slots는 {}.",
+      "completed_at": "2026-11-07T15:42:08+0900"
+    },
+    {
+      "step": 1,
+      "name": "demo-gen-script",
+      "status": "pending"
+    },
+    {
+      "step": 2,
+      "name": "store-demo-mode",
+      "status": "pending"
+    },
+    {
+      "step": 3,
+      "name": "demo-route-shell",
+      "status": "pending"
+    },
+    {
+      "step": 4,
+      "name": "demo-availability-ui",
+      "status": "pending"
+    },
+    {
+      "step": 5,
+      "name": "demo-schedule-ui",
+      "status": "pending"
+    },
+    {
+      "step": 6,
+      "name": "landing-buttons",
+      "status": "pending"
+    },
+    {
+      "step": 7,
+      "name": "docs-e2e",
+      "status": "pending"
+    }
+  ],
+  "created_at": "2026-11-07T15:39:23+0900"
+}
