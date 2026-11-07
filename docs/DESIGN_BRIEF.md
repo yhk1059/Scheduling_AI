@@ -1,6 +1,6 @@
 # 디자인 브리프: 말로
 
-디자인 재설계(Claude Design 시안 → UI_GUIDE 갱신 → phase `8-design` 구현)의 결정 기록이다. 시안: [말로 디자인 시안](https://claude.ai/artifact/CCGFVEsAp3ffAkCXuKyD66) (2026-11-01 승인). "디자인 원칙"과 "유지하는 것"은 `docs/UI_GUIDE.md`로 옮겼고, 구현 규칙은 UI_GUIDE가 우선한다. 이 문서는 왜 그렇게 정했는지를 남긴다.
+디자인 재설계(Claude Design 시안 → UI_GUIDE 갱신 → phase `8-design` 구현)의 결정 기록이다. 시안: 말로 디자인 시안(Claude Design, 비공개) (2026-11-01 승인). "디자인 원칙"과 "유지하는 것"은 `docs/UI_GUIDE.md`로 옮겼고, 구현 규칙은 UI_GUIDE가 우선한다. 이 문서는 왜 그렇게 정했는지를 남긴다.
 
 ## 왜 다시 하나
 지금 화면은 UI_GUIDE의 "장식 없음, 무채색, 정보 밀도 우선"을 그대로 구현한 결과다. 규칙은 지켰지만 완성도가 "절제"가 아니라 "성의 없음"으로 읽힌다.

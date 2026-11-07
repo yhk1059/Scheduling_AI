@@ -9,7 +9,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "uv run pytest backend/tests scripts/test_hooks.py && vitest run",
+    "test": "uv run pytest backend/tests && vitest run",
     "test:e2e": "playwright test",
     "seed": "vite-node scripts/seed.ts",
     "record:demo": "vite-node scripts/record-demo.ts",

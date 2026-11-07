@@ -4,9 +4,11 @@ out/
 next-env.d.ts
 tsconfig.tsbuildinfo
 
-# phase execution outputs
-phases/**/phase*-output.json
-phases/**/step*-output.json
+# AI agent harness (local only)
+phases/
+notes/
+.claude/
+AGENTS.md
 
 # python
 __pycache__/

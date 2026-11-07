@@ -300,7 +300,7 @@ def _window_rule(codes: list[str], at_least: float) -> dict:
     return _rule({"per": "day"}, _cmp(_n({"in": codes}), "ge", _ref("min")), values={"min": _val(at_least, "최소 인원")})
 
 
-# 시간대 필요 인원. 근무조가 A 09:00~15:00, M 12:00~18:00, C 17:00~23:00일 때(notes/time-window-probe-2026-10-30.md)
+# 시간대 필요 인원. 근무조가 A 09:00~15:00, M 12:00~18:00, C 17:00~23:00일 때
 TIME_WINDOW_EXAMPLES: list[tuple[str, dict]] = [
     ("12시부터 15시까지 최소 3명", {"rules": [_window_rule(["A", "M"], 3)]}),
     ("13시~14시 최소 4명", {"rules": [_window_rule(["A", "M"], 4)]}),
