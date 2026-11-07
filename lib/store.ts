@@ -190,8 +190,14 @@ export interface AppState extends Data {
   /** 로그인 직후(세션 복원 포함) 한 번. 서버 문서가 있으면 서버 우선, 없으면 캐시나 빈 매장을 올린다. */
   signedIn: (user: AuthUser) => Promise<void>;
   retrySave: () => Promise<void>;
-  /** 이 브라우저의 상태와 localStorage 키를 지운다. 서버 문서는 그대로 둔다. */
+  /** 이 브라우저의 상태와 localStorage 키를 지운다. 서버 문서는 그대로 둔다. 체험 중이면 아무것도 하지 않는다. */
   signedOut: () => void;
+  /** 체험 중(/demo). persist 저장소는 메모리이고 서버 저장은 없다 */
+  demo: boolean;
+  /** 체험 시작. 로그인 상태(auth !== null)면 아무것도 하지 않는다. persist 저장소를 메모리로 바꾼 뒤 data를 올린다(replace). */
+  enterDemo: (data: Data) => void;
+  /** 체험 끝. 체험 중이 아니면 아무것도 하지 않는다. 초기 상태로 되돌리고 persist 저장소를 원래(localStorage)로 되돌린다. 메모리 저장소는 비운다. */
+  exitDemo: () => void;
   /** 서버 문서를 지우고 빈 매장으로(로그인 유지). 실패하면 throw한다. */
   deleteShopData: () => Promise<void>;
   // 매장
@@ -953,6 +959,13 @@ const loaded = (s: Data): Data => {
 export function createAppStore(getStorage: () => Storage, now: () => Date = () => new Date(), remote?: ShopRemote) {
   let markUnavailable = () => {};
   const { storage, available } = safeStorage(getStorage, () => markUnavailable());
+  // 체험 중 persist 저장소. localStorage에 체험 데이터가 남지 않게 한다
+  const demoMemory = new Map<string, StorageValue<Data>>();
+  const demoStorage: PersistStorage<Data> = {
+    getItem: (name) => demoMemory.get(name) ?? null,
+    setItem: (name, value) => void demoMemory.set(name, value),
+    removeItem: (name) => void demoMemory.delete(name),
+  };
   // 서버 상태를 확인한 뒤에만 자동 저장한다(로딩·샘플 선택 중에는 서버 문서를 덮어쓰지 않게)
   let ready = false;
   let timer: ReturnType<typeof setTimeout> | null = null;
@@ -1009,7 +1022,7 @@ export function createAppStore(getStorage: () => Storage, now: () => Date = () =
         const doc = () => ({ version: STORAGE_VERSION, state: persisted(get()) });
         const save = async (): Promise<void> => {
           const userId = get().auth?.userId;
-          if (!remote || !userId || !ready) return;
+          if (!remote || !userId || !ready || get().demo) return;
           cancelTimer();
           if (saving) {
             dirty = true;
@@ -1044,8 +1057,11 @@ export function createAppStore(getStorage: () => Storage, now: () => Date = () =
           resetNotice: false,
           auth: null,
           sync: { status: "idle", savedAt: null },
+          demo: false,
 
           signedIn: async (user) => {
+            // 체험 데이터가 캐시로 오인되어 올라가지 않게 먼저 끝낸다
+            if (get().demo) get().exitDemo();
             if (!remote) return;
             ready = false;
             cancelTimer();
@@ -1083,11 +1099,26 @@ export function createAppStore(getStorage: () => Storage, now: () => Date = () =
             await save();
           },
           signedOut: () => {
+            if (get().demo) return;
             ready = false;
             cancelTimer();
             dirty = false;
             replace(initialData(), { auth: null, sync: { status: "idle", savedAt: null } });
             storage.removeItem(STORAGE_KEY);
+          },
+          enterDemo: (data) => {
+            if (get().auth) return;
+            // 저장소를 먼저 바꿔야 체험 데이터가 localStorage에 한 번도 쓰이지 않는다
+            store.persist.setOptions({ storage: demoStorage });
+            set({ demo: true });
+            replace(data);
+          },
+          exitDemo: () => {
+            if (!get().demo) return;
+            // 초기 상태는 메모리에 쓰이고 localStorage는 건드리지 않는다
+            replace(initialData(), { demo: false });
+            demoMemory.clear();
+            store.persist.setOptions({ storage });
           },
           deleteShopData: async () => {
             if (!remote || !get().auth) return;
