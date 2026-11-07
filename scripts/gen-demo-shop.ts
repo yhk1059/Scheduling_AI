@@ -1,5 +1,5 @@
 // 랜딩 [체험하기](/demo)의 체험 데이터 lib/samples/demo-shop.json을 만든다(한강 다이닝, docs/DEMO_SCENARIO.md).
-// 실행: npm run fastapi-dev를 띄운 채 npm run gen:demo-shop. 문장 10개의 번역과 해 없음 설명을 지금 받아 두어, 체험할 때는 LLM을 부르지 않는다.
+// 실행: npm run fastapi-dev를 띄운 채 npm run gen:demo-shop. 체험용 문장 5개(DEMO_*_SENTENCES)의 번역과 해 없음 설명을 지금 받아 두어, 체험할 때는 LLM을 부르지 않는다.
 // 카드는 앱과 같은 store 액션(addPendingRules, applyRule)으로 넣는다.
 import { writeFileSync } from "node:fs";
 
@@ -9,7 +9,7 @@ import { periodFrom, type PeriodRange } from "../lib/period";
 import { STORAGE_VERSION } from "../lib/rules";
 import { createAppStore, newPeriod, refEmployees, toScheduleRequest } from "../lib/store";
 import type { ConstraintSpec, ExplainResponse, RuleExample, ShiftChange, SolveResponse } from "../lib/types.gen";
-import { LIVE_SENTENCES, PRESET_SENTENCES, ROSTER, SHIFT_EDITS, SHOP_NAME, slotsFor } from "./dining-data";
+import { DEMO_LIVE_SENTENCES, DEMO_PRESET_SENTENCES, ROSTER, SHIFT_EDITS, SHOP_NAME, slotsFor } from "./dining-data";
 
 const API_URL = "http://127.0.0.1:8000";
 const OUT = "lib/samples/demo-shop.json";
@@ -114,10 +114,10 @@ async function main(): Promise<void> {
   store.setState({ periods: [{ ...newPeriod(base), holidays: [], availability }] });
 
   const retries = { count: 0 };
-  for (const text of PRESET_SENTENCES) {
+  for (const text of DEMO_PRESET_SENTENCES) {
     for (const id of await translateInto(store, text, retries)) store.getState().applyRule(id);
   }
-  for (const text of LIVE_SENTENCES) await translateInto(store, text, retries);
+  for (const text of DEMO_LIVE_SENTENCES) await translateInto(store, text, retries);
   // 체험은 직접 입력하는 2문장의 카드가 대기 중인 상태에서 시작한다
   const shopDoc = structuredClone(store.getState().shop!);
 

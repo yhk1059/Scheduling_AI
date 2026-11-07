@@ -54,6 +54,10 @@ export const PRESET_SENTENCES = [
   "근무 일수도 고르게",
 ];
 
+/** 체험(/demo)용 매장 조건. 영상보다 적게 둔다: 평일·주말을 나누지 않고 신입·순환 규칙은 뺀다(카드 22장 → 12장). 해 없음 원인(화요일에 마감 가능한 주방 리더 없음)은 같다. */
+export const DEMO_LIVE_SENTENCES = ["홀은 오픈 2명, 미들 1명, 마감 3명", "홀 마감과 주방 마감에는 리더가 꼭 1명씩 있어야 해"];
+export const DEMO_PRESET_SENTENCES = ["주방은 오픈 2명, 미들 1명, 마감 2명", "마감 다음 날 오픈은 안 되게", "일주일에 이틀은 꼭 쉬게"];
+
 /** 근무조 시간 바꾸기(장면 3): 기본 근무조의 끝 시각과 실근무 시간 */
 export const SHIFT_EDITS = [
   { code: "A", end: "14:00", hours: "5" },

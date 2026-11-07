@@ -5,18 +5,9 @@ import { DEMO_DOC } from "./demo-doc";
 import { STORAGE_VERSION } from "./rules";
 import { createAppStore, refEmployees, toScheduleRequest } from "./store";
 
-// scripts/dining-data.ts의 문장. 생성된 JSON을 스크립트 모듈과 따로 검사하려고 여기 적는다
-const LIVE = ["홀은 평일에 오픈 2명, 미들 1명, 마감 3명", "홀 마감과 주방 마감에는 리더가 꼭 1명씩 있어야 해"];
-const PRESET = [
-  "홀은 주말에 오픈 2명, 미들 2명, 마감 4명",
-  "주방은 평일에 오픈 2명, 미들 1명, 마감 2명",
-  "주방은 주말에 오픈 2명, 미들 1명, 마감 3명",
-  "마감 다음 날 오픈은 안 되게",
-  "일주일에 이틀은 꼭 쉬게",
-  "마감에는 파트별로 신입이 1명까지만",
-  "마감은 파트 안에서 돌아가면서 고르게",
-  "근무 일수도 고르게",
-];
+// scripts/dining-data.ts의 체험용 문장(DEMO_*_SENTENCES). 생성된 JSON을 스크립트 모듈과 따로 검사하려고 여기 적는다
+const LIVE = ["홀은 오픈 2명, 미들 1명, 마감 3명", "홀 마감과 주방 마감에는 리더가 꼭 1명씩 있어야 해"];
+const PRESET = ["주방은 오픈 2명, 미들 1명, 마감 2명", "마감 다음 날 오픈은 안 되게", "일주일에 이틀은 꼭 쉬게"];
 const TODAY = "2026-11-09";
 
 function memoryStorage(): Storage {
@@ -49,7 +40,7 @@ describe("DEMO_DOC", () => {
     expect(new Set(shop.pendingRules.map((c) => sentenceOf(LIVE, c.source_text)))).toEqual(new Set(LIVE));
   });
 
-  it("미리 넣는 8문장은 적용돼 있다", () => {
+  it("미리 넣는 3문장은 적용돼 있다", () => {
     const applied = new Set(shop.rules.map((c) => sentenceOf(PRESET, c.source_text)));
     for (const s of PRESET) expect(applied).toContain(s);
   });

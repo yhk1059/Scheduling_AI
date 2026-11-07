@@ -360,7 +360,7 @@
 
 **결정**
 - **화면**: `/demo`는 `AppShell`의 체험 모드(`<AppShell demo />`)다. 랜딩의 [체험하기]와 로그인 화면의 "샘플 매장으로 먼저 체험하기"가 이곳으로 온다. 로그인한 사용자는 `/demo`에서 `/app`으로 간다.
-- **데이터**: `lib/samples/demo-shop.json`(한강 다이닝, 직원 20명, `docs/DEMO_SCENARIO.md`)이다. 매장 조건 10문장 중 8문장은 적용된 규칙, 2문장은 대기 카드(번역이 문장을 나눠 5장)로 두고, 대기 카드를 모두 적용한 상태의 해 없음 설명과 검증된 제안을 미리 저장한다. `npm run gen:demo-shop`(`scripts/gen-demo-shop.ts`)이 실제 백엔드(:8000)의 translate·solve·explain으로 만든다.
+- **데이터**: `lib/samples/demo-shop.json`(한강 다이닝, 직원 20명, `docs/DEMO_SCENARIO.md`)이다. 매장 조건은 영상의 10문장이 아니라 체험용 5문장(`scripts/dining-data.ts`의 `DEMO_*_SENTENCES`, 평일·주말 구분과 신입·순환 규칙 없음)이다. 3문장은 적용된 규칙, 2문장은 대기 카드(번역이 문장을 나눠 5장)로 두고, 대기 카드를 모두 적용한 상태의 해 없음 설명과 검증된 제안을 미리 저장한다. `npm run gen:demo-shop`(`scripts/gen-demo-shop.ts`)이 실제 백엔드(:8000)의 translate·solve·explain으로 만든다.
 - **날짜**: 열 때 오늘 이후 첫 월요일(오늘이 월요일이면 오늘)부터 1주로 옮긴다(`lib/demo.ts`의 `demoData`). 가능 시간은 같은 요일로 옮기고, 공휴일은 비운다. 첫 화면은 ② 매장 조건이다.
 - **스토어**: 싱글턴 스토어에 `demo` 플래그를 두고, 체험 중에는 persist 저장소를 메모리(Map)로 바꾼다. `save()`는 체험이면 저장하지 않는다. `signedIn`은 체험을 먼저 끝내 샘플이 내 매장으로 올라가지 않게 한다. 체험을 떠나면 메모리를 비운다.
 - **API**: 체험에서 부르는 API는 `/api/py/solve`뿐이다. `/translate`, `/explain`, Supabase는 부르지 않는다. 해 없음이면 저장된 설명을 쓰되, 요청의 규칙 제약(켜진 `rule`, 가능 시간 규칙 제외)의 signature가 저장 시점과 같을 때만 보여 준다(`demoExplanation`).
