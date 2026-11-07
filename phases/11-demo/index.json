@@ -37,7 +37,10 @@
     {
       "step": 4,
       "name": "demo-availability-ui",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-11-07T16:01:14+0900",
+      "summary": "components/PeriodWork.tsx LinksSection: 체험(demo)이면 syncAvailabilityLinks를 부르지 않고 demoLinkRows(period.availability, employees, DEMO_SUBMITTED_AT)로 AvailabilityOverview를 그리며, 카드는 \"직원 링크\" + \"체험에서는 직원 링크를 보낼 수 없어요. 직원이 가능 시간을 모두 제출한 상태로 시작해요\" + \"{n}명 중 {m}명 제출\"·진행 막대·미제출만. components/ShopHome.tsx useShareStatus: 체험이면 loadShareStatus 없이 {demo:true, url:null, missing: availability에 없는 활성 직원, failed/none:false}, ShareCard 체험 분기(\"{m} / {n}명 제출\"·막대·미제출 + \"체험에서는 직원 링크를 보낼 수 없어요\"), TaskPanel submittedText는 share.url || share.demo. 수동 체크(Playwright, /demo): ① \"20명 중 20명 제출\", 서민호 캘린더 11/9·11/11~13만(화요일 빈칸), 링크 문구·오류 없음, 매장 홈 카드 \"20 / 20명 제출\"·체험 문구, \"20명 중 20명이 가능 시간을 제출했어요\", 콘솔 오류 없음. 결정: 체험 분기는 hooks 뒤 early return으로 두어 비체험 경로 코드를 그대로 유지, DEMO_SUBMITTED_AT=\"2026-11-01T00:00:00.000Z\".",
+      "completed_at": "2026-11-07T16:03:38+0900"
     },
     {
       "step": 5,
