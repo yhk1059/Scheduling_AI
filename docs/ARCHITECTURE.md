@@ -5,8 +5,9 @@
 app/                  # Next.js 페이지 (UI 세부는 UI_GUIDE 확정 후)
 ├── page.tsx          # 랜딩 (/) — 정적, API 호출 없음
 ├── a/[token]/page.tsx # 직원 가능 시간 입력 (/a/{공용 토큰}) — 로그인 없음, 토큰 DB 함수만 호출
+├── demo/page.tsx     # 체험 (/demo) — <AppShell demo />, 로그인 없음, 샘플 매장을 메모리에만 (ADR-025)
 └── app/page.tsx      # 앱 (/app) — 시작, 매장 홈, 매장 설정, 기간 작업 (PRD 화면)
-components/           # UI 컴포넌트
+components/           # UI 컴포넌트 (Demo.tsx: 체험 상단 바, 체험에서 막은 동작의 안내 대화상자)
 lib/
 ├── store.ts          # Zustand. 로그인한 매니저의 매장 문서와 동기화하고 localStorage는 캐시로만 쓴다
 ├── availability.ts   # 가능 시간 → 근무조 판정 → 반드시 규칙 (순수 함수)
@@ -17,8 +18,10 @@ lib/
 ├── coverage-conflict.ts # 대기 필요 인원 카드와 함께 지킬 수 없는 기존 필요 인원 규칙 찾기 (순수 함수)
 ├── confirmed-view.ts # 직원 확정 근무표 보기: 내 근무 날짜·근무조·주별 합계 (순수 함수)
 ├── csv.ts            # CSV 직렬화 (순수 함수)
+├── demo.ts           # 체험: 체험 문서 → 오늘 기준 주의 store 데이터, 저장된 설명 고르기(규칙 제약 signature), 제출 현황 (순수 함수)
+├── demo-doc.ts       # 체험 문서(samples/demo-shop.json)를 DemoDoc으로 불러온다
 ├── types.gen.ts      # Pydantic JSON Schema에서 생성 (직접 수정 금지)
-└── samples/         # shop-12.json(샘플 매장), demo-schedule.json(랜딩 히어로 근무표, npm run gen:demo)
+└── samples/         # shop-12.json(샘플 매장), demo-schedule.json(랜딩 히어로 근무표, npm run gen:demo), demo-shop.json(체험 매장 한강 다이닝, npm run gen:demo-shop)
 public/demo.mp4       # 데모 영상 (npm run record:dining, ADR-022)
 api/index.py          # Vercel Python 함수 진입점 (import만 함)
 backend/              # FastAPI 앱 (무상태)
@@ -33,7 +36,7 @@ backend/              # FastAPI 앱 (무상태)
 eval/                 # dataset.jsonl, run.py, results.md
 e2e/                  # Playwright 데모 저니 (수동 실행, 실제 API, 테스트 전용 계정, ADR-013, ADR-020)
 supabase/migrations/  # shops 테이블 + RLS, availability_links·availability_shares 테이블 + 토큰 DB 함수(가능 시간, 확정 근무표) (ADR-014, ADR-020, ADR-021, ADR-023)
-scripts/              # harness 전용 + seed.ts(수동 테스트 시드), record-dining.ts(데모 영상 녹화), record-demo.ts(이전 데모 영상) — 앱 코드를 두지 않음
+scripts/              # harness 전용 + seed.ts(수동 테스트 시드), dining-data.ts(한강 다이닝 시나리오 데이터), record-dining.ts(데모 영상 녹화, dining-data.ts를 씀), gen-demo-shop.ts(체험 문서 생성, 실제 백엔드로 번역·풀이·설명), record-demo.ts(이전 데모 영상) — 앱 코드를 두지 않음
 ```
 
 ## 패턴
@@ -78,6 +81,8 @@ scripts/              # harness 전용 + seed.ts(수동 테스트 시드), recor
 
 저장:      store ↔ supabase-js ↔ shops(data jsonb, RLS owner_id = auth.uid())
            (backend/는 DB에 접근하지 않는다. 계산 요청은 지금처럼 store 상태를 통째로 보낸다)
+
+체험:      /demo → demoData(JSON, 오늘) → store(메모리) → /solve만 → 해 없음이면 저장된 설명(규칙 제약 signature가 같을 때)
 ```
 
 ## API 계약
@@ -132,6 +137,7 @@ POST /api/py/explain
 - **저장**
   - 상태를 `shops.data` 문서 하나로 저장한다. 게스트 모드는 없다. localStorage는 저장 실패 때의 캐시다. 마지막 저장이 이기고 `updated_at`을 보여 준다. 로그아웃하면 localStorage를 비운다.
   - persist `version`이 다르거나 데이터가 손상됐으면 초기화한다. 옛 형식 변환은 두지 않는다(ADR-020).
+  - 체험(ADR-025): `enterDemo`가 persist 저장소를 메모리(Map)로 바꾸고 `demo` 플래그를 켠다(플래그는 persist 대상이 아니다). 체험 중에는 서버에 저장하지 않고 localStorage에도 쓰지 않는다. `exitDemo`가 메모리를 비우고 원래 저장소로 돌린다. `signedIn`은 체험을 먼저 끝내 샘플이 내 매장으로 올라가지 않게 하고, `signedOut`은 체험 중에 무시한다.
 - **서버(FastAPI)**: 무상태다. 매 요청에 필요한 상태를 통째로 받는다. DB와 세션은 없다.
 - **stale 처리**: 상태가 바뀔 때마다 `input_version`을 증가시키고, 응답의 버전이 현재와 다르면 stale로 표시한다.
 
@@ -150,6 +156,7 @@ POST /api/py/explain
 - 로컬
   - `npm run dev`: Next(:3000)를 띄우고, `/api/py/*`를 uvicorn(:8000)으로 리라이트한다.
   - Python은 `.venv`(3.12, uv)를 쓴다.
+  - `npm run gen:demo-shop`: 체험 문서 `lib/samples/demo-shop.json`을 다시 만든다. 백엔드(:8000)가 떠 있어야 하고 실제 LLM을 부른다.
 - 배포
   - Vercel 프로젝트 1개다. `/api/py/*`는 `api/index.py`로 리라이트된다.
   - `.vercelignore`로 docs, phases, scripts, eval, tests, e2e를 제외한다.

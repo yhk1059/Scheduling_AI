@@ -28,9 +28,14 @@ test("S1. 랜딩 → 데모 영상 → 로그인 → 매장 준비", async ({ pa
   await expect(page.getByRole("heading", { level: 1 })).toHaveText(/매장 조건은 말로,\s*근무표는 버튼 하나로/);
   const demoCta = page.getByRole("button", { name: "데모 영상" });
   const ownCta = page.getByRole("link", { name: "내 매장으로 시작하기" });
-  // 첫 화면과 CTA 띠에 같은 버튼이 있고, [내 매장으로 시작하기]는 모두 앱으로 간다
-  await expect(demoCta).toHaveCount(2);
+  const tryCta = page.getByRole("link", { name: "체험하기" });
+  // [데모 영상]은 상단 바에 하나, 첫 화면과 CTA 띠에 [내 매장으로 시작하기](앱)와 [체험하기](/demo)가 있다
+  await expect(demoCta).toHaveCount(1);
+  await expect(page.getByRole("banner").getByRole("button", { name: "데모 영상" })).toHaveCount(1);
+  await expect(ownCta).toHaveCount(2);
   for (const link of await ownCta.all()) await expect(link).toHaveAttribute("href", "/app");
+  await expect(tryCta).toHaveCount(2);
+  for (const link of await tryCta.all()) await expect(link).toHaveAttribute("href", "/demo");
 
   // 데모 영상: 대화상자로 열리고 Esc로 닫힌다. 페이지 이동과 저장이 없다
   await demoCta.first().click();
@@ -70,6 +75,7 @@ test("S1-b. 앱을 로그인 없이 열면 로그인 화면", async ({ page }) =
   await expect(login).toHaveClass(/bg-\[#155E75\]/);
   await expect(page.getByRole("button", { name: "데모 영상" })).toHaveCount(0);
   await expect(page.getByRole("link", { name: "개인정보처리방침" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "샘플 매장으로 먼저 체험하기" })).toHaveAttribute("href", "/demo");
   await expect(page.getByRole("button", { name: "근무표", exact: true })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "매장 설정", exact: true })).toHaveCount(0);
   await expectNoDevTerms(page, "로그인 화면");
