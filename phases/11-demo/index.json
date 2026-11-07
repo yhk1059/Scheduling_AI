@@ -13,7 +13,10 @@
     {
       "step": 1,
       "name": "demo-gen-script",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-11-07T15:42:36+0900",
+      "summary": "scripts/dining-data.ts(시나리오 데이터 분리, record-dining.ts는 import·re-export) + scripts/gen-demo-shop.ts(demoAvailability(base): Record<id, AvailabilitySlots>, seedDiningShop(store): void, main: translate 10문장 순차 → store 액션, solve 해 없음 확인, explain) + npm run gen:demo-shop + lib/demo-doc.ts(DEMO_DOC) + 테스트 2개. 실행 결과: lib/samples/demo-shop.json 40KB, 직원 20명, 적용된 규칙 17개(fair-balance는 '근무 일수도 고르게'가 대체), 대기 카드 5장(LIVE 2문장 → 3+2장), 검증된 제안 2개, 번역 재시도 1번(리더 문장이 직원 id로 묶여 다시 번역), 설명 재시도 0번. 결정: 번역이 한 문장을 규칙 여러 개로 나누며 source_text도 조각('미들 1명')으로 두므로, demo-doc 테스트는 카드 원문이 해당 문장의 부분 문자열이고 문장마다 카드가 1장 이상인지로 검사한다(대기 카드는 2장이 아니라 5장). AC 재검증용으로 백엔드(:8000)를 띄워 둔 채 끝낸다.",
+      "completed_at": "2026-11-07T15:52:34+0900"
     },
     {
       "step": 2,
