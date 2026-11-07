@@ -50,6 +50,10 @@
       "dir": "10-polish",
       "status": "completed",
       "completed_at": "2026-11-06T12:58:21+0900"
+    },
+    {
+      "dir": "11-demo",
+      "status": "pending"
     }
   ]
 }
