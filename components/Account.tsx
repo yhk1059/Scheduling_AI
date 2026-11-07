@@ -26,7 +26,7 @@ export function useGoogleLogin() {
   return { busy, error, login, label: busy ? "이동 중…" : "Google로 로그인" };
 }
 
-const LOGIN_ERROR = "로그인 페이지로 이동하지 못했어요. 잠시 후 다시 시도해 주세요.";
+export const LOGIN_ERROR = "로그인 페이지로 이동하지 못했어요. 잠시 후 다시 시도해 주세요.";
 
 export function PrivacyLink({ className = ui.text }: { className?: string }) {
   return (
