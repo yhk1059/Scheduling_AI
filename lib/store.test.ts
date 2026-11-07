@@ -2277,3 +2277,97 @@ describe("scheduleInputs", () => {
     expect(scheduleInputs(shop, draft, [draft]).carryDays).toBe(0);
   });
 });
+
+describe("체험", () => {
+  beforeEach(() => vi.useFakeTimers());
+  afterEach(() => vi.useRealTimers());
+
+  /** 체험 데이터: 매장 "샘플"(직원 1명) + 기간 1개. */
+  function sampleData() {
+    const s = fresh();
+    startDenShop(s);
+    s.getState().setShopName("샘플");
+    s.getState().addEmployees([rows[0]]);
+    s.getState().createPeriod(TODAY);
+    const { shop, periods, view, inputVersion } = s.getState();
+    return { shop, periods, view, inputVersion };
+  }
+
+  it("체험을 시작하면 데이터가 올라가고, 바꿔도 localStorage에 쓰지 않는다", () => {
+    const storage = new MemoryStorage();
+    const store = fresh(storage);
+    store.getState().enterDemo(sampleData());
+    expect(store.getState().demo).toBe(true);
+    expect(store.getState().shop!.name).toBe("샘플");
+    expect(store.getState().periods).toHaveLength(1);
+    store.getState().setShopName("바꿈");
+    expect(store.getState().shop!.name).toBe("바꿈");
+    expect(storage.getItem(STORAGE_KEY) ?? "").not.toContain("바꿈");
+    expect(storage.getItem(STORAGE_KEY) ?? "").not.toContain("샘플");
+  });
+
+  it("체험을 끝내면 초기 상태이고, 저장소가 localStorage로 돌아온다", () => {
+    const storage = new MemoryStorage();
+    const store = fresh(storage);
+    store.getState().enterDemo(sampleData());
+    store.getState().exitDemo();
+    const s = store.getState();
+    expect(s.demo).toBe(false);
+    expect(s.shop).toBeNull();
+    expect(s.periods).toEqual([]);
+    expect(storage.getItem(STORAGE_KEY) ?? "").not.toContain("샘플");
+    store.getState().startShop();
+    store.getState().setShopName("내 매장");
+    expect(storage.getItem(STORAGE_KEY)).toContain("내 매장");
+  });
+
+  it("체험 중이 아니면 exitDemo는 아무것도 하지 않는다", () => {
+    const store = fresh();
+    store.getState().startShop();
+    store.getState().setShopName("내 매장");
+    store.getState().exitDemo();
+    expect(store.getState().shop!.name).toBe("내 매장");
+  });
+
+  it("로그인 상태에서는 체험을 시작하지 않는다", async () => {
+    const f = fakeRemote({ data: serverDoc(), updatedAt: SERVER_AT });
+    const store = synced(f.remote);
+    await store.getState().signedIn(USER);
+    store.getState().enterDemo(sampleData());
+    expect(store.getState().demo).toBe(false);
+    expect(store.getState().shop!.name).toBe("서버 매장");
+  });
+
+  it("체험 중 로그인하면 체험을 끝내고 체험 데이터가 아닌 빈 매장을 올린다", async () => {
+    const f = fakeRemote();
+    const store = synced(f.remote);
+    store.getState().enterDemo(sampleData());
+    await store.getState().signedIn(USER);
+    expect(store.getState().demo).toBe(false);
+    expect(f.calls.save).toHaveLength(1);
+    const state = savedState(f.calls.save[0]) as { shop: { name: string }; periods: unknown[] };
+    expect(state.shop.name).toBe("");
+    expect(state.periods).toEqual([]);
+    expect(JSON.stringify(f.calls.save)).not.toContain("샘플");
+  });
+
+  it("체험 중 signedOut은 체험을 지우지 않는다", () => {
+    const store = synced(fakeRemote().remote);
+    store.getState().enterDemo(sampleData());
+    store.getState().signedOut();
+    expect(store.getState().demo).toBe(true);
+    expect(store.getState().shop!.name).toBe("샘플");
+  });
+
+  it("체험 전에 localStorage에 있던 캐시는 체험이 끝나도 그대로다", () => {
+    const storage = new MemoryStorage();
+    const store = fresh(storage);
+    addInput(store);
+    const before = storage.getItem(STORAGE_KEY);
+    expect(before).not.toBeNull();
+    store.getState().enterDemo(sampleData());
+    store.getState().setShopName("바꿈");
+    store.getState().exitDemo();
+    expect(storage.getItem(STORAGE_KEY)).toBe(before);
+  });
+});
