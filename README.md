@@ -64,5 +64,3 @@
 - **화면**: Next.js (TypeScript). 매장 데이터와 Google 로그인은 Supabase에 둡니다.
 - **계산**: FastAPI 위의 OR-Tools CP-SAT 솔버. 규칙을 모두 만족하는 근무표를 찾고, 없으면 어떤 규칙이 부딪히는지 짚어 냅니다.
 - **AI**: Anthropic Claude. 매니저의 말을 솔버가 읽는 규칙으로 옮기고, 막힌 이유를 설명하고 완화안을 제안합니다. 제안은 솔버로 다시 풀어 검증한 뒤에만 보여 줍니다.
-
-더 알아보기: [제품 기획](docs/PRD.md) · [아키텍처](docs/ARCHITECTURE.md) · [설계 결정 기록](docs/ADR.md) · [데모 시나리오](docs/DEMO_SCENARIO.md)
