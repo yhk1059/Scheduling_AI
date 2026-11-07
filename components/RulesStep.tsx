@@ -16,7 +16,9 @@ import {
 } from "@/lib/store";
 import type { ConstraintSpec } from "@/lib/types.gen";
 
+import { LOGIN_ERROR } from "./Account";
 import ConstraintCard, { ShiftChangeCardView } from "./ConstraintCard";
+import { useStartOwnShop } from "./Demo";
 import { ui } from "./ui";
 import { Mark } from "./Wordmark";
 
@@ -82,6 +84,7 @@ export default function RulesStep({
   const addPendingRules = useAppStore((s) => s.addPendingRules);
   const addPendingRequests = useAppStore((s) => s.addPendingRequests);
   const setDisabled = useAppStore((s) => s.setDisabled);
+  const demo = useAppStore((s) => s.demo);
 
   const [text, setText] = useState("");
   const [loading, setLoading] = useState(false);
@@ -215,7 +218,10 @@ export default function RulesStep({
     }
   };
 
-  const input = (
+  // 체험에서는 LLM을 부르지 않으므로 입력 바 대신 안내를 둔다
+  const input = demo ? (
+    <DemoInputNote />
+  ) : (
     <>
       <div className="flex flex-col gap-1">
         <p className={ui.cardTitle}>{copy.prompt}</p>
@@ -354,6 +360,29 @@ export default function RulesStep({
       {list}
 
       {note}
+    </div>
+  );
+}
+
+/** 체험의 입력 바 자리. 카드와 숫자 폼은 그대로 쓴다. */
+function DemoInputNote() {
+  const { busy, error, start, label } = useStartOwnShop();
+  return (
+    <div className="flex items-start justify-between gap-3">
+      <div className="flex flex-col gap-1">
+        <p className={ui.cardTitle}>체험에서는 말로 적을 수 없어요</p>
+        <p className="text-[13px] text-[#3D3D38]">
+          카드를 끄고 켜거나 숫자를 바꾸고, ③에서 근무표를 만들어 보세요. 내 매장에서는 문장을 적으면 카드가 돼요.
+        </p>
+        {error && (
+          <p role="alert" className={ui.error}>
+            {LOGIN_ERROR}
+          </p>
+        )}
+      </div>
+      <button type="button" onClick={() => void start()} disabled={busy} className={`${ui.textSm} shrink-0`}>
+        {label}
+      </button>
     </div>
   );
 }

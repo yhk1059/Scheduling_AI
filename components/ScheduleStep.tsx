@@ -5,6 +5,8 @@ import { useEffect, useState, type CSSProperties, type ReactNode } from "react";
 import { ApiError, errorMessage, explain, solve } from "@/lib/api";
 import { toScheduleCsv } from "@/lib/csv";
 import { availabilityFromLinks, isAvailabilityRule, mergeAvailabilityConflicts, unsubmittedCause } from "@/lib/availability";
+import { demoExplanation } from "@/lib/demo";
+import { DEMO_DOC } from "@/lib/demo-doc";
 import { historyLoadFor, isOperating } from "@/lib/continuity";
 import { closingShift, DEFAULT_CONFIG, OFF_CODE, shiftTones } from "@/lib/rules";
 import { dayHeader, dayOfDate, isWeekendDay, monthDay, periodDays, periodEnd } from "@/lib/period";
@@ -37,6 +39,7 @@ import type {
 import { statsFromAssignments } from "@/lib/stats";
 import { describeRule, formatDeviation, hardnessLabel, josa, presetName, scheduleInputsText } from "@/lib/wording";
 
+import { DemoGateDialog } from "./Demo";
 import Dialog from "./Dialog";
 import { Spinner, today } from "./RulesStep";
 import { ui } from "./ui";
@@ -164,6 +167,8 @@ export function toMessage(e: unknown): string {
 /** 작성 중 근무표의 가능 시간을 링크 행에서 다시 읽어 store에 넣는다. 달라졌으면 true. 확정한 근무표는 링크가 잠겨 읽지 않는다. */
 async function readAvailability(periodId: string): Promise<boolean> {
   const s = useAppStore.getState();
+  // 체험은 링크가 없고 가능 시간이 문서에 들어 있다
+  if (s.demo) return false;
   const period = s.periods.find((p) => p.id === periodId);
   if (period?.status !== "draft") return false;
   try {
@@ -230,6 +235,12 @@ export function useSolve(periodId: string) {
         const s = useAppStore.getState();
         const p = s.periods.find((x) => x.id === periodId)!;
         if (unsubmittedFor(s.shop!, p, res.conflicts)) return;
+        // 체험은 LLM을 부르지 않고 저장된 설명을 쓴다. 요청이 저장 시점과 다르면 설명 없이 둔다
+        if (s.demo) {
+          const explanation = demoExplanation(DEMO_DOC, req, res.input_version);
+          setOutcome((o) => (o?.kind === "infeasible" && o.version === res.input_version ? { ...o, explanation } : o));
+          return;
+        }
         await runExplain(req, res.conflicts, res.input_version);
       }
     } catch (e) {
@@ -483,10 +494,12 @@ export default function ScheduleStep() {
   const inputVersion = useAppStore((s) => s.inputVersion);
   const confirm = useAppStore((s) => s.confirm);
   const go = useAppStore((s) => s.go);
+  const demo = useAppStore((s) => s.demo);
   const sv = useSolve(period?.id ?? "");
   const { setToast } = sv;
   const [confirming, setConfirming] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [gateOpen, setGateOpen] = useState(false);
   const stepPeriodId = period?.id ?? "";
 
   // ③에 들어오면 가능 시간을 다시 읽는다. 달라졌으면 아래 배너가 뜬다
@@ -513,6 +526,11 @@ export default function ScheduleStep() {
 
   // 마지막 생성에 쓴 가능 시간과 다르면 확정하지 않고 배너로 알린다. 링크를 잠근 뒤에 확정한다
   const onConfirm = async () => {
+    // 체험은 링크를 잠그거나 저장하지 않고 내 매장으로 안내한다
+    if (demo) {
+      setGateOpen(true);
+      return;
+    }
     setConfirming(true);
     setToast(null);
     try {
@@ -611,7 +629,8 @@ export default function ScheduleStep() {
                   {loading && <Spinner />}
                   {loading ? "만드는 중…" : "다시 만들기"}
                 </button>
-                <button type="button" onClick={() => setConfirmOpen(true)} disabled={busy || blocked || outdated} className={ui.primaryLg}>
+                <button type="button" onClick={() => (demo ? void onConfirm() : setConfirmOpen(true))}
+                  disabled={busy || blocked || outdated} className={ui.primaryLg}>
                   확정
                 </button>
               </div>
@@ -638,6 +657,15 @@ export default function ScheduleStep() {
             이후 변경은 변경 입력으로만 할 수 있어요.
           </p>
         </Dialog>
+      )}
+
+      {gateOpen && (
+        <DemoGateDialog title="확정은 내 매장에서 할 수 있어요" onClose={() => setGateOpen(false)}>
+          <p>
+            확정하면 직원 링크가 잠기고, 직원은 같은 링크에서 근무표를 봐요. 내 매장을 만들면 여기서 만든 것처럼 바로 이어서 할 수
+            있어요.
+          </p>
+        </DemoGateDialog>
       )}
     </div>
   );
