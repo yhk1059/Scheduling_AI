@@ -4,7 +4,7 @@
 
 직원은 링크로 가능 시간을 칠하고, 매니저는 매장 조건을 말로 적으면 근무표가 만들어집니다. 조건이 서로 부딪혀 막히면 이유와 해결책까지 알려 줍니다.
 
-**[바로 체험하기](https://optimize-schedule-ai.vercel.app/demo)** · [서비스 열기](https://optimize-schedule-ai.vercel.app) · [▶ 데모 영상 (2분)](public/demo.mp4)
+**[바로 체험하기](https://optimize-schedule-ai.vercel.app/demo)** · [서비스 열기](https://optimize-schedule-ai.vercel.app)
 
 체험은 로그인 없이 샘플 매장(한강 다이닝, 직원 20명)에서 시작합니다. 직원이 가능 시간을 모두 낸 상태에서 매장 조건 카드를 적용하고 근무표를 만들어 보세요. 조건이 부딪혀 근무표가 나오지 않는 상황과, 검증된 해결책을 수락해 근무표가 나오는 과정을 그대로 볼 수 있습니다. 바꾼 내용은 저장되지 않습니다.
 
