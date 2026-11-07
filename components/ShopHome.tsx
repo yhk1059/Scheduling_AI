@@ -58,6 +58,7 @@ function TaskProgress({ done }: { done: number }) {
 /** 작성 중 근무표의 공용 링크와 제출 현황. 읽기만 한다(링크를 만들고 맞추는 것은 ① 가능 시간). period가 없으면 읽지 않는다. */
 function useShareStatus(period: WorkPeriod | null) {
   const shop = useAppStore((s) => s.shop);
+  const demo = useAppStore((s) => s.demo);
   const shopName = shop?.name ?? "";
   const employees = (shop?.employees ?? []).filter((n) => n.active);
   const roster = JSON.stringify(employees.map(({ id, name }) => ({ id, name })));
@@ -70,7 +71,7 @@ function useShareStatus(period: WorkPeriod | null) {
   const key = `${start}|${length}|${shopName}|${roster}`;
 
   useEffect(() => {
-    if (start === undefined || length === undefined) return;
+    if (demo || start === undefined || length === undefined) return;
     let live = true;
     loadShareStatus(start)
       .then((loaded) => {
@@ -84,10 +85,23 @@ function useShareStatus(period: WorkPeriod | null) {
     return () => {
       live = false;
     };
-  }, [key, start, length, attempt]);
+  }, [demo, key, start, length, attempt]);
 
   const current = links?.key === key ? links : null;
+  if (demo) {
+    // 체험: 링크가 없고 제출 현황은 저장된 가능 시간으로 센다
+    return {
+      demo,
+      url: null,
+      total: employees.length,
+      missing: employees.filter((n) => !period?.availability[n.id]).map((n) => n.name),
+      failed: false,
+      none: false,
+      reload: () => {},
+    };
+  }
   return {
+    demo,
     url: current ? `${location.origin}/a/${current.shareToken}` : null,
     total: employees.length,
     missing: employees.filter((n) => !current?.rows.find((r) => r.employee_id === n.id)?.submitted_at).map((n) => n.name),
@@ -102,7 +116,7 @@ function useShareStatus(period: WorkPeriod | null) {
 
 /** 지금 할 일 패널 오른쪽의 직원 링크 카드. */
 function ShareCard({ status }: { status: ReturnType<typeof useShareStatus> }) {
-  const { url, total, missing, failed, none, reload } = status;
+  const { demo, url, total, missing, failed, none, reload } = status;
   const [copied, setCopied] = useState<string | null>(null);
   const [copyFailed, setCopyFailed] = useState(false);
   const submitted = total - missing.length;
@@ -115,6 +129,25 @@ function ShareCard({ status }: { status: ReturnType<typeof useShareStatus> }) {
       setCopyFailed(true);
     }
   };
+
+  if (demo) {
+    return (
+      <div className={`${ui.card} flex min-w-0 flex-col gap-2.5`}>
+        <h3 className="text-[13px] font-semibold text-[#1B1B18]">직원 링크</h3>
+        <p className="text-[13px] text-[#1B1B18]">
+          <span className="font-mono">
+            {submitted} / {total}
+          </span>
+          명 제출
+        </p>
+        <div aria-hidden="true" className="h-1.5 overflow-hidden rounded bg-[#E2E2DC]">
+          <div className="h-full bg-[#155E75]" style={{ width: `${total === 0 ? 0 : (submitted / total) * 100}%` }} />
+        </div>
+        {missing.length > 0 && <p className={ui.help}>미제출: {missing.join(", ")}</p>}
+        <p className={ui.help}>체험에서는 직원 링크를 보낼 수 없어요</p>
+      </div>
+    );
+  }
 
   return (
     <div className={`${ui.card} flex min-w-0 flex-col gap-2.5`}>
@@ -184,7 +217,7 @@ function TaskPanel() {
   // 다음 근무표(오늘 이후 가장 늦은 근무표)가 확정됐으면 그다음 근무표를 만들 수 있다
   const canCreateAfter = next.state === "confirmed";
   const afterName = scheduleName(upcomingRange(shop.unit, periods, now), shop.unit);
-  const submittedText = share.url ? `${share.total}명 중 ${share.total - share.missing.length}명이 가능 시간을 제출했어요.` : "";
+  const submittedText = share.url || share.demo ? `${share.total}명 중 ${share.total - share.missing.length}명이 가능 시간을 제출했어요.` : "";
 
   return (
     <section className={`${ui.panel} px-8! py-7! ${draft ? "grid grid-cols-[1fr_320px] gap-8" : ""}`}>

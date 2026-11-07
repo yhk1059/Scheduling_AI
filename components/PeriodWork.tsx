@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import { carryOverFrom, previousConfirmedPeriod } from "@/lib/continuity";
 import { effectiveCoverage } from "@/lib/coverage-conflict";
 import { dateOfDay, dayHeader, formatRange, isWeekendDay, MAX_MONTH_START_DAY, monthDay, periodDays, periodEnd, validStart } from "@/lib/period";
+import { demoLinkRows } from "@/lib/demo";
 import { parseCarryOver, type CellError } from "@/lib/roster-import";
 import { syncAvailabilityLinks, type AvailabilityLink } from "@/lib/supabase";
 import {
@@ -90,9 +91,13 @@ export default function PeriodWork() {
   );
 }
 
+/** 체험의 가능 시간 행에 붙이는 제출 시각. 화면에는 보이지 않는다. */
+const DEMO_SUBMITTED_AT = "2026-11-01T00:00:00.000Z";
+
 /** ① 공용 직원 링크 하나, 제출 현황, 직원별 가능 시간. 근무표 시작일이나 명단이 바뀌면 행을 맞춘다. */
 function LinksSection({ period }: { period: WorkPeriod }) {
   const shop = useAppStore((s) => s.shop);
+  const demo = useAppStore((s) => s.demo);
   const shopName = shop?.name ?? "";
   const employees = (shop?.employees ?? []).filter((n) => n.active);
   const roster = JSON.stringify(employees.map(({ id, name }) => ({ id, name })));
@@ -105,6 +110,7 @@ function LinksSection({ period }: { period: WorkPeriod }) {
   const key = `${start}|${length}|${shopName}|${roster}`;
 
   useEffect(() => {
+    if (demo) return;
     let live = true;
     syncAvailabilityLinks({ start_date: start, length }, JSON.parse(roster), shopName)
       .then((synced) => {
@@ -116,7 +122,32 @@ function LinksSection({ period }: { period: WorkPeriod }) {
     return () => {
       live = false;
     };
-  }, [key, start, length, roster, shopName, attempt]);
+  }, [demo, key, start, length, roster, shopName, attempt]);
+
+  if (demo) {
+    // 체험: 링크를 만들지 않고 저장된 가능 시간으로 제출 현황과 캘린더를 그린다
+    const rows = demoLinkRows(period.availability, employees, DEMO_SUBMITTED_AT);
+    const absent = employees.filter((n) => !period.availability[n.id]);
+    const done = employees.length - absent.length;
+    return (
+      <>
+        <section className={`${ui.card} flex flex-col gap-3`}>
+          <div className="flex min-w-0 flex-col gap-1">
+            <h3 className={ui.cardTitle}>직원 링크</h3>
+            <p className={ui.help}>체험에서는 직원 링크를 보낼 수 없어요. 직원이 가능 시간을 모두 제출한 상태로 시작해요</p>
+          </div>
+          <p className="text-[13px] text-[#1B1B18]">
+            <span className="font-mono">{employees.length}</span>명 중 <span className="font-mono">{done}</span>명 제출
+          </p>
+          <div aria-hidden="true" className="h-1.5 overflow-hidden rounded bg-[#E2E2DC]">
+            <div className="h-full bg-[#155E75]" style={{ width: `${employees.length === 0 ? 0 : (done / employees.length) * 100}%` }} />
+          </div>
+          {absent.length > 0 && <p className={ui.help}>미제출: {absent.map((n) => n.name).join(", ")}</p>}
+        </section>
+        {shop && <AvailabilityOverview key={period.id} period={period} employees={employees} rows={rows} config={shop.config} />}
+      </>
+    );
+  }
 
   const current = links?.key === key ? links : null;
   const url = current ? `${location.origin}/a/${current.shareToken}` : "";
