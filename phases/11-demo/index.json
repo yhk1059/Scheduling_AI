@@ -61,7 +61,10 @@
     {
       "step": 7,
       "name": "docs-e2e",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-11-07T16:10:03+0900",
+      "summary": "docs: ADR-025(체험 = AppShell 체험 모드, 메모리 저장소·demo 플래그·signedIn 가드, /solve만, 저장된 설명은 규칙 제약 signature 일치 때만, ADR-016·022와의 관계) 추가, PRD(보조 사용자·화면 /demo·J0 흐름·J7-b 체험 저니·랜딩 버튼·게스트 모드 단서), ARCHITECTURE(디렉토리 app/demo·components/Demo·lib/demo·demo-doc·demo-shop.json·scripts/dining-data·gen-demo-shop, 상태 관리 체험 항목, 데이터 흐름 체험 줄, 로컬 gen:demo-shop), UI_GUIDE(화면 구조 /demo, 로그인 화면 체험 링크, 랜딩 상단 바·히어로·CTA 문구, 새 절 '체험'), BROWSER_TEST_SCENARIOS(S1 3~5단계·S1-b 체험 링크, 새 S20, spec 목록), README(체험 두 줄, 배포 URL 없음). e2e: entry.spec.ts S1(데모 버튼 상단 바 1개, 내 매장 링크 2개 /app, 체험하기 링크 2개 /demo), S1-b(샘플 매장으로 먼저 체험하기 → /demo), 새 demo.spec.ts S20(로그인·Supabase 도우미 없음, ② 입력 바 대신 안내 → [모두 적용] → ③ 근무표 없음·분석 중 없이 검증됨 제안 → [수락] → 반드시 규칙 모두 지킴 → [확정] 체험 대화상자 → ① 20명 중 20명 제출·링크 복사 없음, /api는 /solve만·Supabase 호스트 요청 0, [나가기] 뒤 다시 열면 대기 카드 수 그대로, localStorage에 한강 다이닝 없음, 개발 용어 검사 ②·①). 결과: build·lint·npm test(pytest 816, vitest 500) 통과, npm run test:e2e -- e2e/demo.spec.ts e2e/entry.spec.ts 4 passed. 결정: step 설명의 '대기 카드 2장'은 실제 문서가 두 문장 5장이라 문서에 '두 문장(5장)'으로 적고 S20은 대기 카드 수를 고정하지 않고 1장 이상·재진입 시 같은 수로 검사한다, 체험 대화상자는 [닫기]로 닫는다. 재녹화 권장: 랜딩 첫 장면이 바뀌어 public/demo.mp4 첫 컷이 현재 랜딩과 다르다.",
+      "completed_at": "2026-11-07T16:15:11+0900"
     }
   ],
   "created_at": "2026-11-07T15:39:23+0900"
