@@ -1,5 +1,7 @@
 "use client";
 
+import Link from "next/link";
+
 import { supabaseConfigured } from "@/lib/supabase";
 
 import { LoginButton, PrivacyLink } from "./Account";
@@ -54,6 +56,9 @@ export default function LoginScreen() {
             <PrivacyLink className="ml-1 rounded-sm underline underline-offset-2 hover:text-[#1B1B18]" />
           </p>
         )}
+        <Link href="/demo" className={`${ui.textSm} -ml-2 self-start`}>
+          샘플 매장으로 먼저 체험하기
+        </Link>
       </section>
     </div>
   );

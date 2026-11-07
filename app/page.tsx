@@ -342,6 +342,7 @@ export default function Home() {
       <header className="border-b border-[#E2E2DC]">
         <div className={`${container} flex h-[60px] items-center justify-end`}>
           <nav className="flex items-center gap-1">
+            <DemoVideoButton className={ui.text}>데모 영상</DemoVideoButton>
             <a href={REPO_URL} className={ui.text}>
               GitHub
             </a>
@@ -368,9 +369,11 @@ export default function Home() {
               <Link href="/app" className={ui.primaryXl}>
                 내 매장으로 시작하기
               </Link>
-              <DemoVideoButton className={ui.secondaryXl}>데모 영상</DemoVideoButton>
+              <Link href="/demo" className={ui.secondaryXl}>
+                체험하기
+              </Link>
             </div>
-            <p className={ui.help}>내 매장은 Google 로그인으로 시작해요. 데모 영상은 2분, 로그인 없이 볼 수 있어요.</p>
+            <p className={ui.help}>체험은 샘플 매장으로 로그인 없이 눌러 볼 수 있어요. 내 매장은 Google 로그인으로 시작해요.</p>
           </div>
           <HeroSequence />
         </section>
@@ -460,7 +463,7 @@ export default function Home() {
                 직원 명단만 넣으면
                 <br />첫 근무표를 시작할 수 있어요
               </h2>
-              <p className="text-base text-[#CFE4EA]">Google 로그인으로 시작해요. 영상은 로그인 없이 볼 수 있어요.</p>
+              <p className="text-base text-[#CFE4EA]">Google 로그인으로 시작해요. 체험은 로그인 없이 할 수 있어요.</p>
             </div>
             <div className="flex shrink-0 flex-wrap items-center gap-2">
               <Link
@@ -469,9 +472,12 @@ export default function Home() {
               >
                 내 매장으로 시작하기
               </Link>
-              <DemoVideoButton className="inline-flex h-12 items-center rounded-md border border-white px-[22px] text-[15px] font-medium text-white transition-colors duration-[120ms] hover:bg-[#0E4A5C] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white">
-                데모 영상
-              </DemoVideoButton>
+              <Link
+                href="/demo"
+                className="inline-flex h-12 items-center rounded-md border border-white px-[22px] text-[15px] font-medium text-white transition-colors duration-[120ms] hover:bg-[#0E4A5C] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
+              >
+                체험하기
+              </Link>
             </div>
           </div>
         </section>
