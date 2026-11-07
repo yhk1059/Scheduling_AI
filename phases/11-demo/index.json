@@ -21,7 +21,10 @@
     {
       "step": 2,
       "name": "store-demo-mode",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-11-07T15:53:44+0900",
+      "summary": "lib/store.ts AppState에 demo: boolean, enterDemo(data: Data), exitDemo() 추가(persist 대상 아님). createAppStore 안의 Map 기반 PersistStorage<Data>(demoStorage)로 store.persist.setOptions({storage}) 교체: enterDemo는 auth가 있으면 무시 → 저장소 교체 → demo=true → replace(data), exitDemo는 체험 중일 때만 replace(initialData(), {demo:false}) → 메모리 비우기 → 원래 저장소 복귀. 가드: signedIn 맨 앞에서 체험 종료(빈 매장 업로드), signedOut은 체험 중 무시, save()는 demo면 저장 안 함. lib/store.test.ts describe(\"체험\") 7개. 결정: 액션은 initializer의 api 대신 create() 결과 store를 클로저로 참조한다(api.persist는 PersistStorage<unknown> 타입이라 PersistStorage<Data>를 받지 않음).",
+      "completed_at": "2026-11-07T15:57:07+0900"
     },
     {
       "step": 3,
