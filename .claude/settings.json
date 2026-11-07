@@ -1,0 +1,34 @@
+{
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "sid=$(python3 -c \"import json,sys; print(json.load(sys.stdin).get('session_id','default'))\"); cd \"$CLAUDE_PROJECT_DIR\" || exit 0; [ -f package.json ] || exit 0; f=\"${TMPDIR:-/tmp}/claude-stop-retry-$sid\"; if { npm run --if-present lint && npm run --if-present build && npm run --if-present test; } >&2; then rm -f \"$f\"; exit 0; fi; n=$(( $(cat \"$f\" 2>/dev/null || echo 0) + 1 )); if [ \"$n\" -gt 3 ]; then rm -f \"$f\"; echo '검증 3회 재시도 후에도 실패 — 종료를 허용합니다.' >&2; exit 0; fi; echo \"$n\" > \"$f\"; echo \"검증 실패 — 위 에러를 수정하라 (재시도 $n/3)\" >&2; exit 2"
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "cmd=$(python3 -c \"import json,sys; print(json.load(sys.stdin).get('tool_input',{}).get('command',''))\"); if printf '%s' \"$cmd\" | grep -qiE -e '(^|[^[:alnum:]_.-])rm[[:space:]]([^;&|]*[[:space:]])?-[a-z]*(r[a-z]*f|f[a-z]*r)' -e '(^|[^[:alnum:]_.-])rm[[:space:]]([^;&|]*[[:space:]])?(-[a-z]*r[a-z]*|--recursive)[[:space:]]([^;&|]*[[:space:]])?(-[a-z]*f[a-z]*|--force)([[:space:]]|$)' -e '(^|[^[:alnum:]_.-])rm[[:space:]]([^;&|]*[[:space:]])?(-[a-z]*f[a-z]*|--force)[[:space:]]([^;&|]*[[:space:]])?(-[a-z]*r[a-z]*|--recursive)([[:space:]]|$)' -e '(^|[^[:alnum:]_.-])git[[:space:]]([^;&|]*[[:space:]])?push[[:space:]]([^;&|]*[[:space:]])?(--force|-[a-z]*f[a-z]*([[:space:]]|$)|[+][^[:space:]])' -e '(^|[^[:alnum:]_.-])git[[:space:]]([^;&|]*[[:space:]])?reset[[:space:]]([^;&|]*[[:space:]])?--hard' -e 'drop[[:space:]]+table'; then echo 'BLOCKED: 위험한 명령어가 감지되었습니다.' >&2; exit 2; fi"
+          }
+        ]
+      },
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$CLAUDE_PROJECT_DIR/scripts/hooks/tdd-guard.sh"
+          }
+        ]
+      }
+    ]
+  }
+}

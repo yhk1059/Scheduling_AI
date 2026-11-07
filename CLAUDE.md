@@ -23,5 +23,5 @@
 npm run dev      # 개발 서버 (Next :3000 + FastAPI :8000)
 npm run build    # 프로덕션 빌드
 npm run lint     # ESLint
-npm run test     # pytest (backend/tests) + vitest
+npm run test     # pytest (backend/tests, scripts/test_hooks.py)
 uv pip install -r requirements-dev.txt   # Python 의존성 설치 (.venv, Python 3.12)

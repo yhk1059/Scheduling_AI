@@ -1,0 +1,55 @@
+{
+  "phases": [
+    {
+      "dir": "1-mvp",
+      "status": "completed",
+      "completed_at": "2026-10-26T20:25:31+0900"
+    },
+    {
+      "dir": "2-periods",
+      "status": "completed",
+      "completed_at": "2026-10-28T20:14:24+0900"
+    },
+    {
+      "dir": "3-ux",
+      "status": "completed",
+      "completed_at": "2026-10-29T01:48:44+0900"
+    },
+    {
+      "dir": "4-blocks",
+      "status": "completed",
+      "completed_at": "2026-10-30T01:40:17+0900"
+    },
+    {
+      "dir": "5-expressions",
+      "status": "completed",
+      "completed_at": "2026-10-30T15:50:06+0900"
+    },
+    {
+      "dir": "6-shop-pivot",
+      "status": "completed",
+      "completed_at": "2026-10-30T23:51:55+0900"
+    },
+    {
+      "dir": "7-availability",
+      "status": "completed",
+      "completed_at": "2026-10-31T01:12:39+0900"
+    },
+    {
+      "dir": "8-design",
+      "status": "completed",
+      "completed_at": "2026-11-01T07:03:42+0900"
+    },
+    {
+      "dir": "9-rules-and-confirm",
+      "status": "completed",
+      "blocked_at": "2026-11-05T20:42:12+0900",
+      "completed_at": "2026-11-05T21:08:16+0900"
+    },
+    {
+      "dir": "10-polish",
+      "status": "completed",
+      "completed_at": "2026-11-06T12:58:21+0900"
+    }
+  ]
+}

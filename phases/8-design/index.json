@@ -1,0 +1,96 @@
+{
+  "project": "shop-scheduler",
+  "phase": "8-design",
+  "steps": [
+    {
+      "step": 0,
+      "name": "design-tokens",
+      "status": "completed",
+      "started_at": "2026-11-01T06:03:50+0900",
+      "summary": "components/ui.ts에 primaryLg·secondaryLg·primaryXl·secondaryXl·primaryBar·chip·panel·bar·barInput·cardXl·shadow·pageTitle·sectionTitle·eyebrow·bigNumber·badgeTone(applied·pending·draft·confirmed·operating·none·excluded·base) 추가, components/Wordmark.tsx(Mark({size,tone?:accent|inverse|muted}), default Wordmark({size:bar|hero|small,href?,tone?:accent|inverse})), layout title template, reduced-motion 규칙, lib/wording.ts PRODUCT_NAME. 결정: Wordmark 링크는 next/link(<a>로 렌더), applied·base 배지 색은 기존 화면 값(#E6F2EA, #EFEFEB), template과 겹치지 않게 demo·privacy·a/[token]의 title에서 옛 제품 이름을 뺌.",
+      "completed_at": "2026-11-01T06:06:05+0900"
+    },
+    {
+      "step": 1,
+      "name": "app-shell",
+      "status": "completed",
+      "started_at": "2026-11-01T06:06:12+0900",
+      "summary": "AppShell 상단 바(60px, 워드마크·구분선·매장 이름·주기)와 탭 줄(44px, 청록 밑줄), Account 아바타 메뉴(ui.shadow), LoginScreen 두 열, Stepper 26px. 결정: 탭 줄을 header 안에 둠, 매장 이름과 주기 사이 ' · '는 e2e·시나리오 문구에 맞춰 유지, 워드마크는 매장 준비·비로그인에서 '/' 링크(준비를 건너뛰지 않게), LoginButton이 G 아이콘을 포함, main 가로 여백 px-10, 탭·계정 버튼에 focus-visible 링 추가",
+      "completed_at": "2026-11-01T06:11:31+0900"
+    },
+    {
+      "step": 2,
+      "name": "landing",
+      "status": "completed",
+      "summary": "components/HeroSequence.tsx(LandingPreview 대체, ReplyCard·ChangeFragment도 export), app/page.tsx 랜딩 전체 재작성, ScheduleGrid에 선택 prop cellStyle·totalCodes 추가, 시퀀스는 globals.css @keyframes + 칸별 animationDelay(기본 스타일이 끝 상태, reduced-motion은 animation:none). 결정: PreviewCard는 유일한 사용처인 SampleDemo로 옮김, 마감 합계 행만 그리려 totalCodes 추가, [다시 보기]는 inert 영역만 재마운트해 포커스 유지, 합계 숫자는 칸이 찬 뒤 5s에 나타남. 남은 일: ScheduleGrid 합계 행의 빈 <span />로 합계가 한 칸 밀림(기존 버그, 히어로·앱 모두, 이 step 금지 범위라 안 고침), e2e S1의 옛 h1 문구와 CTA 중복 strict 위반은 step 10에서 고침",
+      "started_at": "2026-11-01T06:22:32+0900",
+      "completed_at": "2026-11-01T06:24:22+0900"
+    },
+    {
+      "step": 3,
+      "name": "sample-demo",
+      "status": "completed",
+      "summary": "components/SampleDemo.tsx 재작성(상단 바 → 제목 → 요약 지표 → 28일 근무표 → 규칙 카드 7장 + 필요 인원 표 → 하단 CTA). 결정: 근무표는 inert 대신 readOnly(inert면 1280px에서 표 상자를 가로 스크롤할 수 없음), 요약 지표는 칸이 달라 직접 그림, ReplyCard에 선택 prop hardness 추가·reading을 ReactNode로 넓힘(밑줄 값과 가능하면 배지), 필요 인원 표는 lib/store를 import하지 않으려 샘플의 cov-* 값을 직접 읽음, ScheduleGrid 합계 행의 빈 <span /> 제거(합계 한 칸 밀림 수정, 히어로·앱에도 적용). e2e에 영향: S1의 /demo 근무 칸이 button이 아니라 aria-label 있는 div, 원문이 “…” 따옴표 문자 없이 글리프 + 글자, 제목이 '매장 조건 7개', [내 매장으로 시작하기] 링크 2개(strict 위반) — step 10에서 고침",
+      "started_at": "2026-11-01T06:24:29+0900",
+      "completed_at": "2026-11-01T06:27:31+0900"
+    },
+    {
+      "step": 4,
+      "name": "shop-home",
+      "status": "completed",
+      "summary": "components/ShopHome.tsx 재작성(제목 줄, 얇은 운영 중 카드, 지금 할 일 강조 패널 + 작성 중 직원 링크 카드, 지난 근무표 표 5열), lib/stats.ts closingSpread(assignments: Record<string, Code[]>, config, activeIds) → {min,max}|null. 결정: 링크·제출 현황은 store에 없어 PeriodWork와 같은 syncAvailabilityLinks를 ShopHome의 useShareStatus에서 부른다(①과 같은 쓰기 포함, 작성 중 근무표는 하나뿐이라 안전). PeriodWork는 export 추가만 허용이라 고치지 않아 LinksSection과 상태 로직이 중복되며 step 6에서 합칠 수 있다. 배정 행이 없는 직원은 closingSpread에서 빼고, 지난 근무표는 확정 snapshot의 명단으로 센다. h2는 근무표 이름만 담아 section 찾기를 유지하고, 날짜 범위는 아이브로우 옆에 둔다. 행 클릭과 [열기 →] 모두 연다. e2e에 영향: S3-a의 '확인하세요. 아직 근무표를…' 이어진 문장이 문장과 보조 줄로 나뉨 — step 10에서 고침",
+      "started_at": "2026-11-01T06:27:38+0900",
+      "completed_at": "2026-11-01T06:31:43+0900"
+    },
+    {
+      "step": 5,
+      "name": "rule-cards",
+      "status": "completed",
+      "started_at": "2026-11-01T06:31:49+0900",
+      "summary": "ConstraintCard·ShiftChangeCardView를 답장 형태로(제목+토글 → 따옴표 글리프+원문 → '이렇게 읽었어요' 해석·수정 폼·예시 → 배지+버튼), RulesStep 입력을 ui.panel+ui.bar+칩으로, Wordmark에 QuoteGlyph 추가. 결정: 패널 제목은 heading이 아니라 p(e2e의 heading '매장 조건'과 겹치지 않게), period 범위도 같은 패널을 쓰고 제목은 UI_GUIDE의 '이번 근무표에만 적용할 예외가 있나요?', 입력 이름은 aria-label 대신 sr-only label(이름은 같음), 중요도 select·값 입력 높이가 ui.input의 h-10에 눌려 h-7!·h-8!로 고침, HeroSequence ReplyCard의 따옴표는 글자 그대로 둠(step 범위 밖, SVG 글리프로 바꿀 수 있음). e2e에 영향: journey.spec:351의 설명 문구가 '근무 형태, 필요 인원, 지켜야 할 규칙 모두 한 곳에서요.'로 바뀌어 step 10에서 고침(BROWSER_TEST_SCENARIOS S8-a와 원문 “따옴표” 표기도), cardOrder의 첫 p는 원문 그대로.",
+      "completed_at": "2026-11-01T06:36:02+0900"
+    },
+    {
+      "step": 6,
+      "name": "schedule-step",
+      "status": "completed",
+      "started_at": "2026-11-01T06:36:09+0900",
+      "summary": "components/ScheduleStep.tsx·PeriodWork.tsx·RulesStep.tsx·ConstraintCard.tsx: ③을 예외 입력 패널(RulesStep scope=period가 패널 안 7fr_5fr 두 열, 카드는 compact) → 요약 지표+안내 → 근무표 → 버튼 줄 → 개인별 통계 순으로, 제목 ui.pageTitle, ① 링크 카드를 홈 모양(진행 막대)으로 바꿈. ScheduleBody에 선택 prop hint·actions·outcomeAtGrid, SummaryCard에 care, 날짜 머리 DayHead export. 배려 칸 출처: 클라이언트 history(historyLoadFor)와 result.stats의 마감 수로 historyEvidence와 같은 대상(최근 4주 평균 초과 & 이번 평균 이하)을 고른 closingCare. 결정: ShiftTable은 근무 셀을 그리지 않아(지난 근무 표는 PeriodWork의 CarryOverTable) 고치지 않고 CarryOverTable 머리만 DayHead로 맞춤, 해 없음이어도 마지막 근무표는 패널 아래 유지(칸 고정으로 풀 수 있음), 배려 칸은 대상자가 없으면 그리지 않고 2명까지, 근거 한 줄은 유지, 안내의 🔒는 UI_GUIDE 아이콘 규칙대로 SVG, 만들기 전 버튼 줄에도 [이전], 휴가 카드에 토글 대신 반드시 배지, ConfirmedPeriod는 안 고쳤지만 공유 컴포넌트로 통계 머리·날짜 머리·배려 칸이 함께 바뀜. e2e에 영향(step 10): [이번 근무표 예외 입력] 접기 버튼이 없어 입력이 항상 보임(operating.spec:139, journey.spec:482·569), '칸을 눌러 근무를 고정하면…' 문구가 '칸을 누르면 바꿀 수 있어요…'로 바뀜(journey.spec:531), 예외 설명 문구 변경, 버튼 줄이 근무표 아래로 이동, ① 링크 복사가 링크 줄이 아니라 카드 머리, ③ 첫 단계 설명 줄이 [근무표 만들기] 옆으로 이동, 해 없음 패널이 예외 패널 아래, 요약 지표 아래.",
+      "completed_at": "2026-11-01T06:42:35+0900"
+    },
+    {
+      "step": 7,
+      "name": "confirmed-period",
+      "status": "completed",
+      "started_at": "2026-11-01T06:42:42+0900",
+      "summary": "components/ConfirmedPeriod.tsx 재작성(제목 ui.pageTitle + '마지막 확정 … · 직원 링크는 잠겼어요', 변경 입력 패널 7fr_5fr, 바뀐 칸 배너 + SummaryCard 한 줄, 표 위 오늘 안내, 버튼 줄, 확정 기록, 통계). 확정 기록 출처: period.versions(최신 위, 첫 버전은 '처음 확정', 나머지는 changed.length). ScheduleBody에 선택 prop summaryLead·gridNote, ConstraintCard에 appliedLabel, 지난 날짜 칸 opacity-55. 결정: 변경 카드는 changeIds + cardsInOrder로 적용 뒤에도 [다시 확정]·[변경 취소]까지 패널에 readOnly로 남긴다(수정·삭제 경로를 새로 만들지 않음), 배지 '적용됨 · 다시 만들었어요'는 다시 만들기가 성공했을 때만이고 진행 중·근무표 없음·오류면 '적용됨', 시각은 ShopHome shortTime(M/D HH:MM)을 export해 쓰고 안 쓰이게 된 confirmedTime·formatTime과 ScheduleBody children을 지움, 빈 카드 자리에 '아직 변경이 없어요.', '만드는 중…' 표시는 제목 줄 오른쪽. 수동 저니는 D3 + 실제 LLM 임시 spec으로 확인 후 삭제(포커스, 2명 2칸 배너, 변경 취소, 다시 확정 후 기록 2행, 끝난 근무표 CSV만, Primary 하나). e2e 영향(step 10): 마지막 확정이 항상 날짜 포함(BROWSER_TEST_SCENARIOS S12의 HH:MM), 바뀐 칸 문구 끝이 '아직 다시 확정하지 않았어요.', [다시 확정]·[변경 취소]·[CSV 받기]가 제목 줄에서 근무표 아래로 이동, 변경 카드가 적용 뒤에도 남아 appliedCards 수가 늘 수 있음.",
+      "completed_at": "2026-11-01T06:46:13+0900"
+    },
+    {
+      "step": 8,
+      "name": "availability-form",
+      "status": "completed",
+      "started_at": "2026-11-01T06:46:19+0900",
+      "summary": "components/AvailabilityForm.tsx 재작성(워드마크 줄, 이름 칩, 두 열 캘린더 + '이번 주 칠한 시간' 카드, sticky 하단 72px 줄). 칸 높이: 달력 상자 height min(100%, 622px) + 행 minmax(14px,1fr)로 JS 없이 14~16px(1280×720 14, 1440×900 16, 세로 스크롤 없음). 결정: '매장 근무조' 카드와 공휴일 빨강 머리는 넣지 않음 — get_availability_roster·get_availability가 근무조와 공휴일을 돌려주지 않고 이 step은 세 DB 함수만 쓰며 기본 근무조를 하드코딩하면 틀린 정보가 되므로, DB 함수 변경이 필요한 후속 과제로 남김. [이전 주]·[다음 주]는 1280×720에 맞추려 제목 줄 오른쪽에 둠, 드래그 그림자는 pointer-events-none 겹침 span, 머리 날짜는 '월 11/2', 잠긴 화면은 하단 줄에 칠한 양 없이 문구만, 틀린 토큰은 pageTitle h1. 수동 저니는 RPC를 모킹한 임시 spec으로 확인 후 삭제(실제 Supabase 미사용). e2e 영향(step 10): 셀 aria-label·aria-pressed와 기존 문구는 유지, 제목이 '{매장} · {이름}님의 가능 시간'과 '{매장} · 가능 시간 입력'으로 합쳐짐, 하단 줄이 main 밖 footer.",
+      "completed_at": "2026-11-01T06:49:44+0900"
+    },
+    {
+      "step": 9,
+      "name": "settings-setup",
+      "status": "completed",
+      "started_at": "2026-11-01T06:49:51+0900",
+      "summary": "ShopSetup·ShopSettings·CoverageForm·ShiftTable·Dialog·HolidayCalendar를 새 토큰으로(pageTitle, sectionTitle, primaryLg, cardXl+shadow, 태그 칩 rounded-full h-7, 필요 인원 칸 ui.cell, 공휴일 선택 #155E75, 오늘 테두리). 결정: 설정 탭은 e2e·시나리오의 tab 역할을 지키려 role=tab·aria-selected를 두고 aria-current를 더함, ui.input의 테두리·placeholder를 UI_GUIDE 값(#8A8A80, #707068)으로 고쳐 Account·ConstraintCard·PeriodWork 입력에도 함께 적용됨, 공휴일 달력은 요일 머리와 주말 색까지 무채색, 오늘 테두리는 #1B1B18 + aria-current=date(기간 밖 날짜에도 표시), 행 끝 메뉴에 ui.shadow, CoverageSection 제목이 sectionTitle이라 근무표 작성 ②의 펼친 폼에도 적용됨. 수동 저니는 테스트 계정 임시 spec과 스크린샷으로 확인 후 삭제. e2e 영향 없음(접근성 이름·역할 유지).",
+      "completed_at": "2026-11-01T06:52:18+0900"
+    },
+    {
+      "step": 10,
+      "name": "e2e-docs",
+      "status": "completed",
+      "started_at": "2026-11-01T06:52:25+0900",
+      "summary": "e2e 19개 전부 통과. 고친 것: entry.spec(S1 제목, 같은 이름 링크 여럿, 데모 h2 '매장 조건 7개', 따옴표 없는 원문, 데모 칸은 main 안 div), operating.spec(S3 홈 문장 두 줄, 접기 버튼 없는 예외 패널), journey.spec(S8 설명 문구, S9 예외 패널·칸 고정 안내), test-helpers는 수정 없음. 앱 수정 없음(접근성 위반으로 못 찾는 경우 없음). ui 키는 badgeTone.pending만 지움(나머지 최상위 키는 모두 사용 중). BROWSER_TEST_SCENARIOS를 새 화면대로 갱신, README 맨 위에 '말로' 소개와 옛 내용 안내를 두고 Eval 절 제목을 '번역 정확도 측정 방법 (Eval)'로 바꿈. 결정: S1·S2·S9·S14 따라가기는 갱신한 spec 실행으로 갈음(손으로 따로 하지 않음), 화면과 UI_GUIDE 문구가 다른 곳(홈 상태 문장, ② 입력 설명, ③ 안내)은 금지사항대로 화면을 기준으로 spec·시나리오만 고침. 남은 문제: README 본문과 Eval 수치·랜딩 번역 정확도 자리표시가 간호사 시절 그대로, UI_GUIDE 문구 3곳이 실제 화면과 다름, 실패한 e2e가 남긴 playwright-report·test-results를 eslint가 읽어 lint가 실패함(eslint 무시 목록에 없음), 직원 화면 '매장 근무조' 카드 없음(step 8)",
+      "completed_at": "2026-11-01T07:01:58+0900"
+    }
+  ],
+  "created_at": "2026-11-01T06:03:50+0900",
+  "completed_at": "2026-11-01T07:03:42+0900"
+}

@@ -1,0 +1,88 @@
+{
+  "project": "shop-scheduler",
+  "phase": "10-polish",
+  "steps": [
+    {
+      "step": 0,
+      "name": "holidays-lib",
+      "status": "completed",
+      "started_at": "2026-11-06T12:07:36+0900",
+      "summary": "lib/holidays.ts 추가: KR_HOLIDAYS(2026·2027년 관공서 공휴일, 대체공휴일·선거일 포함, 표 그대로), holidayDays(period: PeriodRange): number[](기간 안 인덱스 오름차순, 상수 없는 연도 제외), holidayName(date): string | null. lib/period.ts의 dateOfDay만 사용(타임존 무관). lib/holidays.test.ts 9개. 결정: 표의 날짜를 요일로 검산해 고칠 곳 없음",
+      "completed_at": "2026-11-06T12:09:48+0900"
+    },
+    {
+      "step": 1,
+      "name": "holidays-apply",
+      "status": "completed",
+      "started_at": "2026-11-06T12:10:16+0900",
+      "summary": "newPeriod가 holidays: holidayDays(range)로 시작해 createPeriod(첫·다음 근무표)에 한국 공휴일이 자동 체크된다. postponeStart는 옮긴 공휴일과 새 기간 holidayDays의 합집합(오름차순). toggleHoliday·불러오기·확정본은 그대로, 저장 문서 모양 불변, backend 무변경. HolidayCalendar 공휴일 버튼에 title=holidayName(date), 도움말을 '한국 공휴일은 자동으로 체크돼요. 날짜를 누르면 바꿀 수 있어요. 주말과 같은 인원 기준을 써요.'로 바꿈(aria-label 그대로). lib/holidays.ts 머리 메모에 '2027년 안에 추가'. store.test.ts에 '공휴일 자동 채우기' 4개 추가, 기존 2개 기대값 갱신(다음 근무표 12/1~ holidays [25], postponeStart 테스트는 12/10 직접 체크로 바꿔 [3,18,25]). e2e 영향: UI로 만든 근무표에 공휴일이 자동으로 들어가므로 12/25·1/1이 든 기간(S15 다음 근무표 12/15~1/14·12/20~1/19 등)과 2026-11 밖 기간의 주말·공휴일 칸 수·필요 인원이 달라질 수 있다. 11월 기간(S6 11/2~11/8, D4·D6)은 공휴일 없음 그대로. 달력 도움말 문구 변경. 결정: 매니저가 뺀 공휴일은 시작일을 미루면 다시 들어올 수 있다(추적하지 않음). 결정: 시드(lib/seed-scenarios.ts)도 newPeriod를 써서 시드한 첫 주에 공휴일이 자동으로 들어간다(시드 파일은 고치지 않음). 수동 체크: 확인 못 함(브라우저 저니 미실행).",
+      "completed_at": "2026-11-06T12:12:59+0900"
+    },
+    {
+      "step": 2,
+      "name": "coverage-table",
+      "status": "completed",
+      "started_at": "2026-11-06T12:13:28+0900",
+      "summary": "lib/coverage-conflict.ts에 DayKind(store.ts는 import type 후 re-export)와 effectiveCoverage(rules, code, kind, period, holidays) 추가: 켜진 반드시 필요 인원 모양 규칙 중 shifts.in이 [code]이고(not_in·복합 코드 제외) 그 요일 종류의 모든 날을 덮는 규칙의 min 최댓값·max 최솟값(상한 없는 규칙만이면 null), 없으면 null. 테스트 10개 추가. ② CoverageSummary의 need()가 coverageRange 대신 effectiveCoverage(liveShopRules, …, period.holidays)를 쓰고 직급별(tagCoverage)은 그대로 잇는다. 바뀐 화면 문구: 요약표 아래 ui.help 한 줄 '켜진 반드시 필요 인원 규칙을 합친 값이에요. 일부 날짜에만 적용되는 규칙은 카드에서 봐요'. 카드에서 빼는 규칙(isCoverageRule·summarizedCoverageIds)은 그대로라 말로 만든 '매일 오픈 1명 이상'은 표에도 나오고 카드로도 남는다(UI_GUIDE 문장 수정은 마지막 step). hasStaffing은 presetName(필요 인원·직급별 배치)으로 말로 만든 규칙도 이미 세므로 그대로. 폼(setCoverage·CoverageForm)·저장 모양 무변경. e2e 영향: S8-a 요약표 값이 폼 규칙뿐 아니라 말로 만든 날마다 필요 인원 규칙(매일·평일·주말, 코드 하나)에도 반응한다(S18 6의 요약표 오픈 행 등). 결정: 합친 결과 min > max여도 그대로 보여 준다(예: '3~2명', 함께 지킬 수 없음이 드러남). 결정: 요일 고르기(토·일)나 특정일이라도 그 요일 종류의 날을 모두 덮으면 표에 넣는다(공휴일이 있으면 토·일 규칙은 주말 칸에서 빠진다). 수동 체크: 확인 못 함(브라우저 저니 미실행).",
+      "completed_at": "2026-11-06T12:16:10+0900"
+    },
+    {
+      "step": 3,
+      "name": "pre-summary",
+      "status": "completed",
+      "started_at": "2026-11-06T12:16:39+0900",
+      "summary": "lib/wording.ts에 ScheduleInputs와 scheduleInputsText(i): SentencePart[](숫자는 value 조각) 추가, lib/store.ts에 scheduleInputs(shop, period, periods) 추가: toScheduleRequest 결과의 employees·constraints(칸 고정·avail- 규칙·꺼진 것 제외)·carry_over에서 센다(hard = isLeaveRule 또는 normalizeRule(c).hardness==='hard', 제출 = 활성 직원 중 period.availability에 있는 id, disabled = disabledRulesFor 수, carryDays = carry_over 행 중 가장 긴 shifts 길이). 테스트: wording 3개, store 4개(D3: 제출 12/12·반드시 12·가능하면 5·지난 근무 7일). 바뀐 화면 문구: ③ 만들기 전 버튼 옆 '가능 시간과 매장 조건으로 근무표를 만들어요'가 없어지고 '제출 {m}/{n}명 · 반드시 {h}개 · 가능하면 {s}개[ · 이번 근무표에서 끈 규칙 {d}개][ · 지난 근무 {k}일 이어받아요]'(숫자 font-mono, max-w-[420px] 오른쪽 정렬로 두 줄까지 접힘)가 된다. e2e S3-b 12·S9-b 1이 그 문장을 찾으면 바뀐다(UI_GUIDE '③ 근무표의 버튼' 표 문장 수정은 마지막 step). 결정: 반드시·가능하면 수에는 필요 인원 규칙과 이번 근무표 요청도 들어간다(솔버 요청과 같은 기준, D3은 매장 조건 8개와 달리 반드시 12개). 결정: scheduleInputs는 today 인자 없이 시작일을 today로 넘긴다(today는 지난 날짜 잠금에만 쓰이고 칸 고정은 세지 않음). 결정: 꺼진 코드의 필요 인원처럼 toScheduleRequest가 enabled=false로 바꾼 규칙은 켜진 수에서 빠지지만 끈 규칙 수에는 들지 않는다(disabledIds만 센다). 수동 체크: 확인 못 함(브라우저 저니 미실행).",
+      "completed_at": "2026-11-06T12:19:32+0900"
+    },
+    {
+      "step": 4,
+      "name": "josa-lib",
+      "status": "completed",
+      "started_at": "2026-11-06T12:20:01+0900",
+      "summary": "lib/wording.ts josa(word,a,b) 확장(시그니처 그대로): 끝의 ” \" ’ ' ) 」 』 ] 와 공백을 건너뛰고, 한글은 받침(ㄹ 받침이면 a='으로'일 때 b), 숫자는 읽는 소리(0·3·6 받침, 1·7·8 ㄹ), 영문자는 L·R(ㄹ)·M·N만 받침(대소문자 무관), 그 밖·빈 문자열은 b. wording.test.ts에 josa 6개 + describeShiftChange 1개(ㄹ·코드 이름) 추가. 바뀐 접근 가능한 이름: ScheduleStep 칸 편집 바 버튼 `${code}로 고정` → `${code}${josa(code,'으로','로')} 고정`이라 'M로 고정'이 'M으로 고정'이 된다(A·C·O·P로는 그대로, L·R은 '로', N은 '으로'). e2e/journey.spec.ts:711의 `${code}로 고정` 루프(A,M,C,O)가 M에서 깨지므로 마지막 step이 맞춘다. 고친 문장: ConfirmedPeriod 근무표 위 '오늘은 M/D {요일}예요' → 월·일·목·금은 '이에요'(예: '11/4 수예요' 그대로, '11/2 월이에요'); describeShiftChange 더블 '…{이름}으로/로 세요'가 ㄹ 받침 이름(예: 홀)이면 '홀로 세요', 이름 없는 코드는 읽는 소리(X와 M2로). 그 밖의 기존 josa 호출(규칙 비교 문장, 고르게, 최근 4주 근거, 기존 규칙 충돌 안내)은 새 규칙을 그대로 따른다. 결정: wording.ts ifPhrase의 고정 '이면'은 앞말이 항상 이상·이하·명·번·일·시간(받침 있음)·같음/없음(별도 처리)이라 그대로 둔다. 결정: ShopHome '{task.name}를 만들 차례예요'는 task.name이 늘 '…근무표'라 그대로 둔다. 결정: 변수 뒤 조사 grep 결과 남은 곳 없음(테스트 이름 제외). 수동 체크: 확인 못 함(브라우저 저니 미실행).",
+      "completed_at": "2026-11-06T12:23:08+0900"
+    },
+    {
+      "step": 5,
+      "name": "restore-josa",
+      "status": "completed",
+      "started_at": "2026-11-06T12:23:37+0900",
+      "summary": "backend/llm/pseudonym.py에 _PARTICLES(이에요/예요, 으로/로, 이/가, 은/는, 을/를, 과/와, 긴 것 먼저), has_final_consonant(word)->bool|None, fix_particle(name, following) 추가하고 restore(시그니처·호출처 그대로)가 id를 이름으로 바꾼 뒤 바로 뒤(공백 없이)의 조사를 이름 받침에 맞게 고친다(조사 다음이 한글·영숫자면 그대로, '으로'는 ㄹ 받침 뒤 '로'). 받침 표는 lib/wording.ts josa와 같다(끝 ” \" ’ ' ) 」 』 ] 공백 건너뜀, 숫자 0·3·6 받침·1·7·8 ㄹ, 영문 L·R ㄹ·M·N 받침). explainer의 text·제안 title·description, translator의 source_text·clarification_question·unsupported_reason이 모두 restore를 지나 같은 혜택을 받는다. pseudonymize·prompts·explainer·translator·requirements 무변경. test_pseudonym.py 테스트 5개 추가, 옛 버그를 기대하던 기대값 4곳 갱신(test_pseudonym test_restore '이영희는'·'라마바와', test_llm_explainer '이영희와', test_routes '이영희가'). eval 영향 없음 확인: eval/run.py는 source_text를 비교에서 뺀다(_DUMP_EXCLUDE), 실행하지 않음. 결정: 받침을 판단 못 하는 이름 끝 글자(기호 등)면 TS josa처럼 '받침 없음'으로 보지 않고 조사를 그대로 둔다(LLM이 쓴 것 유지). 결정: '은요'처럼 조사 뒤에 한글이 이어지면 고치지 않는다.",
+      "completed_at": "2026-11-06T12:27:13+0900"
+    },
+    {
+      "step": 6,
+      "name": "availability-drag-lib",
+      "status": "completed",
+      "summary": "lib/availability.ts: applyDrag(base, dates: string[], start, end)가 dates × [min..max] 직사각형을 칠하거나 지운다(지우기 판정은 base의 시작 칸 (dates[0], start) 하나로만, 섞여 있어도 전부 칠하거나 전부 지움), copyDay(cells, from, to: string[])가 from 날의 칠한 칸을 to 날들에 합집합으로 더한다(새 Set 반환, 원본 불변). AvailabilityForm은 호출만 [date]로 바꿔 화면 동작은 그대로(열 하나). slotsFromCells·cellsFromSlots·제출 형식·DB 함수 무변경. availability.test.ts: 기존 applyDrag 4개를 새 시그니처로 옮기고 applyDrag 5개(열 셋 칠하기, 지우기 일부 칠함 포함, 섞여도 칠하기, 뒤집힌 순서, 시작 열 기준 판정) + copyDay 3개 추가. 결정: dates의 순서는 판정에만 쓰이고(dates[0]이 시작 열) 칠하는 범위는 순서와 무관하다. 결정: copyDay는 시간 칸(0..SLOT_COUNT-1)을 그대로 옮기며 from 날의 구간 사이 빈칸은 to에서 지우지 않는다.",
+      "started_at": "2026-11-06T12:27:45+0900",
+      "completed_at": "2026-11-06T12:30:06+0900"
+    },
+    {
+      "step": 7,
+      "name": "availability-drag-ui",
+      "status": "completed",
+      "started_at": "2026-11-06T12:30:34+0900",
+      "summary": "components/AvailabilityForm.tsx Calendar: 드래그 상태를 {base,startDate,start}로 바꾸고 moveDrag(col,slot)가 이번 주 shown 안에서 시작 열~지금 열(순서 무관) 날짜로 applyDrag를 불러 열을 건너 직사각형을 칠하거나 지운다. dragSpan은 {fromCol,toCol,start,end}이고 그림자 span이 gridColumn '{시작열+2} / {끝열+3}'로 여러 열을 덮는다. [이전 주]/[다음 주]는 goPage로 드래그 상태를 버린다. 키보드 토글(detail 0)·한 칸 클릭·window mouseup 종료·칸 button의 aria-pressed/aria-label·submitAvailability·제출 형식 무변경, store 미사용. PaintedSummary에 onCopy prop: 구간이 있는 날 줄 오른쪽(ml-auto)에 Text 버튼 [모든 날에 복사](ui.textSm, aria-label '{M}월 {D}일 칠한 시간을 모든 날에 복사')가 생기고 copyDay(cells, 그날, 기간 전체 날짜)로 바꾼 뒤 status idle. 잠기면(locked) onCopy를 넘기지 않아 버튼 없음, 구간 없는 날도 없음. 오른쪽 안내 묶음 맨 위에 새 줄 '여러 날을 가로질러 드래그하면 한 번에 칠해져요'(잠긴 뒤 없음). 아래 고정 줄 합계는 기간 전체 그대로. e2e 영향: S7의 dragCells는 같은 열 드래그라 dates=[그 날짜]로 전과 같게 통한다. 오른쪽 카드 줄에 '모든 날에 복사' 버튼이 생겨 텍스트 검사에 걸리면 맞춘다. 새 시나리오 줄(열 건너 드래그, 모든 날에 복사)은 마지막 step이 더할지 정한다. 결정: applyDrag의 칠하기/지우기 판정이 dates[0]이라 시작 열을 dates 맨 앞에 둔다. 결정: 복사 버튼이 h-8이라 카드 줄 높이가 늘지만 aside가 overflow-y-auto라 그대로 둔다. 결정: 복사 뒤 '복사했어요' 피드백 없음(칸이 바로 칠해짐). 수동 체크: 확인 못 함(브라우저 저니 미실행).",
+      "completed_at": "2026-11-06T12:33:35+0900"
+    },
+    {
+      "step": 8,
+      "name": "notices",
+      "status": "completed",
+      "started_at": "2026-11-06T12:34:02+0900",
+      "summary": "lib/wording.ts ruleQuote(rule, siblings, config, employees, period): 폼 규칙(source_text=COVERAGE_SOURCE_TEXT)은 해석 문장만, 같은 source_text가 siblings에 둘 이상이면 '“원문” (해석 문장)', 아니면 '“원문”'. ConstraintCard 충돌 경고가 ruleQuote(conflict, shop.rules, …)를 쓰고 JSX 따옴표를 빼 '기존 규칙 {quote}{josa(quote,과,와)} 함께 지킬 수 없어요'(예: 기존 규칙 “매일 오픈, 미들, 마감 각각 1명씩” (매일 미들 1명)과 함께 지킬 수 없어요, 폼 규칙은 따옴표 없이 '기존 규칙 평일마다 오픈 1~2명과 …'). lib/availability.ts unsubmittedCause(conflictIds, submittedIds, activeIds): 활성 0명 false, 활성 중 제출 0명 true, 아니면 충돌의 avail- id에서 마지막 '-' 앞을 직원 id로 뽑아 하나 이상이고 모두 미제출이면 true. 테스트 wording 3개·availability 7개 추가. ScheduleStep: unsubmittedFor(shop, period, conflicts)(status=confirmed면 false라 확정 근무표 화면은 늘 기존 패널)를 useSolve와 ScheduleBody가 함께 쓴다. useSolve는 해 없음이고 미제출 원인이면 explain을 부르지 않는다(explaining false). OutcomePanel에 unsubmitted·noneSubmitted·onGoAvailability props: unsubmitted면 제목('이 조건으로는 근무표를 만들 수 없어요')·배지 아래에 '아직 가능 시간을 제출한 직원이 없어요. ①에서 링크를 보내고 제출을 기다려 주세요'(제출 0명) 또는 '{이름, 이름}의 가능 시간이 아직 없어요. 제출을 기다리거나 ①에서 확인해 주세요'(걸린 직원만 미제출)와 Text 버튼 [① 가능 시간으로](go period step 1)만 보이고, 분석 중·제안·함께 지킬 수 없는 규칙·가능 시간도 함께 걸려 있어요·원인 못 찾음 목록·왜 만들 수 없나요?를 숨긴다(끄기 버튼 없음). 미제출이 아니면 패널 순서 그대로. ConfirmedPeriod 제목 줄 '마지막 확정 {시각} · 직원 링크는 잠겼어요. 직원은 같은 링크에서 근무표를 봐요'. 문구 훑기: components/ShopHome.tsx 지난·다가오는 근무표 표의 열 머리 '기간' → '날짜'로 고침. 그 밖 components/에 없음(app/page.tsx '만든 방식'의 '다시 풀어'와 개인정보처리방침의 '보관 위치와 기간'·'해석'은 기술 설명·법적 문서라 그대로). backend 무변경. e2e 영향: S10·S18은 모두 제출한 상태라 미제출 안내가 뜨지 않아 기존 패널 그대로. 충돌 경고 인용 꼴과 확정 화면 문장(S12 3 '직원 링크는 잠겼어요'는 부분 일치면 통과)이 바뀜. 결정: 이름 목록은 병합된 가능 시간 충돌의 source_text에서 얻는다('…의'라 조사 변형 없음). 결정: 제출자 판정은 활성 직원만 센다(비활성 직원의 제출은 무시). 결정: UI_GUIDE 지난 근무표 표의 열 이름 '기간'은 문서 수정을 마지막 step에 맡긴다. 수동 체크: 확인 못 함(브라우저 저니 미실행).",
+      "completed_at": "2026-11-06T12:38:44+0900"
+    },
+    {
+      "step": 9,
+      "name": "e2e-sync",
+      "status": "completed",
+      "started_at": "2026-11-06T12:39:13+0900",
+      "summary": "e2e 20개 통과(S19 추가). 첫 실행 실패는 S9·S3의 ③ 만들기 전 문장(문구 변화) 2개뿐. 고친 spec: journey S9-b(만들기 전 요약 정규식 '제출 12/12명 · 반드시 n개 · 가능하면 n개'), S3(정확히 '제출 12/12명 · 반드시 12개 · 가능하면 5개 · 지난 근무 7일 이어받아요'), S7(안내 줄, 열 건넘 드래그 11/3 09:00→11/5 11:30 +18칸과 되돌리기, [11월 5일 칠한 시간을 모든 날에 복사] +60칸 뒤 지우기 드래그로 34칸 복귀), S8-a(요약표 아래 한 줄, 오픈 평일 '1~2명'·마감 주말 '3명'), S11(고정 버튼 이름 정규식 '{code}(으)?로 고정'), S12('직원은 같은 링크에서 근무표를 봐요'), 새 S19(다음 근무표 11/9~ 제출 0명 → 안내 문장, 패널 버튼은 [① 가능 시간으로] 하나, 끄기·함께 지킬 수 없는 규칙·왜 만들 수 없나요? 없음, /explain 요청 0, 눌러 ① 복귀); structure S15(12/15~1/14 '공휴일 2일'·저장 holidays [11,18], 12/20로 미룬 뒤 [6,13]). test-helpers·fixtures·playwright.config 무변경. 앱 코드 수정 없음. 고친 문서: BROWSER_TEST_SCENARIOS(S3-b 12·S7 7-1~7-5·S8-a 6·S9-b 1·S11 4·S12 3·S15 6/9/검증, S19 추가, 테스트 데이터 '공휴일' 절, 진행 순서·파일 목록), UI_GUIDE(① 공휴일 자동·도움말, ② 요약표 합산 규칙, ③ 만들기 전 요약 한 줄, 해 없음 미제출 분기, 캘린더 직사각형 드래그·[모든 날에 복사]·안내 세 줄, 확정 화면 문장, 충돌 경고 인용 꼴, 지난 근무표 표 열 '기간'→'날짜'), PRD(J2 ① 공휴일, ② 요약표, ③ 만들기 전, 직원 드래그·복사, J8 미제출 분기, MVP 제외에 폰 터치 드래그), ARCHITECTURE(lib/holidays.ts, 가명화 복원 조사), ADR-024 추가, README 사용 1번에 드래그·복사·공휴일 한 줄. record-dining.ts·record-demo.ts는 바뀐 문장·셀렉터를 쓰지 않아 무변경. 영상(public/demo.mp4) 재녹화 필요(③ 만들기 전 문장·확정 화면 문장 변경, 녹화 주에 공휴일이 들면 자동 체크됨). 결정: S19는 journey 흐름 끝(S13 뒤)에 두어 필요 인원 기본 규칙이 있는 매장의 다음 근무표로 근무표 없음을 만든다. 결정: 실행 시 사용자의 npm run dev(:3000, E2E 플래그 없음)를 멈추고 Playwright가 서버를 띄우게 했다(문서 절차). 재검증: 앞선 AC 실패는 E2E 플래그 없이 12:47에 다시 뜬 npm run dev(:3000·:8000)를 Playwright가 재사용해 loginAsTestUser가 막힌 환경 문제였다. 그 서버를 멈추고 tsc·lint·test(pytest 811, vitest 472)·build·test:e2e(20 passed) 모두 통과. 코드 변경 없음.",
+      "completed_at": "2026-11-06T12:55:59+0900"
+    }
+  ],
+  "created_at": "2026-11-06T12:07:36+0900",
+  "completed_at": "2026-11-06T12:58:21+0900"
+}

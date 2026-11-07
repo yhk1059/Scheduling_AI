@@ -1,0 +1,136 @@
+{
+  "project": "nurse-scheduler",
+  "phase": "1-mvp",
+  "steps": [
+    {
+      "step": 0,
+      "name": "domain-schema",
+      "status": "completed",
+      "started_at": "2026-10-26T19:14:29+0900",
+      "summary": "backend/domain/constants.py(상한·시간·가중치), backend/domain/models.py(Nurse, Period, 템플릿 12개 ConstraintSpec discriminated union, ScheduleRequest 참조 무결성, ScheduleResult, SolveResponse/TranslateRequest·Response/ExplainRequest·Response, ErrorBody), backend/gen_types.py → lib/types.gen.ts(npm run gen:types), 샘플 lib/samples/ward-15.json(15명·2026-11·daily_coverage 6개), 테스트 backend/tests/test_domain.py·test_gen_types.py",
+      "completed_at": "2026-10-26T19:18:03+0900"
+    },
+    {
+      "step": 1,
+      "name": "solver-hard",
+      "status": "completed",
+      "started_at": "2026-10-26T19:18:06+0900",
+      "summary": "backend/solver/model.py(ModelContext·build_model·solve: 기본 제약, enabled hard 제약마다 리터럴+OnlyEnforceIf, AddAssumptions, ok/infeasible(conflicts=[])/timeout), backend/solver/hard.py(템플릿 1~9 add_<type>, ADDERS, 이월 상수와 대상 월을 잇는 연속 계열 검사), 테스트 backend/tests/test_solver_hard.py(22개)",
+      "completed_at": "2026-10-26T19:21:05+0900"
+    },
+    {
+      "step": 2,
+      "name": "solver-soft-stats",
+      "status": "completed",
+      "started_at": "2026-10-26T19:21:06+0900",
+      "summary": "backend/solver/soft.py(템플릿 10~12 페널티, soft 토글된 1~7은 위반량 비례 페널티, 연속 계열은 hard.CLAUSE_TEMPLATES 절 재사용), backend/solver/stats.py(순수 함수 compute_result·is_weekend·preference_days: D/E/N/O·주말근무·최대연속·희망반영률·편차, summary, soft_violations), solve()는 objective_terms 최소화 + hard 리터럴을 add_bool_and로 고정해 풂(assumptions는 presolve를 막아 LP 하한이 약함 → step 3 충돌 분석에서 별도 사용), constants.FAIRNESS_TOLERANCE, 테스트 backend/tests/test_solver_soft_stats.py(19개, 15명×31일 성능 0.3초 OPTIMAL)",
+      "completed_at": "2026-10-26T19:29:35+0900"
+    },
+    {
+      "step": 3,
+      "name": "solver-conflicts",
+      "status": "completed",
+      "started_at": "2026-10-26T19:29:36+0900",
+      "summary": "backend/solver/conflicts.py(find_conflicts: build_model의 hard_literals를 assumptions로 걸어 sufficient_assumptions_for_infeasibility로 core → CONFLICT_TIME_LIMIT_S 안에서 deletion 기반 축소(순서 유지) → Conflict(constraint_id,type,source_text), 판정 못하면 None, 지연 import로 순환 회피), solve()는 INFEASIBLE이면 find_conflicts 호출(None이면 []), 테스트 backend/tests/test_solver_conflicts.py(10개: 휴가 과다×주말 coverage, 고정 칸끼리, 고정+forbidden_sequence, 나이트 전담 D 고정, disabled 제외, None 경로, 시간 예산), test_solver_hard의 임시 단언(conflicts==[])을 새 계약으로 갱신",
+      "completed_at": "2026-10-26T19:31:44+0900"
+    },
+    {
+      "step": 4,
+      "name": "solver-reschedule",
+      "status": "completed",
+      "started_at": "2026-10-26T19:31:45+0900",
+      "summary": "previous가 있으면 build_model이 공통 nurse_id×날짜(stats.common_cells: 새/빠진 간호사·범위 밖 날짜 무시)의 이전 근무와 다른 칸마다 constants.DIFF_WEIGHT(20, soft 가중치 최대 10보다 큼) 페널티를 objective_terms에 추가, compute_result가 ScheduleResult.diff(DiffCell 목록, previous 없으면 None)를 채움, 별도 솔버 경로 없음(고정은 fixed_assignment), 테스트 backend/tests/test_solver_reschedule.py(5개: diff None, 동일 재풀이 diff 0, 병가 3일 → 6칸 변경, 고정 칸 수정, 명단 추가)",
+      "completed_at": "2026-10-26T19:33:14+0900"
+    },
+    {
+      "step": 5,
+      "name": "llm-translator",
+      "status": "completed",
+      "started_at": "2026-10-26T19:33:16+0900",
+      "summary": "backend/env.py(load_local_env: KEY=VALUE·주석·따옴표, 기존 env 보존), backend/llm/client.py(LLMClient Protocol·ToolCallResult·AnthropicClient: ANTHROPIC_MODEL/DEFAULT_MODEL, tool_choice 강제, max_tokens·timeout, 401/403→LLMConfigError, 429/5xx/529/timeout/연결→LLMUnavailableError, LLMInvalidOutputError 정의), backend/llm/pseudonym.py(성명·유일 이름(2자 이상)→nurse.id, 긴 것부터, restore는 id 경계 매칭), backend/llm/prompts.py(TRANSLATE_SYSTEM, TRANSLATE_TOOL submit_constraints: ConstraintSpec 멤버에서 create_model로 만든 Draft union(type·hardness?·params·source_text) + clarification_question·unsupported_reason, discriminator/title 제거), backend/llm/translator.py(translate: 가명 처리+context(가명 명단·월·주말/공휴일·오늘) → 검증(TranslatorOutput, ConstraintSpec, 참조 무결성) → 실패 시 assistant/user 턴으로 오류 전달해 최대 LLM_MAX_RETRIES회 재시도 → 참조 오류면 Clarify, 아니면 LLMInvalidOutputError; id uuid8·scope·enabled, weight soft=DEFAULT_SOFT_WEIGHTS(없으면 DEFAULT_WEIGHT)/hard=1, source_text·질문 이름 복원), 테스트 test_env.py(3)·test_pseudonym.py(7)·test_llm_translator.py(26, mock 클라이언트·실제 SDK 예외 클래스)",
+      "completed_at": "2026-10-26T19:37:14+0900"
+    },
+    {
+      "step": 6,
+      "name": "llm-explainer",
+      "status": "completed",
+      "started_at": "2026-10-26T19:37:16+0900",
+      "summary": "backend/llm/prompts.py(EXPLAIN_SYSTEM: 원문 기반 2~4문장 설명, conflicts id만 참조, fixed_assignment는 disable, leave는 마지막 수단, update는 같은 템플릿 params만; EXPLAIN_TOOL submit_explanation: ExplainerOutput(text, proposals[ProposalDraft(title, description, changes[ConstraintChange])])에서 생성), backend/llm/explainer.py(explain: 충돌 제약(id·type·hardness·params·가명 source_text)+병동 요약(인원·월·주말/공휴일) → 스키마 위반·tool 없음·max_tokens면 최대 LLM_MAX_RETRIES회 재시도 후 LLMInvalidOutputError → conflicts 밖 id 참조·템플릿/참조 무결성 실패·빈 update 제안 제거, update params는 원 params와 병합해 전체 값으로 정규화 → MAX_PROPOSALS로 자름, text·title·description 이름 복원, 솔버 import 없음; fallback_explanation: source_text 나열 또는 빈 conflicts 안내), 테스트 test_llm_explainer.py(16, mock 클라이언트)",
+      "completed_at": "2026-10-26T19:39:16+0900"
+    },
+    {
+      "step": 7,
+      "name": "api-routes",
+      "status": "completed",
+      "started_at": "2026-10-26T19:39:18+0900",
+      "summary": "backend/routes.py(health·/solve·/translate·/explain, 모든 응답 input_version 반환, get_llm_client 의존성 주입, lifespan에서 load_local_env; 본문은 의존성 _body에서 413 상한(nurses·constraints·text, context/request 중첩 포함)을 Pydantic보다 먼저 검사 후 검증해 LLM 키 확인보다 먼저 판정; /explain 오케스트레이션: explain 실패(Invalid/Unavailable)면 fallback_explanation+fallback=True, 제안마다 changes 적용(disable→enabled=False, update→params/hardness 재검증) 후 solve(time_limit=min(PROPOSAL_VERIFY_TIME_LIMIT_S, 남은 예산), analyze_conflicts=False)로 SolveOk만 verified_summary 채워 남김, 총 예산 3초×MAX_PROPOSALS 초과 시 중단; http 미들웨어 하나에서 ApiError/ValidationError/LLM 예외→ErrorBody(413·422·502·503·500 CONFIG_ERROR/INTERNAL, request_id uuid4, 스택은 logger만) 변환과 stdout JSON 한 줄 로그(request_id·path·status·duration_ms, LLM이면 _MeteredClient로 llm_retries·input/output_tokens, 원문·이름·키 없음)), solver.model.solve에 analyze_conflicts 인자 추가(제안 검증에서 충돌 분석 생략), 0-spike(solver/demo.py, solve-demo, test_spike.py) 삭제, 테스트 test_routes.py(27개)·test_solver_conflicts 1개 추가",
+      "completed_at": "2026-10-26T19:43:53+0900"
+    },
+    {
+      "step": 8,
+      "name": "eval-harness",
+      "status": "completed",
+      "started_at": "2026-10-26T19:43:58+0900",
+      "summary": "eval/dataset.jsonl 44개(ward 규칙 16: 템플릿 1~7·11·12, 복합 문장 4·구어/오타 포함 / hard·soft 판정 4 / month 요청 17: 휴가·고정·희망/기피, '15~17일'·'다음 주 수요일'·'3주차'·'이번 주 목~토'·'매주 금요일'·'주말마다'·'마지막 날'·이름만 호칭 / clarify 4: 명단 밖·모호·대상 월 밖·날짜 없음 / unsupported 3, 모두 ward-15 샘플 2026-11, 일부 holidays 덮어쓰기), eval/run.py(--dry-run: ConstraintSpec+ScheduleRequest 참조 무결성·id 중복·status/scope/today·ok↔constraints 일관성 검증, 실패 시 exit 1; 실행 모드: load_local_env→키 없으면 exit 2→AnthropicClient로 translate, 미터 래퍼로 재시도·토큰 측정(translator 무변경); 채점: type·hardness·params(Pydantic 기본값 채움, 리스트 정렬) 다중집합 매칭; 지표: 스키마 유효율·status 정확도·제약 P/R/F1(micro)·완전 일치율·clarify/unsupported 정확도·평균 재시도·평균/p95 지연·토큰 합계 → eval/results.md(지표 표, 실패 케이스 기대 vs 실제, 실행 시각, 모델)), 테스트 backend/tests/test_eval_runner.py(22개: 채점·데이터셋 검증·mock 2케이스 집계·results.md·CLI exit 0/2)",
+      "completed_at": "2026-10-26T19:47:51+0900"
+    },
+    {
+      "step": 9,
+      "name": "eval-run",
+      "status": "completed",
+      "started_at": "2026-10-26T19:47:54+0900",
+      "summary": "실제 Claude API(claude-sonnet-5-5)로 eval 전체 3회 실행: 1회차 전부 400(모델이 강제 tool_choice 거절) → backend/llm/client.py tool_choice를 auto+disable_parallel_tool_use로 바꿔(test_llm_translator 단언 먼저 갱신) 2회차 F1 97.9%·완전 일치 97.7%(m16 '데이만'에 E/N 기피 추가) → prompts.py에 'X만은 X 희망 하나만' 지시 추가 후 3회차 최종 제약 F1 100%·완전 일치율 100%·status 정확도 100%, eval/results.md 상단 실행 이력 표, dataset expected 무변경, pytest 208 통과",
+      "completed_at": "2026-10-26T19:53:09+0900"
+    },
+    {
+      "step": 10,
+      "name": "ui-shell-ward",
+      "status": "completed",
+      "started_at": "2026-10-26T19:53:11+0900",
+      "summary": "vitest 3.2.7(v4/v5는 npm arborist 버그·@types/node 피어 충돌로 설치 불가)·zustand 추가, test 스크립트에 vitest run 연결; app/layout.tsx·globals.css: IBM Plex Sans KR/Mono(next/font), 라이트 전용 배경·텍스트, 다크 미디어쿼리 제거; lib/roster-import.ts(parseDelimited 탭 우선/쉼표·RFC 4180, mapHeaders 동의어, buildRoster: 연차 숫자 추출·나이트 전담 정규화·동명이인 행 오류·0명/40명 초과 표 오류·id n01~, parseCarryOver: 명단 밖 경고·코드 동의어·셀 오류·마지막 7일, CellError{row,col,message}) + test 21개; lib/store.ts(createAppStore(getStorage, now)+useAppStore: persist 키 nurse-scheduler·version 1, 입력 액션마다 inputVersion+1(setPeriod는 공휴일 비움), applyCard는 type·scope·대상(nurse_id/shift·day_kind/금지 순서 first·second) 같으면 교체, setCoverage→daily_coverage cov-{day_kind}-{shift}, orphanConstraintIds, loadSample, 버전 불일치·파싱 실패·모양 손상→초기 상태+resetNotice, localStorage 접근/쓰기 예외→메모리+storageAvailable=false) + test 16개; lib/api.ts(translate/solve/explain, inputVersion 자동 첨부, ApiError{code,message,requestId}·NETWORK, errorMessage 코드별 문구); app/app/page.tsx(next/dynamic ssr:false로 AppShell 클라이언트 전용 렌더), components/: ui.ts(UI_GUIDE 클래스), AppShell(상단 바·스테퍼·저장소/초기화 배너, 2~4단계는 준비 중 자리표시), Stepper, WardStep(대상 월·샘플·붙여넣기 [변환]·[다음] 게이트), RosterEditor(열 매핑·첫 행도 데이터·편집 표·오류 셀 빨강·행 추가/삭제, 오류 없을 때만 store 반영), CoverageForm(D/E/N×평일/주말 min/max, 최소>최대 오류), HolidayCalendar; app/page.tsx는 /app 링크 임시 페이지; 수동 저니(Playwright·시스템 Chrome) 확인",
+      "completed_at": "2026-10-26T20:02:46+0900"
+    },
+    {
+      "step": 11,
+      "name": "ui-rules-requests",
+      "status": "completed",
+      "started_at": "2026-10-26T20:02:52+0900",
+      "summary": "lib/store.ts에 findReplaced(같은 type·scope·대상의 기존 제약)·updateCard(대기 카드는 inputVersion 유지, 적용된 제약은 +1, hardness 변경 시 weight를 translator 규칙(soft=템플릿 기본값/hard=1)으로 맞춤, 휴가·고정은 항상 hard)·removeCard 추가 + test 6개(vitest 42); components/RulesStep.tsx(scope ward/month 공용: 자연어 입력 바·1000자 초과 시 비활성+글자 수, [해석]→api.translate(context nurses·period·holidays·today), '해석 중…'+스피너, ok→pendingCards, clarify 질문·unsupported 안내, 오류 토스트+[다시 시도], 대기/적용 카드 그리드(cov-* 제외), ③ 전월 이월 붙여넣기(parseCarryOver 경고·셀 오류, 비우기), [이전]/[다음], ④ 진입 시 고아 제약 있으면 차단 안내, 미적용 카드 안내); components/ConstraintCard.tsx(템플릿 한국어 이름, hard/soft 토글(aria-pressed, 휴가·고정 비활성), 원문 인용, mono 해석 결과(예 'n03 이영희 · 11/15~11/17 · O'), 적용 대기/적용됨 배지, 대기: 삭제·적용 / 적용됨: 수정·삭제, '기존 규칙 대체', 명단 밖 nurse_id 경고 SVG, 수정 폼(숫자·날짜 목록 '15-17, 20'·근무 코드 select·희망/기피·주말만) 검증 후 저장); ui.ts에 h-8 버튼·배지 클래스; AppShell 2·3단계 연결; 수동 저니(Playwright·시스템 Chrome, 실제 API 1회 200, 나머지 mock): 1000자 비활성·503 토스트·다시 시도·적용·수정 bump·대체 표시·고아 차단·clarify/unsupported·이월 오류 확인",
+      "completed_at": "2026-10-26T20:08:10+0900"
+    },
+    {
+      "step": 12,
+      "name": "ui-schedule",
+      "status": "completed",
+      "started_at": "2026-10-26T20:08:16+0900",
+      "summary": "lib/csv.ts(toScheduleCsv: BOM·CRLF, 1행 이름·연차·요일(공휴일은 '수(공휴일)')·D/E/N/O·주말근무, 2행 날짜, 간호사 행 근무+stats 합계, 하단 D/E/N 날짜별 합계, RFC 4180 이스케이프, '= + - @' 앞 ' 접두) + csv.test.ts 8개(31일 달 포함); lib/store.ts에 Code 타입·setResult(버전 유지)·setFixed(같은 칸 기존 고정(번역 포함) 교체, id fix-{nurse}-{day}, source_text '수동 고정: 이름 11/5 D', bump)·clearFixed·confirm(result.assignments→confirmed) + test 4개(vitest 54); components/ScheduleStep.tsx(④: [생성]=api.solve(store 전체, previous는 확정본 있을 때만), '푸는 중…'+스피너, 응답 input_version 불일치면 버림, 오류 배너+다시 시도, infeasible '해가 없습니다'/timeout '시간 안에 풀지 못했습니다' 표시(마지막 해 유지), 요약 지표(해 상태·최적 아닐 수 있음·확정됨 배지, 희망 반영 n/m, soft 위반 주의색, 이전 대비 변경 칸), 근무표 그리드(150/44/30px×일/34px×4 inline gridTemplateColumns, overflow-x-auto, 일·공휴일 빨강/토 청록 헤더, 주말 열 배경, 셀 button aria-label '{이름} {월}월 {일}일 {코드}', 자물쇠 SVG, diff 칸 inset #D97706, soft 위반 칸 주의색 점+title, 개인별 D/E/N/O 합계·하단 날짜별 D/E/N 합계), 셀 클릭→D/E/N/O 고정·고정 해제·취소 편집 바 → setFixed 후 현재 결과를 previous로 자동 재풀이, 개인별 통계 표(주말·공휴일·최대 연속·희망 반영률·편차), [확정]·[CSV 다운로드](근무표-YYYY-MM.csv)); RulesStep Spinner export, AppShell 4단계 연결; 수동 저니(Playwright·시스템 Chrome, LLM 미사용): 생성·셀 30×28px·고정 후 재풀이(변경 2칸, 자물쇠)·고정 해제 버튼·확정·CSV(BOM, 20행)·infeasible/timeout(mock) 확인",
+      "completed_at": "2026-10-26T20:13:37+0900"
+    },
+    {
+      "step": 13,
+      "name": "ui-conflicts-changes",
+      "status": "completed",
+      "started_at": "2026-10-26T20:13:44+0900",
+      "summary": "lib/store.ts에 resultVersion(setResult 시점 inputVersion, persist)·setEnabled(bump)·applyChanges(disable→enabled=false, update→params·hardness 교체(weight 규칙 유지), 한 번 bump) + test 3개(vitest 57); components/ScheduleStep.tsx: infeasible이면 자동 api.explain('원인을 분석하는 중…'), 해 없음 패널(border #E8B4AE·해 없음/시간 초과 배지, 설명 텍스트, fallback이면 '자동 설명을 만들지 못해 충돌 규칙만 표시합니다', verified_summary 있는 제안만 제안 카드(검증됨 배지·'재풀이 결과 · 해 있음 · 희망 반영 n/m'·[무시]·[수락]→applyChanges 후 자동 재풀이), 충돌 규칙 목록(원문·해석·[이번 달만 끄기]→enabled=false 후 재풀이, 제안 0개·fallback에도 표시), conflicts 비었거나 timeout이면 안내 + hard 제약 전체 끄기/다시 켜기 토글); 확정본 있으면 월중 변경 입력 바(translate scope month → ConstraintCard 대기 카드, onApplied로 previous=확정본 재풀이), 확정본 이후 모든 재풀이(셀 고정 포함)는 previous=확정본, '확정본 대비 n명, m칸 변경' 배너(#FDF0DC/#F1D3A8)·diff 칸 하이라이트·'초안' 배지, [확정]으로 교체; stale: 표시 중인 결과/패널 버전≠inputVersion이면 '입력이 바뀌었어요. 다시 생성하세요' 배지 + [다시 생성]; solve·explain·translate 오류는 api.ts 문구 토스트 + [다시 시도](자동 재시도 없음), 요청 중 생성·확정·CSV·셀·수락·끄기·적용 비활성; ConstraintCard에 onApplied·busy prop, RulesStep today export; 수동 저니(Playwright·시스템 Chrome): 실제 API explain 1회(휴가 8건 → 설명+검증된 제안 3개 → 수락 → 해결)·translate 1회(최지훈 병가 → 적용 → 2명 2칸 변경 하이라이트·초안 → 확정), mock으로 503 토스트→다시 시도·fallback 문구·미검증 제안 숨김·이번 달만 끄기 해결·빈 conflicts/timeout 끄기 목록·stale 배지·500 토스트 자동 재시도 없음·요청 중 비활성 확인",
+      "completed_at": "2026-10-26T20:20:48+0900"
+    },
+    {
+      "step": 14,
+      "name": "ui-landing",
+      "status": "completed",
+      "started_at": "2026-10-26T20:20:54+0900",
+      "summary": "app/page.tsx 정적 랜딩(API 호출 없음, ○ static): 첫 화면 좌측 텍스트(랜딩 h1·가치 제안·[데모 시작] Primary h-11→/app·GitHub Secondary)+우측 components/LandingPreview.tsx(client, inert: 기존 ConstraintCard 2개(N-OFF·숙련도 믹스)와 ScheduleStep의 ScheduleGrid(export로 변경)를 ward-15 앞 5명×11/1~7 샘플로 정적 렌더, 자물쇠 1칸), 섹션 py-[72px] border-t·mono 청록 머리말: 01 문제(PRD 페인 포인트 4개)·02 동작 방식(3단계)·03 데모(빌드 시점 existsSync(public/demo.gif)면 이미지, 없으면 '데모 영상 준비 중' 상자)·04 설계 요약(LLM 번역·설명/CP-SAT 계산/검증 장치 + eval/results.md 3회차 값 그대로: 44개·스키마 유효율·status·F1·완전 일치 100.0%·재시도 0.00·지연 1.95/2.76초·실행 이력), 푸터 GitHub 링크(상단 상수 REPO_URL=https://github.com/jha0313/harness_framework 한 곳); 안티패턴 grep 0건, 수동 확인(Playwright: 렌더·콘솔 오류 0·/api/py 요청 0·[데모 시작]→/app); build·lint·vitest 57·pytest 208 통과",
+      "completed_at": "2026-10-26T20:23:39+0900"
+    },
+    {
+      "step": 15,
+      "name": "readme",
+      "status": "completed",
+      "started_at": "2026-10-26T20:23:45+0900",
+      "summary": "README.md(한국어 포트폴리오): 한 줄 소개·<!-- DEMO_URL --> 자리표시, 페르소나·페인 포인트 4개, 데모 GIF 주석 자리표시(docs/demo.gif·public/demo.gif)·데모 저니 8단계, mermaid 아키텍처 다이어그램+데이터 흐름·역할 분리(번역/계산/설명), ADR 6개(001·002·003·004·005·009) 한 줄씩 docs/ADR.md 링크, LLM 출력 검증 장치 6가지, eval/results.md 지표 표 그대로+데이터셋 구성·회차 요약, harness(phase/step·execute.py AC 재검증·재시도 3회·feat/chore 커밋·TDD 가드·위험 명령 차단·Stop 훅·step summary) 소개, 로컬 실행(uv 3.12·npm·.env.local·dev/test/build/lint·eval run/--dry-run·gen:types), MVP 범위 밖; 코드 무변경, build·lint·pytest·vitest 57 통과",
+      "completed_at": "2026-10-26T20:25:25+0900"
+    }
+  ],
+  "created_at": "2026-10-26T19:14:29+0900",
+  "completed_at": "2026-10-26T20:25:31+0900"
+}

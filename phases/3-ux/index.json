@@ -1,0 +1,80 @@
+{
+  "project": "nurse-scheduler",
+  "phase": "3-ux",
+  "steps": [
+    {
+      "step": 0,
+      "name": "sample-schedules",
+      "status": "completed",
+      "started_at": "2026-10-29T01:04:58+0900",
+      "summary": "lib/samples/ward-15.json에 병동 규칙 6개(off_after_night_block 1·max_consecutive_work 5·max_consecutive_nights 3·min_days_off 8 hard, night/weekend_fairness soft — 규칙 값 조정 없이 28개 모두 최적해)와 next_requests 3개(이영희 10~12 휴가, 박민수 주말 N 기피, 정유진 20일 D 희망) 추가; backend/gen_sample.py(npm run gen:sample: 달 모양 28개 L-W마다 실제 1일 날짜 탐색(윤년 2월 위해 2026~2059) → solve(deterministic=True) → 최적해 아니면 실패) → lib/samples/confirmed-schedules.json(109,331 bytes, 압축 JSON, 두 번 생성 동일, 생성 약 7초); solve()에 deterministic 옵션(num_workers=1, random_seed=0) 추가; backend/tests/test_sample_schedules.py(28키·형태·나이트 전담 휴무≥8·연속 근무≤5·전 칸 fixed_assignment 재풀이로 hard 규칙 검증·결정성); 기존 테스트는 sample_data() 헬퍼로 next_requests를 빼고 읽게 수정; Python 의존성 추가 없음, solver↔llm import 없음; pytest 411·vitest 150·build·lint 통과",
+      "completed_at": "2026-10-29T01:09:10+0900"
+    },
+    {
+      "step": 1,
+      "name": "guest-confirm",
+      "status": "completed",
+      "started_at": "2026-10-29T01:09:28+0900",
+      "summary": "store에서 PendingAfterLogin·pendingAfterLogin·requireLogin과 signedIn 업로드 뒤 대기 동작 실행을 제거(STORAGE_VERSION 4 유지, isData는 옛 필드 허용, persist merge·서버 문서 로드는 persisted()로 Data 필드만 취해 옛 pendingAfterLogin을 버림); Account.tsx의 LoginRequiredDialog·useNeedsLogin·useGoogleLogin before 인자 제거, ScheduleStep 확정·WardHome 다음 기간 만들기는 게스트도 바로 동작(CSV만 받기 안내 제거), StartScreen 로그인 카드는 supabaseConfigured && auth===null로 그대로 표시; store.test.ts에 게스트 확정(버전 1개·remote 미호출)·게스트 다음 기간(이월 계산)·옛 필드 localStorage/서버 문서 호환 테스트 추가; pytest 411·vitest 150·build·lint 통과",
+      "completed_at": "2026-10-29T01:11:39+0900"
+    },
+    {
+      "step": 2,
+      "name": "wording-lib",
+      "status": "completed",
+      "started_at": "2026-10-29T01:11:51+0900",
+      "summary": "lib/wording.ts 추가(순수 함수: scheduleName·unitName·unitShort·TEMPLATE_NAMES·hardnessLabel·dayRanges·describeParams·wardRuleCount·formatDeviation·NextTask/nextTask) — describeParams는 이름·M/D·데이/이브닝/나이트/휴무로 쓰고 내부 id·코드 표기·≤≥를 쓰지 않으며 명단 밖은 \"(명단에 없는 간호사)\", nextTask는 store homeSummary를 감싸고 \"없음\" 이름은 store에서 추출한 upcomingRange(createPeriod도 이것을 사용)로 계산; ConstraintCard의 TEMPLATE_NAMES·describeParams·dayRanges·formatDays·nurseLabel을 wording으로 옮기고 ConstraintCard·ScheduleStep은 import만 교체(카드 문구가 새 문구로 바뀌어 e2e S4 등 카드 제목 기대값은 step 8에서 갱신 필요); lib/wording.test.ts 20개(월 경계 주 단위 이름, 반올림·0·− 기호, 필요 인원 제외, nextTask 4상태·운영 중 다음 근무표); pytest 411·vitest 170·build·lint 통과",
+      "completed_at": "2026-10-29T01:14:24+0900"
+    },
+    {
+      "step": 3,
+      "name": "sample-store",
+      "status": "completed",
+      "started_at": "2026-10-29T01:14:35+0900",
+      "summary": "lib/sample.ts buildSample(today, makeId) 추가(순수 함수: 오늘이 속한 달은 confirmed-schedules.json의 \"{길이}-{1일 요일(월=0)}\" 확정본으로 status confirmed·versions 1개(시작 전날 18:00 KST)·snapshot·carryOverUsed [], 다음 달은 next_requests 3개가 적용된 초안, 병동은 샘플 병동·달력 월·15명 활성·필요 인원+규칙 6개·isSample); store loadSample은 buildSample(id p-sample-N)로 바꾸고 view를 home으로(옛 다음 달 기간 하나만 만들던 코드와 SAMPLE_WARD_NAME·ward-15 import 제거), StartScreen의 중복 go(home) 제거; lib/sample.test.ts 8개(2026-10-28→31-3 10월 확정+11월 초안, 2027-02-15→28-0 2월, 1일 당일 운영 중, isOperating, 요청 날짜 범위, carry_over=확정본 마지막 7일·history_load 비어 있지 않음, homeSummary·nextTask \"운영 중 10월 + 작성 중 11월\", wardRuleCount 6), store.test.ts loadSample 기대값 갱신·createPeriod가 샘플 초안을 여는 테스트 추가; 샘플 로드 시 네트워크 호출 0건(Playwright 수동 확인, 생성 시 이월·최근 4주 근거 표시), STORAGE_VERSION 4 유지; pytest 411·vitest 179·build·lint 통과",
+      "completed_at": "2026-10-29T01:17:06+0900"
+    },
+    {
+      "step": 4,
+      "name": "ui-rules-settings",
+      "status": "completed",
+      "started_at": "2026-10-29T01:17:17+0900",
+      "summary": "규칙·요청 카드와 병동 설정 문구 정리: ConstraintCard 토글 반드시/가능하면(hardnessLabel, group aria-label '반드시/가능하면'), 해석 결과 본문 글꼴, 배지 '이번 근무표에서 꺼짐'·버튼 [이번 근무표에서만 끄기], 수정 폼 근무 선택 데이/이브닝/나이트/휴무·'근무표 전체'; RulesStep [규칙 만들기]/[요청 만들기]·'읽는 중…', 병동 규칙 예시 Text 버튼 3개, 대기 2개 이상이면 [모두 적용] Secondary, 토스트 대신 입력 바 아래 role=alert+[다시 시도], '이 근무표에 적용되는 병동 규칙 N개'(wardRuleCount); 카드 순서 유지: Ward·WorkPeriod에 선택 필드 cardOrder(새 카드 id 앞에) + 순수 함수 cardsInOrder(pending, applied, order)로 대기·적용 카드를 한 목록에 그려 적용해도 제자리(옛 저장본은 대기→적용 순, STORAGE_VERSION 4 유지), store.test.ts 3개 먼저 추가; WardSettings '근무표 주기'(unitName, 한 달/1주/2주/4주)·변경 배너 '근무표부터…최소 휴무 일수', '바꾼 내용은 바로 저장돼요', 제외 배지·'제외된 간호사 N명 보기'·[근무표에서 빼기]/[다시 넣기]+'빼도 지난 근무표와 통계에는 남아요', [삭제]는 isNurseUsed=false인 간호사의 ⋯ 메뉴('{이름} 더 보기', Esc·바깥 클릭으로 닫힘)에만, [표로 만들기], [첫 근무표 만들기]; e2e의 'hard/soft' group·'이번 기간만 끄기'·'해석'·'변환'·'비활성으로'·'첫 기간 만들기' 기대값은 step 8에서 갱신 필요(ScheduleStep의 끄기 문구는 step 5·6 범위라 그대로); pytest 411·vitest 182·build·lint·AC grep 통과, Playwright 수동 확인(샘플 요청 2개 해석→모두 적용 후 순서 동일, 샘플 간호사 ⋯ 메뉴 없음, 새 간호사 메뉴 삭제 동작)",
+      "completed_at": "2026-10-29T01:21:27+0900"
+    },
+    {
+      "step": 5,
+      "name": "ui-period-schedule",
+      "status": "completed",
+      "started_at": "2026-10-29T01:21:38+0900",
+      "summary": "기간 작업·근무표 화면 문구와 버튼 정리: PeriodWork 제목을 scheduleName('11월 근무표')+mono 날짜 범위+작성 중/확정/운영 중 배지로, ① 준비는 '날짜'·'명단 확인'(간호사 N명 · 지난 근무표 이후 a명 추가 · b명 제외 / 지난 근무표와 명단이 같아요 + 추가·제외 이름 + [병동 설정]), 지난 확정본이 있으면 '지난 근무 마지막 며칠' 읽기 전용 표(UI_GUIDE 보조 문구), 없으면 접힌 [지난 근무 입력하기 (선택)] → 붙여넣기+예시 한 줄+[표로 만들기](이미 반영된 값이 있으면 펼친 채), 이월 변경 배너 '지난 근무표가 바뀌어 이어지는 근무가 달라졌어요. 다시 만들면 반영돼요'; ScheduleStep 버튼을 상태별 Primary 하나로(만들기 전 [근무표 만들기]+설명 한 줄만·칸 고정 안내는 근무표 생긴 뒤, 작성 중 [확정] Primary·[다시 만들기] Secondary·[CSV 받기] Text, 확정 후 변경 없음 [CSV 받기] Secondary만, 변경 있음 [다시 확정] Primary·[CSV 받기] Text, '만드는 중…', 확정 상태 재풀이 중엔 role=status 진행 표시), 게스트 확정 배너(auth null일 때 [확정]/[다시 확정] 직후, '확정했어요. 이 브라우저에만 저장돼 있어요'+LoginButton(supabaseConfigured일 때만), 닫기 없음), 요약 지표 결과(규칙을 모두 지켰어요/근무표 없음)·희망 반영+보조 한 줄·못 지킨 규칙·확정본에서 바뀐 칸, 그리드·통계 '최근 4주 나이트/주말' 열은 history가 비거나 모두 0이면 숨김(LandingPreview도 자동으로 숨김), '나이트 전담', 통계 '평균보다 많은 근무일'(formatDeviation), 해 없음 패널 '규칙을 모두 지키는 근무표가 없어요'·'함께 지킬 수 없는 규칙'·[이번 근무표에서만 끄기], 제안 카드 '이렇게 바꾸면 근무표를 만들 수 있어요 · 희망 반영 x/y', 근거 한 줄 '이번 근무표에서 나이트를 줄였어요', 운영 중 변경 바 [요청 만들기]/'읽는 중…'; e2e의 '생성'·'해 있음'·'확정됨'·'4주 N'·'이월 근무'·'해석' 등 기대값은 step 8에서 갱신 필요; pytest 411·vitest 182·build·lint·AC grep 통과, Playwright 수동 확인(샘플 11월 ③ 만들기→[확정] Primary·최근 4주 열·근거 표시→확정→게스트 배너, 운영 중 10월 지난 날짜 aria-disabled·CSV Secondary, 빈 병동 첫 근무표는 최근 4주 열 없음, 콘솔 오류 0)",
+      "completed_at": "2026-10-29T01:26:46+0900"
+    },
+    {
+      "step": 6,
+      "name": "ui-home-start",
+      "status": "completed",
+      "started_at": "2026-10-29T01:26:56+0900",
+      "summary": "병동 홈 재구성: 제목 줄(병동 이름 + '간호사 N명 · 병동 규칙 N개(wardRuleCount) · 한 달 단위(unitShort)' + [병동 설정] Text) → 운영 중 카드(scheduleName·운영 중 배지·mono 날짜·'마지막 확정 M/D HH:MM'·[열기] Secondary) → 지금 할 일 카드(nextTask: 이름+mono 범위, 표시 전용 진행 단계 준비→요청→근무표→확정 체크 SVG, 상태 문장 '첫 근무표를/{이름}를 만들 차례예요'·'요청 N개를 넣었어요. 아직…'·'근무표를 만들었어요. 확인하고 확정하세요'·'확정했어요 · M/D HH:MM', 버튼 하나 Primary [{이름} 만들기]/[이어서 하기]/[근무표 확인하기], 확정이면 [열기] Secondary+[{다음} 근무표 만들기] Primary) → 지난 근무표 표(확정분 중 운영 중·지금 할 일과 겹치는 근무표 제외, 열 근무표·확정 시각, 비면 '확정한 근무표가 여기에 쌓여요'), 병동 미준비 시 안내+[병동 설정 열기]; 옛 다음 기간 카드·최근 기간 표·하단 요약·StatusBadge 제거; StartScreen 로그인 카드 제거, 카드 2~3개(grid 열 수 맞춤) 아래 '로그인하면 다른 기기에서도 이어서 쓸 수 있어요.'+[개인정보처리방침](supabaseConfigured && 게스트일 때만), 샘플 문구 숫자는 ward-15.json에서 계산(간호사 15명·병동 규칙 6개), 이어서 하기 문구 '병동 홈/병동 설정/{11월 근무표} · 간호사 N명'; AppShell 상단 바 unitShort; Account 변경 없음(남은 대화상자: 샘플 저장·서버 우선·데이터 삭제); e2e S1·S2·S4-d·S10·S11·S13의 홈·시작 화면 기대값('다음 기간'·'이어서 작성'·'활성 15명'·'달력 월'·'명단 15명'·최근 기간 표 날짜 버튼)은 step 8에서 갱신 필요; pytest 411·vitest 182·build·lint·AC grep 통과, Playwright 수동 확인(시작 화면 로그인 카드 없음→샘플 홈 운영 중 10월+11월 요청 3개 [이어서 하기]→만들기 후 [근무표 확인하기]→확정 후 [12월 근무표 만들기] 유일 Primary, 빈 병동 안내, 콘솔 오류 0)",
+      "completed_at": "2026-10-29T01:30:07+0900"
+    },
+    {
+      "step": 7,
+      "name": "landing",
+      "status": "completed",
+      "started_at": "2026-10-29T01:30:18+0900",
+      "summary": "랜딩을 수간호사 문구로 재구성: 첫 화면 '말로 설명한 규칙으로 근무표를 짭니다'(주기 무관)+LLM·CP-SAT 없는 보조 문장+'…시작할 수 있어요', 문제 카드 6개(반복 사용: 지난 근무 이어받기·최근 4주 나이트 배려 포함, 재풀이·번역 용어 제거), 동작 방식 4단계(말로 규칙 적기→근무표 만들기→막히면 이유와 해결책→다음 근무표로 이어짐, 반드시/가능하면), 데모 자리표시 유지, 맨 아래 '04 · 만든 방식' 카드 하나(LLM은 말→규칙 카드·설명, CP-SAT는 계산 문단+eval 한 줄 44개·제약 F1 100.0% 3회차+[GitHub에서 자세히 보기]), 옛 설계 요약·eval 표 섹션 제거(README에 검증 장치·eval 표·회차 기록이 이미 있어 README 변경 없음); LandingPreview는 ConstraintCard가 빈 store에서 null이라 규칙 카드가 안 보이던 문제를 PreviewCard(TEMPLATE_NAMES·hardnessLabel·describeParams 재사용, 반드시/가능하면, 적용됨 배지)로 정적 렌더해 해결, 최근 4주 열은 기록이 없어 자동 숨김; pytest 411·vitest 182·build·lint·AC grep 통과, Playwright 수동 확인(API 호출 0·콘솔 오류 0, /app·/privacy·GitHub 링크)",
+      "completed_at": "2026-10-29T01:33:06+0900"
+    },
+    {
+      "step": 8,
+      "name": "e2e-ux",
+      "status": "completed",
+      "started_at": "2026-10-29T01:33:17+0900",
+      "summary": "docs/BROWSER_TEST_SCENARIOS.md를 게스트 모드·새 문구로 개정(S1 랜딩→앱, S2 시작 화면 카드 2개·로그인 카드 없음, S3 샘플 체험: 홈 10월 운영 중+11월 요청 3개→① 지난 근무 마지막 며칠=10월 확정본 마지막 7일→③ 근무표 만들기·최근 4주 열/근거·carry_over·history_load 검증→게스트 [확정] 배너→홈 [12월 근무표 만들기] 유일 Primary, S4 샘플 10월 운영 중 변경: 10/1~27 잠금→최지훈 10/28~30 병가→최소 변경 diff·하이라이트·[다시 확정] 버전 2→11월 '지난 근무표가 바뀌어…' 배너→다시 만들기로 새 carry_over, S5~S12 내 병동 데모 저니 1~7(근무표 주기·표로 만들기·근무표에서 빼기/다시 넣기, 규칙 3개·[모두 적용] 순서 유지, ① 공휴일·접힌 지난 근무 입력, ② 요청 2개, ③ 만들기(최근 4주 열 없음), 근무표 없음→제안 수락, 칸 고정, 확정), S13 새로고침 후 이어서 하기); e2e를 entry(S1·S2)·sample(S3·S4)·journey(S5~S13)+test-helpers.ts(근무표 읽기·반드시 규칙 검사·개발 용어 검사 hard/soft/해 있음/초안/이월/기간/생성/n0x 등)로 1:1 정리, LLM mock 없음·로그인 미자동화·npm run test/Stop 훅에 e2e 없음; 앱 버그 수정: 운영 중 근무표 지난 날짜 잠금(15명×27일=405개 고정 근무)이 제약 200개 상한에 걸려 /solve 413 → 고정 근무를 따로 MAX_FIXED_ASSIGNMENTS(40×31)로 세고 나머지는 200 유지(constants·routes, test_routes 2개 먼저 추가, ARCHITECTURE 413 행 갱신); npm run test:e2e 13/13 통과(첫 실행 S1 h1 줄바꿈 검증식·S4 413으로 실패→수정 후 재실행 통과, S10 분기 10-a 제안 수락, S8 홍길동은 clarify로 '확인 필요' 기록); pytest 413·vitest 182·build·lint·playwright --list 13개 통과",
+      "completed_at": "2026-10-29T01:48:33+0900"
+    }
+  ],
+  "created_at": "2026-10-29T01:04:58+0900",
+  "completed_at": "2026-10-29T01:48:44+0900"
+}

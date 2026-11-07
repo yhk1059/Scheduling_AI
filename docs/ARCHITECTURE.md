@@ -33,7 +33,7 @@ backend/              # FastAPI 앱 (무상태)
 eval/                 # dataset.jsonl, run.py, results.md
 e2e/                  # Playwright 데모 저니 (수동 실행, 실제 API, 테스트 전용 계정, ADR-013, ADR-020)
 supabase/migrations/  # shops 테이블 + RLS, availability_links·availability_shares 테이블 + 토큰 DB 함수(가능 시간, 확정 근무표) (ADR-014, ADR-020, ADR-021, ADR-023)
-scripts/              # seed.ts(수동 테스트 시드), record-dining.ts(데모 영상 녹화), record-demo.ts(이전 데모 영상) — 앱 코드를 두지 않음
+scripts/              # harness 전용 + seed.ts(수동 테스트 시드), record-dining.ts(데모 영상 녹화), record-demo.ts(이전 데모 영상) — 앱 코드를 두지 않음
 ```
 
 ## 패턴
