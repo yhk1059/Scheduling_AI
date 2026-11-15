@@ -159,7 +159,7 @@ POST /api/py/explain
   - `npm run gen:demo-shop`: 체험 문서 `lib/samples/demo-shop.json`을 다시 만든다. 백엔드(:8000)가 떠 있어야 하고 실제 LLM을 부른다.
 - 배포
   - Vercel 프로젝트 1개다. `/api/py/*`는 `api/index.py`로 리라이트된다.
-  - `.vercelignore`로 docs, phases, scripts, eval, tests, e2e를 제외한다.
+  - `.vercelignore`로 docs, scripts, eval, tests, e2e를 제외한다.
 - env
   - 서버: `ANTHROPIC_API_KEY`, `ANTHROPIC_MODEL`(기본값 `claude-sonnet-5-5`)
   - 클라이언트: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`. anon 키는 공개되어도 되고, 접근은 RLS로 막는다.
