@@ -588,8 +588,11 @@ export default function ScheduleStep() {
         busy={busy}
         outcomeAtGrid
         hint={
-          <p className="ml-auto max-w-[300px] text-right text-[13px] leading-relaxed text-[#3D3D38]">
-            칸을 누르면 바꿀 수 있어요. <InlineLock /> 고정한 칸은 다시 만들 때 그대로 둬요
+          <p className="ml-auto text-right text-[13px] leading-relaxed text-[#3D3D38]">
+            <span className="block whitespace-nowrap">칸을 누르면 바꿀 수 있어요.</span>
+            <span className="block whitespace-nowrap">
+              <InlineLock /> 고정한 칸은 다시 만들 때 그대로 둬요
+            </span>
           </p>
         }
         actions={
