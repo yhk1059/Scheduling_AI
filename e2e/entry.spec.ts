@@ -75,7 +75,7 @@ test("S1-b. 앱을 로그인 없이 열면 로그인 화면", async ({ page }) =
   await expect(login).toHaveClass(/bg-\[#155E75\]/);
   await expect(page.getByRole("button", { name: "데모 영상" })).toHaveCount(0);
   await expect(page.getByRole("link", { name: "개인정보처리방침" })).toBeVisible();
-  await expect(page.getByRole("link", { name: "샘플 매장으로 먼저 체험하기" })).toHaveAttribute("href", "/demo");
+  await expect(page.getByRole("link", { name: "샘플 매장으로 먼저 체험하기" })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "근무표", exact: true })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "매장 설정", exact: true })).toHaveCount(0);
   await expectNoDevTerms(page, "로그인 화면");
