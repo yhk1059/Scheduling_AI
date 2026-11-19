@@ -1,7 +1,5 @@
 "use client";
 
-import Link from "next/link";
-
 import { supabaseConfigured } from "@/lib/supabase";
 
 import { LoginButton, PrivacyLink } from "./Account";
@@ -43,22 +41,15 @@ export default function LoginScreen() {
       <section className={`${ui.cardXl} flex flex-col gap-4 px-9 pt-9 pb-7`}>
         <div className="flex flex-col gap-1">
           <h1 className={ui.sectionTitle}>로그인</h1>
-          {supabaseConfigured ? (
-            <p className="text-sm leading-relaxed text-[#3D3D38]">Google 계정으로만 로그인할 수 있어요</p>
-          ) : (
-            <p className="text-sm leading-relaxed text-[#3D3D38]">로그인 설정이 필요해요</p>
-          )}
+          {!supabaseConfigured && <p className="text-sm leading-relaxed text-[#3D3D38]">로그인 설정이 필요해요</p>}
         </div>
         {supabaseConfigured && <LoginButton className={`${ui.primaryXl} w-full justify-center`} />}
         {supabaseConfigured && (
           <p className="text-xs leading-relaxed text-[#66665E]">
             내 매장과 근무표는 서버에 저장되고, 언제든 직접 지울 수 있어요.
-            <PrivacyLink className="ml-1 rounded-sm underline underline-offset-2 hover:text-[#1B1B18]" />
+            <PrivacyLink className="ml-1 rounded-sm whitespace-nowrap underline underline-offset-2 hover:text-[#1B1B18]" />
           </p>
         )}
-        <Link href="/demo" className={`${ui.textSm} -ml-2 self-start`}>
-          샘플 매장으로 먼저 체험하기
-        </Link>
       </section>
     </div>
   );
