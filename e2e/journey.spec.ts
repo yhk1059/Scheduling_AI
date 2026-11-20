@@ -687,9 +687,9 @@ test("S10. 근무표 없음 → 설명과 검증된 제안", async () => {
   const proposals = panel.locator("article").filter({ hasText: "검증됨" });
   if ((await proposals.count()) > 0) {
     const first = proposals.first();
-    await expect(first).toContainText(/이렇게 바꾸면 근무표를 만들 수 있어요 · 희망 반영 \d+\/\d+/);
+    await expect(first).toContainText(/검증됨 · 희망 반영 \d+\/\d+/);
     await expect(first).toContainText(/\S+ → \S+|이번 근무표에서만 끄기/);
-    await expect(first).toContainText("이번 근무표에만 적용돼요. 매장 조건은 그대로예요");
+    await expect(panel).toContainText("이번 근무표에만 적용돼요. 매장 조건은 그대로예요");
     await expect(first).not.toContainText("가능 시간");
     test.info().annotations.push({ type: "S10 분기", description: `8-a 제안 수락: ${await first.innerText()}` });
     expect(await solve(() => first.getByRole("button", { name: "수락" }).click())).toBe("ok");
