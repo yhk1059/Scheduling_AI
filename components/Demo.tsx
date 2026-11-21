@@ -49,9 +49,9 @@ export function DemoBar() {
   return (
     <div className="flex items-center gap-3">
       <span className={`${ui.badge} ${ui.badgeTone.draft}`}>체험 중</span>
-      <span className={ui.help}>저장되지 않아요</span>
+      <span className={`${ui.help} hidden sm:inline`}>저장되지 않아요</span>
       <span className="flex flex-col items-end gap-1">
-        <button type="button" onClick={() => void start()} disabled={busy} className={ui.primarySm}>
+        <button type="button" onClick={() => void start()} disabled={busy} className={`${ui.primarySm} whitespace-nowrap`}>
           {label}
         </button>
         {error && (

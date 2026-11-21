@@ -18,7 +18,7 @@ export const ui = {
   primarySm: `${btnSm} bg-[#111214] text-white border border-[#111214] hover:bg-[#2C2F35]`,
   secondarySm: `${btnSm} bg-[#F5F5F4] text-[#111214] border border-transparent hover:bg-[#EDEDEA]`,
   textSm: "inline-flex items-center gap-2 h-8 px-2 rounded-md text-[13px] font-medium text-[#4B4F57] transition-colors duration-[120ms] hover:bg-[#F5F5F4] hover:text-[#111214]",
-  badge: "inline-flex items-center h-6 px-2.5 rounded-full text-xs font-semibold",
+  badge: "inline-flex items-center h-6 px-2.5 rounded-full text-xs font-semibold whitespace-nowrap",
   danger: "inline-flex items-center h-8 px-2 rounded-md text-[13px] font-medium text-[#B42318] hover:bg-[#F5F5F4]",
   /** Primary 자리에 두는 Danger(데이터 삭제 확인). */
   dangerMd: `${btn} bg-white text-[#B42318] border border-[#DCDCD8] hover:bg-[#FEE4E2]`,

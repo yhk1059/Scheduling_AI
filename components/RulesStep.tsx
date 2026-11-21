@@ -296,7 +296,7 @@ export default function RulesStep({
             </button>
           </div>
         )}
-        <div className={scope === "period" ? "flex flex-col gap-3" : "grid grid-cols-2 gap-4"}>
+        <div className={scope === "period" ? "flex flex-col gap-3" : "grid grid-cols-1 gap-4 md:grid-cols-2"}>
           {items.map(({ id, cfg, entry }) =>
             cfg ? (
               <div key={id} className="flex flex-col gap-3">
@@ -332,7 +332,7 @@ export default function RulesStep({
   // ② 아래 예외 입력: 왼쪽 입력, 오른쪽 요청 카드를 패널 하나에 둔다
   if (scope === "period") {
     return (
-      <section className={`${ui.panel} grid grid-cols-[7fr_5fr] gap-6`}>
+      <section className={`${ui.panel} grid grid-cols-1 gap-6 md:grid-cols-[7fr_5fr]`}>
         <div className="flex min-w-0 flex-col gap-3">{input}</div>
         <div className="flex min-w-0 flex-col gap-3">
           {list}

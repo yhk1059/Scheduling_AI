@@ -67,7 +67,7 @@ export default function PeriodWork() {
             ← 근무표 목록
           </button>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
           <h1 className={ui.pageTitle}>{scheduleName(period, unit)}</h1>
           <span className="font-mono text-sm text-[#6B6F78]">{formatRange(period)}</span>
           <span className={`${ui.badge} ${ui.badgeTone.draft}`}>작성 중</span>

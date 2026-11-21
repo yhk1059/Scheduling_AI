@@ -19,6 +19,7 @@ import { dayHeader, isWeekendDay, monthDay, type PeriodRange } from "@/lib/perio
 import type { ConstraintSpec, Employee, RuleExample } from "@/lib/types.gen";
 import { describeRule, describeShiftChange, hardnessLabel, josa, presetName, ruleQuote } from "@/lib/wording";
 
+import Dialog from "./Dialog";
 import RuleText from "./RuleText";
 import { previewRange } from "./RulesStep";
 import { cellText, codeClass } from "./ScheduleStep";
@@ -338,6 +339,7 @@ export default function ConstraintCard({
   const [op, setOp] = useState<Comparison | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [showExamples, setShowExamples] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   // 매장 규칙은 매장에, 요청은 지금 기간에 반영한다
   const isRule = card.scope === "shop";
@@ -387,7 +389,7 @@ export default function ConstraintCard({
 
   return (
     <article className={`${CARD} ${compact ? "px-4! py-3.5!" : ""} ${pending ? "border-transparent bg-[#FDEAF4]!" : "border-[#EDEDEA]"}`}>
-      <div className="flex items-center justify-between gap-3">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <h3 className={compact ? "text-sm font-semibold text-[#111214]" : ui.cardTitle}>{presetName(card)}</h3>
         {/* 휴가 카드는 항상 반드시라 토글 대신 배지를 둔다 */}
         {isLeaveRule(card) ? (
@@ -461,7 +463,7 @@ export default function ConstraintCard({
         </p>
       )}
 
-      <div className="flex items-center justify-between gap-3">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2">
           {isDefault && <span className={`${ui.badge} bg-[#F5F5F4] text-[#4B4F57]`}>기본</span>}
           {off ? (
@@ -483,7 +485,7 @@ export default function ConstraintCard({
             </span>
           )}
         </div>
-        <div className="flex items-center gap-1">
+        <div className="flex flex-wrap items-center gap-1">
           {draft ? (
             <>
               <button
@@ -531,7 +533,7 @@ export default function ConstraintCard({
           ) : (
             <>
               {!isDefault && (
-                <button type="button" onClick={() => removeCard(card.id)} className={ui.danger}>
+                <button type="button" onClick={() => setConfirmDelete(true)} className={ui.danger}>
                   삭제
                 </button>
               )}
@@ -567,6 +569,23 @@ export default function ConstraintCard({
           )}
         </div>
       </div>
+      {confirmDelete && (
+        <Dialog
+          title={`${presetName(card)} 삭제`}
+          onClose={() => setConfirmDelete(false)}
+          secondary={{ label: "취소", onClick: () => setConfirmDelete(false) }}
+          primary={{
+            label: "삭제",
+            onClick: () => {
+              setConfirmDelete(false);
+              removeCard(card.id);
+            },
+          }}
+          danger
+        >
+          {isRule ? "이 규칙을 매장 조건에서 지울까요? 되돌릴 수 없어요." : "이 요청을 지울까요? 되돌릴 수 없어요."}
+        </Dialog>
+      )}
     </article>
   );
 }

@@ -117,6 +117,8 @@ button:not(:disabled) { cursor: pointer; }
 :focus-visible { outline: 2px solid #C4247C; outline-offset: 3px; }
 ::selection { background: #FDEAF4; color: #111214; }
 .landing section[id] { scroll-margin-top: 88px; }
+/* 앱 화면: 고정 헤더와 아래 단계 바가 키보드 포커스를 가리지 않게 스크롤 여백을 둔다 */
+html:has([data-app-shell]) { scroll-padding-top: 152px; scroll-padding-bottom: 104px; }
 .landing-hero { max-width: 1200px; margin: auto; border-inline: 1px solid #EDEDEA; }
 .hero-heading { isolation: isolate; position: relative; padding-top: 112px; padding-bottom: 64px; }
 .hero-heading::before { content: ""; position: absolute; inset: 0; z-index: -1; background-image: radial-gradient(#DCDCD8 1px, transparent 1px); background-size: 28px 28px; mask-image: radial-gradient(ellipse at 50% 20%, #000, transparent 70%); }

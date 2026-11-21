@@ -78,7 +78,7 @@ export function StepBar({ current, total, caption, children }: { current?: numbe
     <div className="sticky bottom-0 z-30 -mx-4 border-t border-[#EDEDEA] bg-white/85 px-4 py-3 backdrop-blur-md sm:-mx-6 sm:px-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         {current !== undefined && total !== undefined ? (
-          <div className="flex items-center gap-3">
+          <div className="hidden items-center gap-3 sm:flex">
             <div aria-hidden="true" className="h-1.5 w-24 overflow-hidden rounded-full bg-[#EDEDEA]">
               <div className="h-full rounded-full bg-[#111214]" style={{ width: `${(current / total) * 100}%` }} />
             </div>
@@ -92,7 +92,9 @@ export function StepBar({ current, total, caption, children }: { current?: numbe
         ) : (
           <div className="text-sm text-[#4B4F57]">{caption}</div>
         )}
-        <div className="flex flex-wrap items-center justify-end gap-3">{children}</div>
+        <div className="flex w-full flex-wrap items-center justify-end gap-2 sm:w-auto sm:gap-3 max-sm:[&_button]:px-3.5 max-sm:[&_p]:w-full max-sm:[&_p]:text-right">
+          {children}
+        </div>
       </div>
     </div>
   );

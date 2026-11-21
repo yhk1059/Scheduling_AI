@@ -5,8 +5,10 @@ import { useEffect, useRef, useState } from "react";
 import type { PeriodUnit } from "@/lib/period";
 import { MAX_EMPLOYEES } from "@/lib/roster-import";
 import { isEmployeeUsed, MAX_TAG_CHARS, MAX_TAGS_PER_EMPLOYEE, orphanConstraintIds, useAppStore, type ShopEmployee } from "@/lib/store";
+import { josa } from "@/lib/wording";
 
 import CoverageForm, { type CoverageDrafts } from "./CoverageForm";
+import Dialog from "./Dialog";
 import RulesStep from "./RulesStep";
 import ShiftTable from "./ShiftTable";
 import { ui } from "./ui";
@@ -534,6 +536,7 @@ function NewEmployeeRow({ employees }: { employees: ShopEmployee[] }) {
 /** 행 끝 ⋯ 메뉴. [삭제]는 근무표에 들어간 적 없는 직원에게만 둔다. */
 function RowMenu({ name, onDelete }: { name: string; onDelete: () => void }) {
   const [open, setOpen] = useState(false);
+  const [confirm, setConfirm] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (!open) return;
@@ -571,13 +574,30 @@ function RowMenu({ name, onDelete }: { name: string; onDelete: () => void }) {
             role="menuitem"
             onClick={() => {
               setOpen(false);
-              onDelete();
+              setConfirm(true);
             }}
             className={`${ui.danger} w-full whitespace-nowrap`}
           >
             삭제
           </button>
         </div>
+      )}
+      {confirm && (
+        <Dialog
+          title={`${name} 삭제`}
+          onClose={() => setConfirm(false)}
+          secondary={{ label: "취소", onClick: () => setConfirm(false) }}
+          primary={{
+            label: "삭제",
+            onClick: () => {
+              setConfirm(false);
+              onDelete();
+            },
+          }}
+          danger
+        >
+          {`${name}${josa(name, "을", "를")} 명단에서 지울까요? 되돌릴 수 없어요.`}
+        </Dialog>
       )}
     </div>
   );
