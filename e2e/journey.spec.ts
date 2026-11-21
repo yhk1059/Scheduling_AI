@@ -403,7 +403,7 @@ test("S8. ② 매장 조건", async () => {
   const numbers = page.getByRole("button", { name: "숫자로 입력하기" });
   await expect(numbers).toHaveAttribute("aria-expanded", "false");
   await numbers.click();
-  await expect(numbers).toHaveAttribute("aria-expanded", "true");
+  await expect(page.getByRole("button", { name: "숫자 입력 접기" })).toHaveAttribute("aria-expanded", "true");
   for (const [kind, shift, min, max] of COVERAGE) {
     await page.getByRole("textbox", { name: `${kind} ${shift} 최소 인원` }).fill(String(min));
     await page.getByRole("textbox", { name: `${kind} ${shift} 최대 인원` }).fill(String(max));

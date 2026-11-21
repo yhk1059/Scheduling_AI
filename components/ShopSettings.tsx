@@ -17,6 +17,7 @@ const TABS = [
   { tab: "shifts", label: "근무조" },
   { tab: "rules", label: "매장 조건" },
   { tab: "roster", label: "명단" },
+  { tab: "basic", label: "매장 정보" },
 ] as const;
 
 /** 근무표 주기 선택 카드: 이름과 짧은 설명. */
@@ -58,11 +59,10 @@ export default function ShopSettings() {
         </div>
       </div>
 
-      {tab === "roster" ? (
-        <>
-          <BasicSection />
-          <RosterSection />
-        </>
+      {tab === "basic" ? (
+        <BasicSection />
+      ) : tab === "roster" ? (
+        <RosterSection />
       ) : tab === "shifts" ? (
         <>
           <section className={`${ui.card} flex flex-col gap-3`}>
@@ -103,7 +103,7 @@ function UnconvertedNotice() {
   );
 }
 
-/** "기본" 영역: 매장 이름, 근무표 주기. 매장 준비에서도 쓴다. */
+/** "매장 정보" 영역: 매장 이름, 근무표 주기. 매장 준비에서도 쓴다. */
 export function BasicSection() {
   const shop = useAppStore((s) => s.shop)!;
   const setShopName = useAppStore((s) => s.setShopName);
@@ -114,7 +114,7 @@ export function BasicSection() {
 
   return (
     <section className={`${ui.card} flex flex-col gap-3`}>
-      <h2 className={ui.sectionTitle}>기본</h2>
+      <h2 className={ui.sectionTitle}>매장 정보</h2>
       <div className="flex flex-wrap items-end gap-4">
         <label className="flex flex-col gap-1">
           <span className={ui.label}>매장 이름</span>
@@ -232,7 +232,7 @@ export function CoverageSection({ collapsible = false }: { collapsible?: boolean
       <div className="flex items-center justify-between gap-3">
         <p className="text-sm text-[#4B4F57]">필요 인원을 숫자로 넣을 수도 있어요.</p>
         <button type="button" aria-expanded={open} onClick={() => setOpen((o) => !o)} className={ui.textSm}>
-          숫자로 입력하기
+          {open ? "숫자 입력 접기" : "숫자로 입력하기"}
         </button>
       </div>
       {open && body}

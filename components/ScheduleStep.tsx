@@ -1252,7 +1252,7 @@ function CellEditor({
             aria-describedby={outside ? outsideId : undefined}
             title={outside ? `${name} · 가능 시간 밖` : name}
             aria-pressed={fixed === code}
-            className={`${available ? "rounded-lg px-2 py-1.5" : CELL} ${codeClass(code, config)} ${outside ? "opacity-50" : ""} ${current === code ? "ring-1 ring-inset ring-[#111214]" : ""} hover:opacity-80 aria-pressed:outline-2 aria-pressed:outline-[#C4247C] aria-pressed:outline-offset-1`}
+            className={`${available ? "rounded-lg px-2 py-1.5" : CELL} ${codeClass(code, config)} ${outside ? "opacity-40 line-through" : ""} ${current === code ? "ring-1 ring-inset ring-[#111214]" : ""} hover:opacity-80 aria-pressed:outline-2 aria-pressed:outline-[#C4247C] aria-pressed:outline-offset-1`}
           >
             {available ? name : code}
           </button>
@@ -1264,7 +1264,7 @@ function CellEditor({
         </button>
       )}
       {available ? (
-        <p className={`${ui.help} w-full`}>근무를 누르면 이 칸을 고정하고 다시 만들어요. <span id={outsideId}>흐린 근무는 가능 시간 밖이에요.</span></p>
+        <p className={`${ui.help} w-full`}>근무를 누르면 이 칸을 고정하고 다시 만들어요. <span id={outsideId}>줄 그어진 근무는 가능 시간 밖이에요.</span></p>
       ) : (
         <button type="button" onClick={onCancel} className={ui.textSm}>취소</button>
       )}

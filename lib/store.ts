@@ -160,7 +160,7 @@ export type PeriodStep = 1 | 2 | 3;
 export type View =
   | { screen: "home" }
   | { screen: "setup" }
-  | { screen: "settings"; tab: "roster" | "shifts" | "rules" }
+  | { screen: "settings"; tab: "roster" | "shifts" | "rules" | "basic" }
   | { screen: "period"; periodId: string; step: PeriodStep }
   | { screen: "confirmed"; periodId: string };
 

@@ -313,6 +313,9 @@ function CoverageSummary({ period }: { period: WorkPeriod }) {
   return (
     <section className={`${ui.card} flex flex-col gap-3`}>
       <div className="flex flex-wrap items-start justify-between gap-3">
+        {open ? (
+          <h3 className={ui.cardTitle}>근무조 바꾸기</h3>
+        ) : (
         <table className="w-full border-collapse sm:w-auto">
           <thead>
             <tr className="border-b border-[#EDEDEA]">
@@ -335,11 +338,12 @@ function CoverageSummary({ period }: { period: WorkPeriod }) {
             ))}
           </tbody>
         </table>
+        )}
         <button type="button" aria-expanded={open} onClick={() => setOpen((o) => !o)} className={ui.textSm}>
           {open ? "접기" : "바꾸기"}
         </button>
       </div>
-      <p className={ui.help}>켜 둔 필수 인원 규칙을 한 표로 모았어요. 특정 날짜에만 적용되는 인원은 아래 카드에서 봐요</p>
+      {!open && <p className={ui.help}>켜 둔 필수 인원 규칙을 한 표로 모았어요. 특정 날짜에만 적용되는 인원은 아래 카드에서 봐요</p>}
       {open && <ShiftTable />}
     </section>
   );

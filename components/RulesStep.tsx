@@ -325,7 +325,7 @@ export default function RulesStep({
   const activeEmployees = shop.employees.filter((n) => n.active);
   const ruleList = step && selected && (
     <div className="flex min-w-0 flex-col gap-5">
-      {groups.map(({ title, rows }, group) => (
+      {groups.map(({ title, rows }, group) => (group === 0 && rows.length === 0 ? null : (
         <section key={title} aria-label={title} className="flex flex-col gap-2">
           <div className="flex flex-wrap items-center justify-between gap-1">
             <h3 className={ui.cardTitle}>
@@ -375,7 +375,7 @@ export default function RulesStep({
             })}
           </ul>
         </section>
-      ))}
+      )))}
     </div>
   );
 
