@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { availabilityRules, type AvailabilitySlots } from "./availability";
 import { dateOfDay } from "./period";
 import { DEFAULT_CONFIG } from "./rules";
-import { coverageShortages, withoutDays } from "./shortage";
+import { availabilityShortages, coverageShortages, withoutDays } from "./shortage";
 import { ruleShape } from "./rules";
 import type { ConstraintSpec } from "./types.gen";
 import { count } from "./test-rules";
@@ -57,6 +57,19 @@ describe("coverageShortages", () => {
   it("가능 시간으로 모두 채울 수 있으면 빈 배열이다(다른 규칙과 겹쳐서 막힌 경우)", () => {
     const rule = count({ people: { tags: ["홀"] }, shifts: { in: ["C"] }, per: "day", min: 1 }, { id: "hall" });
     expect(coverageShortages(["hall"], [rule, ...avail], employees, DEFAULT_CONFIG, period, [])).toEqual([]);
+  });
+});
+
+describe("availabilityShortages", () => {
+  it("만들기 전에 반드시 인원 규칙 모두를 가능 시간으로 센다", () => {
+    expect(availabilityShortages([kitchenLead(1), ...avail], employees, DEFAULT_CONFIG, period, [])).toEqual([
+      { constraintId: "lead", day: 2, code: "C", need: 1, names: [] },
+    ]);
+  });
+
+  it("가능하면 규칙은 모자라도 경고하지 않는다", () => {
+    const soft = { ...kitchenLead(1), hardness: "soft" } as ConstraintSpec;
+    expect(availabilityShortages([soft, ...avail], employees, DEFAULT_CONFIG, period, [])).toEqual([]);
   });
 });
 

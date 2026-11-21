@@ -65,6 +65,18 @@ export function coverageShortages(
   });
 }
 
+/** ① 가능 시간에서 만들기 전에 보는 경고. 반드시 인원 규칙 모두를 지금 받은 가능 시간으로 센다(가능하면 규칙은 모자라도 근무표가 나온다). */
+export function availabilityShortages(
+  constraints: ConstraintSpec[],
+  employees: { id: string; name: string; tags?: string[] }[],
+  config: ShopConfig,
+  period: PeriodRange,
+  holidays: number[],
+): Shortage[] {
+  const hard = constraints.filter((c) => (c.hardness ?? "hard") === "hard").map((c) => c.id);
+  return coverageShortages(hard, constraints, employees, config, period, holidays);
+}
+
 /** 규칙이 고르던 날에서 drop을 뺀 수정본(그날만 예외). 날마다 세는 규칙(require)이 아니면 그대로 돌려준다. */
 export function withoutDays(c: ConstraintSpec, drop: number[], period: PeriodRange, holidays: number[]): ConstraintSpec {
   if (c.type !== "rule" || c.body.kind !== "require") return c;

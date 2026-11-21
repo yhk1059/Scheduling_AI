@@ -5,8 +5,10 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { carryOverFrom, previousConfirmedPeriod } from "@/lib/continuity";
 import { effectiveCoverage } from "@/lib/coverage-conflict";
 import { dateOfDay, dayHeader, formatRange, isWeekendDay, MAX_MONTH_START_DAY, monthDay, periodDays, periodEnd, validStart } from "@/lib/period";
+import { availabilityFromLinks } from "@/lib/availability";
 import { demoLinkRows } from "@/lib/demo";
 import { parseCarryOver, type CellError } from "@/lib/roster-import";
+import { availabilityShortages } from "@/lib/shortage";
 import { syncAvailabilityLinks, type AvailabilityLink } from "@/lib/supabase";
 import {
   carryOverChanged,
@@ -20,6 +22,7 @@ import {
   prepareNeedsReview,
   rosterChangesFor,
   tagCoverage,
+  toScheduleRequest,
   useAppStore,
   type WorkPeriod,
 } from "@/lib/store";
@@ -27,8 +30,8 @@ import { coverageText, presetName, scheduleName } from "@/lib/wording";
 
 import AvailabilityOverview from "./AvailabilityOverview";
 import HolidayCalendar from "./HolidayCalendar";
-import RulesStep from "./RulesStep";
-import ScheduleStep, { CELL, cellText, codeClass, DayHead } from "./ScheduleStep";
+import RulesStep, { today } from "./RulesStep";
+import ScheduleStep, { CELL, cellText, codeClass, DayHead, ShortageLines } from "./ScheduleStep";
 import Stepper, { StepBar } from "./Stepper";
 import ShiftTable from "./ShiftTable";
 import { CoverageSection } from "./ShopSettings";
@@ -97,6 +100,28 @@ export default function PeriodWork() {
   );
 }
 
+/** ① 미리 경고: 지금 받은 가능 시간만으로 반드시 인원 규칙을 채울 수 없는 날. 솔버를 부르지 않는다. 미제출 직원은 언제든 나올 수 있다고 본다. */
+function AvailabilityWarning({ period, rows }: { period: WorkPeriod; rows: AvailabilityLink[] }) {
+  const shop = useAppStore((s) => s.shop);
+  const periods = useAppStore((s) => s.periods);
+  if (!shop) return null;
+  const availability = availabilityFromLinks(rows);
+  const req = toScheduleRequest(shop, { ...period, availability }, periods, today());
+  const shortages = availabilityShortages(req.constraints ?? [], req.employees, shop.config, period, req.holidays ?? []);
+  if (!shortages.length) return null;
+  const unsubmitted = req.employees.some((n) => !availability[n.id]);
+  return (
+    <section aria-label="가능 시간 미리 확인" className="flex flex-col gap-2 rounded-2xl border border-[#FECDCA] bg-white px-[18px] py-4">
+      <h3 className={ui.cardTitle}>지금 받은 가능 시간으로는 사람이 모자란 날이 있어요</h3>
+      <p className={ui.help}>
+        이대로면 근무표를 만들 수 없어요. 그날 나올 수 있는 직원에게 다시 물어보거나, ② 매장 조건에서 필요 인원을 바꿔 주세요.
+        {unsubmitted && " 아직 내지 않은 직원은 언제든 나올 수 있다고 보고 셌어요."}
+      </p>
+      <ShortageLines shortages={shortages} config={shop.config} period={period} />
+    </section>
+  );
+}
+
 /** 체험의 가능 시간 행에 붙이는 제출 시각. 화면에는 보이지 않는다. */
 const DEMO_SUBMITTED_AT = "2026-11-01T00:00:00.000Z";
 
@@ -132,14 +157,17 @@ function LinksSection({ period }: { period: WorkPeriod }) {
 
   const layout = (rows: AvailabilityLink[] | null, submission: ReactNode) =>
     shop && (
-      <AvailabilityOverview
-        period={period}
-        employees={employees}
-        rows={rows}
-        config={shop.config}
-        preparation={<PrepareSummary period={period} />}
-        submission={submission}
-      />
+      <>
+        <AvailabilityOverview
+          period={period}
+          employees={employees}
+          rows={rows}
+          config={shop.config}
+          preparation={<PrepareSummary period={period} />}
+          submission={submission}
+        />
+        {rows && <AvailabilityWarning period={period} rows={rows} />}
+      </>
     );
 
   if (demo) {

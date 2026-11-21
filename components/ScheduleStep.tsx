@@ -1069,7 +1069,7 @@ export function OutcomePanel({
 const WEEKDAY_SHORT = ["일", "월", "화", "수", "목", "금", "토"]; // 0=일
 
 /** 인원 규칙이 가능 시간으로 모자란 날. 근무조·필요 인원·들어올 수 있는 사람이 같은 날은 한 줄로 묶고 [그날만 빼고 만들기]를 둔다. */
-function ShortageLines({
+export function ShortageLines({
   shortages,
   config,
   period,
@@ -1079,8 +1079,9 @@ function ShortageLines({
   shortages: Shortage[];
   config: ShopConfig;
   period: Period;
-  busy: boolean;
-  onExcept: (days: number[]) => void;
+  busy?: boolean;
+  /** 없으면 [빼고 만들기] 버튼 없이 줄만 보여 준다(① 가능 시간의 미리 경고) */
+  onExcept?: (days: number[]) => void;
 }) {
   if (!shortages.length) return null;
   const days = periodDays(period);
@@ -1101,15 +1102,17 @@ function ShortageLines({
             <span>
               {when} {shift}: {who} · {need}명 필요
             </span>
-            <button
-              type="button"
-              disabled={busy}
-              onClick={() => onExcept(group.map((s) => s.day))}
-              title="그날만 이 규칙 없이 다시 만들어요. 매장 조건은 그대로예요"
-              className={ui.secondarySm}
-            >
-              {group.length === 1 ? `${when}만 빼고 만들기` : `이 ${group.length}일만 빼고 만들기`}
-            </button>
+            {onExcept && (
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => onExcept(group.map((s) => s.day))}
+                title="그날만 이 규칙 없이 다시 만들어요. 매장 조건은 그대로예요"
+                className={ui.secondarySm}
+              >
+                {group.length === 1 ? `${when}만 빼고 만들기` : `이 ${group.length}일만 빼고 만들기`}
+              </button>
+            )}
           </li>
         );
       })}
