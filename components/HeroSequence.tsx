@@ -230,7 +230,7 @@ export default function HeroSequence() {
       </div>
 
       <div className="flex items-center justify-between gap-3">
-        <p className={ui.help}>실제 화면이에요. A 오픈 · M 미들 · C 마감. 샘플 매장 12명 중 5명, 첫 주만 보여요.</p>
+        <p className={ui.help}>실제 화면이에요. A 오픈 · M 미들 · C 마감 · 빈칸 휴무. 샘플 매장 12명 중 5명, 첫 주만 보여요.</p>
         <button type="button" onClick={() => setRun((r) => r + 1)} className={`${ui.textSm} shrink-0`}>
           다시 보기
         </button>

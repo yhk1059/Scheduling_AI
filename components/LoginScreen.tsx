@@ -3,7 +3,7 @@
 import { supabaseConfigured } from "@/lib/supabase";
 
 import { LoginButton, PrivacyLink } from "./Account";
-import { CELL, codeClass } from "./ScheduleStep";
+import { CELL, cellText, codeClass } from "./ScheduleStep";
 import { ui } from "./ui";
 import Wordmark from "./Wordmark";
 
@@ -28,7 +28,7 @@ export default function LoginScreen() {
                 <span aria-hidden="true" className="flex gap-0.5">
                   {["A", "M", "C", "O"].map((code) => (
                     <span key={code} className={`${CELL} ${codeClass(code, false)}`}>
-                      {code}
+                      {cellText(code)}
                     </span>
                   ))}
                 </span>

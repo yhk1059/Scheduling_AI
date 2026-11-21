@@ -1396,9 +1396,10 @@ export function ScheduleGrid({
             {pdays.map(({ day: d, weekday: w }) => (
               <DayHead key={d} label={dayHeader(period, d)} weekday={w} holiday={holidays.includes(d)} weekend={isWeekend(d)} today={d === todayDay} />
             ))}
+            {/* 개수 열: 일하는 근무조는 범례의 글자, 휴무는 칸에 글자가 없어 이름으로 쓴다 */}
             {codes.map(({ code, name }) => (
-              <span key={code} title={name} className="flex items-end justify-center font-mono text-xs font-semibold text-[#6B6F78]">
-                {code}
+              <span key={code} title={name} className={`flex items-end justify-center text-xs font-semibold text-[#6B6F78] ${code === OFF_CODE ? "" : "font-mono"}`}>
+                {code === OFF_CODE ? name : code}
               </span>
             ))}
             {/* 누적 부담(최근 4주) */}
@@ -1534,8 +1535,8 @@ export function StatsTable({
             <tr className="border-b border-[#EDEDEA]">
               <th className={`${thBase} text-left`}>이름</th>
               {codes.map(({ code, name }) => (
-                <th key={code} title={name} className={`${th} font-mono`}>
-                  {code}
+                <th key={code} title={name} className={`${th} ${code === OFF_CODE ? "" : "font-mono"}`}>
+                  {code === OFF_CODE ? name : code}
                 </th>
               ))}
               <th className={th}>근무 시간</th>
