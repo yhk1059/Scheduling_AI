@@ -37,11 +37,12 @@ import type {
   ShopConfig,
 } from "@/lib/types.gen";
 import { statsFromAssignments } from "@/lib/stats";
-import { describeRule, formatDeviation, hardnessLabel, josa, presetName, scheduleInputsText } from "@/lib/wording";
+import { describeRule, formatDeviation, hardnessLabel, josa, presetName, type ScheduleInputs } from "@/lib/wording";
 
 import { DemoGateDialog } from "./Demo";
 import Dialog from "./Dialog";
 import { Spinner, today } from "./RulesStep";
+import { StepBar } from "./Stepper";
 import { ui } from "./ui";
 
 export const WEEKDAYS = ["일", "월", "화", "수", "목", "금", "토"];
@@ -316,7 +317,6 @@ export function ScheduleBody({
   summaryLead,
   gridNote,
   actions,
-  toolbar,
   outcomeAtGrid = false,
 }: {
   period: WorkPeriod;
@@ -329,10 +329,8 @@ export function ScheduleBody({
   summaryLead?: ReactNode;
   /** 근무표 제목 아래, 표 위에 놓을 한 줄 */
   gridNote?: ReactNode;
-  /** 근무표와 통계 사이의 버튼 줄 */
+  /** 맨 아래 버튼 줄(근무표 작성 ③의 고정 바) */
   actions?: ReactNode;
-  /** 위에 붙는 요약 줄의 오른쪽 버튼(근무표 작성 ③의 [CSV 받기]·[다시 만들기]·[확정]) */
-  toolbar?: ReactNode;
   outcomeAtGrid?: boolean;
 }) {
   const shop = useAppStore((s) => s.shop);
@@ -435,11 +433,7 @@ export function ScheduleBody({
 
       {result && (
         <>
-          {/* 요약과 버튼은 스크롤해도 위에 붙는다. 근무표를 보면서 바로 확정할 수 있게 */}
-          <div className="sticky top-0 z-10 -mx-4 sm:-mx-6 flex min-h-14 flex-wrap items-center gap-x-6 gap-y-2 border-b border-[#EDEDEA] bg-[#FFFFFF] px-4 sm:px-6 py-2.5">
-            <SummaryLine result={result} infeasible={outcome !== null} confirmed={isConfirmed} draft={isDraft} legacy={legacy} care={care} disabled={disabledRules} />
-            {toolbar && <div className="ml-auto flex items-center gap-2">{toolbar}</div>}
-          </div>
+          <SummaryLine result={result} infeasible={outcome !== null} confirmed={isConfirmed} draft={isDraft} legacy={legacy} care={care} disabled={disabledRules} />
           {summaryLead}
           {legacy && <p className="text-sm text-[#6B6F78]">변환 전에 확정한 근무표예요. 희망 반영과 못 지킨 규칙은 보여 주지 않아요.</p>}
           {evidence && <p className="text-sm text-[#4B4F57]">{evidence}</p>}
@@ -599,6 +593,8 @@ export default function ScheduleStep() {
 
       {sv.toast && <ToastAlert toast={sv.toast} busy={busy} onClose={() => sv.setToast(null)} />}
 
+      {!result && !sv.outcome && <ReadyCard inputs={scheduleInputs(shop, period, periods)} />}
+
       <ScheduleBody
         period={period}
         solve={sv}
@@ -612,53 +608,42 @@ export default function ScheduleStep() {
             </span>
           </p>
         }
-        toolbar={
-          result && (
-            <>
-              {blocked ? (
-                <p className={`${ui.help} mr-1`}>가능 시간이 바뀌어 다시 만들어야 확정할 수 있어요</p>
-              ) : (
-                outdated && <p className={`${ui.help} mr-1`}>지금 조건으로 만든 근무표만 확정할 수 있어요</p>
-              )}
-              <button type="button" onClick={() => downloadCsv(period, employees, result)} disabled={busy} className={ui.text}>
-                CSV 받기
-              </button>
-              <button type="button" onClick={sv.run} disabled={remake} className={ui.secondary}>
-                {loading && <Spinner />}
-                {loading ? "만드는 중…" : "다시 만들기"}
-              </button>
-              <button type="button" onClick={() => (demo ? void onConfirm() : setConfirmOpen(true))}
-                disabled={busy || blocked || outdated} className={ui.primaryLg}>
-                확정
-              </button>
-            </>
-          )
-        }
         actions={
-          <div className="flex items-center justify-between gap-3">
-            <button type="button" onClick={() => go({ screen: "period", periodId, step: 2 })} className={ui.secondary}>
+          <StepBar current={3} total={3} caption="근무표">
+            {result &&
+              (blocked ? (
+                <p className={ui.help}>가능 시간이 바뀌어 다시 만들어야 확정할 수 있어요</p>
+              ) : (
+                outdated && <p className={ui.help}>지금 조건으로 만든 근무표만 확정할 수 있어요</p>
+              ))}
+            <button type="button" onClick={() => go({ screen: "period", periodId, step: 2 })} className={ui.secondaryLg}>
               이전
             </button>
-            {!result ? (
-              <div className="flex items-center gap-3">
-                <p className="max-w-[420px] text-right text-sm leading-relaxed text-[#4B4F57]">
-                  {scheduleInputsText(scheduleInputs(shop, period, periods)).map((p, i) =>
-                    "value" in p ? (
-                      <span key={i} className="font-mono">
-                        {p.text}
-                      </span>
-                    ) : (
-                      p.text
-                    ),
-                  )}
-                </p>
-                <button type="button" onClick={sv.run} disabled={remake} className={ui.primaryLg}>
-                  {loading && <Spinner />}
-                  {loading ? "만드는 중…" : "근무표 만들기"}
+            {result ? (
+              <>
+                <button type="button" onClick={() => downloadCsv(period, employees, result)} disabled={busy} className={ui.text}>
+                  CSV 받기
                 </button>
-              </div>
-            ) : null}
-          </div>
+                <button type="button" onClick={sv.run} disabled={remake} className={ui.secondaryLg}>
+                  {loading && <Spinner />}
+                  {loading ? "만드는 중…" : "다시 만들기"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => (demo ? void onConfirm() : setConfirmOpen(true))}
+                  disabled={busy || blocked || outdated}
+                  className={ui.primaryLg}
+                >
+                  확정
+                </button>
+              </>
+            ) : (
+              <button type="button" onClick={sv.run} disabled={remake} className={ui.primaryLg}>
+                {loading && <Spinner />}
+                {loading ? "만드는 중…" : "근무표 만들기"}
+              </button>
+            )}
+          </StepBar>
         }
       />
 
@@ -691,6 +676,48 @@ export default function ScheduleStep() {
         </DemoGateDialog>
       )}
     </div>
+  );
+}
+
+/** ③ 만들기 전: 무엇으로 만드는지 확인하는 카드. 만들기 버튼은 아래 고정 바에 있다. */
+function ReadyCard({ inputs }: { inputs: ScheduleInputs }) {
+  const allIn = inputs.submitted === inputs.employees;
+  const checks = [
+    { ok: allIn, text: `제출 ${inputs.submitted}/${inputs.employees}명` },
+    { ok: true, text: `반드시 규칙 ${inputs.hard}개` },
+    { ok: true, text: `가능하면 규칙 ${inputs.soft}개` },
+    ...(inputs.disabled > 0 ? [{ ok: false, text: `이번 근무표에서 끈 규칙 ${inputs.disabled}개` }] : []),
+    ...(inputs.carryDays > 0 ? [{ ok: true, text: `지난 근무 ${inputs.carryDays}일 이어받음` }] : []),
+  ];
+  return (
+    <section aria-label="근무표 만들기 전 확인" className="flex flex-col gap-4 rounded-3xl border-[1.5px] border-[#2558F0] bg-[#F2F6FF] px-6 py-6">
+      <span className="inline-flex h-7 items-center gap-1.5 self-start rounded-full bg-[#2558F0] px-3 text-[13px] font-semibold text-white">
+        <svg aria-hidden="true" viewBox="0 0 24 24" className="size-3.5" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinejoin="round">
+          <path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.8l-5.2 2.8 1-5.8-4.3-4.1 5.9-.9z" />
+        </svg>
+        만들 준비
+      </span>
+      <div className="flex flex-col gap-1">
+        <p className="text-2xl font-bold tracking-[-0.03em] text-[#111214]">{allIn ? "근무표를 만들 차례예요" : "아직 안 낸 직원이 있어요"}</p>
+        <p className="text-[15px] text-[#4B4F57]">
+          {allIn ? "반드시 규칙을 모두 지키는 배치를 찾아요" : "기다리지 않고 지금 만들어도 돼요"}
+        </p>
+      </div>
+      <ul aria-label="만들 때 쓰는 것" className="flex flex-wrap items-center gap-2">
+        {checks.map((c) => (
+          <li key={c.text} className="inline-flex h-[34px] items-center gap-1.5 rounded-full bg-white px-3 text-[13.5px] font-medium text-[#111214]">
+            {c.ok ? (
+              <svg aria-hidden="true" viewBox="0 0 24 24" className="size-3.5" fill="none" stroke="#12B76A" strokeWidth={2.6} strokeLinecap="round" strokeLinejoin="round">
+                <path d="M5 12.5l4.5 4.5L19 7.5" />
+              </svg>
+            ) : (
+              <span aria-hidden="true" className="size-1.5 rounded-full bg-[#FF7A1A]" />
+            )}
+            {c.text}
+          </li>
+        ))}
+      </ul>
+    </section>
   );
 }
 
@@ -980,57 +1007,78 @@ function SummaryLine({
   disabled?: { name: string; text: string }[];
 }) {
   const { summary } = result;
-  const item = "flex items-baseline gap-1.5 text-sm text-[#6B6F78]";
-  const value = "font-mono text-[15px] font-semibold text-[#111214]";
+  const cell = "flex flex-col gap-0.5 border-r border-[#EDEDEA] px-4 py-1 last:border-r-0";
+  const label = "text-xs text-[#6B6F78]";
+  const value = "flex items-center gap-1.5 text-[15px] font-semibold text-[#111214]";
+  const dot = (color: string) => <span aria-hidden="true" className={`size-[7px] rounded-full ${color}`} />;
   return (
-    <div className="flex flex-wrap items-center gap-x-5 gap-y-1.5">
-        <span className="flex items-center gap-2">
-          {infeasible ? (
-            <span className={`${ui.badge} bg-[#FEE4E2] text-[#B42318]`}>근무표 없음</span>
-          ) : (
-            <span className={`${ui.badge} bg-[#DDF7E9] text-[#067647]`}>반드시 규칙을 모두 지켰어요</span>
-          )}
-          {disabled.length > 0 && <span className={`${ui.badge} bg-[#FFEBDB] text-[#B93815]`}>끈 규칙 {disabled.length}개</span>}
-          {!result.optimal && <span className={`${ui.badge} bg-[#FFEBDB] text-[#B93815]`}>더 나은 배치가 있을 수 있어요</span>}
-          {confirmed && <span className={`${ui.badge} bg-[#DDF7E9] text-[#067647]`}>확정</span>}
-          {draft && <span className={`${ui.badge} border border-[#DCDCD8] bg-white text-[#4B4F57]`}>작성 중</span>}
-        </span>
-      {!legacy && (
-        <>
-          <span className={item} title="희망·기피 요청이 걸린 날 중 지킨 날">
-            <span>희망 반영</span>
-            {summary.preferences_total > 0 ? (
-              <span className={value}>
-                {summary.preferences_met}/{summary.preferences_total}
-              </span>
+    <div className="flex flex-wrap items-center gap-2">
+      <dl aria-label="결과 요약" className="flex flex-wrap rounded-2xl border border-[#DCDCD8] bg-white py-1.5">
+        <div className={cell}>
+          <dt className={label}>결과</dt>
+          <dd className={value}>
+            {infeasible ? (
+              <>
+                {dot("bg-[#F04438]")}
+                <span className="text-[#B42318]">근무표 없음</span>
+              </>
             ) : (
-              <span className="text-[#111214]">요청 없음</span>
+              <>
+                {dot("bg-[#12B76A]")}반드시 규칙 모두 지킴
+              </>
             )}
-          </span>
-          <span className={item}>
-            <span>못 지킨 가능하면 규칙</span>
-            <span className={`${value} ${summary.soft_violation_count > 0 ? "text-[#B93815]!" : ""}`}>{summary.soft_violation_count}</span>
-          </span>
-        </>
-      )}
-      {disabled.length > 0 && (
-        <span className={item} title={disabled.map((d) => `${d.name} · ${d.text}`).join("\n")}>
-          <span>이번 근무표에서 끈 규칙</span>
-          <span className={value}>{disabled.length}개</span>
-        </span>
-      )}
-      {result.diff && (
-        <span className={item}>
-          <span>확정본에서 바뀐 칸</span>
-          <span className={value}>{result.diff.length}칸</span>
-        </span>
-      )}
-      {care && (
-        <span className={item}>
-          <span>{care.label}</span>
-          <span className="font-medium text-[#111214]">{care.text}</span>
-        </span>
-      )}
+          </dd>
+        </div>
+        {!legacy && (
+          <>
+            <div className={cell} title="희망·기피 요청이 걸린 날 중 지킨 날">
+              <dt className={label}>희망 반영</dt>
+              <dd className={value}>
+                {summary.preferences_total > 0 ? (
+                  <span className="font-mono">
+                    {summary.preferences_met}/{summary.preferences_total}
+                  </span>
+                ) : (
+                  "요청 없음"
+                )}
+              </dd>
+            </div>
+            <div className={cell}>
+              <dt className={label}>못 지킨 가능하면 규칙</dt>
+              <dd className={`${value} ${summary.soft_violation_count > 0 ? "text-[#B93815]" : ""}`}>
+                {summary.soft_violation_count > 0 && dot("bg-[#FF7A1A]")}
+                <span className="font-mono">{summary.soft_violation_count}</span>개
+              </dd>
+            </div>
+          </>
+        )}
+        {disabled.length > 0 && (
+          <div className={cell} title={disabled.map((d) => `${d.name} · ${d.text}`).join("\n")}>
+            <dt className={label}>이번 근무표에서 끈 규칙</dt>
+            <dd className={value}>
+              {dot("bg-[#FF7A1A]")}
+              <span className="font-mono">{disabled.length}</span>개
+            </dd>
+          </div>
+        )}
+        {result.diff && (
+          <div className={cell}>
+            <dt className={label}>확정본에서 바뀐 칸</dt>
+            <dd className={value}>
+              <span className="font-mono">{result.diff.length}</span>칸
+            </dd>
+          </div>
+        )}
+        {care && (
+          <div className={cell}>
+            <dt className={label}>{care.label}</dt>
+            <dd className={value}>{care.text}</dd>
+          </div>
+        )}
+      </dl>
+      {!result.optimal && <span className={`${ui.badge} bg-[#FFEBDB] text-[#B93815]`}>더 나은 배치가 있을 수 있어요</span>}
+      {confirmed && <span className={`${ui.badge} bg-[#DDF7E9] text-[#067647]`}>확정</span>}
+      {draft && <span className={`${ui.badge} border border-[#DCDCD8] bg-white text-[#4B4F57]`}>작성 중</span>}
     </div>
   );
 }
