@@ -217,7 +217,7 @@ test("S6. ① 가능 시간: 준비 요약과 직원 링크", async () => {
   await expect(page.getByText(/^미제출: /)).toContainText("박민수");
   await expect(page.getByRole("heading", { name: "직원별 가능 시간" })).toBeVisible();
   const availableTable = page.getByRole("table", { name: "직원별 가능 시간과 날짜별 가능 인원" });
-  await expect(availableTable.getByRole("button", { name: /미제출/ })).toHaveCount(EMPLOYEE_COUNT);
+  await expect(availableTable.getByRole("rowheader").filter({ hasText: "미제출" })).toHaveCount(EMPLOYEE_COUNT);
   await expect(availableTable.locator("tfoot td").filter({ hasText: /[1-9]명/ })).toHaveCount(0);
   const links = await shownLinks(page);
   expect(links).toHaveLength(1);
@@ -375,7 +375,7 @@ test("S7. 직원 화면: 드래그 입력과 제출", async ({ browser }) => {
   await expect(dayCounts(3)).toContainText(`미들 ${EMPLOYEE_COUNT}명`); // 11/5: 박민수도 덮는다
   await expect(dayCounts(3)).toContainText(`마감 ${EMPLOYEE_COUNT - 1}명`); // 11/5: 일부만 겹치면 세지 않는다
   await expect(dayCounts(3)).toContainText(`오픈 ${EMPLOYEE_COUNT - 1}명`);
-  await counts.getByRole("button", { name: /^박민수/ }).press("Enter");
+  await counts.getByRole("rowheader", { name: /^박민수/ }).getByRole("button").press("Enter");
   const parkCard = page.getByRole("region", { name: "박민수 가능 시간" });
   await expect(parkCard.getByText("12:00~23:00", { exact: true })).toBeVisible();
   await expect(parkCard.getByText("12:00~18:00", { exact: true })).toBeVisible();

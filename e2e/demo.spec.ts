@@ -41,7 +41,7 @@ test("S20. 체험 저니", async ({ page }) => {
   await applyAllPending(page);
 
   // ③ 근무표 없음 → 저장된 설명과 제안이 바로 보인다
-  await page.getByRole("button", { name: "다음" }).click();
+  await page.getByRole("button", { name: /^다음/ }).click();
   await expect(steps.locator('[aria-current="step"]')).toContainText("근무표");
   await page.getByRole("button", { name: "근무표 만들기" }).click();
   const panel = page.locator("section").filter({ hasText: "이 조건으로는 근무표를 만들 수 없어요" });
@@ -51,7 +51,7 @@ test("S20. 체험 저니", async ({ page }) => {
   await expect(proposals.first()).toBeVisible();
   // 저장된 설명(LLM 문장)이 보이는 화면이라 개발 용어 검사는 하지 않는다
   await proposals.first().getByRole("button", { name: "수락" }).click();
-  await expect(page.getByText("반드시 규칙을 모두 지켰어요", { exact: true })).toBeVisible();
+  await expect(page.getByText("반드시 규칙 모두 지킴", { exact: true })).toBeVisible();
 
   // [확정]은 체험 안내로
   await page.getByRole("button", { name: "확정", exact: true }).click();
@@ -64,7 +64,7 @@ test("S20. 체험 저니", async ({ page }) => {
   // ① 가능 시간: 모두 제출한 상태, 링크 없음
   await steps.getByRole("button", { name: "가능 시간" }).click();
   await expect(page.getByText(/20\s*명 중\s*20\s*명 제출/)).toBeVisible();
-  await page.getByRole("table", { name: "직원별 가능 시간과 날짜별 가능 인원" }).getByRole("button", { name: /^서민호/ }).press("Enter");
+  await page.getByRole("table", { name: "직원별 가능 시간과 날짜별 가능 인원" }).getByRole("rowheader", { name: /^서민호/ }).getByRole("button").press("Enter");
   await expect(page.getByRole("region", { name: "서민호 가능 시간" })).toBeVisible();
   await expect(page.getByRole("button", { name: "링크 복사" })).toHaveCount(0);
   await expectNoDevTerms(page, "체험 ① 가능 시간");

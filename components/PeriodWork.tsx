@@ -365,7 +365,7 @@ function PrepareSummary({ period }: { period: WorkPeriod }) {
       <section aria-label="준비 요약" className="flex flex-wrap items-center gap-1 self-start rounded-2xl border border-[#DCDCD8] bg-white py-1.5 pr-1.5 pl-1">
         <dl className="flex flex-wrap">
           {[
-            ["기간", formatRange(period)],
+            ["날짜", formatRange(period)],
             ["공휴일", period.holidays.length > 0 ? `${period.holidays.length}일` : "없음"],
             ["직원", `${active}명`],
             ["지난 근무", carry],

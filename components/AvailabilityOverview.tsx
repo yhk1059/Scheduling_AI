@@ -32,6 +32,7 @@ export default function AvailabilityOverview({
   const detailId = useId();
   const [week, setWeek] = useState(0);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [openCell, setOpenCell] = useState<string | null>(null);
   const days = periodDays(period);
   const pages = Math.ceil(days.length / 7);
   const page = Math.min(week, pages - 1);
@@ -65,7 +66,7 @@ export default function AvailabilityOverview({
               )}
             </div>
             <ul aria-label="근무조 범례" className="flex flex-wrap gap-2">
-              {codes.map((shift) => <li key={shift.code} className={`${ui.badge} ${codeClass(shift.code, false, config)}`}>{shift.name}</li>)}
+              {codes.map((shift) => <li key={shift.code} className={`${ui.badge} gap-1 ${codeClass(shift.code, false, config)}`}><span className="font-mono">{shift.code}</span> {shift.name}</li>)}
             </ul>
             <table aria-label="직원별 가능 시간과 날짜별 가능 인원" className="w-full table-fixed border-collapse text-center">
               <thead>
@@ -86,21 +87,30 @@ export default function AvailabilityOverview({
                           <span className="block text-[11px] font-normal text-[#6B6F78]">{row?.submitted_at ? n.tags.join(" · ") : "미제출"}</span>
                         </button>
                       </th>
-                      {shown.map((d) => (
-                        <td key={d.date} className="px-0.5 py-1.5">
-                          <div className="flex flex-col gap-0.5">
-                            {codes.map((shift) => {
-                              const available = coversShift(row?.slots[d.date] ?? [], shift, config);
-                              return (
-                                <span key={shift.code} className={`block h-1 overflow-hidden rounded-full border-0! ${available ? codeClass(shift.code, false, config) : "bg-[#EDEDEA]"}`}>
-                                  {available && <span aria-hidden="true" className="block h-full bg-current" />}
-                                  <span className="sr-only">{shift.name} {available ? "가능" : "불가"}</span>
-                                </span>
-                              );
-                            })}
-                          </div>
-                        </td>
-                      ))}
+                      {shown.map((d) => {
+                        const slots = row?.slots[d.date] ?? [];
+                        const ok = codes.filter((shift) => coversShift(slots, shift, config));
+                        const time = !row?.submitted_at ? "미제출" : slots.map(([start, end]) => `${start}~${end}`).join(" · ") || "가능 시간 없음";
+                        const key = `${n.id}|${d.date}`;
+                        const open = openCell === key;
+                        return (
+                          <td key={d.date} className="px-0.5 py-1.5">
+                            <button
+                              type="button"
+                              aria-label={`${n.name} ${label(d)} ${ok.length ? ok.map((s) => s.name).join("·") + " 가능" : "근무 불가"}, ${time}`}
+                              aria-expanded={open}
+                              onClick={(e) => { e.stopPropagation(); setSelectedId(n.id); setOpenCell(open ? null : key); }}
+                              onBlur={() => setOpenCell((c) => (c === key ? null : c))}
+                              className={`group relative flex h-8 w-full items-center justify-center gap-0.5 rounded-md px-0.5 focus-visible:outline-2 focus-visible:outline-[#C4247C] ${ok.length ? "hover:bg-[#EDEDEA]" : "border border-dashed border-[#DCDCD8]"}`}
+                            >
+                              {ok.map((shift) => (
+                                <span key={shift.code} aria-hidden="true" className={`flex h-6 min-w-0 max-w-6 flex-1 items-center justify-center rounded font-mono text-[11px]! ${codeClass(shift.code, false, config)}`}>{shift.code}</span>
+                              ))}
+                              <span aria-hidden="true" className={`pointer-events-none absolute bottom-full left-1/2 z-20 mb-1 -translate-x-1/2 whitespace-nowrap rounded-md bg-[#111214] px-2 py-1 font-mono text-[11px] text-white ${open ? "block" : "hidden group-hover:block"}`}>{time}</span>
+                            </button>
+                          </td>
+                        );
+                      })}
                     </tr>
                   );
                 })}
