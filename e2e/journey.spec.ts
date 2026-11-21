@@ -215,10 +215,9 @@ test("S6. ① 가능 시간: 준비 요약과 직원 링크", async () => {
   await expect(page.getByRole("button", { name: "링크 복사" })).toHaveCount(1);
   await expect(page.getByText(`${EMPLOYEE_COUNT}명 중 0명 제출`)).toBeVisible();
   await expect(page.getByText(/^미제출: /)).toContainText("박민수");
-  await expect(page.getByRole("heading", { name: "직원별 가능 시간" })).toBeVisible();
-  const availableTable = page.getByRole("table", { name: "직원별 가능 시간과 날짜별 가능 인원" });
+  await expect(page.getByRole("heading", { name: "직원별 가능 시간", exact: true })).toBeVisible();
+  const availableTable = page.getByRole("table", { name: "직원별 가능 시간", exact: true });
   await expect(availableTable.getByRole("rowheader").filter({ hasText: "미제출" })).toHaveCount(EMPLOYEE_COUNT);
-  await expect(availableTable.locator("tfoot td").filter({ hasText: /[1-9]명/ })).toHaveCount(0);
   const links = await shownLinks(page);
   expect(links).toHaveLength(1);
   await page.getByRole("button", { name: "링크 복사" }).click();
@@ -369,12 +368,11 @@ test("S7. 직원 화면: 드래그 입력과 제출", async ({ browser }) => {
   await expect(page.getByText("미제출:")).toHaveCount(0);
 
   // 매니저는 제출한 가능 시간을 한 화면에서 본다
-  const counts = page.getByRole("table", { name: "직원별 가능 시간과 날짜별 가능 인원" });
-  const dayCounts = (column: number) => counts.locator("tfoot td").nth(column);
-  await expect(dayCounts(1)).toContainText(`마감 ${EMPLOYEE_COUNT}명`); // 11/3: 박민수도 덮는다
-  await expect(dayCounts(3)).toContainText(`미들 ${EMPLOYEE_COUNT}명`); // 11/5: 박민수도 덮는다
-  await expect(dayCounts(3)).toContainText(`마감 ${EMPLOYEE_COUNT - 1}명`); // 11/5: 일부만 겹치면 세지 않는다
-  await expect(dayCounts(3)).toContainText(`오픈 ${EMPLOYEE_COUNT - 1}명`);
+  const counts = page.getByRole("table", { name: "직원별 가능 시간", exact: true });
+  const parkCell = (md: string) => counts.getByRole("button", { name: new RegExp(`^박민수 \\S+ ${md} `) });
+  await expect(parkCell("11/3")).toHaveAccessibleName(/마감[^,]* 가능/); // 11/3: 마감을 덮는다
+  await expect(parkCell("11/5")).toHaveAccessibleName(/미들[^,]* 가능/); // 11/5: 미들을 덮는다
+  await expect(parkCell("11/5")).not.toHaveAccessibleName(/(오픈|마감)[^,]* 가능/); // 일부만 겹치면 넣지 않는다
   await counts.getByRole("rowheader", { name: /^박민수/ }).getByRole("button").press("Enter");
   const parkCard = page.getByRole("region", { name: "박민수 가능 시간" });
   await expect(parkCard.getByText("12:00~23:00", { exact: true })).toBeVisible();

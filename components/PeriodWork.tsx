@@ -137,7 +137,6 @@ function LinksSection({ period }: { period: WorkPeriod }) {
         employees={employees}
         rows={rows}
         config={shop.config}
-        rules={liveShopRules(shop, period)}
         preparation={<PrepareSummary period={period} />}
         submission={submission}
       />

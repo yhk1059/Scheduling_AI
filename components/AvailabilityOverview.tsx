@@ -2,30 +2,22 @@
 
 import { useId, useState, type ReactNode } from "react";
 
-import { availableCount, coversShift } from "@/lib/availability";
-import { effectiveCoverage, staffingTone, type StaffingTone } from "@/lib/coverage-conflict";
+import { coversShift } from "@/lib/availability";
 import { isWeekendDay, periodDays } from "@/lib/period";
 import type { AvailabilityLink } from "@/lib/supabase";
 import { coverageCodes, type ShopEmployee, type WorkPeriod } from "@/lib/store";
-import type { ConstraintSpec, ShopConfig } from "@/lib/types.gen";
+import type { ShopConfig } from "@/lib/types.gen";
 
 import { WEEKDAYS, codeClass } from "./ScheduleStep";
 import { ui } from "./ui";
 
-const TONES: Record<StaffingTone, { dot: string; text: string }> = {
-  ok: { dot: "bg-[#12B76A]", text: "여유" },
-  tight: { dot: "bg-[#FF7A1A]", text: "빠듯" },
-  short: { dot: "bg-[#F04438]", text: "부족" },
-};
-
 export default function AvailabilityOverview({
-  period, employees, rows, config, rules, preparation, submission,
+  period, employees, rows, config, preparation, submission,
 }: {
   period: WorkPeriod;
   employees: ShopEmployee[];
   rows: AvailabilityLink[] | null;
   config: ShopConfig;
-  rules: ConstraintSpec[];
   preparation: ReactNode;
   submission: ReactNode;
 }) {
@@ -41,13 +33,7 @@ export default function AvailabilityOverview({
   const rowById = new Map(rows?.map((row) => [row.employee_id, row]));
   const selected = employees.find((n) => n.id === selectedId) ?? employees[0];
   const selectedRow = selected && rowById.get(selected.id);
-  const slotsList = employees.map((n) => rowById.get(n.id)?.slots ?? {});
   const label = (d: (typeof days)[number]) => `${WEEKDAYS[d.weekday]} ${d.month}/${d.dom}`;
-  const totals = codes.map((shift) => shown.map((d) => {
-    const count = availableCount(slotsList, d.date, shift, config);
-    const kind = isWeekendDay(period, d.day, period.holidays) ? "weekend" : "weekday";
-    return { count, tone: staffingTone(count, effectiveCoverage(rules, shift.code, kind, period, period.holidays)) };
-  }));
 
   return (
     <div className={ui.workLayout}>
@@ -68,7 +54,7 @@ export default function AvailabilityOverview({
             <ul aria-label="근무조 범례" className="flex flex-wrap gap-2">
               {codes.map((shift) => <li key={shift.code} className={`${ui.badge} gap-1 ${codeClass(shift.code, false, config)}`}><span className="font-mono">{shift.code}</span> {shift.name}</li>)}
             </ul>
-            <table aria-label="직원별 가능 시간과 날짜별 가능 인원" className="w-full table-fixed border-collapse text-center">
+            <table aria-label="직원별 가능 시간" className="w-full table-fixed border-collapse text-center">
               <thead>
                 <tr className="border-b border-[#EDEDEA] text-xs">
                   <th scope="col" className="w-[24%] py-2 text-left">직원</th>
@@ -115,36 +101,7 @@ export default function AvailabilityOverview({
                   );
                 })}
               </tbody>
-              <tfoot>
-                {codes.length > 0 && (
-                  <tr>
-                    <th scope="row" className="py-1 text-left text-xs font-medium">
-                      <span className="sr-only">가능 인원</span>
-                      {codes.map((shift) => <span key={shift.code} className="block leading-5 wrap-anywhere">{shift.name}</span>)}
-                    </th>
-                    {shown.map((d, j) => (
-                      <td key={d.date} className="text-xs">
-                        {codes.map((shift, i) => {
-                          const { count, tone } = totals[i][j];
-                          return (
-                            <span key={shift.code} className="block leading-5">
-                              <span className="sr-only">{shift.name} </span>
-                              {tone && <span aria-hidden="true" className={`mr-0.5 inline-block size-1.5 rounded-full ${TONES[tone].dot}`} />}
-                              {count}<span className="sr-only">명{tone && `, ${TONES[tone].text}`}</span>
-                            </span>
-                          );
-                        })}
-                      </td>
-                    ))}
-                  </tr>
-                )}
-              </tfoot>
             </table>
-            {totals.some((row) => row.some(({ tone }) => tone)) && (
-              <ul aria-label="필요 인원 대비 가능 인원" className={`${ui.help} flex flex-wrap gap-3`}>
-                {Object.entries(TONES).map(([key, { dot, text }]) => <li key={key}><span aria-hidden="true" className={`mr-1 inline-block size-1.5 rounded-full ${dot}`} />{text}</li>)}
-              </ul>
-            )}
           </section>
         )}
       </div>

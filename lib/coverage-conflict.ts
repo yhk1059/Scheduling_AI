@@ -107,11 +107,3 @@ export function effectiveCoverage(
   return out;
 }
 
-export type StaffingTone = "short" | "tight" | "ok";
-
-/** 가능 인원이 필요 인원에 비해 어떤지: 최소보다 적으면 short, 최소~최소+1이면 tight, 그보다 많으면 ok. 필요 인원이 없거나 0명이면 null. */
-export function staffingTone(available: number, need: { min: number; max: number | null } | null): StaffingTone | null {
-  if (!need || need.min <= 0) return null;
-  if (available < need.min) return "short";
-  return available - need.min <= 1 ? "tight" : "ok";
-}

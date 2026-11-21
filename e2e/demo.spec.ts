@@ -64,7 +64,7 @@ test("S20. 체험 저니", async ({ page }) => {
   // ① 가능 시간: 모두 제출한 상태, 링크 없음
   await steps.getByRole("button", { name: "가능 시간" }).click();
   await expect(page.getByText(/20\s*명 중\s*20\s*명 제출/)).toBeVisible();
-  await page.getByRole("table", { name: "직원별 가능 시간과 날짜별 가능 인원" }).getByRole("rowheader", { name: /^서민호/ }).getByRole("button").press("Enter");
+  await page.getByRole("table", { name: "직원별 가능 시간", exact: true }).getByRole("rowheader", { name: /^서민호/ }).getByRole("button").press("Enter");
   await expect(page.getByRole("region", { name: "서민호 가능 시간" })).toBeVisible();
   await expect(page.getByRole("button", { name: "링크 복사" })).toHaveCount(0);
   await expectNoDevTerms(page, "체험 ① 가능 시간");
