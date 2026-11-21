@@ -9,6 +9,7 @@ import { firstPeriodStart, periodFrom, type PeriodRange, type PeriodUnit } from 
 import {
   applyShiftChange,
   cardsInOrder,
+  COVERAGE_SOURCE_TEXT,
   currentPeriod,
   findReplaced,
   isLeaveRule,
@@ -333,8 +334,13 @@ export default function RulesStep({
             )}
           </div>
           <ul className="flex flex-col gap-1.5">
-            {rows.map(({ id, cfg, entry }) => {
+            {rows.map(({ id, cfg, entry }, i) => {
               const card = entry?.card;
+              // 한 문장에서 나온 규칙이 둘 이상이면 원문 아래에 묶어 보인다
+              const quote = card?.source_text && card.source_text !== COVERAGE_SOURCE_TEXT ? card.source_text : null;
+              const siblings = quote ? rows.filter((r) => r.entry?.card.source_text === quote).length : 0;
+              const grouped = siblings > 1;
+              const firstOfGroup = grouped && rows[i - 1]?.entry?.card.source_text !== quote;
               const hardness = card && (card.type === "fixed_assignment" || isLeaveRule(card)
                 ? "hard"
                 : card.hardness ?? (card.body.kind === "balance" ? "soft" : "hard"));
@@ -344,16 +350,17 @@ export default function RulesStep({
                 : describeShiftChange(cfg!.change, shop.config);
               const off = card && (card.enabled === false || stepPeriod?.disabledIds.includes(id));
               return (
-                <li key={id}>
+                <li key={id} className={grouped ? "border-l-2 border-[#F4C0D1] pl-2.5" : undefined}>
+                  {firstOfGroup && <p className="mb-1 truncate text-xs text-[#6B6F78]" title={quote!}>“{quote}”</p>}
                   <button
                     type="button"
                     aria-controls={detailId}
                     aria-pressed={id === selected.id}
                     onClick={() => setSelectedId(id)}
-                    className={`grid w-full min-w-0 grid-cols-[minmax(0,5rem)_minmax(0,1fr)_auto] items-center gap-2 rounded-xl border border-[#EDEDEA] px-2 py-2.5 text-left text-[13px] focus-visible:outline-2 focus-visible:outline-[#C4247C] aria-pressed:border-[#C4247C] aria-pressed:bg-[#FDEAF4] sm:grid-cols-[minmax(0,8rem)_minmax(0,1fr)_auto] sm:px-3 ${group === 0 ? "bg-[#FFF6FA]" : "bg-white"}`}
+                    className={`grid w-full min-w-0 grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2 rounded-xl border border-[#EDEDEA] px-2 py-2.5 text-left text-[13px] focus-visible:outline-2 focus-visible:outline-[#C4247C] aria-pressed:border-[#C4247C] aria-pressed:bg-[#FDEAF4] sm:px-3 ${group === 0 ? "bg-[#FFF6FA]" : "bg-white"}`}
                   >
-                    <span className="truncate font-semibold" title={name}>{name}</span>
-                    <span className="truncate text-[#4B4F57]" title={reading}>{reading}</span>
+                    <span className="max-w-24 truncate rounded-full bg-[#F5F5F4] px-2 py-0.5 text-[11px] font-semibold text-[#4B4F57] sm:max-w-32" title={name}>{name}</span>
+                    <span className="truncate font-medium text-[#111214]" title={reading}>{reading}</span>
                     <span className={`${ui.badge} ${hardness === "hard" && !off ? "bg-[#111214] text-white" : ui.badgeTone.base}`}>
                       {off ? "꺼짐 · " : ""}{hardness ? hardnessLabel(hardness) : "설정"}
                     </span>

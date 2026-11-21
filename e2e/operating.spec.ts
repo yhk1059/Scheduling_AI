@@ -144,14 +144,14 @@ test("S3. 운영 중인 매장: 다음 근무표 작성과 확정", async () => 
   await page.getByRole("button", { name: "다음", exact: true }).click();
   await expect(stepper.locator('[aria-current="step"]')).toContainText("근무표");
   await expect(scheduleTitle(page)).toBeVisible();
-  await expect(page.getByRole("main")).toContainText("제출 12/12명 · 반드시 12개 · 가능하면 5개 · 지난 근무 7일 이어받아요");
+  await expect(page.getByRole("main")).toContainText("제출 12/12명 · 필수 12개 · 선호 5개 · 지난 근무 7일 이어받아요");
   await expect(page.getByRole("textbox", { name: "예외 입력" })).toHaveCount(0);
 
   // S3-c. 근무표 만들기: 최근 4주 열과 근거 한 줄
   expect(await solve(() => page.getByRole("button", { name: "근무표 만들기" }).click())).toBe("ok");
-  await expect(page.getByText("반드시 규칙을 모두 지켰어요", { exact: true })).toBeVisible();
+  await expect(page.getByText("필수 규칙을 모두 지켰어요", { exact: true })).toBeVisible();
   await expect(page.getByText("희망 반영", { exact: true })).toBeVisible();
-  await expect(page.getByText("못 지킨 가능하면 규칙", { exact: true })).toBeVisible();
+  await expect(page.getByText("못 지킨 선호 규칙", { exact: true })).toBeVisible();
   await openStats(page);
   const stats = sectionWith("개인별 통계");
   await expect(stats.locator("tbody tr")).toHaveCount(EMPLOYEE_COUNT);
@@ -256,7 +256,7 @@ test("S4. 확정 근무표: 변경 입력 → 최소 변경 → 다시 확정 ·
     expect(await solve(() => pendingCards(page).first().getByRole("button", { name: "적용" }).click())).toBe("ok");
   }
 
-  await expect(page.getByText("반드시 규칙을 모두 지켰어요", { exact: true })).toBeVisible();
+  await expect(page.getByText("필수 규칙을 모두 지켰어요", { exact: true })).toBeVisible();
   await expect(page.getByText("작성 중", { exact: true })).toBeVisible();
   await expect(page.getByText("확정본에서 바뀐 칸", { exact: true })).toBeVisible();
   const locks = (lastSolve!.constraints ?? []).filter((c) => c.id.startsWith("lock-"));

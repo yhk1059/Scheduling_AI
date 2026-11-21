@@ -99,7 +99,7 @@ test("S16. 저장된 매장 열기 → 다시 만들기", async () => {
   await page.getByRole("button", { name: "다음", exact: true }).click();
   await expect(scheduleTitle(page)).toBeVisible();
   expect(await solve(() => page.getByRole("button", { name: "근무표 만들기" }).click())).toBe("ok");
-  await expect(page.getByText("반드시 규칙을 모두 지켰어요", { exact: true })).toBeVisible();
+  await expect(page.getByText("필수 규칙을 모두 지켰어요", { exact: true })).toBeVisible();
   await expectHardRulesHold(page, NOV, lastSolve);
 });
 
@@ -118,13 +118,14 @@ test("S17. 조건부·짝 규칙 → 예시 판정 → 적용 → 값 수정 →
   const examples = conditional!.examples?.[condRules[0].id] ?? [];
   expect(examples.length, "예시 판정").toBeGreaterThan(0);
   expect(examples.length).toBeLessThanOrEqual(3);
+  await condCard.getByRole("button", { name: "어긋나는 예 보기" }).click();
   await expect(condCard.getByText("이런 근무면 이 규칙에 어긋나요")).toBeVisible();
-  await expect(condCard.locator("table")).toHaveCount(examples.length);
+  await expect(condCard.locator("table")).toHaveCount(1);
   await expect(condCard.locator('[aria-label$=" 어긋남"]').first()).toBeVisible();
   await expectNoDevTerms(page, "매장 조건(조건부 대기 카드)");
   await applyAllPending(page);
   const appliedCond = page.locator("article").filter({ hasText: conditional!.constraints[0].source_text }).first();
-  const showExamples = appliedCond.getByRole("button", { name: "예시 보기" });
+  const showExamples = appliedCond.getByRole("button", { name: "어긋나는 예 보기" });
   await expect(showExamples).toHaveAttribute("aria-expanded", "false");
   await showExamples.click();
   await expect(appliedCond.getByText("이런 근무면 이 규칙에 어긋나요")).toBeVisible();
@@ -138,11 +139,11 @@ test("S17. 조건부·짝 규칙 → 예시 판정 → 적용 → 값 수정 →
 
   // 값 수정: 최대 연속 근무 5 → 6(밑줄 값만 고친다)
   const maxRun = page.locator("article").filter({ hasText: "연속 근무" }).filter({ hasText: "5일 넘게" });
-  await expect(maxRun).toContainText("연속 근무 5일까지");
+  await expect(maxRun).toContainText("5일 넘게 연달아 일하지 않아요");
   await maxRun.getByRole("button", { name: "수정" }).click();
   await maxRun.getByRole("textbox").fill("6");
   await maxRun.getByRole("button", { name: "저장" }).click();
-  await expect(maxRun).toContainText("연속 근무 6일까지");
+  await expect(maxRun).toContainText("6일 넘게 연달아 일하지 않아요");
   await expectNoDevTerms(page, "매장 조건(적용 뒤)");
 
   // 다시 만들기: 새 규칙과 바꾼 값이 요청에 들어가고 근무표가 지킨다
@@ -150,7 +151,7 @@ test("S17. 조건부·짝 규칙 → 예시 판정 → 적용 → 값 수정 →
   await sectionWith(NOV_NAME).getByRole("button", { name: "근무표 확인하기" }).click();
   await expect(scheduleTitle(page)).toBeVisible();
   expect(await solve(() => page.getByRole("button", { name: "다시 만들기" }).first().click())).toBe("ok");
-  await expect(page.getByText("반드시 규칙을 모두 지켰어요", { exact: true })).toBeVisible();
+  await expect(page.getByText("필수 규칙을 모두 지켰어요", { exact: true })).toBeVisible();
   const sent = lastSolve!.constraints ?? [];
   const sentMax = sent.find((c) => c.id === "rule-max-run");
   expect(sentMax?.type === "rule" && sentMax.values?.max_len?.value, "최대 연속 근무 값").toBe(6);
@@ -205,7 +206,7 @@ test("S18. 말로 필요 인원 → 근무표 → 사람이 모자란 필요 인
 
   await page.getByRole("button", { name: "다음", exact: true }).click();
   expect(await solve(() => page.getByRole("button", { name: "근무표 만들기" }).click())).toBe("ok");
-  await expect(page.getByText("반드시 규칙을 모두 지켰어요", { exact: true })).toBeVisible();
+  await expect(page.getByText("필수 규칙을 모두 지켰어요", { exact: true })).toBeVisible();
   await expectHardRulesHold(page, WEEK, lastSolve);
   const grid = await readGrid(page, WEEK);
   for (let d = 1; d <= WEEK.length; d++) {
@@ -238,6 +239,6 @@ test("S18. 말로 필요 인원 → 근무표 → 사람이 모자란 필요 인
   if ((await valueChange.count()) === 0) test.info().annotations.push({ type: "확인 필요", description: "값 바꾸기 제안 없음(끄기·가능하면만)" });
   const chosen = (await valueChange.count()) > 0 ? valueChange.first() : proposals.first();
   expect(await solve(() => chosen.getByRole("button", { name: "수락" }).click())).toBe("ok");
-  await expect(page.getByText("반드시 규칙을 모두 지켰어요", { exact: true })).toBeVisible();
+  await expect(page.getByText("필수 규칙을 모두 지켰어요", { exact: true })).toBeVisible();
   await expectHardRulesHold(page, WEEK, lastSolve);
 });

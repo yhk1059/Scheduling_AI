@@ -247,7 +247,7 @@ function ConditionsStep({ period, onStep }: { period: WorkPeriod; onStep: (s: Pe
   const orphanCount = orphanConstraintIds(shop, null).length;
   const pending = shop.pendingRules.length + shop.pendingConfig.length;
   // 직급별 배치(홀 오픈 2명 등)도 인원을 맞추는 규칙이다
-  const hasStaffing = liveShopRules(shop, period).some((r) => ["필요 인원", "직급별 배치"].includes(presetName(r)));
+  const hasStaffing = liveShopRules(shop, period).some((r) => ["필요 인원", "직급별 인원"].includes(presetName(r)));
   const exceptionCount = period.requests.length + period.pendingRequests.length;
 
   return (
@@ -339,7 +339,7 @@ function CoverageSummary({ period }: { period: WorkPeriod }) {
           {open ? "접기" : "바꾸기"}
         </button>
       </div>
-      <p className={ui.help}>켜진 반드시 필요 인원 규칙을 합친 값이에요. 일부 날짜에만 적용되는 규칙은 카드에서 봐요</p>
+      <p className={ui.help}>켜진 필수 필요 인원 규칙을 합친 값이에요. 일부 날짜에만 적용되는 규칙은 카드에서 봐요</p>
       {open && <ShiftTable />}
     </section>
   );
@@ -542,7 +542,7 @@ function CarryOverTable({ period, prev }: { period: WorkPeriod; prev: WorkPeriod
       <div className="flex flex-col gap-1">
         <h3 className={ui.cardTitle}>지난 근무 마지막 며칠</h3>
         <p className={ui.help}>
-          지난 근무표에서 가져왔어요. 마감 다음 날 오픈 금지 같은 규칙이 근무표 사이에서도 지켜지게 써요
+          지난 근무표에서 가져왔어요. ‘마감 다음 날 오픈 안 돼요’ 같은 규칙이 근무표 사이에서도 지켜지게 써요
           {rows.length < employees.length && ` · 지난 근무표에 없던 ${employees.length - rows.length}명은 지난 근무 없이 시작해요`}
         </p>
       </div>
@@ -620,7 +620,7 @@ function CarryOverPaste({ period }: { period: WorkPeriod }) {
       <div className="flex flex-col gap-1">
         <h3 className={ui.cardTitle}>지난 근무 마지막 며칠 (선택)</h3>
         <p className={ui.help}>
-          마감 다음 날 오픈 금지 같은 규칙이 근무표 사이에서도 지켜지게 써요. 지금 반영된 직원:{" "}
+          ‘마감 다음 날 오픈 안 돼요’ 같은 규칙이 근무표 사이에서도 지켜지게 써요. 지금 반영된 직원:{" "}
           <span className="font-mono">{carryOver.length}</span>명
         </p>
       </div>

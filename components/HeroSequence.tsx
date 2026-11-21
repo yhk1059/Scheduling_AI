@@ -143,7 +143,7 @@ export function ScheduleFragment() {
     <div className={`${ui.card} flex flex-col gap-3`}>
       <div className="flex min-h-[22px] flex-wrap items-center justify-between gap-x-3 gap-y-1.5">
         <h3 className={`${ui.cardTitle} whitespace-nowrap`}>11/2~11/8 근무표</h3>
-        <span className={`${ui.badge} ${ui.badgeTone.applied} whitespace-nowrap`}>반드시 규칙을 모두 지켰어요</span>
+        <span className={`${ui.badge} ${ui.badgeTone.applied} whitespace-nowrap`}>필수 규칙을 모두 지켰어요</span>
       </div>
       <div className="overflow-x-auto">
         <MiniGrid days={WEEK_DAYS} rows={SCENE_ROWS} totals={{ label: "C 합계", values: C_TOTALS }} />
@@ -154,7 +154,7 @@ export function ScheduleFragment() {
           <span className={`${ui.bigNumber} text-[#111214]`}>9/9</span>
         </span>
         <span className="flex flex-col gap-0.5">
-          <span className={ui.help}>못 지킨 가능하면 규칙</span>
+          <span className={ui.help}>못 지킨 선호 규칙</span>
           <span className={`${ui.bigNumber} text-[#111214]`}>0</span>
         </span>
         <span className={`${ui.primarySm} ml-auto`}>확정</span>
@@ -202,12 +202,12 @@ export default function HeroSequence() {
           </span>
         </div>
 
-        <ReplyCard className="hero-rise" title="금지 순서" quote={TYPED} reading="모든 사람 · 매일 · 마감 다음 날 오픈 금지" />
+        <ReplyCard className="hero-rise" title="연달아 금지" quote={TYPED} reading="마감 다음 날에는 오픈을 넣지 않아요" />
 
         <div className={`${ui.card} hero-table flex flex-col gap-3`}>
           <div className="flex min-h-[22px] flex-wrap items-center justify-between gap-x-3 gap-y-1.5">
             <h3 className={`${ui.cardTitle} whitespace-nowrap`}>11/2~11/8 근무표</h3>
-            <span className={`hero-badge ${ui.badge} ${ui.badgeTone.applied} whitespace-nowrap`}>반드시 규칙을 모두 지켰어요</span>
+            <span className={`hero-badge ${ui.badge} ${ui.badgeTone.applied} whitespace-nowrap`}>필수 규칙을 모두 지켰어요</span>
           </div>
           <div className="hero-cells overflow-x-auto">
             <ScheduleGrid

@@ -554,7 +554,7 @@ export function ScheduleBody({
                     <h3 className={ui.cardTitle}>결과 요약</h3>
                     {summary}
                     {!legacy && result.soft_violations.length > 0 && (
-                      <ul aria-label="못 지킨 가능하면 규칙 목록" className="max-h-48 space-y-2 overflow-y-auto text-sm text-[#4B4F57]" tabIndex={0}>
+                      <ul aria-label="못 지킨 선호 규칙 목록" className="max-h-48 space-y-2 overflow-y-auto text-sm text-[#4B4F57]" tabIndex={0}>
                         {result.soft_violations.map((violation, index) => {
                           const rule = constraints.find((item) => item.id === violation.constraint_id);
                           return (
@@ -773,8 +773,8 @@ function ReadyCard({ inputs }: { inputs: ScheduleInputs }) {
   const allIn = inputs.submitted === inputs.employees;
   const checks = [
     { ok: allIn, text: `제출 ${inputs.submitted}/${inputs.employees}명` },
-    { ok: true, text: `반드시 규칙 ${inputs.hard}개` },
-    { ok: true, text: `가능하면 규칙 ${inputs.soft}개` },
+    { ok: true, text: `필수 규칙 ${inputs.hard}개` },
+    { ok: true, text: `선호 규칙 ${inputs.soft}개` },
     ...(inputs.disabled > 0 ? [{ ok: false, text: `이번 근무표에서 끈 규칙 ${inputs.disabled}개` }] : []),
     ...(inputs.carryDays > 0 ? [{ ok: true, text: `지난 근무 ${inputs.carryDays}일 이어받음` }] : []),
   ];
@@ -789,7 +789,7 @@ function ReadyCard({ inputs }: { inputs: ScheduleInputs }) {
       <div className="flex flex-col gap-1">
         <p className="text-2xl font-bold tracking-[-0.03em] text-[#111214]">{allIn ? "근무표를 만들 차례예요" : "아직 안 낸 직원이 있어요"}</p>
         <p className="text-[15px] text-[#4B4F57]">
-          {allIn ? "반드시 규칙을 모두 지키는 배치를 찾아요" : "기다리지 않고 지금 만들어도 돼요"}
+          {allIn ? "필수 규칙을 모두 지키는 배치를 찾아요" : "기다리지 않고 지금 만들어도 돼요"}
         </p>
       </div>
       <ul aria-label="만들 때 쓰는 것" className="flex flex-wrap items-center gap-2">
@@ -969,7 +969,7 @@ export function OutcomePanel({
         <div className="flex flex-col gap-1.5">
           <p className="text-sm text-[#111214]">
             {outcome.kind === "timeout"
-              ? "'반드시' 규칙을 하나씩 꺼서 확인해 주세요."
+              ? "'필수' 규칙을 하나씩 꺼서 확인해 주세요."
               : "원인을 찾지 못했어요. 규칙을 하나씩 꺼서 확인해 주세요."}
             <span className={ui.help}> 끄거나 켠 뒤 [다시 만들기]를 눌러 주세요.</span>
           </p>
@@ -1057,7 +1057,7 @@ function ProposalCard({
           {s.soft_violation_count > 0 && (
             <>
               {" "}
-              · 못 지킨 가능하면 규칙 <span className="font-mono">{s.soft_violation_count}</span>
+              · 못 지킨 선호 규칙 <span className="font-mono">{s.soft_violation_count}</span>
             </>
           )}
         </p>
@@ -1074,7 +1074,7 @@ function ProposalCard({
   );
 }
 
-/** 요약 지표 한 줄: 결과 배지, 희망 반영, 못 지킨 가능하면 규칙, (끈 규칙, 바뀐 칸, 마감 배려). */
+/** 요약 지표 한 줄: 결과 배지, 희망 반영, 못 지킨 선호 규칙, (끈 규칙, 바뀐 칸, 마감 배려). */
 function SummaryLine({
   result,
   infeasible,
@@ -1117,7 +1117,7 @@ function SummaryLine({
               </>
             ) : (
               <>
-                {dot("bg-[#12B76A]")}반드시 규칙 모두 지킴
+                {dot("bg-[#12B76A]")}필수 규칙 모두 지킴
               </>
             )}
           </dd>
@@ -1137,7 +1137,7 @@ function SummaryLine({
               </dd>
             </div>
             <div className={cell}>
-              <dt className={label}>못 지킨 가능하면 규칙</dt>
+              <dt className={label}>못 지킨 선호 규칙</dt>
               <dd className={`${value} ${summary.soft_violation_count > 0 ? "text-[#B93815]" : ""}`}>
                 {summary.soft_violation_count > 0 && dot("bg-[#FF7A1A]")}
                 <span className="font-mono">{summary.soft_violation_count}</span>개

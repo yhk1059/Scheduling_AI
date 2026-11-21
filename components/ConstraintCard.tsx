@@ -110,7 +110,8 @@ function ExampleStrip({
   const nameOf = (id: string) => employees.find((n) => n.id === id)?.name ?? "직원";
   const marked = (id: string, d: number) => example.marks.some(([m, md]) => m === id && md === d);
   return (
-    <div className="flex min-w-0 flex-col gap-1 overflow-x-auto">
+    <div className="flex min-w-0 flex-col gap-1.5 overflow-x-auto">
+      <p className="text-xs font-semibold text-[#B42318]">{example.detail}</p>
       <table className="border-separate border-spacing-x-0.5 border-spacing-y-0.5">
         <thead>
           <tr>
@@ -152,7 +153,6 @@ function ExampleStrip({
           ))}
         </tbody>
       </table>
-      <p className="text-xs text-[#4B4F57]">{example.detail}</p>
     </div>
   );
 }
@@ -171,11 +171,7 @@ function Examples({
   return (
     <div className="flex flex-col gap-2">
       <p className={ui.help}>이런 근무면 이 규칙에 어긋나요</p>
-      <div className="flex flex-wrap gap-x-5 gap-y-2.5">
-        {examples.map((ex, i) => (
-          <ExampleStrip key={i} example={ex} employees={employees} range={range} holidays={holidays} />
-        ))}
-      </div>
+      <ExampleStrip example={examples[0]} employees={employees} range={range} holidays={holidays} />
     </div>
   );
 }
@@ -208,8 +204,8 @@ function Reading({ sentence, dim = false, children }: { sentence: ReactNode; dim
   return (
     <div className="ml-2 flex flex-col gap-2.5 border-l-2 border-[#EDEDEA] pl-3.5">
       <div className="flex flex-col gap-1">
-        <span className={`${ui.eyebrow} text-[11px]!`}>이렇게 읽었어요</span>
-        <p className={`text-sm ${dim ? "text-[#6B6F78]" : "text-[#111214]"}`}>{sentence}</p>
+        <span className={`${ui.eyebrow} text-[11px]!`}>이렇게 이해했어요</span>
+        <p className={`text-base font-semibold leading-snug tracking-[-0.01em] ${dim ? "text-[#6B6F78]" : "text-[#111214]"}`}>{sentence}</p>
       </div>
       {children}
     </div>
@@ -220,8 +216,8 @@ function HardnessToggle({ value, disabled, onChange }: { value: Hardness; disabl
   return (
     <div
       role="group"
-      aria-label="반드시/가능하면"
-      title={disabled ? "휴가와 고정 근무는 항상 반드시 지켜요" : undefined}
+      aria-label="필수/선호"
+      title={disabled ? "휴가와 고정 근무는 항상 필수예요" : undefined}
       className="inline-flex overflow-hidden rounded-md border border-[#DCDCD8]"
     >
       {(["hard", "soft"] as const).map((h) => (
@@ -393,7 +389,7 @@ export default function ConstraintCard({
         <h3 className={compact ? "text-sm font-semibold text-[#111214]" : ui.cardTitle}>{presetName(card)}</h3>
         {/* 휴가 카드는 항상 반드시라 토글 대신 배지를 둔다 */}
         {isLeaveRule(card) ? (
-          <span className={`${ui.badge} bg-[#111214] text-white`}>반드시</span>
+          <span className={`${ui.badge} bg-[#111214] text-white`}>필수</span>
         ) : (
           <div className="flex items-center gap-2">
             {hardness === "soft" && card.type !== "fixed_assignment" && (
@@ -427,22 +423,19 @@ export default function ConstraintCard({
           </div>
         )}
 
-        {examples.length > 0 &&
-          (pending ? (
-            <Examples examples={examples} employees={shop.employees} range={range} holidays={holidays} />
-          ) : (
-            <div className="flex flex-col gap-2">
-              <button
-                type="button"
-                aria-expanded={showExamples}
-                onClick={() => setShowExamples(!showExamples)}
-                className={`${ui.textSm} self-start`}
-              >
-                예시 보기
-              </button>
-              {showExamples && <Examples examples={examples} employees={shop.employees} range={range} holidays={holidays} />}
-            </div>
-          ))}
+        {examples.length > 0 && (
+          <div className="flex flex-col gap-2">
+            <button
+              type="button"
+              aria-expanded={showExamples}
+              onClick={() => setShowExamples(!showExamples)}
+              className={`${ui.textSm} self-start`}
+            >
+              {showExamples ? "예시 접기" : "어긋나는 예 보기"}
+            </button>
+            {showExamples && <Examples examples={examples} employees={shop.employees} range={range} holidays={holidays} />}
+          </div>
+        )}
       </Reading>
 
       {orphan && (

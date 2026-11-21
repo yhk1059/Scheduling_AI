@@ -51,7 +51,7 @@ test("S20. 체험 저니", async ({ page }) => {
   await expect(proposals.first()).toBeVisible();
   // 저장된 설명(LLM 문장)이 보이는 화면이라 개발 용어 검사는 하지 않는다
   await proposals.first().getByRole("button", { name: "수락" }).click();
-  await expect(page.getByText("반드시 규칙 모두 지킴", { exact: true })).toBeVisible();
+  await expect(page.getByText("필수 규칙 모두 지킴", { exact: true })).toBeVisible();
 
   // [확정]은 체험 안내로
   await page.getByRole("button", { name: "확정", exact: true }).click();

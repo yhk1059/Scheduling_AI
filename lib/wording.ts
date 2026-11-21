@@ -45,9 +45,9 @@ export function describeShiftChange(change: ShiftChange, config: ShopConfig): st
   ].join(" · ");
 }
 
-/** "반드시" | "가능하면". */
+/** "필수" | "선호". */
 export function hardnessLabel(h: "hard" | "soft"): string {
-  return h === "hard" ? "반드시" : "가능하면";
+  return h === "hard" ? "필수" : "선호";
 }
 
 /** [15,16,17,20] → [[15,17],[20,20]] */
@@ -146,6 +146,21 @@ function peopleLabel(p: People | null | undefined, employees: Employee[]): strin
   return parts.join(" ");
 }
 
+/** 괄호 설명을 뺀 말에 조사를 붙인다: "리더 직원(홀 제외)" → "을". */
+const roleJosa = (w: string, a: string, b: string) => josa(w.replace(/\([^)]*\)$/, ""), a, b);
+
+/** 문장 속 사람: "리더", "리더(홀 제외)", "신입 빼고", "이영희 박민수 중". 비어 있으면 "". */
+function roleLabel(p: People | null | undefined, employees: Employee[]): string {
+  if (!p) return "";
+  const excluded = p.exclude_tags?.join("·");
+  if (p.ids?.length) {
+    const names = p.ids.map((id) => employeeLabel(id, employees));
+    return `${names.length > 3 ? `${names[0]} 외 ${names.length - 1}명` : names.join(" ")} 중`;
+  }
+  if (p.tags?.length) return `${p.tags.join("·")} 직원${excluded ? `(${excluded} 제외)` : ""}`;
+  return excluded ? `${excluded} 빼고` : "";
+}
+
 /** 날짜 고르기: "평일", "11/15~11/17", "평일 중 월·수요일", "11/2~11/7 중 주말·공휴일". 비어 있으면 "". */
 function daysLabel(d: Days | undefined, period: PeriodRange): string {
   if (!d) return "";
@@ -232,30 +247,30 @@ function shapeName(s: Shape, hardness: string): string {
     case "count": {
       const hours = s.measure === "hours";
       if (s.per === "day") {
-        if (hours) return "세는 규칙";
+        if (hours) return "근무 시간";
         if (noPeople(s.people)) return "필요 인원";
         const { ids, tags, exclude_tags } = s.people;
-        if (!ids && !exclude_tags?.length && tags?.length) return "직급별 배치";
-        return "세는 규칙";
+        if (!ids && !exclude_tags?.length && tags?.length) return "직급별 인원";
+        return "인원";
       }
       if (isLeaveShape(s, hardness)) return "휴가";
       if (isPreferenceShape(s, hardness)) return "희망·기피 근무";
       if (hours) return "근무 시간";
       if (s.per === "person") return onlyIn(s.shifts, OFF) && noPeople(s.people) && noDays(s.days) && !s.max ? "최소 휴무 일수" : "근무 횟수";
-      return onlyIn(s.shifts, OFF) ? "휴무 간격" : "세는 규칙";
+      return onlyIn(s.shifts, OFF) ? "쉬는 날" : "근무 횟수";
     }
     case "forbid":
-      return "금지 순서";
+      return "연달아 금지";
     case "off_after":
-      return onlyIn(s.after, "C") ? "마감 다음 휴무" : "순서 규칙";
+      return onlyIn(s.after, "C") ? "마감 다음 휴무" : "연달아 규칙";
     case "max_run":
-      return anyWork(s.run) ? "최대 연속 근무" : onlyIn(s.run, "C") ? "최대 연속 마감" : "순서 규칙";
+      return anyWork(s.run) ? "최대 연속 근무" : onlyIn(s.run, "C") ? "최대 연속 마감" : "연달아 규칙";
     case "min_run":
-      return onlyIn(s.run, "C") ? "최소 연속 마감" : "순서 규칙";
+      return onlyIn(s.run, "C") ? "최소 연속 마감" : "연달아 규칙";
     case "balance":
       if (s.measure === "count" && noDays(s.days) && onlyIn(s.shifts, "C")) return "마감 고르게";
       if (s.measure === "count" && s.days.kind === "weekend" && !s.days.days && !s.days.weekdays && anyWork(s.shifts)) return "주말·공휴일 고르게";
-      return "고르게 규칙";
+      return "공평하게";
   }
 }
 
@@ -274,8 +289,24 @@ function describeCount(s: CountShape, hardness: string, config: ShopConfig, empl
   const none = isNone(s);
   const amount = none ? `${what} 없음` : words(what, boundLabel(s.min, s.max, unit));
   const everyone = who || "모든 사람";
+  const each = when ? `${when}마다` : "매일";
+  if (s.per === "day" && hours && !who) return [`${each} ${what}을 합쳐 `, ...boundLabel(s.min, s.max, unit), "로 해요"];
+  if (s.per === "day" && !hours) {
+    const role = roleLabel(s.people, employees);
+    if (none) return [`${each} ${shifts}에 ${role ? `${role}${/(중|빼고)$/.test(role) ? "" : roleJosa(role, "을", "를")}` : "아무도"} 넣지 않아요`];
+    const obj = role && !/(중|빼고)$/.test(role) ? `${role}${roleJosa(role, "을", "를")} ` : role ? `${role} ` : "";
+    const exact = !!s.min && !!s.max;
+    const n: Phrase = exact ? [...boundLabel(s.min, s.max, unit), "을 넣어요"] : s.min ? [num(s.min), "명 이상 넣어요"] : [num(s.max!), "명까지만 넣어요"];
+    return [`${each} ${shifts}에 ${obj}`, ...n];
+  }
+  const restOff = onlyIn(s.shifts, OFF) && !!s.min && !s.max && !hours;
+  if (restOff && (s.per === "person" || s.per === "person_week" || s.per === "person_window")) {
+    const all = who ? `${who} 모두` : "모두";
+    const span = s.per === "person" ? (when || "근무표 기간에") : s.per === "person_week" ? "한 주에" : `${s.window}일마다`;
+    return [`${all} ${span} `, num(s.min!), "일 이상 쉬어요"];
+  }
   return s.per === "day"
-    ? words(when ? `${when}마다` : "매일", who, amount)
+    ? words(each, who, amount)
     : s.per === "person"
       ? words(everyone, when || (none ? "" : "근무표마다"), amount)
       : words(everyone, s.per === "person_week" ? "주마다" : `${s.window}일마다`, when, amount);
@@ -290,18 +321,24 @@ function describeShape(s: Shape, hardness: string, config: ShopConfig, employees
       const what = s.measure === "hours" ? "근무 시간" : anyWork(s.shifts) ? "근무 수" : `${label(s.shifts)} 수`;
       const history = s.with_history ? "(최근 4주 포함)" : "";
       const gap = hardness === "hard" ? [" · 차이 ", num(s.max_gap), " 이하"] : [];
-      return [...words(peopleLabel(s.people, employees), daysLabel(s.days, period), `${what}${josa(what, "을", "를")} 고르게`), history, ...gap];
+      return [...words(peopleLabel(s.people, employees), daysLabel(s.days, period), `${what}${josa(what, "을", "를")} 고르게 나눠요`), history, ...gap];
     }
   }
   let text: Phrase;
   if (s.kind === "forbid") {
     const p = s.pattern;
-    text = [`${p.length === 2 ? `${label(p[0])} 다음 날 ${label(p[1])}` : p.map(label).join(" → ")} 금지`];
+    const role = roleLabel(s.people, employees);
+    const subject = role ? `${role}${roleJosa(role, "은", "는")} ` : "";
+    if (p.length === 2) return [`${subject}${label(p[0])} 다음 날에는 ${label(p[1])}${josa(label(p[1]), "을", "를")} 넣지 않아요`];
+    return [`${subject}${p.map(label).join(" → ")} 순서로 넣지 않아요`];
   } else if (s.kind === "off_after") {
     const after = label(s.after);
     text = [`${after}${josa(after, "이", "가")} 끝나면 휴무 ${s.then_off}일 (연속 ${after}은 가능)`];
   } else if (s.kind === "max_run") {
-    text = anyWork(s.run) ? ["연속 근무 ", num(s.max_len), "일까지"] : [`${label(s.run)} 연속 `, num(s.max_len), "일까지"];
+    const run = label(s.run);
+    const role = roleLabel(s.people, employees);
+    const subject = role ? `${role}${roleJosa(role, "은", "는")} ` : "";
+    return anyWork(s.run) ? [subject, num(s.max_len), "일 넘게 연달아 일하지 않아요"] : [`${subject}${run}${josa(run, "은", "는")} `, num(s.max_len), "일 넘게 연달아 넣지 않아요"];
   } else {
     const run = label(s.run);
     text = [`${run}${josa(run, "은", "는")} ${s.min_len}일 이상씩 이어서`];
@@ -397,9 +434,9 @@ export function presetName(c: ConstraintSpec): string {
   if (c.type === "fixed_assignment") return "고정 근무";
   const s = ruleShape(c);
   if (s) return shapeName(s, c.hardness ?? (c.body.kind === "balance" ? "soft" : "hard"));
-  if (c.body.kind === "balance") return "고르게 규칙";
+  if (c.body.kind === "balance") return "공평하게";
   if (c.body.when) return "조건 규칙";
-  return hasOffset(c.body) ? "순서 규칙" : "세는 규칙";
+  return hasOffset(c.body) ? "연달아 규칙" : "맞춤 규칙";
 }
 
 /**

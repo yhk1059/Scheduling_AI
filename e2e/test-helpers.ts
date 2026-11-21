@@ -597,11 +597,11 @@ export async function confirmSchedule(page: Page) {
 }
 
 /** 대기 카드의 배지·버튼과 반드시/가능하면 토글. 휴가 카드는 토글이 없다(null). */
-export async function expectCardChrome(card: Locator, hardness: "반드시" | "가능하면" | null) {
+export async function expectCardChrome(card: Locator, hardness: "필수" | "선호" | null) {
   await expect(card.getByText("적용 대기")).toBeVisible();
   await expect(card.getByRole("button", { name: "삭제" })).toBeVisible();
   await expect(card.getByRole("button", { name: "적용" })).toBeVisible();
-  const toggle = card.getByRole("group", { name: "반드시/가능하면" });
+  const toggle = card.getByRole("group", { name: "필수/선호" });
   if (hardness === null) await expect(toggle).toHaveCount(0);
   else await expect(toggle.getByRole("button", { name: hardness })).toHaveAttribute("aria-pressed", "true");
 }
