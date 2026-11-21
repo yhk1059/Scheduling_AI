@@ -291,7 +291,7 @@ function AccuracyNote() {
         <span className={ui.help}>
           매니저 말투 문장 102개 기준 ·{" "}
           <a href={EVAL_URL} className="underline underline-offset-2 hover:text-[#111214]">
-            평가 결과 보기
+            평가 자료 보기(GitHub)
           </a>
         </span>
       </div>
@@ -355,17 +355,17 @@ export default function Home() {
           <div className={`${container} hero-heading`}>
             <h1>
               근무표는<span aria-hidden="true" className="hero-sticker calendar-sticker"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><rect x="3" y="5" width="18" height="16" rx="3" /><path d="M3 10h18M8 3v4M16 3v4" /></svg></span><br />
-              <span className="text-[#EE46BC]">AI</span>가 짜요<span aria-hidden="true" className="hero-sticker sparkle-sticker">✦</span>
+              <span className="text-[#EE46BC]">말로</span> 짜요<span aria-hidden="true" className="hero-sticker sparkle-sticker">✦</span>
             </h1>
             <div className="flex flex-wrap items-center justify-between gap-6">
-              <p className="text-lg leading-relaxed text-[#4B4F57] sm:text-xl">규칙만 알려 주세요. 나머지는 AI가 할게요.</p>
+              <p className="text-lg leading-relaxed text-[#4B4F57] sm:text-xl">규칙은 평소 말투로 적고, 근무표는 버튼 하나로 만들어요.</p>
               <div className="flex flex-wrap gap-2.5">
-                <Link href="/app" className={ui.primaryXl}>시작하기</Link>
-                <Link href="/demo" className={ui.secondaryXl}>데모 보기</Link>
+                <Link href="/app" className={ui.primaryXl}>내 매장으로 시작하기</Link>
+                <Link href="/demo" className={ui.secondaryXl}>체험하기</Link>
               </div>
             </div>
           </div>
-          <div className="hero-caption"><span className="rounded-full bg-[#111214] px-3 py-1 font-mono text-[11px] font-semibold text-white">LIVE DEMO</span>말로 적은 규칙이 근무표가 되는 과정</div>
+          <div className="hero-caption"><span className="rounded-full bg-[#111214] px-3 py-1 text-[11px] font-semibold text-white">실제 화면</span>말로 적은 규칙이 근무표가 되는 과정</div>
           <div className={`${container} hero-stage`}>
             <span aria-hidden="true" className="hero-float hero-float-request">일요일은 휴무로 해 주세요</span>
             <div className="hero-window">
