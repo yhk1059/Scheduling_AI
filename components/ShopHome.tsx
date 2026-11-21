@@ -41,7 +41,7 @@ function TaskProgress({ done }: { done: number }) {
                   current ? "bg-[#C4247C] text-white" : "border border-[#DCDCD8] text-[#6B6F78]"
                 }`}
               >
-                {i < TASK_STEPS.length - 1 ? i + 1 : ""}
+                {i + 1}
               </span>
             )}
             <span className={current ? "font-semibold text-[#111214]" : "text-[#4B4F57]"}>

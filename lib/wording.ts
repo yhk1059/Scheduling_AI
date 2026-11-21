@@ -507,17 +507,17 @@ export function nextTask(shop: Shop, periods: WorkPeriod[], today: string): Next
 }
 
 /** 홈 지금 할 일 카드의 진행 단계. */
-export const TASK_STEPS = ["가능 시간", "매장 조건", "근무표", "확정"] as const;
+export const TASK_STEPS = ["가능 시간", "매장 조건", "근무표"] as const;
 
-/** 지금 할 일 카드에서 끝난 단계 수. */
+/** 지금 할 일 카드에서 끝난 단계 수. 근무표 화면의 ①②③과 같아서, 확정은 ③을 끝내는 일이다. */
 export function taskDoneSteps(task: NextTask): number {
   switch (task.kind) {
     case "none":
     case "drafting":
       return 0;
     case "generated":
-      return 3;
+      return 2;
     case "confirmed":
-      return 4;
+      return 3;
   }
 }

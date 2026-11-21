@@ -553,15 +553,15 @@ describe("coverageText", () => {
 });
 
 describe("taskDoneSteps", () => {
-  it("홈 진행 단계는 요청 → 근무표 → 확정 세 칸이다", () => {
-    expect(TASK_STEPS).toEqual(["가능 시간", "매장 조건", "근무표", "확정"]);
+  it("홈 진행 단계는 근무표 화면의 ①②③과 같은 세 칸이다", () => {
+    expect(TASK_STEPS).toEqual(["가능 시간", "매장 조건", "근무표"]);
   });
 
-  it("상태별로 끝난 단계 수를 센다", () => {
+  it("상태별로 끝난 단계 수를 센다. 만들었지만 확정 전이면 ③이 지금 단계, 확정하면 셋 다 끝이다", () => {
     expect(taskDoneSteps({ kind: "none", name: "" })).toBe(0);
     expect(taskDoneSteps({ kind: "drafting", name: "" })).toBe(0);
-    expect(taskDoneSteps({ kind: "generated", name: "" })).toBe(3);
-    expect(taskDoneSteps({ kind: "confirmed", name: "", confirmedAt: "" })).toBe(4);
+    expect(taskDoneSteps({ kind: "generated", name: "" })).toBe(2);
+    expect(taskDoneSteps({ kind: "confirmed", name: "", confirmedAt: "" })).toBe(3);
   });
 });
 
