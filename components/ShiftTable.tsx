@@ -3,7 +3,7 @@
 import { useId, useRef, useState } from "react";
 
 import { OFF_CODE, shiftTimesError } from "@/lib/rules";
-import { coverageCodes, coverageRange, isShiftUsed, liveShopRules, MAX_SHIFT_CODES, useAppStore, type Shop } from "@/lib/store";
+import { coverageCodes, coverageRange, isShiftUsed, liveShopRules, MAX_SHIFT_CODES, tagCoverage, useAppStore, type Shop } from "@/lib/store";
 import { coverageText } from "@/lib/wording";
 import type { ShiftDef, ShopConfig } from "@/lib/types.gen";
 
@@ -78,7 +78,7 @@ function ShiftTimeline({ shop, focusShift }: { shop: Shop; focusShift: (code: st
   return (
     <aside aria-label="하루 타임라인" className={`${ui.workAside} rounded-2xl bg-[#F5F5F4] px-4 py-4`}>
       <h3 className={ui.cardTitle}>하루 타임라인</h3>
-      <p className={ui.help}>필요 인원 · 평일 / 주말·공휴일</p>
+      <p className={ui.help}>근무조마다 필요 인원</p>
       {shifts.length ? (
         <div className="relative space-y-3 px-2 pt-6">
           <div aria-hidden="true" className="pointer-events-none absolute inset-x-2 inset-y-0 flex justify-between">
@@ -92,7 +92,14 @@ function ShiftTimeline({ shop, focusShift }: { shop: Shop; focusShift: (code: st
           {shifts.map((shift) => {
             const start = shift.start!;
             const end = shift.end!;
-            const need = (kind: "weekday" | "weekend") => coverageText(coverageRange(rules, shift.code, kind)) || "—";
+            // 전체 필요 인원 뒤에 직급별 필요 인원("홀 2명 이상 · 주방 2명 이상")을 잇는다
+            const need = (kind: "weekday" | "weekend") =>
+              [coverageText(coverageRange(rules, shift.code, kind)), ...tagCoverage(rules, shift.code, kind).map((t) => `${t.tag} ${coverageText(t)}`)]
+                .filter(Boolean)
+                .join(" · ") || "—";
+            const weekday = need("weekday");
+            const weekend = need("weekend");
+            const lines = weekday === weekend ? [["매일", weekday]] : [["평일", weekday], ["주말·공휴일", weekend]];
             return (
               <div key={shift.code} className="relative">
                 <button
@@ -100,10 +107,13 @@ function ShiftTimeline({ shop, focusShift }: { shop: Shop; focusShift: (code: st
                   onClick={() => focusShift(shift.code)}
                   className="w-full rounded text-left focus-visible:outline-2 focus-visible:outline-[#C4247C]"
                 >
-                  <span className="flex flex-wrap items-baseline justify-between gap-x-2 text-xs text-[#111214]">
-                    <span className="font-semibold wrap-anywhere">{shift.code} {shift.name}</span>
-                    <span className="font-mono">{need("weekday")} / {need("weekend")}</span>
-                  </span>
+                  <span className="block text-xs font-semibold text-[#111214] wrap-anywhere">{shift.code} {shift.name}</span>
+                  {lines.map(([label, text]) => (
+                    <span key={label} className="mt-0.5 flex gap-2 text-xs text-[#111214]">
+                      <span className="shrink-0 text-[#6B6F78]">{label}</span>
+                      <span className="font-mono">{text}</span>
+                    </span>
+                  ))}
                   <span className="relative mt-1 block h-4">
                     <span aria-hidden="true" className={`absolute inset-y-0 min-w-px overflow-hidden rounded-md ${codeClass(shift.code, false, shop.config)}`} style={{ left: `${position(start)}%`, width: `${position(end) - position(start)}%` }}>
                       <span className="block h-full bg-current opacity-80" />

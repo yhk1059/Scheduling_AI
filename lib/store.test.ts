@@ -236,6 +236,22 @@ describe("매장", () => {
     // 직급별 배치는 폼 모양 필요 인원이 아니다
     expect(coverageRange(rules, "D", "weekday")).toBeNull();
   });
+
+  it("tagCoverage는 매일 규칙을 평일·주말 칸 모두에 읽고, 같은 직급은 하나로 합친다", () => {
+    const daily = countCard("d", { people: { tags: ["주방"] }, days: { kind: "all" }, shifts: { in: ["D"] }, per: "day", min: 2 });
+    const noDays = countCard("n", { people: { tags: ["홀"] }, shifts: { in: ["D"] }, per: "day", min: 1 });
+    const weekendKitchen = countCard("wk", { people: { tags: ["주방"] }, days: { kind: "weekend" }, shifts: { in: ["D"] }, per: "day", min: 3, max: 4 });
+    const rules = [daily, noDays, weekendKitchen];
+    expect(tagCoverage(rules, "D", "weekday")).toEqual([
+      { tag: "주방", min: 2, max: null },
+      { tag: "홀", min: 1, max: null },
+    ]);
+    // 주말 주방은 매일 2명 이상과 주말 3~4명이 함께 걸려 3~4명이다
+    expect(tagCoverage(rules, "D", "weekend")).toEqual([
+      { tag: "주방", min: 3, max: 4 },
+      { tag: "홀", min: 1, max: null },
+    ]);
+  });
 });
 
 describe("매장 규칙 카드", () => {

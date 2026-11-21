@@ -398,8 +398,8 @@ function coverageKey(c: ConstraintSpec): { code: Code; kind: DayKind; min: numbe
   return ok ? { code: shifts.in![0], kind: days.kind as DayKind, min: s.min?.n ?? 0, max: s.max?.n ?? null } : null;
 }
 
-/** 직급별 배치 모양: 필요 인원 폼 모양에서 사람만 직급 하나로 고른 규칙. 그 (코드, 요일 종류, 직급). */
-function tagCoverageKey(c: ConstraintSpec): { code: Code; kind: DayKind; tag: string; min: number; max: number | null } | null {
+/** 직급별 배치 모양: 필요 인원 폼 모양에서 사람만 직급 하나로 고른 규칙. 그 (코드, 요일 종류, 직급). 매일 규칙은 kind가 "all"이다. */
+function tagCoverageKey(c: ConstraintSpec): { code: Code; kind: DayKind | "all"; tag: string; min: number; max: number | null } | null {
   const s = ruleShape(c);
   if (c.scope !== "shop" || s?.kind !== "count") return null;
   const { people, days, shifts } = s;
@@ -409,21 +409,28 @@ function tagCoverageKey(c: ConstraintSpec): { code: Code; kind: DayKind; tag: st
     !people.ids &&
     people.tags?.length === 1 &&
     !people.exclude_tags?.length &&
-    (days.kind === "weekday" || days.kind === "weekend") &&
+    (days.kind === undefined || days.kind === "all" || days.kind === "weekday" || days.kind === "weekend") &&
     !days.weekdays &&
     !days.days &&
     shifts.in?.length === 1;
-  return ok ? { code: shifts.in![0], kind: days.kind as DayKind, tag: people.tags![0], min: s.min?.n ?? 0, max: s.max?.n ?? null } : null;
+  return ok ? { code: shifts.in![0], kind: (days.kind ?? "all") as DayKind | "all", tag: people.tags![0], min: s.min?.n ?? 0, max: s.max?.n ?? null } : null;
 }
 
-/** 요약표 한 칸의 직급별 필요 인원(직급 이름 순). 없으면 빈 배열. */
+/** 요약표 한 칸의 직급별 필요 인원(직급 이름 순). 매일 규칙도 읽고, 같은 직급은 범위를 겹쳐 하나로 합친다. 없으면 빈 배열. */
 export function tagCoverage(rules: ConstraintSpec[], code: Code, kind: DayKind): { tag: string; min: number; max: number | null }[] {
-  return rules
-    .flatMap((c) => {
-      const k = tagCoverageKey(c);
-      return k?.code === code && k.kind === kind ? [{ tag: k.tag, min: k.min, max: k.max }] : [];
-    })
-    .sort((a, b) => a.tag.localeCompare(b.tag, "ko"));
+  const byTag = new Map<string, { tag: string; min: number; max: number | null }>();
+  for (const c of rules) {
+    const k = tagCoverageKey(c);
+    if (k?.code !== code || (k.kind !== kind && k.kind !== "all")) continue;
+    const prev = byTag.get(k.tag);
+    byTag.set(
+      k.tag,
+      prev
+        ? { tag: k.tag, min: Math.max(prev.min, k.min), max: prev.max === null ? k.max : k.max === null ? prev.max : Math.min(prev.max, k.max) }
+        : { tag: k.tag, min: k.min, max: k.max },
+    );
+  }
+  return [...byTag.values()].sort((a, b) => a.tag.localeCompare(b.tag, "ko"));
 }
 
 /** 필요 인원 모양(폼에 나오는 규칙). */

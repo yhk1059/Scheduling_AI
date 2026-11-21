@@ -22,13 +22,13 @@ export function shortTime(iso: string): string {
 /** 진행 단계 한 줄(표시만, 누를 수 없다). Stepper와 같은 모양이다. */
 function TaskProgress({ done }: { done: number }) {
   return (
-    <ol aria-label="진행 단계" className="flex items-center gap-2 text-sm">
+    <ol aria-label="진행 단계" className="flex flex-wrap items-center gap-x-2 gap-y-1.5 text-sm">
       {TASK_STEPS.map((label, i) => {
         const finished = i < done;
         const current = i === done;
         return (
-          <li key={label} className="flex items-center gap-2">
-            {i > 0 && <span aria-hidden="true" className="h-px w-6 bg-[#DCDCD8]" />}
+          <li key={label} className="flex items-center gap-2 whitespace-nowrap">
+            {i > 0 && <span aria-hidden="true" className="h-px w-3 bg-[#DCDCD8] sm:w-6" />}
             {finished ? (
               <span className="flex size-[22px] items-center justify-center rounded-full bg-[#FDEAF4] text-[#C4247C]">
                 <svg aria-hidden="true" viewBox="0 0 12 12" className="size-3" fill="none" stroke="currentColor" strokeWidth={1.8}>
@@ -220,7 +220,7 @@ function TaskPanel() {
   const submittedText = share.url || share.demo ? `${share.total}명 중 ${share.total - share.missing.length}명이 가능 시간을 제출했어요.` : "";
 
   return (
-    <section className={`${ui.panel} px-8! py-7! ${draft ? "grid grid-cols-[1fr_320px] gap-8" : ""}`}>
+    <section className={`${ui.panel} px-8! py-7! ${draft ? "grid grid-cols-1 gap-6 md:grid-cols-[minmax(0,1fr)_320px] md:gap-8" : ""}`}>
       <div className="flex min-w-0 flex-col items-start gap-3.5">
         <div className="flex items-center gap-2.5">
           <span className={ui.eyebrow}>지금 할 일</span>
