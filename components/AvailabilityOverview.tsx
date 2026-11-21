@@ -3,10 +3,11 @@
 import { useState } from "react";
 
 import { availableCount, SLOT_COUNT, slotSpan, type AvailabilitySlots } from "@/lib/availability";
+import { effectiveCoverage, staffingTone, type StaffingTone } from "@/lib/coverage-conflict";
 import { isWeekendDay, periodDays, type PeriodDay } from "@/lib/period";
 import type { AvailabilityLink } from "@/lib/supabase";
 import { coverageCodes, type ShopEmployee, type WorkPeriod } from "@/lib/store";
-import type { ShopConfig } from "@/lib/types.gen";
+import type { ConstraintSpec, ShopConfig } from "@/lib/types.gen";
 
 import { ui } from "./ui";
 
@@ -17,20 +18,32 @@ const SLOT_HEIGHT = 6;
 /** 3시간마다 시각과 줄을 긋는다(06, 09, … 21시). */
 const HOUR_SLOTS = Array.from({ length: SLOT_COUNT / 6 }, (_, i) => i * 6);
 
+/** 가능 인원 칸의 상태: 점 색, 글자 색, 화면 읽기용 말. */
+const TONES: Record<StaffingTone, { dot: string; ink: string; text: string }> = {
+  ok: { dot: "bg-[#12B76A]", ink: "text-[#111214]", text: "여유" },
+  tight: { dot: "bg-[#FF7A1A]", ink: "text-[#B93815]", text: "빠듯" },
+  short: { dot: "bg-[#F04438]", ink: "text-[#B42318]", text: "부족" },
+};
+
 const dayColor = (day: PeriodDay, weekend: boolean) =>
   day.weekday === 0 || (weekend && day.weekday !== 6) ? "text-[#B42318]" : day.weekday === 6 ? "text-[#C4247C]" : "text-[#4B4F57]";
 
-/** ① 직원이 제출한 가능 시간 모아 보기: 날짜별 가능 인원 + 직원별 읽기 전용 캘린더. 2주 이상이면 모두 같은 주로 함께 넘긴다. */
+/**
+ * ① 직원이 제출한 가능 시간 모아 보기: 날짜별 가능 인원 + 직원별 읽기 전용 캘린더. 2주 이상이면 모두 같은 주로 함께 넘긴다.
+ * 가능 인원 칸에는 켜진 반드시 필요 인원과 비교한 상태(여유·빠듯·부족)를 점으로 붙인다.
+ */
 export default function AvailabilityOverview({
   period,
   employees,
   rows,
   config,
+  rules,
 }: {
   period: WorkPeriod;
   employees: ShopEmployee[];
   rows: AvailabilityLink[];
   config: ShopConfig;
+  rules: ConstraintSpec[];
 }) {
   const [page, setPage] = useState(0);
   const days = periodDays(period);
@@ -39,6 +52,9 @@ export default function AvailabilityOverview({
   const weekend = (d: PeriodDay) => isWeekendDay(period, d.day, period.holidays);
   const rowOf = (id: string) => rows.find((r) => r.employee_id === id);
   const slotsList = employees.map((n) => rowOf(n.id)?.slots ?? {});
+  const codes = coverageCodes(config);
+  const needOf = (code: string, d: PeriodDay) => effectiveCoverage(rules, code, weekend(d) ? "weekend" : "weekday", period, period.holidays);
+  const hasNeed = codes.some((s) => days.some((d) => needOf(s.code, d)));
 
   return (
     <section className="flex flex-col gap-3">
@@ -63,7 +79,7 @@ export default function AvailabilityOverview({
         )}
       </div>
 
-      <div className={`${ui.card} sticky top-0 z-10`}>
+      <div className={`${ui.card} sticky top-28 z-10 flex flex-col gap-2`}>
         <table aria-label="날짜별 가능 인원" className="w-full table-fixed border-collapse">
           <thead>
             <tr className="border-b border-[#EDEDEA]">
@@ -79,7 +95,7 @@ export default function AvailabilityOverview({
             </tr>
           </thead>
           <tbody>
-            {coverageCodes(config).map((s) => (
+            {codes.map((s) => (
               <tr key={s.code} className="border-b border-[#F5F5F4] last:border-b-0">
                 <th scope="row" className="py-1 text-left text-[13px] font-medium text-[#111214]">
                   {s.name}{" "}
@@ -87,15 +103,34 @@ export default function AvailabilityOverview({
                     {s.start}~{s.end}
                   </span>
                 </th>
-                {shown.map((d) => (
-                  <td key={d.date} className="py-1 text-center font-mono text-[13px] text-[#111214]">
-                    {availableCount(slotsList, d.date, s, config)}
-                  </td>
-                ))}
+                {shown.map((d) => {
+                  const count = availableCount(slotsList, d.date, s, config);
+                  const tone = staffingTone(count, needOf(s.code, d));
+                  return (
+                    <td key={d.date} className="py-1 text-center">
+                      <span className={`inline-flex items-center gap-1.5 font-mono text-[13px] ${tone ? `font-semibold ${TONES[tone].ink}` : "text-[#111214]"}`}>
+                        {tone && <span aria-hidden="true" className={`size-1.5 rounded-full ${TONES[tone].dot}`} />}
+                        {count}
+                        {tone && <span className="sr-only">명, {TONES[tone].text}</span>}
+                      </span>
+                    </td>
+                  );
+                })}
               </tr>
             ))}
           </tbody>
         </table>
+        {hasNeed && (
+          <p className={`${ui.help} flex flex-wrap items-center gap-x-3 gap-y-1`}>
+            {(["ok", "tight", "short"] as const).map((t) => (
+              <span key={t} className="inline-flex items-center gap-1.5">
+                <span aria-hidden="true" className={`size-1.5 rounded-full ${TONES[t].dot}`} />
+                {TONES[t].text}
+              </span>
+            ))}
+            <span>반드시 필요 인원과 비교해요</span>
+          </p>
+        )}
       </div>
 
       <div className="grid grid-cols-3 gap-3">

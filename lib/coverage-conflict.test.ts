@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { count, forbid } from "./test-rules";
-import { coverageBounds, coverageDays, effectiveCoverage, findCoverageConflict } from "./coverage-conflict";
+import { coverageBounds, coverageDays, effectiveCoverage, findCoverageConflict, staffingTone } from "./coverage-conflict";
 import type { PeriodRange } from "./period";
 import type { ConstraintSpec, Days, Shifts } from "./types.gen";
 
@@ -166,5 +166,24 @@ describe("effectiveCoverage", () => {
     const monday: PeriodRange = { start_date: "2026-11-02", length: 1 };
     expect(effectiveCoverage([daily], "A", "weekend", monday, [])).toBeNull();
     expect(effectiveCoverage([daily], "A", "weekday", monday, [])).toEqual({ min: 1, max: null });
+  });
+});
+
+describe("staffingTone", () => {
+  it("필요 인원이 없으면 null", () => {
+    expect(staffingTone(3, null)).toBeNull();
+  });
+  it("최소 0명이면 null", () => {
+    expect(staffingTone(0, { min: 0, max: 3 })).toBeNull();
+  });
+  it("가능 인원이 최소보다 적으면 short", () => {
+    expect(staffingTone(1, { min: 2, max: null })).toBe("short");
+  });
+  it("최소와 같거나 1명 많으면 tight", () => {
+    expect(staffingTone(2, { min: 2, max: null })).toBe("tight");
+    expect(staffingTone(3, { min: 2, max: 2 })).toBe("tight");
+  });
+  it("최소보다 2명 이상 많으면 ok", () => {
+    expect(staffingTone(4, { min: 2, max: null })).toBe("ok");
   });
 });

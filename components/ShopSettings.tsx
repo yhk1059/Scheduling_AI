@@ -5,7 +5,6 @@ import { useEffect, useRef, useState } from "react";
 import type { PeriodUnit } from "@/lib/period";
 import { MAX_EMPLOYEES } from "@/lib/roster-import";
 import { isEmployeeUsed, MAX_TAG_CHARS, MAX_TAGS_PER_EMPLOYEE, orphanConstraintIds, useAppStore, type ShopEmployee } from "@/lib/store";
-import { unitName } from "@/lib/wording";
 
 import CoverageForm, { type CoverageDrafts } from "./CoverageForm";
 import RulesStep from "./RulesStep";
@@ -18,7 +17,13 @@ const TABS = [
   { tab: "roster", label: "명단" },
 ] as const;
 
-const UNITS: PeriodUnit[] = ["month", "1w", "2w", "4w"];
+/** 근무표 주기 선택 카드: 이름과 짧은 설명. */
+const UNIT_CARDS: { unit: PeriodUnit; title: string; sub: string }[] = [
+  { unit: "1w", title: "1주", sub: "매주" },
+  { unit: "2w", title: "2주", sub: "격주" },
+  { unit: "4w", title: "4주", sub: "4주마다" },
+  { unit: "month", title: "한 달", sub: "1일~말일" },
+];
 
 export default function ShopSettings() {
   const tab = useAppStore((s) => (s.view.screen === "settings" ? s.view.tab : "shifts"));
@@ -118,23 +123,43 @@ export function BasicSection() {
             className={`${ui.input} w-64`}
           />
         </label>
-        <label className="flex flex-col gap-1">
-          <span className={ui.label}>근무표 주기</span>
-          <select
-            value={shop.unit}
-            onChange={(e) => {
-              setUnit(e.target.value as PeriodUnit);
-              setUnitChanged(true);
-            }}
-            className={`${ui.input} w-40`}
-          >
-            {UNITS.map((u) => (
-              <option key={u} value={u}>
-                {unitName(u)}
-              </option>
-            ))}
-          </select>
-        </label>
+        <fieldset className="flex flex-col gap-1">
+          <legend className={`${ui.label} mb-1`}>근무표 주기</legend>
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+            {UNIT_CARDS.map(({ unit, title, sub }) => {
+              const on = shop.unit === unit;
+              return (
+                <label
+                  key={unit}
+                  className={`relative flex w-32 cursor-pointer flex-col gap-0.5 rounded-2xl px-3.5 py-3 transition-shadow duration-[120ms] has-focus-visible:outline-2 has-focus-visible:outline-offset-2 has-focus-visible:outline-[#C4247C] ${
+                    on ? "bg-white shadow-[inset_0_0_0_2px_#111214]" : "bg-white shadow-[inset_0_0_0_1px_#DCDCD8] hover:bg-[#F5F5F4]"
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="shop-unit"
+                    value={unit}
+                    checked={on}
+                    onChange={() => {
+                      setUnit(unit);
+                      setUnitChanged(true);
+                    }}
+                    className="sr-only"
+                  />
+                  <span className="text-base font-bold text-[#111214]">{title}</span>
+                  <span className="text-xs text-[#6B6F78]">{sub}</span>
+                  {on && (
+                    <span aria-hidden="true" className="absolute top-2.5 right-2.5 flex size-[18px] items-center justify-center rounded-full bg-[#111214] text-white">
+                      <svg viewBox="0 0 12 12" className="size-2.5" fill="none" stroke="currentColor" strokeWidth={2.2}>
+                        <path d="M2.5 6.2 5 8.5l4.5-5" />
+                      </svg>
+                    </span>
+                  )}
+                </label>
+              );
+            })}
+          </div>
+        </fieldset>
       </div>
       {unitChanged && hasPeriods && (
         <p role="status" className={ui.banner}>
@@ -149,15 +174,26 @@ export function BasicSection() {
 export function RosterSection() {
   const shop = useAppStore((s) => s.shop)!;
   const orphanCount = orphanConstraintIds(shop, null).length;
+  const empty = !shop.employees.some((n) => n.active);
 
   return (
     <section className={`${ui.card} flex flex-col gap-3.5`}>
       <div className="flex flex-col gap-1">
         <h2 className={ui.sectionTitle}>명단</h2>
-        <p className={ui.help}>
-          맨 아래 줄에 이름을 적고 Enter를 누르면 한 명씩 더해져요. 이름 입력란에는 이니셜을 써도 됩니다. 바꾼 내용은 바로 저장돼요.
-        </p>
+        {!empty && <p className={ui.help}>맨 아래 줄에 이름을 적고 Enter를 누르면 한 명씩 더해져요. 바꾼 내용은 바로 저장돼요.</p>}
       </div>
+      {empty && (
+        <div className="flex flex-col items-center gap-2 rounded-2xl bg-[#F5F5F4] px-5 py-7 text-center">
+          <span aria-hidden="true" className="flex size-12 -rotate-6 items-center justify-center rounded-[14px] bg-[#E5EDFF] text-[#1E4FD8]">
+            <svg viewBox="0 0 24 24" className="size-[22px]" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="9" cy="8.5" r="3.5" />
+              <path d="M3 20c.8-3.4 3.2-5.5 6-5.5s5.2 2.1 6 5.5M16 5.5a3.5 3.5 0 0 1 0 6.5M18 14.8c1.6.8 2.6 2.6 3 5.2" />
+            </svg>
+          </span>
+          <p className="text-[17px] font-bold text-[#111214]">아직 명단이 없어요</p>
+          <p className="text-sm text-[#4B4F57]">아래 줄에 이름을 적고 Enter를 누르면 한 명씩 더해져요. 이니셜도 돼요</p>
+        </div>
+      )}
       <EmployeeTable employees={shop.employees} />
       {orphanCount > 0 && (
         <p className="text-xs font-medium text-[#B93815]">

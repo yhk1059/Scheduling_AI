@@ -29,7 +29,7 @@ import AvailabilityOverview from "./AvailabilityOverview";
 import HolidayCalendar from "./HolidayCalendar";
 import RulesStep from "./RulesStep";
 import ScheduleStep, { CELL, cellText, codeClass, DayHead } from "./ScheduleStep";
-import Stepper from "./Stepper";
+import Stepper, { StepBar } from "./Stepper";
 import ShiftTable from "./ShiftTable";
 import { CoverageSection } from "./ShopSettings";
 import { ui } from "./ui";
@@ -40,6 +40,7 @@ export default function PeriodWork() {
   const step = useAppStore((s) => (s.view.screen === "period" ? s.view.step : 1));
   const go = useAppStore((s) => s.go);
   const unit = useAppStore((s) => s.shop?.unit ?? "month");
+  const shop = useAppStore((s) => s.shop);
 
   // 단계를 옮기면 새 단계 제목으로 포커스를 옮긴다(처음 열 때는 옮기지 않는다)
   const rootRef = useRef<HTMLDivElement>(null);
@@ -52,6 +53,11 @@ export default function PeriodWork() {
 
   if (!period) return null;
   const toStep = (s: PeriodStep) => go({ screen: "period", periodId: period.id, step: s });
+  const notes = [
+    `직원 ${shop?.employees.filter((n) => n.active).length ?? 0}명`,
+    `규칙 ${shop ? liveShopRules(shop, period).length : 0}개`,
+    period.result ? "만들었어요" : "아직 없어요",
+  ];
 
   return (
     <div ref={rootRef} className="flex flex-col gap-5">
@@ -66,7 +72,7 @@ export default function PeriodWork() {
           <span className="font-mono text-sm text-[#6B6F78]">{formatRange(period)}</span>
           <span className={`${ui.badge} ${ui.badgeTone.draft}`}>작성 중</span>
         </div>
-        <Stepper label="근무표 작성 단계" labels={["가능 시간", "매장 조건", "근무표"]} current={step} reached={period.result ? 3 : step} onSelect={toStep} />
+        <Stepper label="근무표 작성 단계" labels={["가능 시간", "매장 조건", "근무표"]} notes={notes} current={step} reached={period.result ? 3 : step} onSelect={toStep} />
       </div>
 
       {step === 1 ? (
@@ -76,11 +82,12 @@ export default function PeriodWork() {
           </h2>
           <PrepareSummary key={`prep-${period.id}`} period={period} />
           <LinksSection period={period} />
-          <div className="flex justify-end">
-            <button type="button" onClick={() => toStep(2)} className={ui.primary}>
-              다음
+          <StepBar current={1} total={3} caption="가능 시간">
+            <button type="button" onClick={() => toStep(2)} className={ui.primaryLg}>
+              다음: 매장 조건
+              <span aria-hidden="true">→</span>
             </button>
-          </div>
+          </StepBar>
         </>
       ) : step === 2 ? (
         <ConditionsStep key={period.id} period={period} onStep={toStep} />
@@ -144,7 +151,7 @@ function LinksSection({ period }: { period: WorkPeriod }) {
           </div>
           {absent.length > 0 && <p className={ui.help}>미제출: {absent.map((n) => n.name).join(", ")}</p>}
         </section>
-        {shop && <AvailabilityOverview key={period.id} period={period} employees={employees} rows={rows} config={shop.config} />}
+        {shop && <AvailabilityOverview key={period.id} period={period} employees={employees} rows={rows} config={shop.config} rules={liveShopRules(shop, period)} />}
       </>
     );
   }
@@ -219,7 +226,7 @@ function LinksSection({ period }: { period: WorkPeriod }) {
         )}
       </section>
       {current && shop && (
-        <AvailabilityOverview key={period.id} period={period} employees={employees} rows={current.rows} config={shop.config} />
+        <AvailabilityOverview key={period.id} period={period} employees={employees} rows={current.rows} config={shop.config} rules={liveShopRules(shop, period)} />
       )}
     </>
   );
@@ -260,11 +267,8 @@ function ConditionsStep({ period, onStep }: { period: WorkPeriod; onStep: (s: Pe
         </div>
         {exceptionsOpen && <RulesStep key="period" scope="period" />}
       </div>
-      <div className="flex items-center justify-between gap-4">
-        <button type="button" onClick={() => onStep(1)} className={ui.secondary}>
-          이전
-        </button>
-        <div className="flex items-center gap-3">
+      <StepBar current={2} total={3} caption="매장 조건">
+        <div className="flex flex-wrap items-center justify-end gap-3">
           {blocked && orphanCount > 0 && (
             <p role="alert" className={ui.error}>
               명단에 없는 직원을 가리키는 규칙 {orphanCount}개를 삭제하거나 고친 뒤 넘어갈 수 있어요.
@@ -272,11 +276,15 @@ function ConditionsStep({ period, onStep }: { period: WorkPeriod; onStep: (s: Pe
           )}
           {!hasStaffing && <p className={ui.help}>필요 인원 없이 만들면 인원을 맞추지 않아요</p>}
           {pending > 0 && <p className={ui.help}>적용하지 않은 규칙 {pending}개는 빠져요</p>}
-          <button type="button" onClick={() => (orphanCount > 0 ? setBlocked(true) : onStep(3))} className={ui.primary}>
-            다음
+          <button type="button" onClick={() => onStep(1)} className={ui.secondaryLg}>
+            이전
+          </button>
+          <button type="button" onClick={() => (orphanCount > 0 ? setBlocked(true) : onStep(3))} className={ui.primaryLg}>
+            다음: 근무표
+            <span aria-hidden="true">→</span>
           </button>
         </div>
-      </div>
+      </StepBar>
     </>
   );
 }
@@ -342,27 +350,25 @@ function PrepareSummary({ period }: { period: WorkPeriod }) {
   const hasPrevious = periods.some((p) => p.status === "confirmed" && p.start_date < period.start_date);
   const { added, deactivated } = rosterChangesFor(shop, periods, period.id);
   const names = (list: { name: string }[]) => list.map((n) => n.name).join(", ");
-  const carry = prev
-    ? "지난 근무표에서 이어져요"
-    : period.carryOver.length > 0
-      ? `지난 근무 ${period.carryOver.length}명 입력`
-      : "지난 근무 없음";
+  const carry = prev ? "지난 근무표에서 이어짐" : period.carryOver.length > 0 ? `${period.carryOver.length}명 입력` : "없음";
 
   return (
     <div className="flex flex-col gap-3">
-      <section className={`${ui.card} flex items-center justify-between gap-3`}>
-        <p className="text-sm text-[#4B4F57]">
-          <span className="font-mono font-medium text-[#111214]">{formatRange(period)}</span> ·{" "}
-          {period.holidays.length > 0 ? (
-            <>
-              공휴일 <span className="font-mono">{period.holidays.length}</span>일
-            </>
-          ) : (
-            "공휴일 없음"
-          )}{" "}
-          · 직원 <span className="font-mono">{active}</span>명 · {carry}
-        </p>
-        <button type="button" aria-expanded={open} onClick={() => setOpen((o) => !o)} className={ui.textSm}>
+      <section aria-label="준비 요약" className="flex flex-wrap items-center gap-1 self-start rounded-2xl border border-[#DCDCD8] bg-white py-1.5 pr-1.5 pl-1">
+        <dl className="flex flex-wrap">
+          {[
+            ["기간", formatRange(period)],
+            ["공휴일", period.holidays.length > 0 ? `${period.holidays.length}일` : "없음"],
+            ["직원", `${active}명`],
+            ["지난 근무", carry],
+          ].map(([k, v]) => (
+            <div key={k} className="flex flex-col gap-0.5 border-r border-[#EDEDEA] px-4 py-1">
+              <dt className="text-xs text-[#6B6F78]">{k}</dt>
+              <dd className="text-[15px] font-semibold text-[#111214]">{v}</dd>
+            </div>
+          ))}
+        </dl>
+        <button type="button" aria-expanded={open} onClick={() => setOpen((o) => !o)} className={`${ui.secondary} ml-2 rounded-xl!`}>
           {open ? "접기" : "바꾸기"}
         </button>
       </section>
