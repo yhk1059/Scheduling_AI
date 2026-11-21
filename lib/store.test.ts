@@ -2188,7 +2188,7 @@ describe("공정성 기본 규칙", () => {
       balance({ people: {}, days: { kind: "all" }, shifts: WORK, with_history: true, max_gap: 1 }, { id: BALANCE, scope: "shop", hardness: "soft", priority: "low", default: true, source_text: "근무 수는 고르게" }),
     );
     expect((fair as Rule).body.kind).toBe("balance");
-    expect(presetName(fair)).toBe("공평하게");
+    expect(presetName(fair)).toBe("고르게 나누기");
     expect(describeRule(fair, DEFAULT_CONFIG, [], { start_date: "2026-11-02", length: 7 }).text).toMatch(/^근무 수를 고르게 나눠요\(최근 4주 포함\)/);
     expect([run, fair].map((c) => [c.hardness, c.enabled, (c as Rule).default])).toEqual([
       ["soft", true, true],

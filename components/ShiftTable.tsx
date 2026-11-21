@@ -41,7 +41,7 @@ export default function ShiftTable({ showTimeline = false }: { showTimeline?: bo
           <table className={`w-full border-collapse text-[13px] ${showTimeline ? "[&_input]:px-1.5 [&_input]:max-w-20 [&_input[type=time]]:max-w-none [&_td]:px-0.5 [&_th]:px-1 [&_th]:leading-tight" : ""}`}>
             <thead>
               <tr className="border-b border-[#EDEDEA] text-left text-xs font-medium text-[#6B6F78]">
-                <th className="px-2 py-2 font-medium">코드</th>
+                <th className="px-2 py-2 font-medium">약자</th>
                 <th className="px-2 py-2 font-medium">이름</th>
                 <th className="px-2 py-2 font-medium">시작 시각</th>
                 <th className="px-2 py-2 font-medium">끝 시각</th>

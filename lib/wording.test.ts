@@ -226,7 +226,7 @@ describe("presetName / describeRule: 프리셋 모양", () => {
     ["차이 0", balance({ shifts: C, max_gap: 0 }, hard), "마감 고르게", "마감 수를 고르게 나눠요(최근 4주 포함) · 차이 0 이하"],
     ["주말 고르게", balance({ days: { kind: "weekend" }, shifts: WORK }), "주말·공휴일 고르게", "주말·공휴일 근무 수를 고르게 나눠요(최근 4주 포함)"],
     ["주말 고르게 반드시", balance({ days: { kind: "weekend" }, shifts: WORK }, hard), "주말·공휴일 고르게", "주말·공휴일 근무 수를 고르게 나눠요(최근 4주 포함) · 차이 1 이하"],
-    ["시간 고르게(최근 4주 뺌)", balance({ days: { kind: "weekend" }, shifts: WORK, measure: "hours", with_history: false }), "공평하게", "주말·공휴일 근무 시간을 고르게 나눠요"],
+    ["시간 고르게(최근 4주 뺌)", balance({ days: { kind: "weekend" }, shifts: WORK, measure: "hours", with_history: false }), "고르게 나누기", "주말·공휴일 근무 시간을 고르게 나눠요"],
   ];
 
   for (const [name, r, preset, sentence] of CASES) {
@@ -316,10 +316,10 @@ describe("presetName / describeRule: 새 모양", () => {
 
   it("고르게: 시간, 직급, 최근 4주를 빼면", () => {
     expect(d(balance({ people: { tags: ["신입"] }, shifts: WORK, measure: "hours" }))).toEqual([
-      "공평하게",
+      "고르게 나누기",
       "신입 직원 근무 시간을 고르게 나눠요(최근 4주 포함)",
     ]);
-    expect(d(balance({ shifts: { in: ["AC"] }, with_history: false }))).toEqual(["공평하게", "더블(AC) 수를 고르게 나눠요"]);
+    expect(d(balance({ shifts: { in: ["AC"] }, with_history: false }))).toEqual(["고르게 나누기", "더블(AC) 수를 고르게 나눠요"]);
   });
 
   it("희망·기피는 가능하면인 한 사람 세기, 반드시면 근무 횟수", () => {

@@ -339,7 +339,7 @@ function CoverageSummary({ period }: { period: WorkPeriod }) {
           {open ? "접기" : "바꾸기"}
         </button>
       </div>
-      <p className={ui.help}>켜진 필수 필요 인원 규칙을 합친 값이에요. 일부 날짜에만 적용되는 규칙은 카드에서 봐요</p>
+      <p className={ui.help}>켜 둔 필수 인원 규칙을 한 표로 모았어요. 특정 날짜에만 적용되는 인원은 아래 카드에서 봐요</p>
       {open && <ShiftTable />}
     </section>
   );
@@ -357,7 +357,7 @@ function PrepareSummary({ period }: { period: WorkPeriod }) {
   const hasPrevious = periods.some((p) => p.status === "confirmed" && p.start_date < period.start_date);
   const { added, deactivated } = rosterChangesFor(shop, periods, period.id);
   const names = (list: { name: string }[]) => list.map((n) => n.name).join(", ");
-  const carry = prev ? "지난 근무표에서 이어짐" : period.carryOver.length > 0 ? `${period.carryOver.length}명 입력` : "없음";
+  const carry = prev ? "지난 근무표에서" : period.carryOver.length > 0 ? `${period.carryOver.length}명 직접 입력` : "없음";
 
   return (
     <div className="flex flex-col gap-3">
@@ -367,7 +367,7 @@ function PrepareSummary({ period }: { period: WorkPeriod }) {
             ["날짜", formatRange(period)],
             ["공휴일", period.holidays.length > 0 ? `${period.holidays.length}일` : "없음"],
             ["직원", `${active}명`],
-            ["지난 근무", carry],
+            ["이어받는 근무", carry],
           ].map(([k, v]) => (
             <div key={k} className="flex flex-col gap-0.5 border-r border-[#EDEDEA] px-4 py-1">
               <dt className="text-xs text-[#6B6F78]">{k}</dt>

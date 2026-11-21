@@ -791,7 +791,7 @@ function ReadyCard({ inputs }: { inputs: ScheduleInputs }) {
       <div className="flex flex-col gap-1">
         <p className="text-2xl font-bold tracking-[-0.03em] text-[#111214]">{allIn ? "근무표를 만들 차례예요" : "아직 안 낸 직원이 있어요"}</p>
         <p className="text-[15px] text-[#4B4F57]">
-          {allIn ? "필수 규칙을 모두 지키는 배치를 찾아요" : "기다리지 않고 지금 만들어도 돼요"}
+          {allIn ? "필수 규칙을 하나도 어기지 않는 근무표를 찾아요" : "기다리지 않고 지금 만들어도 돼요"}
         </p>
       </div>
       <ul aria-label="만들 때 쓰는 것" className="flex flex-wrap items-center gap-2">

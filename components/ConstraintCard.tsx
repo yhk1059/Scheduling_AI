@@ -453,7 +453,11 @@ export default function ConstraintCard({
 
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2">
-          {isDefault && <span className={`${ui.badge} bg-[#F5F5F4] text-[#4B4F57]`}>기본</span>}
+          {isDefault && (
+            <span title="매장마다 처음부터 있는 규칙이에요. 지울 수는 없고 끌 수 있어요" className={`${ui.badge} bg-[#F5F5F4] text-[#4B4F57]`}>
+              기본 규칙
+            </span>
+          )}
           {off ? (
             <span className={`${ui.badge} bg-[#FFEBDB] text-[#B93815]`}>이번 근무표에서 꺼짐</span>
           ) : shopOff ? (

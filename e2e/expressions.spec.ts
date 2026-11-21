@@ -106,7 +106,7 @@ test("S16. 저장된 매장 열기 → 다시 만들기", async () => {
 test("S17. 조건부·짝 규칙 → 예시 판정 → 적용 → 값 수정 → 다시 만들기", async () => {
   await page.getByRole("button", { name: "매장 설정", exact: true }).click();
   await page.getByRole("tab", { name: "매장 조건" }).click();
-  await expect(page.locator("article").first().getByText("기본", { exact: true })).toBeVisible();
+  await expect(page.locator("article").first().getByText("기본 규칙", { exact: true })).toBeVisible();
 
   // 조건부: 신입이 마감이면 리더도 마감에
   const conditional = await makeRules("신입이 마감이면 리더도 마감에 1명");
@@ -191,7 +191,7 @@ test("S18. 말로 필요 인원 → 근무표 → 사람이 모자란 필요 인
   expect(body.status, `"${text}" 해석 상태`).toBe("ok");
   const coverageCards = pendingCards(page).filter({ has: page.getByRole("heading", { name: "필요 인원" }) });
   expect(await coverageCards.count(), "필요 인원 카드").toBeGreaterThan(0);
-  await expect(coverageCards.first().getByText("기본", { exact: true })).toBeVisible();
+  await expect(coverageCards.first().getByText("기본 규칙", { exact: true })).toBeVisible();
   await expect(coverageCards.first()).toContainText("오픈");
   const openRow = page.getByRole("row").filter({ hasText: "오픈" }).first();
   await expect(openRow.locator("td").nth(2)).not.toContainText(/\d/);

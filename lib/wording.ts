@@ -288,7 +288,7 @@ function shapeName(s: Shape, hardness: string): string {
     case "balance":
       if (s.measure === "count" && noDays(s.days) && onlyIn(s.shifts, "C")) return "마감 고르게";
       if (s.measure === "count" && s.days.kind === "weekend" && !s.days.days && !s.days.weekdays && anyWork(s.shifts)) return "주말·공휴일 고르게";
-      return "공평하게";
+      return "고르게 나누기";
   }
 }
 
@@ -452,7 +452,7 @@ export function presetName(c: ConstraintSpec): string {
   if (c.type === "fixed_assignment") return "고정 근무";
   const s = ruleShape(c);
   if (s) return shapeName(s, c.hardness ?? (c.body.kind === "balance" ? "soft" : "hard"));
-  if (c.body.kind === "balance") return "공평하게";
+  if (c.body.kind === "balance") return "고르게 나누기";
   if (c.body.when) return "조건 규칙";
   return hasOffset(c.body) ? "연달아 규칙" : "맞춤 규칙";
 }

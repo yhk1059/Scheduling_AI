@@ -411,7 +411,7 @@ test("S8. ② 매장 조건", async () => {
   await expect(page.getByText("필요 인원 없이 만들면 인원을 맞추지 않아요")).toHaveCount(0);
   await expect(page.getByText(/명 근무 · \d+명 쉼/)).toHaveCount(0);
   // 요약표는 켜진 필수 필요 인원 규칙을 합친 값이다. 말로 만든 날마다 규칙도 같은 표에 든다(S18)
-  await expect(page.getByText("켜진 필수 필요 인원 규칙을 합친 값이에요. 일부 날짜에만 적용되는 규칙은 카드에서 봐요")).toBeVisible();
+  await expect(page.getByText("켜 둔 필수 인원 규칙을 한 표로 모았어요. 특정 날짜에만 적용되는 인원은 아래 카드에서 봐요")).toBeVisible();
   await expect(summaryRow("오픈").locator("td").nth(2)).toHaveText("1~2명");
   await expect(summaryRow("마감").locator("td").nth(3)).toHaveText("3명");
   const weekdayMin = page.getByRole("textbox", { name: "평일 오픈 최소 인원" });
@@ -854,11 +854,11 @@ test("S13. 저장과 다시 들어오기", async () => {
   await page.getByRole("tab", { name: "매장 조건" }).click();
   await expect(appliedCards(page)).toHaveCount(ruleCount + COVERAGE.length);
   const first = page.locator("article").first();
-  await expect(first.getByText("기본", { exact: true })).toBeVisible();
+  await expect(first.getByText("기본 규칙", { exact: true })).toBeVisible();
   await expect(first.getByRole("button", { name: "삭제" })).toHaveCount(0);
   const weekdayOpen = page
     .locator("article")
-    .filter({ has: page.getByText("기본", { exact: true }) })
+    .filter({ has: page.getByText("기본 규칙", { exact: true }) })
     .filter({ hasText: /평일.*오픈/ })
     .first();
   await weekdayOpen.getByRole("button", { name: "매장 조건에서 끄기" }).click();
