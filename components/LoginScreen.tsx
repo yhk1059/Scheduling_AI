@@ -1,5 +1,7 @@
 "use client";
 
+import Link from "next/link";
+
 import { supabaseConfigured } from "@/lib/supabase";
 
 import { LoginButton, PrivacyLink } from "./Account";
@@ -50,6 +52,13 @@ export default function LoginScreen() {
             <PrivacyLink className="ml-1 rounded-sm whitespace-nowrap underline underline-offset-2 hover:text-[#111214]" />
           </p>
         )}
+        {/* 로그인 전에 써 보고 싶은 사람을 위한 체험 경로. 체험은 저장하지 않는다 */}
+        <div className="flex flex-col gap-2 border-t border-[#EDEDEA] pt-4">
+          <p className="text-sm text-[#4B4F57]">로그인 없이 먼저 써 볼 수 있어요</p>
+          <Link href="/demo" className={`${ui.secondaryXl} w-full justify-center`}>
+            샘플 매장으로 체험하기
+          </Link>
+        </div>
       </section>
     </div>
   );

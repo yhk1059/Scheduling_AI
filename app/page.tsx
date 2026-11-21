@@ -105,15 +105,15 @@ const CHAT: { who: "매니저" | "직원"; time: string; text: string; answers: 
     who: "매니저",
     time: "일요일 23:10",
     text: "토요일 마감 채우니까 이번엔 연속 6일이 됐어요… 다시 처음부터.",
-    answers: [["솔버", "336칸을 한 번에 풀어 다 지키는 표를 찾아요."]],
+    answers: [["계산 엔진", "모든 칸을 한꺼번에 따져 규칙을 다 지키는 표를 찾아요."]],
   },
   {
     who: "매니저",
     time: "월요일 00:40",
     text: "이 조건으로 되긴 되는 거예요? 어디부터 바꿔야 하지.",
     answers: [
-      ["솔버", "없으면 “없다”고 증명해요."],
-      ["LLM", "어디를 바꾸면 되는지 설명해요."],
+      ["계산 엔진", "그런 표가 없으면 없다고 확실히 알려 줘요."],
+      ["AI", "어디를 바꾸면 되는지 설명해요."],
     ],
   },
   {
@@ -121,7 +121,7 @@ const CHAT: { who: "매니저" | "직원"; time: string; text: string; answers: 
     time: "월요일 08:12",
     text: "아까 말한 시간 바뀌었어요! 그리고 마감 다음 날 오픈은 안 되는 거 맞죠?",
     answers: [
-      ["LLM", "말을 규칙 카드로 적어요."],
+      ["AI", "말을 규칙 카드로 적어요."],
       ["사람", "맞는지 보고 적용해요."],
     ],
   },
@@ -278,16 +278,16 @@ const STEPS = [
   },
 ];
 
-type Actor = "사람" | "LLM" | "솔버";
+type Actor = "사람" | "AI" | "계산 엔진";
 
 /** 만든 방식의 세 장면. 근무표에 들어가는 길은 세 곳(적용·확정·수락)이고, 셋 다 사람이 연다. */
-/** 번역 정확도 한 줄. 수치의 근거(평가 결과)로 바로 간다. */
+/** 규칙 읽기 정확도 한 줄. 수치의 근거(평가 결과)로 바로 간다. */
 function AccuracyNote() {
   return (
     <div className="flex items-center gap-4 rounded-lg border border-[#EDEDEA] bg-white px-4 py-3">
       <span className="font-mono text-[28px] leading-none font-semibold text-[#C4247C]">97%</span>
       <div className="flex flex-col gap-0.5">
-        <span className="text-[13px] font-semibold text-[#111214]">번역 정확도</span>
+        <span className="text-[13px] font-semibold text-[#111214]">말을 규칙으로 바르게 읽은 비율</span>
         <span className={ui.help}>
           매니저 말투 문장 102개 기준 ·{" "}
           <a href={EVAL_URL} className="underline underline-offset-2 hover:text-[#111214]">
@@ -301,30 +301,30 @@ function AccuracyNote() {
 
 const SCENES: { title: string; body: string; actors: [Actor, string][]; fragment: ReactNode; note?: ReactNode }[] = [
   {
-    title: "말은 LLM이 읽어요",
-    body: "매니저의 말을 규칙 식으로 세우고 “이렇게 읽었어요”로 되돌려 줘요. 식이 검증을 통과하지 못하면 카드 대신 되물어요. [적용]을 누르기 전에는 아무것도 반영되지 않아요.",
+    title: "말은 AI가 읽어요",
+    body: "매니저가 적은 말을 규칙으로 바꾸고 “이렇게 읽었어요”로 되돌려 줘요. 규칙으로 바꿀 수 없으면 카드 대신 다시 물어봐요. [적용]을 누르기 전에는 아무것도 반영되지 않아요.",
     actors: [
-      ["LLM", "읽어요"],
+      ["AI", "읽어요"],
       ["사람", "적용해요"],
     ],
     fragment: <ReplyCard title="연달아 금지" quote="마감 다음 날 오픈은 안 되게" reading="마감 다음 날에는 오픈을 넣지 않아요" pending />,
     note: <AccuracyNote />,
   },
   {
-    title: "계산은 솔버가 해요",
-    body: "OR-Tools CP-SAT 솔버가 규칙 식만 받아, 모두 지키는 근무표를 찾거나 없다는 것을 증명해요. LLM은 근무표의 칸을 하나도 채우지 않아요. 확정하면 직원 링크가 잠겨요.",
+    title: "계산은 계산 엔진이 해요",
+    body: "계산 엔진이 규칙만 받아 모두 지키는 근무표를 찾거나, 그런 근무표가 없다는 것을 확인해요. AI는 근무표의 칸을 하나도 채우지 않아요. 확정하면 직원 링크가 잠겨요.",
     actors: [
-      ["솔버", "계산하고 증명해요"],
+      ["계산 엔진", "계산하고 확인해요"],
       ["사람", "확정해요"],
     ],
     fragment: <ScheduleFragment />,
   },
   {
     title: "막히면 셋이 함께 풀어요",
-    body: "솔버가 “없다”고 증명하면, LLM이 어떤 규칙끼리 부딪히는지 설명하고 바꿀 곳을 제안해요. 제안은 솔버가 다시 풀어 실제로 근무표가 나오는 것만 남겨요. 그중에서 고르는 건 사람이에요.",
+    body: "근무표가 없다고 나오면, AI가 어떤 규칙끼리 부딪히는지 설명하고 바꿀 곳을 제안해요. 제안은 계산 엔진이 다시 계산해 실제로 근무표가 나오는 것만 남겨요. 그중에서 고르는 건 사람이에요.",
     actors: [
-      ["LLM", "설명·제안"],
-      ["솔버", "다시 풀어 검증"],
+      ["AI", "설명·제안"],
+      ["계산 엔진", "다시 계산해 확인"],
       ["사람", "수락해요"],
     ],
     fragment: <BlockedFragment />,
@@ -427,9 +427,13 @@ export default function Home() {
 
         <section id="made" className={section}>
           <div className={`${container} flex flex-col gap-12`}>
-            <SectionHead eyebrow="03 · 만든 방식" title="말은 LLM이, 계산은 솔버가, 결정은 사람이">
-              근무표에 들어가는 길은 세 곳뿐이고, 셋 다 사람이 버튼을 눌러야 열려요. LLM이 낸 것은 사람이 확인하거나 서버가 다시 풀어 검증한 것만 반영돼요.
-            </SectionHead>
+            <div className="flex flex-col gap-2">
+              <SectionHead eyebrow="03 · 만든 방식" title="말은 AI가, 계산은 계산 엔진이, 결정은 사람이">
+                근무표에 들어가는 길은 세 곳뿐이고, 셋 다 사람이 버튼을 눌러야 열려요. AI가 낸 것은 사람이 확인하거나 계산 엔진이 다시 계산해 확인한 것만 반영돼요.
+              </SectionHead>
+              {/* 기술 이름은 궁금한 사람을 위해 한 줄로만 둔다 */}
+              <p className={ui.help}>AI는 Claude(LLM), 계산 엔진은 OR-Tools CP-SAT 솔버예요.</p>
+            </div>
             <div className="grid grid-cols-1 gap-10 xl:grid-cols-3 xl:items-start xl:gap-8">
               {SCENES.map((s) => (
                 <div key={s.title} className="flex max-w-[560px] flex-col gap-5 xl:max-w-none">
