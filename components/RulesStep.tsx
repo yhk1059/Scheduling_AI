@@ -452,7 +452,7 @@ function DemoInputNote() {
       <div className="flex flex-col gap-1">
         <p className={ui.cardTitle}>체험에서는 말로 적을 수 없어요</p>
         <p className="text-[13px] text-[#4B4F57]">
-          카드를 끄고 켜거나 숫자를 바꾸고, ③에서 근무표를 만들어 보세요. 내 매장에서는 문장을 적으면 카드가 돼요.
+          카드를 누르면 이번 근무표에서 끄거나 숫자를 바꿀 수 있어요. 그다음 ③에서 근무표를 만들어 보세요. 내 매장에서는 문장을 적으면 카드가 돼요.
         </p>
         {error && (
           <p role="alert" className={ui.error}>

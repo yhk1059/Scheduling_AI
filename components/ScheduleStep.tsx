@@ -761,8 +761,8 @@ export default function ScheduleStep() {
       {gateOpen && (
         <DemoGateDialog title="확정은 내 매장에서 할 수 있어요" onClose={() => setGateOpen(false)}>
           <p>
-            확정하면 직원 링크가 잠기고, 직원은 같은 링크에서 근무표를 봐요. 내 매장을 만들면 여기서 만든 것처럼 바로 이어서 할 수
-            있어요.
+            확정하면 직원 링크가 잠기고, 직원은 같은 링크에서 근무표를 봐요. 내 매장을 만들면 내 직원과 규칙으로 근무표를 만들고
+            확정할 수 있어요. 체험 내용은 옮겨지지 않아요.
           </p>
         </DemoGateDialog>
       )}

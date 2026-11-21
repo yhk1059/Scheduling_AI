@@ -177,12 +177,17 @@ export function RosterSection() {
   const shop = useAppStore((s) => s.shop)!;
   const orphanCount = orphanConstraintIds(shop, null).length;
   const empty = !shop.employees.some((n) => n.active);
+  const demo = useAppStore((s) => s.demo);
 
   return (
     <section className={`${ui.card} flex flex-col gap-3.5`}>
       <div className="flex flex-col gap-1">
         <h2 className={ui.sectionTitle}>명단</h2>
-        {!empty && <p className={ui.help}>맨 아래 줄에 이름을 적고 Enter를 누르면 한 명씩 더해져요. 바꾼 내용은 바로 저장돼요.</p>}
+        {!empty && (
+          <p className={ui.help}>
+            맨 아래 줄에 이름을 적고 Enter를 누르면 한 명씩 더해져요.{demo ? "" : " 바꾼 내용은 바로 저장돼요."}
+          </p>
+        )}
       </div>
       {empty && (
         <div className="flex flex-col items-center gap-2 rounded-2xl bg-[#F5F5F4] px-5 py-7 text-center">
