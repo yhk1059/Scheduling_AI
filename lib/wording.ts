@@ -1,8 +1,8 @@
 // 화면 문구를 만드는 순수 함수(UI_GUIDE "문구"). 데이터 이름(period, hard 등)은 그대로 두고 화면에 보이는 말만 여기서 만든다.
-import { monthDay, type PeriodRange, type PeriodUnit } from "./period";
+import { monthDay, periodDays, type PeriodRange, type PeriodUnit } from "./period";
 import { normalizeRule, ruleShape, type Bound } from "./rules";
 import { COVERAGE_SOURCE_TEXT, homeSummary, upcomingRange, type Shop, type WorkPeriod } from "./store";
-import type { Cmp, ConstraintSpec, Count, Days, Employee, People, Rule, ShiftChange, Shifts, ShopConfig } from "./types.gen";
+import type { Cmp, ConstraintSpec, Count, Days, Employee, People, Rule, ShiftChange, Shifts, ShopConfig, SoftViolation } from "./types.gen";
 
 /** "11월 근무표"(1일에 시작하는 달력 월) / "11/2~11/15 근무표"(주 단위, 1일이 아닌 날에 시작하는 달력 월). */
 export function scheduleName(period: PeriodRange, unit: PeriodUnit): string {
@@ -538,4 +538,14 @@ export function taskDoneSteps(task: NextTask): number {
     case "confirmed":
       return 3;
   }
+}
+
+const WEEKDAY_SHORT = ["일", "월", "화", "수", "목", "금", "토"]; // 0=일
+
+/** 못 지킨 규칙이 걸린 곳: "김도현 · 화 11/24", "화 11/24", "김도현". 없으면 빈 문자열. */
+export function violationWhere(v: SoftViolation, period: PeriodRange, employees: Pick<Employee, "id" | "name">[]): string {
+  const name = v.employee_id ? (employees.find((e) => e.id === v.employee_id)?.name ?? "") : "";
+  const day = v.day ? periodDays(period)[v.day - 1] : undefined;
+  const date = day ? `${WEEKDAY_SHORT[day.weekday]} ${monthDay(period, day.day)}` : "";
+  return [name, date].filter(Boolean).join(" · ");
 }

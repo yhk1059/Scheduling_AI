@@ -40,7 +40,7 @@ import type {
   ShopConfig,
 } from "@/lib/types.gen";
 import { statsFromAssignments } from "@/lib/stats";
-import { describeRule, formatDeviation, hardnessLabel, josa, presetName, type ScheduleInputs } from "@/lib/wording";
+import { describeRule, formatDeviation, hardnessLabel, josa, presetName, violationWhere, type ScheduleInputs } from "@/lib/wording";
 
 import { DemoGateDialog } from "./Demo";
 import Dialog from "./Dialog";
@@ -57,19 +57,22 @@ export function DayHead({
   holiday,
   weekend,
   today: isToday = false,
+  marked = false,
 }: {
   label: string;
   weekday: number;
   holiday: boolean;
   weekend: boolean;
   today?: boolean;
+  /** 못 지킨 규칙 목록에서 고른 날 */
+  marked?: boolean;
 }) {
   const color = weekday === 0 || holiday ? "text-[#B42318]" : weekday === 6 ? "text-[#C4247C]" : "text-[#6B6F78]";
   return (
     <span
       className={`flex flex-col items-center rounded-xs py-0.5 text-[11px] ${weekend ? "bg-[#F5F5F4]" : ""} ${color} ${
         isToday ? "border-b-2 border-[#C4247C]" : ""
-      }`}
+      } ${marked ? "ring-2 ring-inset ring-[#B42318]" : ""}`}
     >
       <span className="font-mono font-medium tracking-[-0.04em] whitespace-nowrap">{label}</span>
       <span>{WEEKDAYS[weekday]}</span>
@@ -348,6 +351,8 @@ export function ScheduleBody({
   const applyChanges = useAppStore((s) => s.applyChanges);
   const go = useAppStore((s) => s.go);
   const [selected, setSelected] = useState<Cell | null>(null);
+  // 못 지킨 규칙 목록에서 고른 날. 다시 만들면(solved가 바뀌면) 지운다
+  const [mark, setMark] = useState<{ day: number; result: ScheduleResult } | null>(null);
   const [statsOpen, setStatsOpen] = useState(false);
   const reviewId = useId();
   const reviewHeading = useRef<HTMLHeadingElement>(null);
@@ -383,6 +388,20 @@ export function ScheduleBody({
     if (readOnly || cell.day <= pastDays) return;
     selectedButton.current = trigger;
     setSelected(cell);
+  };
+
+  // 못 지킨 규칙을 누르면: 직원 칸이면 그 칸을 열고, 날짜만 있으면 그날 머리글을 표시한다
+  const showViolation = (employeeId: string | null, day: number) => {
+    const { month, dom } = periodDays(period)[day - 1];
+    const name = employees.find((n) => n.id === employeeId)?.name;
+    const cell = name ? document.querySelector<HTMLButtonElement>(`button[aria-label^="${name} ${month}월 ${dom}일 "]`) : null;
+    if (employeeId && cell) {
+      cell.scrollIntoView({ block: "nearest", inline: "center" });
+      cell.focus();
+      onSelect({ employeeId, day }, cell);
+      return;
+    }
+    if (solved) setMark({ day, result: solved });
   };
 
   const closeEditor = () => {
@@ -524,6 +543,7 @@ export function ScheduleBody({
               pastDays={pastDays}
               todayDay={todayDay}
               hideViolations={legacy}
+              markedDay={mark && mark.result === solved ? mark.day : null}
             />
             {/* 근무표를 먼저 보도록 통계는 접어 두고, 펼치면 근무표 바로 아래에 둔다 */}
             {!statsOpen && (
@@ -564,10 +584,20 @@ export function ScheduleBody({
                       <ul aria-label="못 지킨 선호 규칙 목록" className="max-h-48 space-y-2 overflow-y-auto text-sm text-[#4B4F57]" tabIndex={0}>
                         {result.soft_violations.map((violation, index) => {
                           const rule = constraints.find((item) => item.id === violation.constraint_id);
+                          const where = violationWhere(violation, period, employees);
+                          const day = violation.day;
                           return (
-                            <li key={`${violation.constraint_id}-${index}`} className="rounded-lg bg-[#F5F5F4] p-2 wrap-anywhere">
-                              {rule && <span className="block font-semibold">{presetName(rule)}</span>}
-                              {violation.detail}
+                            <li key={`${violation.constraint_id}-${index}`}>
+                              <button
+                                type="button"
+                                disabled={!day}
+                                onClick={() => day && showViolation(violation.employee_id ?? null, day)}
+                                className="w-full rounded-lg bg-[#F5F5F4] p-2 text-left wrap-anywhere enabled:hover:bg-[#EDEDEA] focus-visible:outline-2 focus-visible:outline-[#C4247C]"
+                              >
+                                {rule && <span className="block font-semibold">{presetName(rule)}</span>}
+                                {where && <span className="font-medium text-[#B42318]">{where} · </span>}
+                                {violation.detail}
+                              </button>
                             </li>
                           );
                         })}
@@ -1349,6 +1379,7 @@ export function ScheduleGrid({
   totalCodes,
   legend = true,
   highlightId,
+  markedDay = null,
   fluid = false,
   legendAside,
 }: {
@@ -1382,6 +1413,8 @@ export function ScheduleGrid({
   legend?: boolean;
   /** 이름 칸을 강조할 행(직원 화면의 자기 행) */
   highlightId?: string;
+  /** 이 날의 머리글을 빨간 테두리로 표시한다(못 지킨 규칙 목록에서 고른 날) */
+  markedDay?: number | null;
   /** 날짜 칸을 가로 폭에 맞춰 넓힌다(30~72px). 근무표 작성·확정 근무표 */
   fluid?: boolean;
   /** 범례 줄 오른쪽에 둘 것(안내 한 줄, 칸 편집) */
@@ -1441,7 +1474,7 @@ export function ScheduleGrid({
           <div className={rowClass} style={grid}>
             <span className="flex items-end text-xs font-medium text-[#6B6F78]">이름</span>
             {pdays.map(({ day: d, weekday: w }) => (
-              <DayHead key={d} label={dayHeader(period, d)} weekday={w} holiday={holidays.includes(d)} weekend={isWeekend(d)} today={d === todayDay} />
+              <DayHead key={d} label={dayHeader(period, d)} weekday={w} holiday={holidays.includes(d)} weekend={isWeekend(d)} today={d === todayDay} marked={d === markedDay} />
             ))}
             {/* 개수 열: 일하는 근무조는 범례의 글자, 휴무는 칸에 글자가 없어 이름으로 쓴다 */}
             {codes.map(({ code, name }) => (

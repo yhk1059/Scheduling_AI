@@ -18,6 +18,7 @@ import {
   taskDoneSteps,
   unitName,
   unitShort,
+  violationWhere,
   shopRuleCount,
   ruleQuote,
 } from "./wording";
@@ -606,5 +607,19 @@ describe("ruleQuote", () => {
 
   it("같은 원문이 둘 이상이면 원문 (해석 문장)", () => {
     expect(ruleQuote(mid, [open, mid, close], DEFAULT_CONFIG, EMPLOYEES, NOV)).toBe(`“${SRC}” (매일 미들에 1명을 넣어요)`);
+  });
+});
+
+describe("violationWhere", () => {
+  // 2026-11-23은 월요일
+  const period = { start_date: "2026-11-23", length: 7 };
+  const people = [{ id: "e1", name: "김도현" }] as Employee[];
+  it("날짜는 요일과 함께, 직원이 있으면 이름을 앞에 붙인다", () => {
+    expect(violationWhere({ constraint_id: "r", day: 2, detail: "" }, period, people)).toBe("화 11/24");
+    expect(violationWhere({ constraint_id: "r", employee_id: "e1", day: 7, detail: "" }, period, people)).toBe("김도현 · 일 11/29");
+  });
+  it("날짜가 없으면 이름만, 둘 다 없으면 빈 문자열", () => {
+    expect(violationWhere({ constraint_id: "r", employee_id: "e1", detail: "" }, period, people)).toBe("김도현");
+    expect(violationWhere({ constraint_id: "r", detail: "" }, period, people)).toBe("");
   });
 });
