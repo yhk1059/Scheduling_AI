@@ -81,7 +81,7 @@ test("S14. 시작일 15일과 근무 형태(피크 추가, 더블), 직급 배�
   await page.getByRole("textbox", { name: "매장 이름" }).fill("연남 카페");
   await page.getByRole("combobox", { name: "근무표 주기" }).selectOption({ label: "한 달(1일~말일)" });
   await addRoster(page, ROSTER);
-  await expect(page.getByRole("button", { name: "6행 직급 리더 빼기" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "6행 파트·직급 리더 빼기" })).toBeVisible();
   const { shop: afterRoster } = await readState(page);
   expect(afterRoster.employees.filter((n) => n.tags.includes("리더")).map((n) => n.name)).toEqual(["이영희", "강서연", "윤지민"]);
   expect(afterRoster.employees.filter((n) => n.tags.includes("신입")).map((n) => n.name)).toEqual(["서예린", "신도윤"]);
@@ -154,7 +154,7 @@ test("S14. 시작일 15일과 근무 형태(피크 추가, 더블), 직급 배�
   expect(limits, `${dCode} 사람마다 2번까지`).toHaveLength(1);
   test.info().annotations.push({ type: "더블 코드", description: dCode });
 
-  const configCard = pendingCards(page).filter({ has: page.getByRole("heading", { name: "근무 형태" }) });
+  const configCard = pendingCards(page).filter({ has: page.getByRole("heading", { name: "근무조" }) });
   await expect(configCard).toHaveCount(1);
   await expect(configCard).toContainText("근무 코드 추가");
   await expect(configCard).toContainText(dCode);

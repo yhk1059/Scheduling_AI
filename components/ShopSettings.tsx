@@ -14,7 +14,7 @@ import ShiftTable from "./ShiftTable";
 import { ui } from "./ui";
 
 const TABS = [
-  { tab: "shifts", label: "근무 형태" },
+  { tab: "shifts", label: "근무조" },
   { tab: "rules", label: "매장 조건" },
   { tab: "roster", label: "명단" },
 ] as const;
@@ -66,7 +66,7 @@ export default function ShopSettings() {
       ) : tab === "shifts" ? (
         <>
           <section className={`${ui.card} flex flex-col gap-3`}>
-            <h2 className={ui.sectionTitle}>근무 형태</h2>
+            <h2 className={ui.sectionTitle}>근무조</h2>
             <ShiftTable showTimeline />
           </section>
           <CoverageSection />
@@ -255,7 +255,7 @@ function EmployeeTable({ employees }: { employees: ShopEmployee[] }) {
             <tr className="border-b border-[#EDEDEA] text-left text-xs font-medium text-[#6B6F78]">
               <th className="w-10 px-2 py-2 font-mono font-medium">#</th>
               <th className="px-2 py-2 font-medium">이름</th>
-              <th className="px-2 py-2 font-medium">직급</th>
+              <th className="px-2 py-2 font-medium">파트·직급</th>
               <th />
             </tr>
           </thead>
@@ -310,9 +310,9 @@ function TagInput({
     const t = raw.trim();
     const error =
       t.length > MAX_TAG_CHARS
-        ? `직급은 ${MAX_TAG_CHARS}자까지예요`
+        ? `파트·직급은 ${MAX_TAG_CHARS}자까지예요`
         : full && t !== "" && !tags.includes(t)
-          ? `직급은 한 사람에 ${MAX_TAGS_PER_EMPLOYEE}개까지예요`
+          ? `파트·직급은 한 사람에 ${MAX_TAGS_PER_EMPLOYEE}개까지예요`
           : null;
     setMsg(error);
     if (error) return false;
@@ -363,7 +363,7 @@ function TagInput({
             onKeyDown={onKeyDown}
             onBlur={() => commit(draft)}
             list={TAG_LIST_ID}
-            placeholder="직급"
+            placeholder="예: 홀, 리더"
             aria-label={label}
             aria-invalid={msg !== null || undefined}
             className={`${cellInput} w-24 placeholder:text-[#6B6F78] ${msg ? ui.cellErr : ui.cellOk}`}
@@ -422,7 +422,7 @@ function EmployeeRow({ employee, index, employees }: { employee: ShopEmployee; i
               tags={employee.tags}
               onAdd={(t) => addTag(employee.id, t)}
               onRemove={(t) => removeTag(employee.id, t)}
-              label={`${row}행 직급`}
+              label={`${row}행 파트·직급`}
               draft={tagDraft}
               setDraft={setTagDraft}
             />
@@ -515,12 +515,12 @@ function NewEmployeeRow({ employees }: { employees: ShopEmployee[] }) {
           tags={tags}
           onAdd={(t) => setTags((ts) => (ts.includes(t) ? ts : [...ts, t]))}
           onRemove={(t) => setTags((ts) => ts.filter((x) => x !== t))}
-          label="새 직원 직급"
+          label="새 직원 파트·직급"
           onEnterEmpty={add}
           draft={tagDraft}
           setDraft={setTagDraft}
         />
-        <p className={`${ui.help} mt-0.5`}>직급에는 이름을 쓰지 마세요</p>
+        <p className={`${ui.help} mt-0.5`}>파트·직급에는 이름을 쓰지 마세요</p>
       </td>
       <td className="px-1 py-1">
         <div className="flex justify-end">

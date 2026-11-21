@@ -155,7 +155,7 @@ test("S3. 운영 중인 매장: 다음 근무표 작성과 확정", async () => 
   await openStats(page);
   const stats = sectionWith("개인별 통계");
   await expect(stats.locator("tbody tr")).toHaveCount(EMPLOYEE_COUNT);
-  for (const h of ["최근 4주 마감", "최근 4주 주말", "평균보다 많은 근무일"]) {
+  for (const h of ["최근 4주 마감", "최근 4주 주말", "평균과 차이"]) {
     await expect(stats.getByRole("columnheader", { name: h, exact: true })).toBeVisible();
   }
 

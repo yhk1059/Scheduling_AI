@@ -80,7 +80,7 @@ export default function AppShell({ demo = false }: { demo?: boolean }) {
 
   return (
     <div data-app-shell className="flex flex-1 flex-col">
-      <header className="sticky top-0 z-40 border-b border-[#EDEDEA] bg-white/85 backdrop-blur-md">
+      <header className="top-0 z-40 border-b sm:sticky border-[#EDEDEA] bg-white/85 backdrop-blur-md">
         <div className="mx-auto flex flex-wrap gap-3 py-3 min-h-16 max-w-[1200px] items-center justify-between px-4 sm:px-6">
           <div className="flex items-center gap-3">
             {/* 매장 준비를 건너뛰지 않게 그 화면에서는 앱 홈으로 보내지 않는다 */}

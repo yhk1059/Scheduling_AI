@@ -126,7 +126,7 @@ test("S5. 매장 준비 → 첫 근무표 시작", async () => {
   await expect(page.getByText("명단에 직원을 1명 이상 넣으면 시작할 수 있어요")).toBeVisible();
   await expect(page.getByText("바꾼 내용은 바로 저장돼요.")).toBeVisible();
   await expect(page.getByText("이니셜을 써도 됩니다")).toBeVisible();
-  await expect(page.getByText("직급에는 이름을 쓰지 마세요")).toBeVisible();
+  await expect(page.getByText("파트·직급에는 이름을 쓰지 마세요")).toBeVisible();
 
   await addRoster(page, ROSTER);
 
@@ -141,7 +141,7 @@ test("S5. 매장 준비 → 첫 근무표 시작", async () => {
 
   await expect(page.getByRole("textbox", { name: "1행 이름", exact: true })).toHaveValue("이영희");
   await expect(page.getByRole("textbox", { name: "12행 이름", exact: true })).toHaveValue("신도윤");
-  for (const label of ["1행 직급 리더 빼기", "6행 직급 리더 빼기", "7행 직급 리더 빼기", "11행 직급 신입 빼기", "12행 직급 신입 빼기"]) {
+  for (const label of ["1행 파트·직급 리더 빼기", "6행 파트·직급 리더 빼기", "7행 파트·직급 리더 빼기", "11행 파트·직급 신입 빼기", "12행 파트·직급 신입 빼기"]) {
     await expect(page.getByRole("button", { name: label })).toBeVisible();
   }
   await expect(page.getByRole("button", { name: /붙이기/ })).toHaveCount(0);
@@ -388,7 +388,7 @@ test("S8. ② 매장 조건", async () => {
   // S8-a. 요약표와 필요 인원 폼
   await expect(currentStep()).toContainText("매장 조건");
   await expect(page.getByRole("heading", { name: "매장 조건", exact: true }).first()).toBeFocused();
-  await expect(page.getByText("근무 형태, 필요 인원, 지켜야 할 규칙 모두 한 곳에서요.")).toBeVisible();
+  await expect(page.getByText("근무조, 필요 인원, 지켜야 할 규칙 모두 한 곳에서요.")).toBeVisible();
   const summaryRow = (name: string) => page.getByRole("row").filter({ hasText: name }).first();
   await expect(summaryRow("오픈")).toContainText("09:00~15:00");
   await expect(summaryRow("미들")).toContainText("12:00~18:00");
@@ -595,7 +595,7 @@ test("S9. ② 예외 입력과 ③ 근무표 만들기", async () => {
   await openStats(page);
   const stats = sectionWith("개인별 통계");
   await expect(stats.locator("tbody tr")).toHaveCount(EMPLOYEE_COUNT);
-  for (const h of ["A", "M", "C", "O", "근무 시간", "주말·공휴일 근무", "최대 연속 근무", "희망 반영률", "평균보다 많은 근무일"]) {
+  for (const h of ["A", "M", "C", "휴무", "근무 시간", "주말·공휴일 근무", "최대 연속 근무", "희망 반영률", "평균과 차이"]) {
     await expect(stats.getByRole("columnheader", { name: h, exact: true })).toBeVisible();
   }
   // 첫 근무표: 최근 4주 기록이 없어 열과 근거 한 줄을 그리지 않는다

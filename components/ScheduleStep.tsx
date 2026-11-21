@@ -540,10 +540,10 @@ export function ScheduleBody({
                     <h3 ref={reviewHeading} tabIndex={-1} className={`${ui.cardTitle} wrap-anywhere`}>
                       {selectedEmployee?.name} · {monthDay(period, selected.day)}
                     </h3>
-                    <p className={ui.help}>현재 근무 {shop.config.shifts.find((s) => s.code === currentCode)?.name ?? currentCode}</p>
+                    <p className={ui.help}>지금: {shop.config.shifts.find((s) => s.code === currentCode)?.name ?? currentCode}</p>
                     {editor}
                     <div className="flex flex-col gap-1.5">
-                      <h4 className={ui.label}>이 칸에 걸린 규칙</h4>
+                      <h4 className={ui.label}>이 칸과 관련된 규칙</h4>
                       {cellRules.length ? (
                         <ul className="flex flex-col gap-1 text-sm">
                           {cellRules.map((rule) => <li key={rule.id} className="wrap-anywhere">{describeRule(rule, shop.config, employees, period).text}</li>)}
@@ -1238,7 +1238,7 @@ function CellEditor({
   return (
     <div className="flex flex-wrap items-center gap-1.5">
       <span className="mr-1 text-xs font-medium text-[#4B4F57]">
-        {available ? "바꿀 근무" : <><span className="font-mono">{label}</span> 고정</>}
+        {available ? "바꾸기" : <><span className="font-mono">{label}</span> 고정</>}
       </span>
       {codes.map((shift) => {
         const { code, name } = shift;
@@ -1543,7 +1543,7 @@ export function StatsTable({
               <th className={th}>주말·공휴일 근무</th>
               <th className={th}>최대 연속 근무</th>
               {!legacy && <th className={th}>희망 반영률</th>}
-              <th className={th}>평균보다 많은 근무일</th>
+              <th className={th}>평균과 차이</th>
               {showHistory && (
                 <>
                   <th className={th}>최근 4주 {closingShift(config)?.name ?? "마감"}</th>

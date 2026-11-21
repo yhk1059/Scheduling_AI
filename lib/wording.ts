@@ -131,7 +131,7 @@ function shiftsLabel(s: Selector, config: ShopConfig): string {
   return rest.length ? `${names(rest)} 말고 다른 근무` : "근무";
 }
 
-/** 사람 고르기: 이름(3명 넘으면 "김OO 외 2명"), "리더 직급", "신입 빼고", "리더 직급(홀 제외)". 비어 있으면 "". */
+/** 사람 고르기: 이름(3명 넘으면 "김OO 외 2명"), "리더 직원", "신입 빼고", "홀 리더 직원". 비어 있으면 "". */
 function peopleLabel(p: People | null | undefined, employees: Employee[]): string {
   if (!p) return "";
   const parts: string[] = [];
@@ -140,16 +140,34 @@ function peopleLabel(p: People | null | undefined, employees: Employee[]): strin
     parts.push(names.length > 3 ? `${names[0]} 외 ${names.length - 1}명` : names.join(" "));
   }
   const excluded = p.exclude_tags?.join("·");
-  // 고른 직급에서 빼는 직급은 괄호로 붙여 "리더 직급 홀 빼고"처럼 끊어 읽히지 않게 한다
-  if (p.tags?.length) parts.push(`${p.tags.join("·")} 직급${excluded ? `(${excluded} 제외)` : ""}`);
+  if (p.tags?.length) parts.push(`${tagGroup(p.tags, p.exclude_tags ?? [], employees)} 직원`);
   else if (excluded) parts.push(`${excluded} 빼고`);
   return parts.join(" ");
 }
 
-/** 괄호 설명을 뺀 말에 조사를 붙인다: "리더 직원(홀 제외)" → "을". */
+/**
+ * 고른 직급에서 빼는 파트가 있을 때 사람들을 부르는 말. 남는 직원이 모두 함께 갖고 빠진 직원은 갖지 않은 태그가 있으면
+ * 그 태그로 부른다(리더, 주방 제외 → "홀 리더"). 없으면 "주방이 아닌 리더". 빼는 것이 없으면 고른 태그 그대로.
+ */
+function tagGroup(tags: string[], excluded: string[], employees: Employee[]): string {
+  const name = tags.join("·");
+  if (!excluded.length) return name;
+  const has = (n: Employee, t: string) => !!n.tags?.includes(t);
+  const tagged = employees.filter((n) => tags.some((t) => has(n, t)));
+  const picked = tagged.filter((n) => !excluded.some((t) => has(n, t)));
+  const dropped = tagged.filter((n) => excluded.some((t) => has(n, t)));
+  const common = (picked[0]?.tags ?? []).filter(
+    (t) => !tags.includes(t) && picked.every((n) => has(n, t)) && !dropped.some((n) => has(n, t)),
+  );
+  if (common.length) return `${common.join("·")} ${name}`;
+  const ex = excluded.join("·");
+  return `${ex}${josa(ex, "이", "가")} 아닌 ${name}`;
+}
+
+/** 괄호 설명을 뺀 말에 조사를 붙인다: "리더 직원(예시)" → "을". */
 const roleJosa = (w: string, a: string, b: string) => josa(w.replace(/\([^)]*\)$/, ""), a, b);
 
-/** 문장 속 사람: "리더", "리더(홀 제외)", "신입 빼고", "이영희 박민수 중". 비어 있으면 "". */
+/** 문장 속 사람: "리더 직원", "홀 리더 직원", "신입 빼고", "이영희 박민수 중". 비어 있으면 "". */
 function roleLabel(p: People | null | undefined, employees: Employee[]): string {
   if (!p) return "";
   const excluded = p.exclude_tags?.join("·");
@@ -157,7 +175,7 @@ function roleLabel(p: People | null | undefined, employees: Employee[]): string 
     const names = p.ids.map((id) => employeeLabel(id, employees));
     return `${names.length > 3 ? `${names[0]} 외 ${names.length - 1}명` : names.join(" ")} 중`;
   }
-  if (p.tags?.length) return `${p.tags.join("·")} 직원${excluded ? `(${excluded} 제외)` : ""}`;
+  if (p.tags?.length) return `${tagGroup(p.tags, p.exclude_tags ?? [], employees)} 직원`;
   return excluded ? `${excluded} 빼고` : "";
 }
 
@@ -250,7 +268,7 @@ function shapeName(s: Shape, hardness: string): string {
         if (hours) return "근무 시간";
         if (noPeople(s.people)) return "필요 인원";
         const { ids, tags, exclude_tags } = s.people;
-        if (!ids && !exclude_tags?.length && tags?.length) return "직급별 인원";
+        if (!ids && !exclude_tags?.length && tags?.length) return "파트·직급별 인원";
         return "인원";
       }
       if (isLeaveShape(s, hardness)) return "휴가";

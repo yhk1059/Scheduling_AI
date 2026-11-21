@@ -33,7 +33,7 @@ const COPY = {
     title: "매장 조건",
     noun: "규칙",
     prompt: "매장 조건을 말로 적어 주세요",
-    description: "근무 형태, 필요 인원, 지켜야 할 규칙 모두 한 곳에서요.",
+    description: "근무조, 필요 인원, 지켜야 할 규칙 모두 한 곳에서요.",
     placeholder: "예: 마감 다음 날 오픈은 안 되게",
     submit: "규칙 만들기",
     empty: "아직 규칙이 없어요.",
@@ -344,7 +344,7 @@ export default function RulesStep({
               const hardness = card && (card.type === "fixed_assignment" || isLeaveRule(card)
                 ? "hard"
                 : card.hardness ?? (card.body.kind === "balance" ? "soft" : "hard"));
-              const name = card ? presetName(card) : "근무 형태";
+              const name = card ? presetName(card) : "근무조";
               const reading = card
                 ? describeRule(card, draftConfig, activeEmployees, stepPeriod ?? previewRange(shop.unit)).text
                 : describeShiftChange(cfg!.change, shop.config);

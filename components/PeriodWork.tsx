@@ -247,7 +247,7 @@ function ConditionsStep({ period, onStep }: { period: WorkPeriod; onStep: (s: Pe
   const orphanCount = orphanConstraintIds(shop, null).length;
   const pending = shop.pendingRules.length + shop.pendingConfig.length;
   // 직급별 배치(홀 오픈 2명 등)도 인원을 맞추는 규칙이다
-  const hasStaffing = liveShopRules(shop, period).some((r) => ["필요 인원", "직급별 인원"].includes(presetName(r)));
+  const hasStaffing = liveShopRules(shop, period).some((r) => ["필요 인원", "파트·직급별 인원"].includes(presetName(r)));
   const exceptionCount = period.requests.length + period.pendingRequests.length;
 
   return (

@@ -267,8 +267,8 @@ export function ShiftChangeCardView({ card }: { card: ShiftChangeCard }) {
   return (
     <article className={`${CARD} border-[#DCDCD8]`}>
       <div className="flex items-center justify-between gap-3">
-        <h3 className={ui.cardTitle}>근무 형태</h3>
-        <span className={`${ui.badge} bg-[#F5F5F4] text-[#4B4F57]`}>근무 형태</span>
+        <h3 className={ui.cardTitle}>근무조</h3>
+        <span className={`${ui.badge} bg-[#F5F5F4] text-[#4B4F57]`}>근무조</span>
       </div>
       {card.source_text && <Quote text={card.source_text} />}
       <Reading sentence={describeShiftChange(card.change, config)} />

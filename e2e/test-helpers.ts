@@ -200,7 +200,7 @@ export async function expectNoProblems(page: Page, problems: string[]) {
 /** 명단 표 맨 아래 줄에 적고 이름 칸에서 Enter. 적다 만 직급도 함께 들어간다. */
 export async function addRoster(page: Page, roster: [string, string | null][]) {
   const name = page.getByRole("textbox", { name: "새 직원 이름" });
-  const tag = page.getByRole("combobox", { name: "새 직원 직급" });
+  const tag = page.getByRole("combobox", { name: "새 직원 파트·직급" });
   for (const [n, t] of roster) {
     await name.fill(n);
     if (t) await tag.fill(t);

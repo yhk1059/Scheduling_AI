@@ -18,7 +18,7 @@ export default function Stepper<S extends number>({
   onSelect: (step: S) => void;
 }) {
   return (
-    <ol aria-label={listLabel} className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+    <ol aria-label={listLabel} className="grid grid-cols-3 gap-1.5 sm:gap-2">
       {labels.map((label, i) => {
         const step = (i + 1) as S;
         const active = step === current;
@@ -35,13 +35,13 @@ export default function Stepper<S extends number>({
               disabled={!done}
               onClick={() => onSelect(step)}
               aria-current={active ? "step" : undefined}
-              className={`flex h-full w-full flex-col items-start gap-1.5 rounded-2xl px-4 py-3.5 text-left transition-colors duration-[120ms] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#C4247C] disabled:cursor-default ${
+              className={`flex h-full w-full flex-col items-start gap-1.5 rounded-xl px-2.5 py-2 text-left sm:rounded-2xl sm:px-4 sm:py-3.5 transition-colors duration-[120ms] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#C4247C] disabled:cursor-default ${
                 active
                   ? "bg-[#F5F5F4] shadow-[inset_0_0_0_1.5px_#111214]"
                   : "bg-white shadow-[inset_0_0_0_1px_#EDEDEA] enabled:hover:bg-[#F5F5F4] enabled:active:bg-[#EDEDEA]"
               }`}
             >
-              <span className="flex items-center gap-2 text-[13px] font-semibold text-[#4B4F57]">
+              <span className="flex items-center gap-1.5 text-xs font-semibold text-[#4B4F57] sm:gap-2 sm:text-[13px]">
                 {done ? (
                   <span className="flex size-[22px] items-center justify-center rounded-full bg-[#DDF7E9] text-[#067647]">
                     <svg aria-hidden="true" viewBox="0 0 12 12" className="size-3" fill="none" stroke="currentColor" strokeWidth={1.8}>
@@ -59,8 +59,9 @@ export default function Stepper<S extends number>({
                 )}
                 {label}
               </span>
-              {notes?.[i] && <span className="text-base font-bold tracking-[-0.02em] text-[#111214]">{notes[i]}</span>}
-              <span className={`flex items-center gap-1.5 text-xs font-semibold ${status.ink}`}>
+              {/* 좁은 화면에서는 단계 이름만 한 줄로 보여 근무표가 먼저 보이게 한다 */}
+              {notes?.[i] && <span className="text-base font-bold tracking-[-0.02em] text-[#111214] max-sm:hidden">{notes[i]}</span>}
+              <span className={`flex items-center gap-1.5 text-xs font-semibold max-sm:sr-only ${status.ink}`}>
                 <span aria-hidden="true" className={`size-[7px] rounded-full ${status.dot}`} />
                 {status.text}
               </span>
