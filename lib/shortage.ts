@@ -64,3 +64,12 @@ export function coverageShortages(
     });
   });
 }
+
+/** 규칙이 고르던 날에서 drop을 뺀 수정본(그날만 예외). 날마다 세는 규칙(require)이 아니면 그대로 돌려준다. */
+export function withoutDays(c: ConstraintSpec, drop: number[], period: PeriodRange, holidays: number[]): ConstraintSpec {
+  if (c.type !== "rule" || c.body.kind !== "require") return c;
+  const body = c.body;
+  const days = body.for_each.days ?? {};
+  const keep = coverageDays(days, period, holidays).filter((d) => !drop.includes(d));
+  return { ...c, body: { ...body, for_each: { ...body.for_each, days: { ...days, days: keep } } } };
+}

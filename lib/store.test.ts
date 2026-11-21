@@ -768,6 +768,21 @@ describe("이번 기간만 끄기와 제안 수락", () => {
     expect(Object.keys(p.ruleOverrides)).toEqual(["r"]);
   });
 
+  it("exceptDays는 매장 규칙의 그날만 빼서 ruleOverrides에 두고, 원본은 그대로 둔다", () => {
+    const { store, id, period } = setup();
+    store.getState().addPendingRules([count({ shifts: { in: ["N"] }, per: "day", min: 1 }, { id: "c" })]);
+    store.getState().applyRule("c");
+    const v = store.getState().inputVersion;
+    store.getState().exceptDays(id, "c", [2, 3]);
+    const days = (c: ConstraintSpec) => (ruleShape(c)?.kind === "count" ? (ruleShape(c) as { days: { days?: number[] } }).days.days : null);
+    const kept = days(period().ruleOverrides.c);
+    expect(kept).not.toContain(2);
+    expect(kept).not.toContain(3);
+    expect(kept).toContain(1);
+    expect(days(byId(store.getState().shop!.rules, "c"))).toBeUndefined();
+    expect(store.getState().inputVersion).toBe(v + 1);
+  });
+
   it("disabledRulesFor는 끈 매장 규칙·요청을 disabledIds 순으로, 수정본을 반영해 돌려주고 없는 id는 건너뛴다", () => {
     const { store, id, period } = setup();
     store.getState().applyChanges(id, [{ action: "set_value", constraint_id: "r", name: "max_len", value: 4 }]);

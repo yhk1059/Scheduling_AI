@@ -8,6 +8,7 @@ import { persist, type PersistStorage, type StorageValue } from "zustand/middlew
 import { availabilityRules, isAvailabilityRule, sameAvailability, type AvailabilitySlots } from "./availability";
 import type { DayKind } from "./coverage-conflict";
 import { holidayDays } from "./holidays";
+import { withoutDays } from "./shortage";
 import {
   carryOverFrom,
   diffAssignments,
@@ -260,6 +261,8 @@ export interface AppState extends Data {
   setDisabled: (periodId: string, constraintId: string, disabled: boolean) => void;
   /** 검증된 제안: disable → disabledIds, set_value·set_hardness → 요청은 직접, 매장 규칙은 ruleOverrides. */
   applyChanges: (periodId: string, changes: ConstraintChange[]) => void;
+  /** [그날만 빼고 만들기]: 매장 규칙·요청에서 그 날들만 뺀 수정본을 둔다(원본은 그대로). */
+  exceptDays: (periodId: string, constraintId: string, days: number[]) => void;
   /** 그 칸의 기존 고정 배정을 지우고 수동 고정 제약을 추가한다. */
   setFixed: (periodId: string, employeeId: string, day: number, shift: Code) => void;
   clearFixed: (periodId: string, employeeId: string, day: number) => void;
@@ -1489,6 +1492,17 @@ export function createAppStore(getStorage: () => Storage, now: () => Date = () =
                 }
               }
               return next;
+            });
+          },
+          exceptDays: (periodId, constraintId, days) => {
+            const { shop } = get();
+            if (!shop) return;
+            editPeriod(periodId, (p) => {
+              const request = p.requests.find((c) => c.id === constraintId);
+              if (request)
+                return { ...p, requests: p.requests.map((c) => (c.id === constraintId ? withoutDays(c, days, p, p.holidays) : c)) };
+              const rule = p.ruleOverrides[constraintId] ?? basis(shop, p).rules.find((r) => r.id === constraintId);
+              return rule ? { ...p, ruleOverrides: { ...p.ruleOverrides, [rule.id]: withoutDays(rule, days, p, p.holidays) } } : p;
             });
           },
           setFixed: (periodId, employeeId, day, shift) => {

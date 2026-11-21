@@ -232,7 +232,7 @@ test("S18. 말로 필요 인원 → 근무표 → 사람이 모자란 필요 인
   const explanation = panel.locator("p.whitespace-pre-line");
   await expect(explanation).not.toBeEmpty();
   test.info().annotations.push({ type: "충돌 설명", description: await explanation.innerText() });
-  const proposals = panel.locator("article").filter({ hasText: "검증됨" });
+  const proposals = panel.locator("article").filter({ hasText: "이대로 바꾸면 근무표가 나와요" });
   expect(await proposals.count(), "검증된 제안").toBeGreaterThan(0);
   test.info().annotations.push({ type: "제안", description: (await proposals.allInnerTexts()).join(" | ") });
   const valueChange = proposals.filter({ hasText: /9 → \d+/ });

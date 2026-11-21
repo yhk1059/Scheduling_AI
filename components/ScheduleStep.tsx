@@ -344,6 +344,7 @@ export function ScheduleBody({
   const setFixed = useAppStore((s) => s.setFixed);
   const clearFixed = useAppStore((s) => s.clearFixed);
   const setDisabled = useAppStore((s) => s.setDisabled);
+  const exceptDays = useAppStore((s) => s.exceptDays);
   const applyChanges = useAppStore((s) => s.applyChanges);
   const go = useAppStore((s) => s.go);
   const [selected, setSelected] = useState<Cell | null>(null);
@@ -428,6 +429,10 @@ export function ScheduleBody({
       }}
       onDisable={(id) => {
         setDisabled(periodId, id, true);
+        sv.run();
+      }}
+      onExcept={(id, days) => {
+        exceptDays(periodId, id, days);
         sv.run();
       }}
       onToggle={(id, enabled) => setDisabled(periodId, id, !enabled)}
@@ -836,6 +841,7 @@ export function OutcomePanel({
   hasResult,
   onAccept,
   onDisable,
+  onExcept,
   onToggle,
 }: {
   outcome: NonNullable<Outcome>;
@@ -853,6 +859,8 @@ export function OutcomePanel({
   hasResult: boolean;
   onAccept: (p: RelaxationProposal) => void;
   onDisable: (id: string) => void;
+  /** [그날만 빼고 만들기]: 그 규칙에서 그 날들만 빼고 다시 만든다 */
+  onExcept: (id: string, days: number[]) => void;
   onToggle: (id: string, enabled: boolean) => void;
 }) {
   const [dismissed, setDismissed] = useState<RelaxationProposal[]>([]);
@@ -899,11 +907,36 @@ export function OutcomePanel({
 
       {!unsubmitted && (
         <>
-      {outcome.kind === "infeasible" && explaining && !explanation && (
-        <p className="flex items-center gap-2 text-sm text-[#6B6F78]">
-          <Spinner />
-          원인을 분석하는 중…
-        </p>
+      {(shortages.length > 0 || explanation || (outcome.kind === "infeasible" && explaining)) && (
+        <div className="flex flex-col gap-1.5">
+          <h3 className="text-sm font-semibold text-[#111214]">왜 만들 수 없나요?</h3>
+          {ruleConflicts.map((c) => (
+            <ShortageLines
+              key={c.constraint_id}
+              shortages={shortages.filter((x) => x.constraintId === c.constraint_id)}
+              config={config}
+              period={period}
+              busy={busy}
+              onExcept={(days) => onExcept(c.constraint_id, days)}
+            />
+          ))}
+          {explanation ? (
+            <p className="text-sm leading-relaxed whitespace-pre-line text-[#4B4F57]">
+              {explanation.text}
+              {explanation.fallback && (
+                <span className="text-[#6B6F78]"> 자동 설명을 만들지 못해 함께 지킬 수 없는 규칙만 보여 줘요.</span>
+              )}
+            </p>
+          ) : (
+            outcome.kind === "infeasible" &&
+            explaining && (
+              <p className="flex items-center gap-2 text-sm text-[#6B6F78]">
+                <Spinner />
+                원인을 분석하는 중…
+              </p>
+            )
+          )}
+        </div>
       )}
 
       {proposals.length > 0 && (
@@ -959,7 +992,6 @@ export function OutcomePanel({
                       이번 근무표에서만 끄기
                     </button>
                   )}
-                  <ShortageLines shortages={shortages.filter((x) => x.constraintId === c.constraint_id)} config={config} period={period} />
                 </li>
               );
             })}
@@ -1008,17 +1040,6 @@ export function OutcomePanel({
         </div>
       )}
 
-      {explanation && (
-        <details className="border-t border-[#F5F5F4] pt-3">
-          <summary className="cursor-pointer text-[13px] font-semibold text-[#111214]">왜 만들 수 없나요?</summary>
-          <p className="mt-1.5 text-sm leading-relaxed whitespace-pre-line text-[#4B4F57]">
-            {explanation.text}
-            {explanation.fallback && (
-              <span className="text-[#6B6F78]"> 자동 설명을 만들지 못해 함께 지킬 수 없는 규칙만 보여 줘요.</span>
-            )}
-          </p>
-        </details>
-      )}
         </>
       )}
     </section>
@@ -1027,8 +1048,20 @@ export function OutcomePanel({
 
 const WEEKDAY_SHORT = ["일", "월", "화", "수", "목", "금", "토"]; // 0=일
 
-/** 인원 규칙이 가능 시간으로 모자란 날. 근무조·필요 인원·들어올 수 있는 사람이 같은 날은 한 줄로 묶는다. */
-function ShortageLines({ shortages, config, period }: { shortages: Shortage[]; config: ShopConfig; period: Period }) {
+/** 인원 규칙이 가능 시간으로 모자란 날. 근무조·필요 인원·들어올 수 있는 사람이 같은 날은 한 줄로 묶고 [그날만 빼고 만들기]를 둔다. */
+function ShortageLines({
+  shortages,
+  config,
+  period,
+  busy,
+  onExcept,
+}: {
+  shortages: Shortage[];
+  config: ShopConfig;
+  period: Period;
+  busy: boolean;
+  onExcept: (days: number[]) => void;
+}) {
   if (!shortages.length) return null;
   const days = periodDays(period);
   const groups = new Map<string, Shortage[]>();
@@ -1037,15 +1070,26 @@ function ShortageLines({ shortages, config, period }: { shortages: Shortage[]; c
     groups.set(key, [...(groups.get(key) ?? []), s]);
   }
   return (
-    <ul className="flex w-full flex-col gap-0.5 text-[13px] text-[#B42318]">
+    <ul className="flex w-full flex-col gap-1 text-[13px] text-[#B42318]">
       {[...groups.values()].map((group) => {
         const { code, need, names } = group[0];
         const when = group.map((s) => `${WEEKDAY_SHORT[days[s.day - 1].weekday]} ${monthDay(period, s.day)}`).join(", ");
         const shift = config.shifts.find((x) => x.code === code)?.name ?? code;
         const who = names.length ? `${names.join(", ")}만 들어올 수 있어요` : "들어올 수 있는 사람이 없어요";
         return (
-          <li key={`${code}|${when}`}>
-            {when} {shift}: {who} · {need}명 필요
+          <li key={`${code}|${when}`} className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
+            <span>
+              {when} {shift}: {who} · {need}명 필요
+            </span>
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => onExcept(group.map((s) => s.day))}
+              title="그날만 이 규칙 없이 다시 만들어요. 매장 조건은 그대로예요"
+              className={ui.secondarySm}
+            >
+              {group.length === 1 ? `${when}만 빼고 만들기` : `이 ${group.length}일만 빼고 만들기`}
+            </button>
           </li>
         );
       })}
@@ -1088,10 +1132,13 @@ function ProposalCard({
           <p className="text-sm leading-relaxed text-[#111214]">{proposal.description}</p>
         )}
         <p className="text-xs text-[#6B6F78]">
-          <span className="font-medium text-[#067647]">검증됨</span> · 희망 반영{" "}
-          <span className="font-mono">
-            {s.preferences_met}/{s.preferences_total}
-          </span>
+          <span className="font-medium text-[#067647]">이대로 바꾸면 근무표가 나와요</span>
+          {s.preferences_total > 0 && (
+            <>
+              {" "}
+              · 희망 반영 <span className="font-mono">{s.preferences_met}/{s.preferences_total}</span>
+            </>
+          )}
           {s.soft_violation_count > 0 && (
             <>
               {" "}

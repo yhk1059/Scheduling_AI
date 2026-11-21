@@ -2,7 +2,9 @@ import { describe, expect, it } from "vitest";
 import { availabilityRules, type AvailabilitySlots } from "./availability";
 import { dateOfDay } from "./period";
 import { DEFAULT_CONFIG } from "./rules";
-import { coverageShortages } from "./shortage";
+import { coverageShortages, withoutDays } from "./shortage";
+import { ruleShape } from "./rules";
+import type { ConstraintSpec } from "./types.gen";
 import { count } from "./test-rules";
 
 // 2026-11-23은 월요일. 1=월 … 7=일
@@ -55,5 +57,26 @@ describe("coverageShortages", () => {
   it("가능 시간으로 모두 채울 수 있으면 빈 배열이다(다른 규칙과 겹쳐서 막힌 경우)", () => {
     const rule = count({ people: { tags: ["홀"] }, shifts: { in: ["C"] }, per: "day", min: 1 }, { id: "hall" });
     expect(coverageShortages(["hall"], [rule, ...avail], employees, DEFAULT_CONFIG, period, [])).toEqual([]);
+  });
+});
+
+const daysOf = (c: ConstraintSpec) => {
+  const s = ruleShape(c);
+  return s?.kind === "count" ? s.days : undefined;
+};
+
+describe("withoutDays", () => {
+  it("규칙이 고르던 날에서 뺀 날만 남긴다(주말만이면 토·일 중에서)", () => {
+    const out = withoutDays(kitchenLead(1), [2], period, []);
+    expect(daysOf(out)?.days).toEqual([1, 3, 4, 5, 6, 7]);
+    const weekend = withoutDays(kitchenLead(1, { kind: "weekend" }), [7], period, []);
+    expect(daysOf(weekend)).toMatchObject({ kind: "weekend", days: [6] });
+  });
+
+  it("뺀 날은 더 이상 모자란 날로 잡히지 않고, 원본은 그대로다", () => {
+    const rule = kitchenLead(1);
+    const out = withoutDays(rule, [2], period, []);
+    expect(coverageShortages(["lead"], [out, ...avail], employees, DEFAULT_CONFIG, period, [])).toEqual([]);
+    expect(daysOf(rule)?.days).toBeUndefined();
   });
 });

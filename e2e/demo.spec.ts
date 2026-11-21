@@ -47,7 +47,7 @@ test("S20. 체험 저니", async ({ page }) => {
   const panel = page.locator("section").filter({ hasText: "이 조건으로는 근무표를 만들 수 없어요" });
   await expect(panel.first()).toBeVisible();
   await expect(page.getByText("원인을 분석하는 중…")).toHaveCount(0);
-  const proposals = panel.locator("article").filter({ hasText: "검증됨" });
+  const proposals = panel.locator("article").filter({ hasText: "이대로 바꾸면 근무표가 나와요" });
   await expect(proposals.first()).toBeVisible();
   // 저장된 설명(LLM 문장)이 보이는 화면이라 개발 용어 검사는 하지 않는다
   await proposals.first().getByRole("button", { name: "수락" }).click();
