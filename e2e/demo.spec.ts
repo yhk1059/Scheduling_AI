@@ -1,7 +1,7 @@
 // docs/BROWSER_TEST_SCENARIOS.md S20. 로그인하지 않은 컨텍스트로 /demo를 연다. Supabase와 LLM을 부르지 않고 /solve만 실제로 부른다.
 import { expect, test } from "@playwright/test";
 
-import { applyAllPending, expectNoDevTerms, expectNoProblems, pendingCards, T0, trackProblems } from "./test-helpers";
+import { applyAllPending, expectNoDevTerms, expectNoProblems, pendingRuleRows, T0, trackProblems } from "./test-helpers";
 
 let problems: string[] = [];
 
@@ -35,7 +35,7 @@ test("S20. 체험 저니", async ({ page }) => {
   await expect(steps.locator('[aria-current="step"]')).toContainText("매장 조건");
   await expect(page.getByText("체험에서는 말로 적을 수 없어요")).toBeVisible();
   await expect(page.getByRole("textbox", { name: "매장 조건 입력" })).toHaveCount(0);
-  const pending = await pendingCards(page).count();
+  const pending = await pendingRuleRows(page).count();
   expect(pending, "대기 카드").toBeGreaterThan(0);
   await expectNoDevTerms(page, "체험 ② 매장 조건");
   await applyAllPending(page);
@@ -64,6 +64,7 @@ test("S20. 체험 저니", async ({ page }) => {
   // ① 가능 시간: 모두 제출한 상태, 링크 없음
   await steps.getByRole("button", { name: "가능 시간" }).click();
   await expect(page.getByText(/20\s*명 중\s*20\s*명 제출/)).toBeVisible();
+  await page.getByRole("table", { name: "직원별 가능 시간과 날짜별 가능 인원" }).getByRole("button", { name: /^서민호/ }).press("Enter");
   await expect(page.getByRole("region", { name: "서민호 가능 시간" })).toBeVisible();
   await expect(page.getByRole("button", { name: "링크 복사" })).toHaveCount(0);
   await expectNoDevTerms(page, "체험 ① 가능 시간");
@@ -72,12 +73,28 @@ test("S20. 체험 저니", async ({ page }) => {
   expect(apiPaths.length, "/solve 호출").toBeGreaterThan(0);
   expect(supabaseCalls, "체험은 Supabase를 부르지 않는다").toEqual([]);
 
+  // 좁은 화면에서는 패널이 표 아래에 놓이고 가로 넘침은 표 내부에만 생긴다.
+  await page.setViewportSize({ width: 375, height: 812 });
+  const expectNoPageOverflow = () => expect.poll(() => page.evaluate(() =>
+    document.documentElement.scrollWidth <= document.documentElement.clientWidth,
+  )).toBe(true);
+  await expectNoPageOverflow();
+  await steps.getByRole("button", { name: "매장 조건" }).click();
+  await expect(page.getByRole("complementary", { name: "규칙 상세" })).toBeVisible();
+  await expectNoPageOverflow();
+  await steps.getByRole("button", { name: "근무표" }).click();
+  await expect(page.getByRole("complementary", { name: "근무표 확인 패널" })).toBeVisible();
+  await expectNoPageOverflow();
+  await page.getByRole("navigation").getByRole("button", { name: "매장 설정" }).click();
+  await expect(page.getByRole("complementary", { name: "하루 타임라인" })).toBeVisible();
+  await expectNoPageOverflow();
+
   // [나가기] → 랜딩. 다시 열면 처음 상태(저장되지 않음)
   await page.getByRole("button", { name: "나가기" }).click();
   await expect(page).toHaveURL(/\/$/);
   await page.goto("/demo");
   await expect(page.getByText("체험에서는 말로 적을 수 없어요")).toBeVisible();
-  await expect(pendingCards(page)).toHaveCount(pending);
+  await expect(pendingRuleRows(page)).toHaveCount(pending);
   const stored = await page.evaluate(() => localStorage.getItem("shop-scheduler"));
   expect(stored ?? "", "체험은 저장하지 않는다").not.toContain("한강 다이닝");
 });

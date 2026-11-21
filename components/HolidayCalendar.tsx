@@ -29,11 +29,11 @@ export default function HolidayCalendar({ period }: { period: WorkPeriod }) {
         const offset = new Date(Date.UTC(year, month - 1, 1)).getUTCDay();
         const length = new Date(Date.UTC(year, month, 0)).getUTCDate();
         return (
-          <div key={key} className="flex flex-col gap-1.5">
+          <div key={key} className="flex w-full max-w-[292px] flex-col gap-1.5">
             <span className="text-[13px] font-semibold text-[#111214]">
               {year}년 {month}월
             </span>
-            <div className="inline-grid grid-cols-[repeat(7,40px)] gap-0.5">
+            <div className="inline-grid grid-cols-7 gap-0.5">
               {WEEKDAYS.map((w) => (
                 <span key={w} className="py-1 text-center text-xs font-medium text-[#6B6F78]">
                   {w}

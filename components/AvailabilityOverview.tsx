@@ -1,218 +1,162 @@
 "use client";
 
-import { useState } from "react";
+import { useId, useState, type ReactNode } from "react";
 
-import { availableCount, SLOT_COUNT, slotSpan, type AvailabilitySlots } from "@/lib/availability";
+import { availableCount, coversShift } from "@/lib/availability";
 import { effectiveCoverage, staffingTone, type StaffingTone } from "@/lib/coverage-conflict";
-import { isWeekendDay, periodDays, type PeriodDay } from "@/lib/period";
+import { isWeekendDay, periodDays } from "@/lib/period";
 import type { AvailabilityLink } from "@/lib/supabase";
 import { coverageCodes, type ShopEmployee, type WorkPeriod } from "@/lib/store";
 import type { ConstraintSpec, ShopConfig } from "@/lib/types.gen";
 
+import { WEEKDAYS, codeClass } from "./ScheduleStep";
 import { ui } from "./ui";
 
-const WEEKDAYS = ["일", "월", "화", "수", "목", "금", "토"];
-const DAYS_PER_PAGE = 7;
-const HEAD_HEIGHT = 24;
-const SLOT_HEIGHT = 6;
-/** 3시간마다 시각과 줄을 긋는다(06, 09, … 21시). */
-const HOUR_SLOTS = Array.from({ length: SLOT_COUNT / 6 }, (_, i) => i * 6);
-
-/** 가능 인원 칸의 상태: 점 색, 글자 색, 화면 읽기용 말. */
-const TONES: Record<StaffingTone, { dot: string; ink: string; text: string }> = {
-  ok: { dot: "bg-[#12B76A]", ink: "text-[#111214]", text: "여유" },
-  tight: { dot: "bg-[#FF7A1A]", ink: "text-[#B93815]", text: "빠듯" },
-  short: { dot: "bg-[#F04438]", ink: "text-[#B42318]", text: "부족" },
+const TONES: Record<StaffingTone, { dot: string; text: string }> = {
+  ok: { dot: "bg-[#12B76A]", text: "여유" },
+  tight: { dot: "bg-[#FF7A1A]", text: "빠듯" },
+  short: { dot: "bg-[#F04438]", text: "부족" },
 };
 
-const dayColor = (day: PeriodDay, weekend: boolean) =>
-  day.weekday === 0 || (weekend && day.weekday !== 6) ? "text-[#B42318]" : day.weekday === 6 ? "text-[#C4247C]" : "text-[#4B4F57]";
-
-/**
- * ① 직원이 제출한 가능 시간 모아 보기: 날짜별 가능 인원 + 직원별 읽기 전용 캘린더. 2주 이상이면 모두 같은 주로 함께 넘긴다.
- * 가능 인원 칸에는 켜진 반드시 필요 인원과 비교한 상태(여유·빠듯·부족)를 점으로 붙인다.
- */
 export default function AvailabilityOverview({
-  period,
-  employees,
-  rows,
-  config,
-  rules,
+  period, employees, rows, config, rules, preparation, submission,
 }: {
   period: WorkPeriod;
   employees: ShopEmployee[];
-  rows: AvailabilityLink[];
+  rows: AvailabilityLink[] | null;
   config: ShopConfig;
   rules: ConstraintSpec[];
+  preparation: ReactNode;
+  submission: ReactNode;
 }) {
-  const [page, setPage] = useState(0);
+  const detailId = useId();
+  const [week, setWeek] = useState(0);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
   const days = periodDays(period);
-  const pages = Math.ceil(days.length / DAYS_PER_PAGE);
-  const shown = days.slice(page * DAYS_PER_PAGE, (page + 1) * DAYS_PER_PAGE);
-  const weekend = (d: PeriodDay) => isWeekendDay(period, d.day, period.holidays);
-  const rowOf = (id: string) => rows.find((r) => r.employee_id === id);
-  const slotsList = employees.map((n) => rowOf(n.id)?.slots ?? {});
+  const pages = Math.ceil(days.length / 7);
+  const page = Math.min(week, pages - 1);
+  const shown = days.slice(page * 7, (page + 1) * 7);
   const codes = coverageCodes(config);
-  const needOf = (code: string, d: PeriodDay) => effectiveCoverage(rules, code, weekend(d) ? "weekend" : "weekday", period, period.holidays);
-  const hasNeed = codes.some((s) => days.some((d) => needOf(s.code, d)));
+  const rowById = new Map(rows?.map((row) => [row.employee_id, row]));
+  const selected = employees.find((n) => n.id === selectedId) ?? employees[0];
+  const selectedRow = selected && rowById.get(selected.id);
+  const slotsList = employees.map((n) => rowById.get(n.id)?.slots ?? {});
+  const label = (d: (typeof days)[number]) => `${WEEKDAYS[d.weekday]} ${d.month}/${d.dom}`;
+  const totals = codes.map((shift) => shown.map((d) => {
+    const count = availableCount(slotsList, d.date, shift, config);
+    const kind = isWeekendDay(period, d.day, period.holidays) ? "weekend" : "weekday";
+    return { count, tone: staffingTone(count, effectiveCoverage(rules, shift.code, kind, period, period.holidays)) };
+  }));
 
   return (
-    <section className="flex flex-col gap-3">
-      <div className="flex items-center gap-2">
-        <h3 className={ui.cardTitle}>직원별 가능 시간</h3>
-        <p className={`${ui.help} mr-auto flex items-center gap-1.5`}>
-          <span aria-hidden="true" className="size-3 rounded-xs bg-[#C4247C]" />
-          칠한 곳이 일할 수 있는 시간이에요
-        </p>
-        {pages > 1 && (
-          <>
-            <button type="button" disabled={page === 0} onClick={() => setPage((p) => p - 1)} className={`${ui.textSm} disabled:text-[#9499A2]`}>
-              이전 주
-            </button>
-            <span className="font-mono text-xs text-[#6B6F78]">
-              {page + 1}/{pages}
-            </span>
-            <button type="button" disabled={page === pages - 1} onClick={() => setPage((p) => p + 1)} className={`${ui.textSm} disabled:text-[#9499A2]`}>
-              다음 주
-            </button>
-          </>
-        )}
-      </div>
-
-      <div className={`${ui.card} sticky top-28 z-10 flex flex-col gap-2`}>
-        <table aria-label="날짜별 가능 인원" className="w-full table-fixed border-collapse">
-          <thead>
-            <tr className="border-b border-[#EDEDEA]">
-              <th className="w-44 py-1.5 text-left text-xs font-medium text-[#6B6F78]">날짜별 가능 인원</th>
-              {shown.map((d) => (
-                <th key={d.date} className={`py-1.5 text-center text-xs font-medium ${dayColor(d, weekend(d))}`}>
-                  {WEEKDAYS[d.weekday]}{" "}
-                  <span className="font-mono">
-                    {d.month}/{d.dom}
-                  </span>
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {codes.map((s) => (
-              <tr key={s.code} className="border-b border-[#F5F5F4] last:border-b-0">
-                <th scope="row" className="py-1 text-left text-[13px] font-medium text-[#111214]">
-                  {s.name}{" "}
-                  <span className="font-mono text-xs font-normal text-[#6B6F78]">
-                    {s.start}~{s.end}
-                  </span>
-                </th>
-                {shown.map((d) => {
-                  const count = availableCount(slotsList, d.date, s, config);
-                  const tone = staffingTone(count, needOf(s.code, d));
+    <div className={ui.workLayout}>
+      <div className="flex min-w-0 flex-col gap-4">
+        {preparation}
+        {rows && (
+          <section className={`${ui.card} flex min-w-0 flex-col gap-3 px-3! sm:px-5!`}>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <h3 className={ui.cardTitle}>직원별 가능 시간</h3>
+              {pages > 1 && (
+                <div className="flex items-center gap-1">
+                  <button type="button" disabled={page === 0} onClick={() => setWeek(page - 1)} className={`${ui.textSm} disabled:opacity-40`}>이전 주</button>
+                  <span role="status" className={ui.help}>{page + 1}/{pages}주</span>
+                  <button type="button" disabled={page === pages - 1} onClick={() => setWeek(page + 1)} className={`${ui.textSm} disabled:opacity-40`}>다음 주</button>
+                </div>
+              )}
+            </div>
+            <ul aria-label="근무조 범례" className="flex flex-wrap gap-2">
+              {codes.map((shift) => <li key={shift.code} className={`${ui.badge} ${codeClass(shift.code, false, config)}`}>{shift.name}</li>)}
+            </ul>
+            <table aria-label="직원별 가능 시간과 날짜별 가능 인원" className="w-full table-fixed border-collapse text-center">
+              <thead>
+                <tr className="border-b border-[#EDEDEA] text-xs">
+                  <th scope="col" className="w-[24%] py-2 text-left">직원</th>
+                  {shown.map((d) => <th key={d.date} scope="col" className={`font-medium ${isWeekendDay(period, d.day, period.holidays) ? "text-[#C4247C]" : "text-[#4B4F57]"}`}>{label(d)}</th>)}
+                </tr>
+              </thead>
+              <tbody>
+                {employees.map((n) => {
+                  const row = rowById.get(n.id);
+                  const active = n.id === selected?.id;
                   return (
-                    <td key={d.date} className="py-1 text-center">
-                      <span className={`inline-flex items-center gap-1.5 font-mono text-[13px] ${tone ? `font-semibold ${TONES[tone].ink}` : "text-[#111214]"}`}>
-                        {tone && <span aria-hidden="true" className={`size-1.5 rounded-full ${TONES[tone].dot}`} />}
-                        {count}
-                        {tone && <span className="sr-only">명, {TONES[tone].text}</span>}
-                      </span>
-                    </td>
+                    <tr key={n.id} onClick={() => setSelectedId(n.id)} className={`cursor-pointer border-b border-[#EDEDEA] hover:bg-[#F5F5F4] ${active ? "bg-[#FDEAF4]" : ""}`}>
+                      <th scope="row" className="py-1.5 text-left">
+                        <button type="button" aria-controls={detailId} aria-pressed={active} onClick={() => setSelectedId(n.id)} className="block w-full rounded px-1 py-1 text-left text-xs wrap-anywhere focus-visible:outline-2 focus-visible:outline-[#C4247C]">
+                          {n.name}
+                          <span className="block text-[11px] font-normal text-[#6B6F78]">{row?.submitted_at ? n.tags.join(" · ") : "미제출"}</span>
+                        </button>
+                      </th>
+                      {shown.map((d) => (
+                        <td key={d.date} className="px-0.5 py-1.5">
+                          <div className="flex flex-col gap-0.5">
+                            {codes.map((shift) => {
+                              const available = coversShift(row?.slots[d.date] ?? [], shift, config);
+                              return (
+                                <span key={shift.code} className={`block h-1 overflow-hidden rounded-full border-0! ${available ? codeClass(shift.code, false, config) : "bg-[#EDEDEA]"}`}>
+                                  {available && <span aria-hidden="true" className="block h-full bg-current" />}
+                                  <span className="sr-only">{shift.name} {available ? "가능" : "불가"}</span>
+                                </span>
+                              );
+                            })}
+                          </div>
+                        </td>
+                      ))}
+                    </tr>
                   );
                 })}
-              </tr>
-            ))}
-          </tbody>
-        </table>
-        {hasNeed && (
-          <p className={`${ui.help} flex flex-wrap items-center gap-x-3 gap-y-1`}>
-            {(["ok", "tight", "short"] as const).map((t) => (
-              <span key={t} className="inline-flex items-center gap-1.5">
-                <span aria-hidden="true" className={`size-1.5 rounded-full ${TONES[t].dot}`} />
-                {TONES[t].text}
-              </span>
-            ))}
-            <span>반드시 필요 인원과 비교해요</span>
-          </p>
+              </tbody>
+              <tfoot>
+                {codes.length > 0 && (
+                  <tr>
+                    <th scope="row" className="py-1 text-left text-xs font-medium">
+                      <span className="sr-only">가능 인원</span>
+                      {codes.map((shift) => <span key={shift.code} className="block leading-5 wrap-anywhere">{shift.name}</span>)}
+                    </th>
+                    {shown.map((d, j) => (
+                      <td key={d.date} className="text-xs">
+                        {codes.map((shift, i) => {
+                          const { count, tone } = totals[i][j];
+                          return (
+                            <span key={shift.code} className="block leading-5">
+                              <span className="sr-only">{shift.name} </span>
+                              {tone && <span aria-hidden="true" className={`mr-0.5 inline-block size-1.5 rounded-full ${TONES[tone].dot}`} />}
+                              {count}<span className="sr-only">명{tone && `, ${TONES[tone].text}`}</span>
+                            </span>
+                          );
+                        })}
+                      </td>
+                    ))}
+                  </tr>
+                )}
+              </tfoot>
+            </table>
+            {totals.some((row) => row.some(({ tone }) => tone)) && (
+              <ul aria-label="필요 인원 대비 가능 인원" className={`${ui.help} flex flex-wrap gap-3`}>
+                {Object.entries(TONES).map(([key, { dot, text }]) => <li key={key}><span aria-hidden="true" className={`mr-1 inline-block size-1.5 rounded-full ${dot}`} />{text}</li>)}
+              </ul>
+            )}
+          </section>
         )}
       </div>
-
-      <div className="grid grid-cols-3 gap-3">
-        {employees.map((n) => {
-          const row = rowOf(n.id);
-          return (
-            <section key={n.id} aria-label={`${n.name} 가능 시간`} className={`${ui.card} flex min-w-0 flex-col gap-2 px-3! py-3!`}>
-              <div className="flex h-[22px] items-center gap-1.5">
-                <h4 className="truncate text-[13px] font-semibold text-[#111214]">{n.name}</h4>
-                {n.tags.map((tag) => (
-                  <span key={tag} className={`${ui.badge} ${ui.badgeTone.base}`}>
-                    {tag}
-                  </span>
+      <aside aria-label="제출 현황과 직원 상세" className={ui.workAside}>
+        {submission}
+        {rows && selected && (
+          <section id={detailId} aria-label={`${selected.name} 가능 시간`} className={`${ui.card} flex flex-col gap-2`}>
+            <h3 className={`${ui.cardTitle} wrap-anywhere`}>{selected.name} 가능 시간</h3>
+            {selected.tags.length > 0 && <p className={`${ui.help} wrap-anywhere`}>{selected.tags.join(" · ")}</p>}
+            {selectedRow?.submitted_at ? (
+              <dl>
+                {shown.map((d) => (
+                  <div key={d.date} className="flex items-baseline justify-between gap-2 border-b border-[#EDEDEA] py-1.5 text-sm last:border-b-0">
+                    <dt className="shrink-0">{label(d)}</dt>
+                    <dd className="text-right text-[#4B4F57]">{(selectedRow.slots[d.date] ?? []).map(([start, end]) => `${start}~${end}`).join(" · ") || "가능 시간 없음"}</dd>
+                  </div>
                 ))}
-                {!row?.submitted_at && <span className={`${ui.badge} ${ui.badgeTone.excluded} ml-auto`}>미제출</span>}
-              </div>
-              <MiniCalendar days={shown} slots={row?.slots ?? {}} weekend={weekend} />
-            </section>
-          );
-        })}
-      </div>
-    </section>
-  );
-}
-
-/** 칠한 시간을 칸마다 그리지 않고 이어진 구간 하나를 덩어리 하나로 그린다. */
-function MiniCalendar({ days, slots, weekend }: { days: PeriodDay[]; slots: AvailabilitySlots; weekend: (d: PeriodDay) => boolean }) {
-  return (
-    <div
-      className="grid overflow-hidden rounded-md border border-[#EDEDEA] bg-white"
-      style={{
-        gridTemplateColumns: `28px repeat(${days.length}, minmax(0, 1fr))`,
-        gridTemplateRows: `${HEAD_HEIGHT}px repeat(${SLOT_COUNT}, ${SLOT_HEIGHT}px)`,
-      }}
-    >
-      {days.map((d, col) => (
-        <span
-          key={d.date}
-          aria-hidden="true"
-          className={`border-l border-[#EDEDEA] ${weekend(d) ? "bg-[#F5F5F4]" : ""}`}
-          style={{ gridColumn: col + 2, gridRow: `1 / span ${SLOT_COUNT + 1}` }}
-        />
-      ))}
-      {days.map((d, col) => (
-        <span
-          key={d.date}
-          aria-hidden="true"
-          className={`flex items-center justify-center text-[11px] font-medium ${dayColor(d, weekend(d))}`}
-          style={{ gridColumn: col + 2, gridRow: 1 }}
-        >
-          {WEEKDAYS[d.weekday]}
-        </span>
-      ))}
-      {HOUR_SLOTS.map((slot) => (
-        <span
-          key={slot}
-          aria-hidden="true"
-          className="border-t border-[#EDEDEA] pt-0.5 pr-1 text-right font-mono text-[10px] leading-none text-[#6B6F78]"
-          style={{ gridColumn: 1, gridRow: `${slot + 2} / span 6` }}
-        >
-          {String(6 + slot / 2).padStart(2, "0")}
-        </span>
-      ))}
-      {HOUR_SLOTS.map((slot) => (
-        <span key={slot} aria-hidden="true" className="border-t border-[#EDEDEA]" style={{ gridColumn: "2 / -1", gridRow: slot + 2 }} />
-      ))}
-      {days.flatMap((d, col) =>
-        (slots[d.date] ?? []).map(([from, to]) => {
-          const [start, end] = slotSpan([from, to]);
-          const label = `${d.month}월 ${d.dom}일 ${from}~${to}`;
-          return (
-            <span
-              key={`${d.date}-${from}`}
-              role="img"
-              aria-label={label}
-              title={label}
-              className="mx-px bg-[#C4247C]"
-              style={{ gridColumn: col + 2, gridRow: `${start + 2} / ${end + 2}` }}
-            />
-          );
-        }),
-      )}
+              </dl>
+            ) : <p className={ui.help}>아직 제출하지 않았어요.</p>}
+          </section>
+        )}
+      </aside>
     </div>
   );
 }

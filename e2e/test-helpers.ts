@@ -210,6 +210,8 @@ export async function addRoster(page: Page, roster: [string, string | null][]) {
   }
 }
 
+export const pendingRuleRows = (page: Page) => page.getByRole("region", { name: "확인할 제안" }).getByRole("list").getByRole("button");
+export const appliedRuleRows = (page: Page) => page.getByRole("region", { name: "적용됨" }).getByRole("list").getByRole("button");
 export const pendingCards = (page: Page) => page.locator("article").filter({ hasText: "적용 대기" });
 export const appliedCards = (page: Page) => page.locator("article").filter({ hasText: "적용됨" });
 export const scheduleTitle = (page: Page) => page.getByRole("heading", { name: "근무표", exact: true }).first();
@@ -562,6 +564,18 @@ async function cardOrder(page: Page): Promise<string[]> {
  * "기존 규칙 대체" 카드가 대신하는 기존 카드(같은 모양의 기본 규칙 등)만 목록에서 빠진다.
  */
 export async function applyAllPending(page: Page) {
+  const rows = pendingRuleRows(page);
+  const countInList = await rows.count();
+  if (countInList > 0) {
+    if (await page.getByRole("region", { name: "확인할 제안" }).getByRole("button", { name: "모두 적용" }).count()) {
+      await page.getByRole("region", { name: "확인할 제안" }).getByRole("button", { name: "모두 적용" }).click();
+    } else {
+      await rows.first().click();
+      await pendingCards(page).first().getByRole("button", { name: "적용", exact: true }).click();
+    }
+    await expect(rows).toHaveCount(0);
+    return;
+  }
   const before = await cardOrder(page);
   const replacing = await pendingCards(page).filter({ hasText: "기존 규칙 대체" }).count();
   const count = await pendingCards(page).count();

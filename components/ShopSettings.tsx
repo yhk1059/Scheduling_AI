@@ -67,7 +67,7 @@ export default function ShopSettings() {
         <>
           <section className={`${ui.card} flex flex-col gap-3`}>
             <h2 className={ui.sectionTitle}>근무 형태</h2>
-            <ShiftTable />
+            <ShiftTable showTimeline />
           </section>
           <CoverageSection />
         </>
@@ -216,7 +216,7 @@ export function CoverageSection({ collapsible = false }: { collapsible?: boolean
         <h2 className={ui.sectionTitle}>근무조별 필요 인원</h2>
         <p className={ui.help}>하루에 그 근무조에 들어갈 직원 수예요. 최대를 비우면 그 이상이면 돼요.</p>
       </div>
-      <div className="self-start">
+      <div className="max-w-full self-start overflow-x-auto">
         <CoverageForm drafts={coverageDrafts} setDrafts={setCoverageDrafts} />
       </div>
     </>

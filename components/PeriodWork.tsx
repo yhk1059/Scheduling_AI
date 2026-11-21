@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 
 import { carryOverFrom, previousConfirmedPeriod } from "@/lib/continuity";
 import { effectiveCoverage } from "@/lib/coverage-conflict";
@@ -80,8 +80,7 @@ export default function PeriodWork() {
           <h2 tabIndex={-1} data-step-title className={`${ui.cardTitle} outline-none`}>
             가능 시간
           </h2>
-          <PrepareSummary key={`prep-${period.id}`} period={period} />
-          <LinksSection period={period} />
+          <LinksSection key={period.id} period={period} />
           <StepBar current={1} total={3} caption="가능 시간">
             <button type="button" onClick={() => toStep(2)} className={ui.primaryLg}>
               다음: 매장 조건
@@ -131,28 +130,39 @@ function LinksSection({ period }: { period: WorkPeriod }) {
     };
   }, [demo, key, start, length, roster, shopName, attempt]);
 
+  const layout = (rows: AvailabilityLink[] | null, submission: ReactNode) =>
+    shop && (
+      <AvailabilityOverview
+        period={period}
+        employees={employees}
+        rows={rows}
+        config={shop.config}
+        rules={liveShopRules(shop, period)}
+        preparation={<PrepareSummary period={period} />}
+        submission={submission}
+      />
+    );
+
   if (demo) {
     // 체험: 링크를 만들지 않고 저장된 가능 시간으로 제출 현황과 캘린더를 그린다
     const rows = demoLinkRows(period.availability, employees, DEMO_SUBMITTED_AT);
     const absent = employees.filter((n) => !period.availability[n.id]);
     const done = employees.length - absent.length;
-    return (
-      <>
-        <section className={`${ui.card} flex flex-col gap-3`}>
-          <div className="flex min-w-0 flex-col gap-1">
-            <h3 className={ui.cardTitle}>직원 링크</h3>
-            <p className={ui.help}>체험에서는 직원 링크를 보낼 수 없어요. 직원이 가능 시간을 모두 제출한 상태로 시작해요</p>
-          </div>
-          <p className="text-[13px] text-[#111214]">
-            <span className="font-mono">{employees.length}</span>명 중 <span className="font-mono">{done}</span>명 제출
-          </p>
-          <div aria-hidden="true" className="h-1.5 overflow-hidden rounded bg-[#EDEDEA]">
-            <div className="h-full bg-[#C4247C]" style={{ width: `${employees.length === 0 ? 0 : (done / employees.length) * 100}%` }} />
-          </div>
-          {absent.length > 0 && <p className={ui.help}>미제출: {absent.map((n) => n.name).join(", ")}</p>}
-        </section>
-        {shop && <AvailabilityOverview key={period.id} period={period} employees={employees} rows={rows} config={shop.config} rules={liveShopRules(shop, period)} />}
-      </>
+    return layout(
+      rows,
+      <section className={`${ui.card} flex flex-col gap-3`}>
+        <div className="flex min-w-0 flex-col gap-1">
+          <h3 className={ui.cardTitle}>직원 링크</h3>
+          <p className={ui.help}>체험에서는 직원 링크를 보낼 수 없어요. 직원이 가능 시간을 모두 제출한 상태로 시작해요</p>
+        </div>
+        <p className="text-[13px] text-[#111214]">
+          <span className="font-mono">{employees.length}</span>명 중 <span className="font-mono">{done}</span>명 제출
+        </p>
+        <div aria-hidden="true" className="h-1.5 overflow-hidden rounded bg-[#EDEDEA]">
+          <div className="h-full bg-[#C4247C]" style={{ width: `${employees.length === 0 ? 0 : (done / employees.length) * 100}%` }} />
+        </div>
+        {absent.length > 0 && <p className={ui.help}>미제출: {absent.map((n) => n.name).join(", ")}</p>}
+      </section>,
     );
   }
 
@@ -174,61 +184,57 @@ function LinksSection({ period }: { period: WorkPeriod }) {
     }
   };
 
-  return (
-    <>
-      <section className={`${ui.card} flex flex-col gap-3`}>
-        <div className="flex items-start justify-between gap-4">
-          <div className="flex min-w-0 flex-col gap-1">
-            <h3 className={ui.cardTitle}>직원 링크</h3>
-            <p className={ui.help}>단체 대화방에 이 링크 하나만 올려 주세요. 직원이 자기 이름을 골라 가능 시간을 입력해요</p>
-          </div>
-          {current && (
-            <button type="button" onClick={() => void copy()} className={ui.secondarySm}>
-              {copied === url ? "복사했어요" : "링크 복사"}
-            </button>
-          )}
+  return layout(
+    current?.rows ?? null,
+    <section className={`${ui.card} flex flex-col gap-3`}>
+      <div className="flex items-start justify-between gap-4">
+        <div className="flex min-w-0 flex-col gap-1">
+          <h3 className={ui.cardTitle}>직원 링크</h3>
+          <p className={ui.help}>단체 대화방에 이 링크 하나만 올려 주세요. 직원이 자기 이름을 골라 가능 시간을 입력해요</p>
         </div>
         {current && (
-          <>
-            <p className="truncate font-mono text-[13px] text-[#4B4F57]">{url}</p>
-            <div className="flex items-center justify-between gap-3">
-              <p className="text-[13px] text-[#111214]">
-                <span className="font-mono">{employees.length}</span>명 중 <span className="font-mono">{submitted}</span>명 제출
-              </p>
-              <button type="button" onClick={reload} className={ui.textSm}>
-                새로고침
-              </button>
-            </div>
-            <div aria-hidden="true" className="h-1.5 overflow-hidden rounded bg-[#EDEDEA]">
-              <div className="h-full bg-[#C4247C]" style={{ width: `${employees.length === 0 ? 0 : (submitted / employees.length) * 100}%` }} />
-            </div>
-            {missing.length > 0 && <p className={ui.help}>미제출: {missing.map((n) => n.name).join(", ")}</p>}
-          </>
+          <button type="button" onClick={() => void copy()} className={`${ui.secondarySm} shrink-0`}>
+            {copied === url ? "복사했어요" : "링크 복사"}
+          </button>
         )}
-        {failed === key ? (
-          <div role="alert" className="flex items-center gap-2 text-sm text-[#B42318]">
-            링크를 불러오지 못했어요. 네트워크를 확인하고 다시 시도해 주세요
+      </div>
+      {current && (
+        <>
+          <p className="truncate font-mono text-[13px] text-[#4B4F57]">{url}</p>
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-[13px] text-[#111214]">
+              <span className="font-mono">{employees.length}</span>명 중 <span className="font-mono">{submitted}</span>명 제출
+            </p>
             <button type="button" onClick={reload} className={ui.textSm}>
-              다시 시도
+              새로고침
             </button>
           </div>
-        ) : (
-          !current && (
-            <p role="status" className={ui.help}>
-              링크를 만드는 중…
-            </p>
-          )
-        )}
-        {copyFailed && (
-          <p role="alert" className={ui.error}>
-            복사하지 못했어요. 위의 링크를 직접 복사해 주세요
-          </p>
-        )}
-      </section>
-      {current && shop && (
-        <AvailabilityOverview key={period.id} period={period} employees={employees} rows={current.rows} config={shop.config} rules={liveShopRules(shop, period)} />
+          <div aria-hidden="true" className="h-1.5 overflow-hidden rounded bg-[#EDEDEA]">
+            <div className="h-full bg-[#C4247C]" style={{ width: `${employees.length === 0 ? 0 : (submitted / employees.length) * 100}%` }} />
+          </div>
+          {missing.length > 0 && <p className={ui.help}>미제출: {missing.map((n) => n.name).join(", ")}</p>}
+        </>
       )}
-    </>
+      {failed === key ? (
+        <div role="alert" className="flex items-center gap-2 text-sm text-[#B42318]">
+          링크를 불러오지 못했어요. 네트워크를 확인하고 다시 시도해 주세요
+          <button type="button" onClick={reload} className={ui.textSm}>
+            다시 시도
+          </button>
+        </div>
+      ) : (
+        !current && (
+          <p role="status" className={ui.help}>
+            링크를 만드는 중…
+          </p>
+        )
+      )}
+      {copyFailed && (
+        <p role="alert" className={ui.error}>
+          복사하지 못했어요. 위의 링크를 직접 복사해 주세요
+        </p>
+      )}
+    </section>,
   );
 }
 
@@ -254,19 +260,21 @@ function ConditionsStep({ period, onStep }: { period: WorkPeriod; onStep: (s: Pe
         pendingNote={false}
         summary={<CoverageSummary period={period} />}
         afterInput={<CoverageSection collapsible />}
+        afterList={
+          <div className="flex flex-col gap-3">
+            <div>
+              <button type="button" aria-expanded={exceptionsOpen} onClick={() => setExceptionsOpen((o) => !o)} className={ui.textSm}>
+                {exceptionsOpen
+                  ? "예외 접기"
+                  : exceptionCount > 0
+                    ? `이번 근무표 예외 ${exceptionCount}개 보기`
+                    : "+ 이번 근무표에만 적용할 예외 추가"}
+              </button>
+            </div>
+            {exceptionsOpen && <RulesStep key="period" scope="period" />}
+          </div>
+        }
       />
-      <div className="flex flex-col gap-3">
-        <div>
-          <button type="button" aria-expanded={exceptionsOpen} onClick={() => setExceptionsOpen((o) => !o)} className={ui.textSm}>
-            {exceptionsOpen
-              ? "예외 접기"
-              : exceptionCount > 0
-                ? `이번 근무표 예외 ${exceptionCount}개 보기`
-                : "+ 이번 근무표에만 적용할 예외 추가"}
-          </button>
-        </div>
-        {exceptionsOpen && <RulesStep key="period" scope="period" />}
-      </div>
       <StepBar current={2} total={3} caption="매장 조건">
         <div className="flex flex-wrap items-center justify-end gap-3">
           {blocked && orphanCount > 0 && (
@@ -295,8 +303,8 @@ function CoverageSummary({ period }: { period: WorkPeriod }) {
   const [open, setOpen] = useState(false);
   if (!shop) return null;
   const rules = liveShopRules(shop, period);
-  const th = "py-1.5 pr-6 text-left text-xs font-medium text-[#6B6F78]";
-  const td = "py-1.5 pr-6 font-mono text-[13px] text-[#111214]";
+  const th = "py-1.5 pr-2 sm:pr-4 text-left text-xs font-medium text-[#6B6F78]";
+  const td = "py-1.5 pr-2 sm:pr-4 font-mono text-[13px] text-[#111214]";
   // 전체 필요 인원 뒤에 직급별 필요 인원("홀 2명 · 주방 2명")을 잇는다
   const need = (code: Code, kind: DayKind) =>
     [coverageText(effectiveCoverage(rules, code, kind, period, period.holidays)), ...tagCoverage(rules, code, kind).map((t) => `${t.tag} ${coverageText(t)}`)]
@@ -305,8 +313,8 @@ function CoverageSummary({ period }: { period: WorkPeriod }) {
 
   return (
     <section className={`${ui.card} flex flex-col gap-3`}>
-      <div className="flex items-start justify-between gap-3">
-        <table className="border-collapse">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <table className="w-full border-collapse sm:w-auto">
           <thead>
             <tr className="border-b border-[#EDEDEA]">
               <th className={th}>근무조</th>
@@ -318,7 +326,7 @@ function CoverageSummary({ period }: { period: WorkPeriod }) {
           <tbody>
             {coverageCodes(shop.config).map((s) => (
               <tr key={s.code} className="border-b border-[#F5F5F4] last:border-b-0">
-                <td className="py-1.5 pr-6 text-[13px] font-medium text-[#111214]">{s.name}</td>
+                <td className="py-1.5 pr-2 sm:pr-4 text-[13px] font-medium text-[#111214]">{s.name}</td>
                 <td className={td}>
                   {s.start}~{s.end}
                 </td>
@@ -473,7 +481,7 @@ function DatesSection({ period }: { period: WorkPeriod }) {
     <div className="flex flex-col gap-2">
       <h3 className={ui.cardTitle}>날짜</h3>
       {before === undefined || editing ? (
-        <div className="flex items-end gap-4">
+        <div className="flex flex-wrap items-end gap-4">
           {input}
           <div className="flex flex-col gap-1">
             <span className={ui.label}>끝 날짜</span>

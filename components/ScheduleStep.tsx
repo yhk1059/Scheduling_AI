@@ -1,15 +1,16 @@
 "use client";
 
-import { useEffect, useState, type CSSProperties, type ReactNode } from "react";
+import { useEffect, useId, useRef, useState, type CSSProperties, type ReactNode } from "react";
 
 import { ApiError, errorMessage, explain, solve } from "@/lib/api";
 import { toScheduleCsv } from "@/lib/csv";
-import { availabilityFromLinks, isAvailabilityRule, mergeAvailabilityConflicts, unsubmittedCause } from "@/lib/availability";
+import { availabilityFromLinks, coversShift, isAvailabilityRule, mergeAvailabilityConflicts, unsubmittedCause } from "@/lib/availability";
+import { coverageDays } from "@/lib/coverage-conflict";
 import { demoExplanation } from "@/lib/demo";
 import { DEMO_DOC } from "@/lib/demo-doc";
 import { historyLoadFor, isOperating } from "@/lib/continuity";
-import { closingShift, DEFAULT_CONFIG, OFF_CODE, shiftTones } from "@/lib/rules";
-import { dayHeader, dayOfDate, isWeekendDay, monthDay, periodDays, periodEnd } from "@/lib/period";
+import { closingShift, DEFAULT_CONFIG, OFF_CODE, ruleShape, shiftTones } from "@/lib/rules";
+import { dateOfDay, dayHeader, dayOfDate, isWeekendDay, monthDay, periodDays, periodEnd } from "@/lib/period";
 import {
   availabilityChanged,
   carryOverChanged,
@@ -17,6 +18,7 @@ import {
   COVERAGE_SOURCE_TEXT,
   currentPeriod,
   disabledRulesFor,
+  refEmployees,
   scheduleInputs,
   type Shop,
   toScheduleRequest,
@@ -318,6 +320,7 @@ export function ScheduleBody({
   gridNote,
   actions,
   outcomeAtGrid = false,
+  reviewPanel = false,
 }: {
   period: WorkPeriod;
   solve: Solve;
@@ -332,6 +335,7 @@ export function ScheduleBody({
   /** 맨 아래 버튼 줄(근무표 작성 ③의 고정 바) */
   actions?: ReactNode;
   outcomeAtGrid?: boolean;
+  reviewPanel?: boolean;
 }) {
   const shop = useAppStore((s) => s.shop);
   const periods = useAppStore((s) => s.periods);
@@ -343,6 +347,12 @@ export function ScheduleBody({
   const go = useAppStore((s) => s.go);
   const [selected, setSelected] = useState<Cell | null>(null);
   const [statsOpen, setStatsOpen] = useState(false);
+  const reviewId = useId();
+  const reviewHeading = useRef<HTMLHeadingElement>(null);
+  const selectedButton = useRef<HTMLElement | null>(null);
+  useEffect(() => {
+    if (reviewPanel && selected) reviewHeading.current?.focus();
+  }, [reviewPanel, selected]);
 
   if (!shop) return null;
   const periodId = period.id;
@@ -367,12 +377,19 @@ export function ScheduleBody({
     if (c.type === "fixed_assignment" && c.enabled !== false) fixed.set(`${c.params.employee_id}-${c.params.day}`, c.params.shift);
   }
 
-  const onSelect = (cell: Cell) => {
-    if (!readOnly && cell.day > pastDays) setSelected(cell);
+  const onSelect = (cell: Cell, trigger: HTMLButtonElement) => {
+    if (readOnly || cell.day <= pastDays) return;
+    selectedButton.current = trigger;
+    setSelected(cell);
+  };
+
+  const closeEditor = () => {
+    setSelected(null);
+    if (reviewPanel) selectedButton.current?.focus();
   };
 
   const onPick = (cell: Cell, code: Code | null) => {
-    setSelected(null);
+    closeEditor();
     if (code === null) clearFixed(periodId, cell.employeeId, cell.day);
     else setFixed(periodId, cell.employeeId, cell.day, code);
     sv.run();
@@ -415,12 +432,48 @@ export function ScheduleBody({
     />
   );
 
+  const summary = result && (
+    <SummaryLine result={result} infeasible={outcome !== null} confirmed={isConfirmed} draft={isDraft} legacy={legacy} care={care} disabled={disabledRules} stacked={reviewPanel} />
+  );
+  const selectedEmployee = selected && employees.find((n) => n.id === selected.employeeId);
+  const currentCode = selected && result?.assignments[selected.employeeId]?.[selected.day - 1];
+  const cellRules = reviewPanel && selected && selectedEmployee && result ? constraints.filter((c) => {
+    if (c.enabled === false || c.type === "fixed_assignment" || isAvailabilityRule(c.id)) return false;
+    const shape = ruleShape(c);
+    const scope = c.body.kind === "require" ? c.body.for_each : c.body;
+    const people = scope.people;
+    const ids = people?.ids ?? (!people?.tags?.length ? refEmployees(c) : []);
+    const tags = selectedEmployee.tags ?? [];
+    if ((people?.ids != null || ids.length > 0) && !ids.includes(selected.employeeId)) return false;
+    if (people?.tags != null && !people.tags.some((tag) => tags.includes(tag))) return false;
+    if (people?.exclude_tags?.some((tag) => tags.includes(tag))) return false;
+    if (!coverageDays(shape && "days" in shape ? shape.days : scope.days, period, holidays).includes(selected.day)) return false;
+    if (shape?.kind === "count" && shape.per === "day") {
+      const codes = [currentCode, ...(shop.config.shifts.find((shift) => shift.code === currentCode)?.parts ?? [])];
+      if (shape.shifts.in && !shape.shifts.in.some((code) => codes.includes(code))) return false;
+      if (shape.shifts.not_in?.some((code) => codes.includes(code))) return false;
+    }
+    return true;
+  }) : [];
+  const editor = selected && (
+    <CellEditor
+      config={shop.config}
+      codes={shop.config.shifts.filter((s) => s.active !== false)}
+      label={`${selectedEmployee?.name ?? selected.employeeId} ${monthDay(period, selected.day)}`}
+      fixed={fixed.get(`${selected.employeeId}-${selected.day}`)}
+      onPick={(code) => onPick(selected, code)}
+      onCancel={closeEditor}
+      current={reviewPanel ? currentCode ?? undefined : undefined}
+      available={reviewPanel ? (shift) => coversShift(period.availability[selected.employeeId]?.[dateOfDay(period, selected.day)] ?? [], shift, shop.config) : undefined}
+    />
+  );
+
   return (
     <>
       {stale && (
         <div
           role="status"
-          className="flex items-center justify-between rounded-2xl border border-[#FFD3B0] bg-[#FFEBDB] py-1.5 pr-2 pl-4 text-sm text-[#B93815]"
+          className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-[#FFD3B0] bg-[#FFEBDB] py-1.5 pr-2 pl-4 text-sm text-[#B93815]"
         >
           <span className={`${ui.badge} bg-white text-[#B93815]`}>입력이 바뀌었어요. 다시 만들어 주세요</span>
           <button type="button" onClick={sv.run} disabled={busy} className={ui.secondarySm}>
@@ -433,7 +486,7 @@ export function ScheduleBody({
 
       {result && (
         <>
-          <SummaryLine result={result} infeasible={outcome !== null} confirmed={isConfirmed} draft={isDraft} legacy={legacy} care={care} disabled={disabledRules} />
+          {!reviewPanel && summary}
           {summaryLead}
           {legacy && <p className="text-sm text-[#6B6F78]">변환 전에 확정한 근무표예요. 희망 반영과 못 지킨 규칙은 보여 주지 않아요.</p>}
           {evidence && <p className="text-sm text-[#4B4F57]">{evidence}</p>}
@@ -443,48 +496,83 @@ export function ScheduleBody({
       {outcomeAtGrid && outcomePanel}
 
       {result && (
-        <section aria-label="근무표" className={`${ui.card} flex flex-col gap-3`}>
-          <ScheduleGrid
-            fluid
-            legendAside={
-              selected ? (
-                <CellEditor
-                  config={shop.config}
-                  codes={shop.config.shifts.filter((s) => s.active !== false)}
-                  label={`${employees.find((n) => n.id === selected.employeeId)?.name ?? selected.employeeId} ${monthDay(period, selected.day)}`}
-                  fixed={fixed.get(`${selected.employeeId}-${selected.day}`)}
-                  onPick={(code) => onPick(selected, code)}
-                  onCancel={() => setSelected(null)}
-                />
-              ) : (
-                (hint ?? gridNote)
-              )
-            }
-            config={shop.config}
-            rows={rows}
-            result={result}
-            period={period}
-            holidays={holidays}
-            isWeekend={isWeekend}
-            fixed={fixed}
-            selected={selected}
-            disabled={busy}
-            readOnly={readOnly}
-            onSelect={onSelect}
-            history={history}
-            pastDays={pastDays}
-            todayDay={todayDay}
-            hideViolations={legacy}
-          />
-          {/* 근무표를 먼저 보도록 통계는 접어 두고, 펼치면 근무표 바로 아래에 둔다 */}
-          {!statsOpen && (
-            <div className="flex justify-end border-t border-[#F5F5F4] pt-2">
-              <button type="button" aria-expanded={false} onClick={() => setStatsOpen(true)} className={ui.textSm}>
-                개인별 통계 보기
-              </button>
-            </div>
+        <div className={reviewPanel ? ui.workLayout : undefined}>
+          <section aria-label="근무표" className={`${ui.card} flex min-w-0 flex-col gap-3`}>
+            <ScheduleGrid
+              fluid
+              legendAside={reviewPanel ? undefined : editor ?? hint ?? gridNote}
+              config={shop.config}
+              rows={rows}
+              result={result}
+              period={period}
+              holidays={holidays}
+              isWeekend={isWeekend}
+              fixed={fixed}
+              selected={selected}
+              disabled={busy}
+              readOnly={readOnly}
+              onSelect={onSelect}
+              detailId={reviewPanel ? reviewId : undefined}
+              history={history}
+              pastDays={pastDays}
+              todayDay={todayDay}
+              hideViolations={legacy}
+            />
+            {/* 근무표를 먼저 보도록 통계는 접어 두고, 펼치면 근무표 바로 아래에 둔다 */}
+            {!statsOpen && (
+              <div className="flex justify-end border-t border-[#F5F5F4] pt-2">
+                <button type="button" aria-expanded={false} onClick={() => setStatsOpen(true)} className={ui.textSm}>
+                  개인별 통계 보기
+                </button>
+              </div>
+            )}
+          </section>
+          {reviewPanel && (
+            <aside id={reviewId} aria-label="근무표 확인 패널" className={ui.workAside}>
+              <section className={`${ui.card} flex flex-col gap-3`} onKeyDown={(e) => {
+                if (selected && e.key === "Escape") closeEditor();
+              }}>
+                {selected ? (
+                  <>
+                    <button type="button" onClick={closeEditor} className={`${ui.textSm} self-start`}>← 결과 요약</button>
+                    <h3 ref={reviewHeading} tabIndex={-1} className={`${ui.cardTitle} wrap-anywhere`}>
+                      {selectedEmployee?.name} · {monthDay(period, selected.day)}
+                    </h3>
+                    <p className={ui.help}>현재 근무 {shop.config.shifts.find((s) => s.code === currentCode)?.name ?? currentCode}</p>
+                    {editor}
+                    <div className="flex flex-col gap-1.5">
+                      <h4 className={ui.label}>이 칸에 걸린 규칙</h4>
+                      {cellRules.length ? (
+                        <ul className="flex flex-col gap-1 text-sm">
+                          {cellRules.map((rule) => <li key={rule.id} className="wrap-anywhere">{describeRule(rule, shop.config, employees, period).text}</li>)}
+                        </ul>
+                      ) : <p className={ui.help}>해당하는 규칙이 없어요.</p>}
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <h3 className={ui.cardTitle}>결과 요약</h3>
+                    {summary}
+                    {!legacy && result.soft_violations.length > 0 && (
+                      <ul aria-label="못 지킨 가능하면 규칙 목록" className="max-h-48 space-y-2 overflow-y-auto text-sm text-[#4B4F57]" tabIndex={0}>
+                        {result.soft_violations.map((violation, index) => {
+                          const rule = constraints.find((item) => item.id === violation.constraint_id);
+                          return (
+                            <li key={`${violation.constraint_id}-${index}`} className="rounded-lg bg-[#F5F5F4] p-2 wrap-anywhere">
+                              {rule && <span className="block font-semibold">{presetName(rule)}</span>}
+                              {violation.detail}
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    )}
+                    {hint ?? gridNote}
+                  </>
+                )}
+              </section>
+            </aside>
           )}
-        </section>
+        </div>
       )}
 
       {result && statsOpen && (
@@ -600,6 +688,7 @@ export default function ScheduleStep() {
         solve={sv}
         busy={busy}
         outcomeAtGrid
+        reviewPanel
         hint={
           <p className="text-[13px] text-[#6B6F78]">
             <span>칸을 누르면 바꿀 수 있어요.</span>{" "}
@@ -776,7 +865,7 @@ export function OutcomePanel({
 
   return (
     <section className="flex flex-col gap-3.5 rounded-2xl border border-[#FECDCA] bg-white px-[18px] py-4">
-      <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2">
         <span className={`${ui.badge} ${ui.badgeTone.none}`}>{outcome.kind === "timeout" ? "시간 초과" : "근무표 없음"}</span>
         <h2 className={ui.cardTitle}>
           {outcome.kind === "timeout" ? "시간 안에 근무표를 만들지 못했어요" : "이 조건으로는 근무표를 만들 수 없어요"}
@@ -848,8 +937,8 @@ export function OutcomePanel({
             {ruleConflicts.map((c) => {
               const found = constraints.find((x) => x.id === c.constraint_id);
               return (
-                <li key={c.constraint_id} className="flex items-center justify-between gap-3 border-b border-[#F5F5F4] py-1.5 last:border-b-0">
-                  <span className="flex items-baseline gap-2 text-sm text-[#111214]">
+                <li key={c.constraint_id} className="flex flex-wrap items-center justify-between gap-3 border-b border-[#F5F5F4] py-1.5 last:border-b-0">
+                  <span className="flex flex-wrap items-baseline gap-2 text-sm text-[#111214]">
                     <span className="text-xs font-medium text-[#6B6F78]">{found ? presetName(found) : "규칙"}</span>
                     {c.source_text !== COVERAGE_SOURCE_TEXT && <>“{c.source_text}”</>}
                     {found && (
@@ -888,8 +977,8 @@ export function OutcomePanel({
             {hardList.map((c) => {
               const on = c.enabled !== false;
               return (
-                <li key={c.id} className="flex items-center justify-between gap-3 border-b border-[#F5F5F4] py-1.5 last:border-b-0">
-                  <span className={`flex items-baseline gap-2 text-sm ${on ? "text-[#111214]" : "text-[#6B6F78]"}`}>
+                <li key={c.id} className="flex flex-wrap items-center justify-between gap-3 border-b border-[#F5F5F4] py-1.5 last:border-b-0">
+                  <span className={`flex flex-wrap items-baseline gap-2 text-sm ${on ? "text-[#111214]" : "text-[#6B6F78]"}`}>
                     <span className="text-xs font-medium text-[#6B6F78]">{presetName(c)}</span>“{c.source_text}”
                     <span className="font-mono text-xs text-[#6B6F78]">{describeRule(c, config, employees, period).text}</span>
                   </span>
@@ -945,7 +1034,7 @@ function ProposalCard({
 }) {
   const s = proposal.verified_summary!;
   return (
-    <article className="flex items-center gap-6 py-3">
+    <article className="flex flex-col gap-3 py-3 sm:flex-row sm:items-center sm:gap-6">
       <div className="flex min-w-0 flex-1 flex-col gap-1">
         <h4 className="text-[13px] font-medium text-[#6B6F78]">{proposal.title}</h4>
         {changes.length > 0 ? (
@@ -994,6 +1083,7 @@ function SummaryLine({
   legacy = false,
   care = null,
   disabled = [],
+  stacked = false,
 }: {
   result: ScheduleResult;
   infeasible: boolean;
@@ -1005,15 +1095,18 @@ function SummaryLine({
   care?: { label: string; text: string } | null;
   /** 이번 근무표에서 끈 규칙(제목 · 해석 문장). 비어 있으면 칸을 그리지 않는다 */
   disabled?: { name: string; text: string }[];
+  stacked?: boolean;
 }) {
   const { summary } = result;
-  const cell = "flex flex-col gap-0.5 border-r border-[#EDEDEA] px-4 py-1 last:border-r-0";
+  const cell = stacked
+    ? "flex flex-col gap-0.5 border-b border-[#EDEDEA] py-2 last:border-b-0"
+    : "flex flex-col gap-0.5 border-r border-[#EDEDEA] px-4 py-1 last:border-r-0";
   const label = "text-xs text-[#6B6F78]";
   const value = "flex items-center gap-1.5 text-[15px] font-semibold text-[#111214]";
   const dot = (color: string) => <span aria-hidden="true" className={`size-[7px] rounded-full ${color}`} />;
   return (
     <div className="flex flex-wrap items-center gap-2">
-      <dl aria-label="결과 요약" className="flex flex-wrap rounded-2xl border border-[#DCDCD8] bg-white py-1.5">
+      <dl aria-label="결과 요약" className={stacked ? "w-full" : "flex flex-wrap rounded-2xl border border-[#DCDCD8] bg-white py-1.5"}>
         <div className={cell}>
           <dt className={label}>결과</dt>
           <dd className={value}>
@@ -1090,6 +1183,8 @@ function CellEditor({
   fixed,
   onPick,
   onCancel,
+  current,
+  available,
 }: {
   config: ShopConfig;
   /** 고를 수 있는 근무 코드(활성 코드) */
@@ -1098,33 +1193,43 @@ function CellEditor({
   fixed: Code | undefined;
   onPick: (code: Code | null) => void;
   onCancel: () => void;
+  current?: Code;
+  available?: (shift: ShiftDef) => boolean;
 }) {
+  const outsideId = useId();
   return (
-    <div className="flex items-center gap-1.5">
+    <div className="flex flex-wrap items-center gap-1.5">
       <span className="mr-1 text-xs font-medium text-[#4B4F57]">
-        <span className="font-mono">{label}</span> 고정
+        {available ? "바꿀 근무" : <><span className="font-mono">{label}</span> 고정</>}
       </span>
-      {codes.map(({ code, name }) => (
-        <button
-          key={code}
-          type="button"
-          onClick={() => onPick(code)}
-          aria-label={`${code}${josa(code, "으로", "로")} 고정`}
-          title={name}
-          aria-pressed={fixed === code}
-          className={`${CELL} ${codeClass(code, false, config)} hover:opacity-80 aria-pressed:outline-2 aria-pressed:outline-[#C4247C] aria-pressed:outline-offset-1`}
-        >
-          {code}
-        </button>
-      ))}
+      {codes.map((shift) => {
+        const { code, name } = shift;
+        const outside = available && !available(shift);
+        return (
+          <button
+            key={code}
+            type="button"
+            onClick={() => onPick(code)}
+            aria-label={`${code}${josa(code, "으로", "로")} 고정${available ? ` · ${name}` : ""}`}
+            aria-describedby={outside ? outsideId : undefined}
+            title={outside ? `${name} · 가능 시간 밖` : name}
+            aria-pressed={fixed === code}
+            className={`${available ? "rounded-lg px-2 py-1.5" : CELL} ${codeClass(code, false, config)} ${outside ? "opacity-50" : ""} ${current === code ? "ring-1 ring-inset ring-[#111214]" : ""} hover:opacity-80 aria-pressed:outline-2 aria-pressed:outline-[#C4247C] aria-pressed:outline-offset-1`}
+          >
+            {available ? name : code}
+          </button>
+        );
+      })}
       {fixed && (
         <button type="button" onClick={() => onPick(null)} className={ui.textSm}>
           고정 해제
         </button>
       )}
-      <button type="button" onClick={onCancel} className={ui.textSm}>
-        취소
-      </button>
+      {available ? (
+        <p className={`${ui.help} w-full`}>근무를 누르면 이 칸을 고정하고 다시 만들어요. <span id={outsideId}>흐린 근무는 가능 시간 밖이에요.</span></p>
+      ) : (
+        <button type="button" onClick={onCancel} className={ui.textSm}>취소</button>
+      )}
     </div>
   );
 }
@@ -1150,6 +1255,7 @@ export function ScheduleGrid({
   disabled,
   readOnly = false,
   onSelect,
+  detailId,
   history,
   pastDays = 0,
   todayDay = null,
@@ -1173,7 +1279,8 @@ export function ScheduleGrid({
   disabled: boolean;
   /** 끝난 근무표: 칸을 편집하지 않는다 */
   readOnly?: boolean;
-  onSelect: (cell: Cell) => void;
+  onSelect: (cell: Cell, trigger: HTMLButtonElement) => void;
+  detailId?: string;
   /** 직원별 최근 4주 마감·주말. 없으면 0 */
   history?: Map<string, Load>;
   /** 운영 중 기간의 잠긴 지난 날짜 수(1..pastDays) */
@@ -1302,7 +1409,9 @@ export function ScheduleGrid({
                       type="button"
                       disabled={disabled}
                       aria-disabled={past || undefined}
-                      onClick={() => !past && onSelect({ employeeId: n.id, day: d })}
+                      aria-pressed={isSel}
+                      onClick={(e) => !past && onSelect({ employeeId: n.id, day: d }, e.currentTarget)}
+                      aria-controls={detailId}
                       aria-label={`${n.name} ${m}월 ${dom}일 ${code}`}
                       title={past ? "지난 날짜는 바꿀 수 없어요" : warn ? warn.join(", ") : undefined}
                       style={cellStyle?.(n.id, d)}

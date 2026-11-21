@@ -110,7 +110,7 @@ function ExampleStrip({
   const nameOf = (id: string) => employees.find((n) => n.id === id)?.name ?? "직원";
   const marked = (id: string, d: number) => example.marks.some(([m, md]) => m === id && md === d);
   return (
-    <div className="flex flex-col gap-1">
+    <div className="flex min-w-0 flex-col gap-1 overflow-x-auto">
       <table className="border-separate border-spacing-x-0.5 border-spacing-y-0.5">
         <thead>
           <tr>

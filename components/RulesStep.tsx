@@ -1,14 +1,17 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { useId, useState, type ReactNode } from "react";
 
 import { ApiError, errorMessage, translate } from "@/lib/api";
 import { findCoverageConflict } from "@/lib/coverage-conflict";
+import { describeRule, describeShiftChange, hardnessLabel, presetName } from "@/lib/wording";
 import { firstPeriodStart, periodFrom, type PeriodRange, type PeriodUnit } from "@/lib/period";
 import {
+  applyShiftChange,
   cardsInOrder,
   currentPeriod,
   findReplaced,
+  isLeaveRule,
   liveShopRules,
   summarizedCoverageIds,
   toScheduleRequest,
@@ -63,7 +66,7 @@ type Notice = { kind: "clarify" | "unsupported"; text: string } | null;
  * 말로 적는 입력 바와 카드 목록. scope shop은 매장 조건(작성 ②, 매장 설정), scope period는 이번 근무표 예외(작성 ② 아래, 패널 안 두 열).
  * pendingNote=false: 화면이 대기 카드 안내를 버튼 옆에 따로 둘 때.
  * step: 단계 화면. 제목을 두고, 요약표에 든 필요 인원은 카드에서 빼고, 이 근무표의 꺼짐과 수정본을 보여 준다.
- * summary, afterInput: 입력 바 위·아래에 놓을 영역.
+ * summary, afterInput, afterList: 작업 영역에 함께 놓을 요약과 폼.
  */
 export default function RulesStep({
   scope,
@@ -71,12 +74,14 @@ export default function RulesStep({
   step = false,
   summary,
   afterInput,
+  afterList,
 }: {
   scope: "shop" | "period";
   pendingNote?: boolean;
   step?: boolean;
   summary?: ReactNode;
   afterInput?: ReactNode;
+  afterList?: ReactNode;
 }) {
   const copy = COPY[scope];
   const shop = useAppStore((s) => s.shop);
@@ -86,6 +91,8 @@ export default function RulesStep({
   const setDisabled = useAppStore((s) => s.setDisabled);
   const demo = useAppStore((s) => s.demo);
 
+  const detailId = useId();
+  const [selectedId, setSelectedId] = useState<string | null>(null);
   const [text, setText] = useState("");
   const [loading, setLoading] = useState(false);
   const [notice, setNotice] = useState<Notice>(null);
@@ -202,8 +209,10 @@ export default function RulesStep({
         context: { config: shop.config, employees, period: range, holidays, today: today() },
       });
       if (res.status === "ok") {
-        if (scope === "shop") addPendingRules(res.constraints, res.config_changes ?? [], res.examples);
-        else addPendingRequests(period!.id, res.constraints, res.examples);
+        if (scope === "shop") {
+          addPendingRules(res.constraints, res.config_changes ?? [], res.examples);
+          setSelectedId(useAppStore.getState().shop?.cardOrder?.[0] ?? null);
+        } else addPendingRequests(period!.id, res.constraints, res.examples);
         setText("");
       } else if (res.status === "clarify") {
         setNotice({ kind: "clarify", text: res.question });
@@ -284,6 +293,80 @@ export default function RulesStep({
     </>
   );
 
+  const renderItem = ({ id, cfg, entry }: (typeof items)[number]) =>
+    cfg ? (
+      <div key={id} className="flex flex-col gap-3">
+        <ShiftChangeCardView card={cfg} />
+        {shop.pendingRules
+          .filter((c) => cfg.ruleIds.includes(c.id))
+          .map((c) => (
+            <div key={c.id} className="pl-4">
+              <ConstraintCard
+                card={c}
+                pending
+                replaces={findReplaced(shop.rules, c)}
+                conflict={conflictOf(c)}
+                withConfig={cfg.change.shift.code}
+              />
+            </div>
+          ))}
+      </div>
+    ) : (
+      renderCard(entry!.card, entry!.pending)
+    );
+
+  const groups = [
+    { title: "확인할 제안", rows: items.filter((item) => item.cfg || item.entry?.pending) },
+    { title: "적용됨", rows: items.filter((item) => item.entry && !item.entry.pending) },
+  ];
+  const selected = items.find((item) => item.id === selectedId) ?? groups[0].rows[0] ?? groups[1].rows[0];
+  const draftConfig = configCards.reduce((current, item) => applyShiftChange(current, item.change), shop.config);
+  const activeEmployees = shop.employees.filter((n) => n.active);
+  const ruleList = step && selected && (
+    <div className="flex min-w-0 flex-col gap-5">
+      {groups.map(({ title, rows }, group) => (
+        <section key={title} aria-label={title} className="flex flex-col gap-2">
+          <div className="flex flex-wrap items-center justify-between gap-1">
+            <h3 className={ui.cardTitle}>{title} <span className={ui.help}>{rows.length}</span></h3>
+            {group === 0 && pendingCount >= 2 && (
+              <button type="button" onClick={applyAll} className={ui.secondarySm}>모두 적용</button>
+            )}
+          </div>
+          <ul className="flex flex-col gap-1.5">
+            {rows.map(({ id, cfg, entry }) => {
+              const card = entry?.card;
+              const hardness = card && (card.type === "fixed_assignment" || isLeaveRule(card)
+                ? "hard"
+                : card.hardness ?? (card.body.kind === "balance" ? "soft" : "hard"));
+              const name = card ? presetName(card) : "근무 형태";
+              const reading = card
+                ? describeRule(card, draftConfig, activeEmployees, stepPeriod ?? previewRange(shop.unit)).text
+                : describeShiftChange(cfg!.change, shop.config);
+              const off = card && (card.enabled === false || stepPeriod?.disabledIds.includes(id));
+              return (
+                <li key={id}>
+                  <button
+                    type="button"
+                    aria-controls={detailId}
+                    aria-pressed={id === selected.id}
+                    onClick={() => setSelectedId(id)}
+                    className={`grid w-full min-w-0 grid-cols-[minmax(0,5rem)_minmax(0,1fr)_auto] items-center gap-2 rounded-xl border border-[#EDEDEA] px-2 py-2.5 text-left text-[13px] focus-visible:outline-2 focus-visible:outline-[#C4247C] aria-pressed:border-[#C4247C] aria-pressed:bg-[#FDEAF4] sm:grid-cols-[minmax(0,8rem)_minmax(0,1fr)_auto] sm:px-3 ${group === 0 ? "bg-[#FFF6FA]" : "bg-white"}`}
+                  >
+                    <span className="truncate font-semibold" title={name}>{name}</span>
+                    <span className="truncate text-[#4B4F57]" title={reading}>{reading}</span>
+                    <span className={`${ui.badge} ${hardness === "hard" && !off ? "bg-[#111214] text-white" : ui.badgeTone.base}`}>
+                      {off ? "꺼짐 · " : ""}{hardness ? hardnessLabel(hardness) : "설정"}
+                    </span>
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        </section>
+      ))}
+    </div>
+  );
+
   const list =
     items.length === 0 ? (
       copy.empty && <p className="text-sm text-[#6B6F78]">{copy.empty}</p>
@@ -297,28 +380,7 @@ export default function RulesStep({
           </div>
         )}
         <div className={scope === "period" ? "flex flex-col gap-3" : "grid grid-cols-1 gap-4 md:grid-cols-2"}>
-          {items.map(({ id, cfg, entry }) =>
-            cfg ? (
-              <div key={id} className="flex flex-col gap-3">
-                <ShiftChangeCardView card={cfg} />
-                {shop.pendingRules
-                  .filter((c) => cfg.ruleIds.includes(c.id))
-                  .map((c) => (
-                    <div key={c.id} className="pl-4">
-                      <ConstraintCard
-                        card={c}
-                        pending
-                        replaces={findReplaced(shop.rules, c)}
-                        conflict={conflictOf(c)}
-                        withConfig={cfg.change.shift.code}
-                      />
-                    </div>
-                  ))}
-              </div>
-            ) : (
-              renderCard(entry!.card, entry!.pending)
-            ),
-          )}
+          {items.map(renderItem)}
         </div>
       </div>
     );
@@ -332,7 +394,7 @@ export default function RulesStep({
   // ② 아래 예외 입력: 왼쪽 입력, 오른쪽 요청 카드를 패널 하나에 둔다
   if (scope === "period") {
     return (
-      <section className={`${ui.panel} grid grid-cols-1 gap-6 md:grid-cols-[7fr_5fr]`}>
+      <section className={`${ui.panel} grid grid-cols-1 gap-6 lg:grid-cols-[7fr_5fr]`}>
         <div className="flex min-w-0 flex-col gap-3">{input}</div>
         <div className="flex min-w-0 flex-col gap-3">
           {list}
@@ -351,15 +413,21 @@ export default function RulesStep({
         </h2>
       )}
 
-      {summary}
-
-      <section className={`${ui.panel} flex flex-col gap-3`}>{input}</section>
-
-      {afterInput}
-
-      {list}
-
-      {note}
+      <div className={step && selected ? ui.workLayout : "flex min-w-0 flex-col gap-5"}>
+        <div className="flex min-w-0 flex-col gap-5">
+          {summary}
+          <section className={`${ui.panel} flex min-w-0 flex-col gap-3`}>{input}</section>
+          {afterInput}
+          {step && selected ? ruleList : list}
+          {note}
+          {afterList}
+        </div>
+        {step && selected && (
+          <aside id={detailId} aria-label="규칙 상세" className={ui.workAside}>
+            {renderItem(selected)}
+          </aside>
+        )}
+      </div>
     </div>
   );
 }

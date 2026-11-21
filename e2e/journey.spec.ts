@@ -9,6 +9,7 @@ import type { ConstraintSpec, ScheduleRequest } from "../lib/types.gen";
 import {
   addRoster,
   appliedCards,
+  appliedRuleRows,
   applyAllPending,
   clearAccount,
   type Code,
@@ -35,6 +36,7 @@ import {
   loginAsTestUser,
   openFlow,
   pendingCards,
+  pendingRuleRows,
   periodByStart,
   primaryButtons,
   readCells,
@@ -214,9 +216,9 @@ test("S6. ① 가능 시간: 준비 요약과 직원 링크", async () => {
   await expect(page.getByText(`${EMPLOYEE_COUNT}명 중 0명 제출`)).toBeVisible();
   await expect(page.getByText(/^미제출: /)).toContainText("박민수");
   await expect(page.getByRole("heading", { name: "직원별 가능 시간" })).toBeVisible();
-  await expect(page.getByRole("region", { name: /가능 시간$/ })).toHaveCount(EMPLOYEE_COUNT);
-  await expect(page.getByRole("region", { name: /가능 시간$/ }).getByText("미제출", { exact: true })).toHaveCount(EMPLOYEE_COUNT);
-  await expect(page.getByRole("table", { name: "날짜별 가능 인원" }).getByRole("cell").filter({ hasNotText: /^0$/ })).toHaveCount(0);
+  const availableTable = page.getByRole("table", { name: "직원별 가능 시간과 날짜별 가능 인원" });
+  await expect(availableTable.getByRole("button", { name: /미제출/ })).toHaveCount(EMPLOYEE_COUNT);
+  await expect(availableTable.locator("tfoot td").filter({ hasText: /[1-9]명/ })).toHaveCount(0);
   const links = await shownLinks(page);
   expect(links).toHaveLength(1);
   await page.getByRole("button", { name: "링크 복사" }).click();
@@ -367,16 +369,16 @@ test("S7. 직원 화면: 드래그 입력과 제출", async ({ browser }) => {
   await expect(page.getByText("미제출:")).toHaveCount(0);
 
   // 매니저는 제출한 가능 시간을 한 화면에서 본다
-  const counts = page.getByRole("table", { name: "날짜별 가능 인원" });
-  const countCell = (shift: string, column: number) => counts.getByRole("row", { name: new RegExp(`^${shift} `) }).getByRole("cell").nth(column);
-  await expect(countCell("마감", 1)).toHaveText(String(EMPLOYEE_COUNT)); // 11/3: 박민수도 덮는다
-  await expect(countCell("미들", 3)).toHaveText(String(EMPLOYEE_COUNT)); // 11/5: 박민수도 덮는다
-  await expect(countCell("마감", 3)).toHaveText(String(EMPLOYEE_COUNT - 1)); // 11/5: 일부만 겹치면 세지 않는다
-  await expect(countCell("오픈", 3)).toHaveText(String(EMPLOYEE_COUNT - 1));
+  const counts = page.getByRole("table", { name: "직원별 가능 시간과 날짜별 가능 인원" });
+  const dayCounts = (column: number) => counts.locator("tfoot td").nth(column);
+  await expect(dayCounts(1)).toContainText(`마감 ${EMPLOYEE_COUNT}명`); // 11/3: 박민수도 덮는다
+  await expect(dayCounts(3)).toContainText(`미들 ${EMPLOYEE_COUNT}명`); // 11/5: 박민수도 덮는다
+  await expect(dayCounts(3)).toContainText(`마감 ${EMPLOYEE_COUNT - 1}명`); // 11/5: 일부만 겹치면 세지 않는다
+  await expect(dayCounts(3)).toContainText(`오픈 ${EMPLOYEE_COUNT - 1}명`);
+  await counts.getByRole("button", { name: /^박민수/ }).press("Enter");
   const parkCard = page.getByRole("region", { name: "박민수 가능 시간" });
-  await expect(parkCard.getByRole("img")).toHaveCount(2);
-  await expect(parkCard.getByRole("img", { name: "11월 3일 12:00~23:00" })).toBeVisible();
-  await expect(parkCard.getByRole("img", { name: "11월 5일 12:00~18:00" })).toBeVisible();
+  await expect(parkCard.getByText("12:00~23:00", { exact: true })).toBeVisible();
+  await expect(parkCard.getByText("12:00~18:00", { exact: true })).toBeVisible();
   await expect(parkCard.getByText("미제출", { exact: true })).toHaveCount(0);
   await expect(parkCard.getByRole("button")).toHaveCount(0);
   await expectNoDevTerms(page, "① 가능 시간(직원별 가능 시간)");
@@ -447,8 +449,7 @@ test("S8. ② 매장 조건", async () => {
   );
 
   // S8-b. 규칙 만들기와 적용. 요약표에 든 필요 인원은 카드로 다시 보이지 않고, 공정성 기본 규칙 2장(최대 연속 근무, 근무 수 고르게)만 있다
-  await expect(page.locator("article")).toHaveCount(2);
-  await expect(appliedCards(page)).toHaveCount(2);
+  await expect(appliedRuleRows(page)).toHaveCount(2);
   await page.getByRole("button", { name: "마감 다음 날 오픈은 안 되게" }).click();
   await expect(page.getByRole("textbox", { name: RULE_INPUT })).toHaveValue("마감 다음 날 오픈은 안 되게");
 
@@ -483,11 +484,15 @@ test("S8. ② 매장 조건", async () => {
   await expect(r4Card).not.toContainText("마감");
 
   const total = r1.length + r2.length + r3.length + r4.length;
-  await expect(pendingCards(page)).toHaveCount(total);
-  for (const card of await pendingCards(page).all()) await expectCardChrome(card, "반드시");
+  await expect(pendingRuleRows(page)).toHaveCount(total);
+  for (const row of await pendingRuleRows(page).all()) {
+    await row.click();
+    await expectCardChrome(pendingCards(page).first(), "반드시");
+  }
   await expect(page.getByText(`적용하지 않은 규칙 ${total}개는 빠져요`)).toBeVisible();
   await expectNoDevTerms(page, "② 매장 조건(적용 대기)");
 
+  await pendingRuleRows(page).getByText("연속 근무 5일까지", { exact: true }).first().click();
   const toggle = r2Card.getByRole("group", { name: "반드시/가능하면" });
   await toggle.getByRole("button", { name: "가능하면" }).click();
   await expect(toggle.getByRole("button", { name: "가능하면" })).toHaveAttribute("aria-pressed", "true");
@@ -498,7 +503,8 @@ test("S8. ② 매장 조건", async () => {
   // R2가 기본 규칙 최대 연속 근무를 대체하면 공정성 기본 규칙은 근무 수 고르게만 남는다
   const fairLeft = (await readState(page)).shop.rules.filter((r) => r.id.startsWith("fair-")).map((r) => r.id);
   expect(fairLeft, "남은 공정성 기본 규칙").toEqual(r2Replaces ? ["fair-balance"] : ["fair-max-run", "fair-balance"]);
-  await expect(appliedCards(page)).toHaveCount(total + fairLeft.length);
+  await expect(appliedRuleRows(page)).toHaveCount(total + fairLeft.length);
+  await appliedRuleRows(page).getByText("연속 근무 5일까지", { exact: true }).first().click();
   await expect(page.getByText(/적용하지 않은 규칙/)).toHaveCount(0);
 
   // S8-c. 적용된 카드 수정: 조정 가능한 값(밑줄)만 고친다. 값 이름은 LLM이 붙여 입력칸은 카드 안의 하나로 찾는다
@@ -520,7 +526,7 @@ test("S8. ② 매장 조건", async () => {
     await deleteAllPending(page);
   }
   ruleCount = total + fairLeft.length;
-  await expect(page.locator("article")).toHaveCount(ruleCount);
+  await expect(appliedRuleRows(page)).toHaveCount(ruleCount);
 });
 
 test("S9. ② 예외 입력과 ③ 근무표 만들기", async () => {
@@ -731,7 +737,7 @@ test("S11. 칸 고정 후 다시 만들기", async () => {
   await page.getByRole("button", { name: `김철수 11월 ${dom}일 ${row[day! - 1]}` }).click();
   await expect(page.getByText(`김철수 11/${dom}`)).toBeVisible();
   // 조사는 코드 읽는 소리를 따른다(M으로, A·C·O로)
-  for (const code of ["A", "M", "C", "O"]) await expect(page.getByRole("button", { name: new RegExp(`^${code}(으)?로 고정$`) })).toBeVisible();
+  for (const code of ["A", "M", "C", "O"]) await expect(page.getByRole("button", { name: new RegExp(`^${code}(으)?로 고정`) })).toBeVisible();
   await expect(page.getByRole("button", { name: "취소" })).toBeVisible();
 
   expect(await solve(() => page.getByRole("button", { name: "O로 고정" }).click())).toBe("ok");

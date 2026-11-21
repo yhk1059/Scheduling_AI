@@ -20,6 +20,7 @@ import {
   loginAsTestUser,
   openFlow,
   pendingCards,
+  pendingRuleRows,
   periodByStart,
   readGrid,
   readState,
@@ -194,10 +195,8 @@ test("S18. 말로 필요 인원 → 근무표 → 사람이 모자란 필요 인
   const openRow = page.getByRole("row").filter({ hasText: "오픈" }).first();
   await expect(openRow.locator("td").nth(2)).not.toContainText(/\d/);
 
-  // 요약표에 들어간 카드는 목록에서 빠지므로 순서 비교 없이 적용한다
-  if ((await pendingCards(page).count()) >= 2) await page.getByRole("button", { name: "모두 적용" }).click();
-  else await pendingCards(page).first().getByRole("button", { name: "적용" }).click();
-  await expect(pendingCards(page)).toHaveCount(0);
+  await expect(pendingRuleRows(page).first()).toBeVisible();
+  await applyAllPending(page);
   await expect(openRow.locator("td").nth(2)).toContainText("2");
   await expect(openRow.locator("td").nth(3)).toContainText("3");
   const { shop } = await readState(page);

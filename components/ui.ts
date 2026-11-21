@@ -10,6 +10,8 @@ const btnLg = `${btnCore} h-11 px-5 text-[15px]`;
 const btnXl = `${btnCore} h-[52px] px-[26px] text-[15px]`;
 
 export const ui = {
+  workLayout: "grid min-w-0 items-start gap-4 lg:grid-cols-[minmax(0,1fr)_320px]",
+  workAside: "flex min-w-0 flex-col gap-3 lg:sticky lg:top-28",
   card: "rounded-3xl bg-white border border-[#EDEDEA] px-6 py-5",
   cardTitle: "text-[16px] font-bold tracking-[-0.02em] text-[#111214]",
   primary: `${btn} bg-[#111214] text-white border border-[#111214] hover:bg-[#2C2F35]`,

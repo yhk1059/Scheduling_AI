@@ -1,11 +1,13 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useId, useRef, useState } from "react";
 
 import { OFF_CODE, shiftTimesError } from "@/lib/rules";
-import { isShiftUsed, MAX_SHIFT_CODES, useAppStore } from "@/lib/store";
-import type { ShiftDef } from "@/lib/types.gen";
+import { coverageCodes, coverageRange, isShiftUsed, liveShopRules, MAX_SHIFT_CODES, useAppStore, type Shop } from "@/lib/store";
+import { coverageText } from "@/lib/wording";
+import type { ShiftDef, ShopConfig } from "@/lib/types.gen";
 
+import { codeClass } from "./ScheduleStep";
 import { ui } from "./ui";
 
 const CODE_RE = /^[A-Z0-9]{1,3}$/; // backend/domain/models.py ShiftCode
@@ -24,40 +26,103 @@ function partsText(s: ShiftDef, shifts: ShiftDef[]): string {
 }
 
 /** 근무 형태(근무 코드 표). 휴무는 고칠 수 없어 보여 주지 않는다. 맨 아래 줄에 적어 하나씩 더한다. 매장 설정 [근무 형태] 탭과 근무표 작성 ②에서 쓴다. */
-export default function ShiftTable() {
-  const shifts = useAppStore((s) => s.shop?.config.shifts ?? []);
+export default function ShiftTable({ showTimeline = false }: { showTimeline?: boolean } = {}) {
+  const shop = useAppStore((s) => s.shop);
+  const tableId = useId();
+  if (!shop) return null;
+  const { config } = shop;
+  const { shifts } = config;
 
   return (
-    <div className="flex flex-col gap-2">
-      <p className={ui.help}>말로 &lsquo;피크 근무 11시~14시 추가&rsquo;라고 적어도 돼요.</p>
-      <div className="overflow-x-auto rounded-lg border border-[#EDEDEA] bg-white">
-        <table className="w-full border-collapse text-[13px]">
-          <thead>
-            <tr className="border-b border-[#EDEDEA] text-left text-xs font-medium text-[#6B6F78]">
-              <th className="px-2 py-2 font-medium">코드</th>
-              <th className="px-2 py-2 font-medium">이름</th>
-              <th className="px-2 py-2 font-medium">시작 시각</th>
-              <th className="px-2 py-2 font-medium">끝 시각</th>
-              <th className="px-2 py-2 font-medium">실근무 시간</th>
-              <th />
-            </tr>
-          </thead>
-          <tbody>
-            {shifts
-              .filter((s) => s.code !== OFF_CODE)
-              .map((s) => (
-                <ShiftRow key={s.code} shift={s} shifts={shifts} />
-              ))}
-            <NewShiftRow shifts={shifts} />
-          </tbody>
-        </table>
+    <div className={showTimeline ? ui.workLayout : undefined}>
+      <div className="flex min-w-0 flex-col gap-2">
+        <p className={ui.help}>말로 &lsquo;피크 근무 11시~14시 추가&rsquo;라고 적어도 돼요.</p>
+        <div className="overflow-x-auto rounded-lg border border-[#EDEDEA] bg-white">
+          <table className={`w-full border-collapse text-[13px] ${showTimeline ? "[&_input]:px-1.5 [&_input]:max-w-20 [&_input[type=time]]:max-w-none [&_td]:px-0.5 [&_th]:px-1 [&_th]:leading-tight" : ""}`}>
+            <thead>
+              <tr className="border-b border-[#EDEDEA] text-left text-xs font-medium text-[#6B6F78]">
+                <th className="px-2 py-2 font-medium">코드</th>
+                <th className="px-2 py-2 font-medium">이름</th>
+                <th className="px-2 py-2 font-medium">시작 시각</th>
+                <th className="px-2 py-2 font-medium">끝 시각</th>
+                <th className="px-2 py-2 font-medium">실근무 시간</th>
+                <th />
+              </tr>
+            </thead>
+            <tbody>
+              {shifts
+                .filter((s) => s.code !== OFF_CODE)
+                .map((s) => (
+                  <ShiftRow key={s.code} shift={s} config={config} nameId={`${tableId}-${s.code}`} compact={showTimeline} />
+                ))}
+              <NewShiftRow shifts={shifts} />
+            </tbody>
+          </table>
+        </div>
       </div>
+      {showTimeline && (
+        <ShiftTimeline shop={shop} focusShift={(code) => document.getElementById(`${tableId}-${code}`)?.focus()} />
+      )}
     </div>
   );
 }
 
+function ShiftTimeline({ shop, focusShift }: { shop: Shop; focusShift: (code: string) => void }) {
+  const shifts = coverageCodes(shop.config).filter((shift) => shift.start && shift.end);
+  const rules = liveShopRules(shop, null);
+  const hours = [6, 9, 12, 15, 18, 21, 24];
+  const position = (time: string) => {
+    const [hour, minute] = time.split(":").map(Number);
+    return Math.max(0, (hour + minute / 60 - 6) / 18 * 100);
+  };
+  return (
+    <aside aria-label="하루 타임라인" className={`${ui.workAside} rounded-2xl bg-[#F5F5F4] px-4 py-4`}>
+      <h3 className={ui.cardTitle}>하루 타임라인</h3>
+      <p className={ui.help}>필요 인원 · 평일 / 주말·공휴일</p>
+      {shifts.length ? (
+        <div className="relative space-y-3 px-2 pt-6">
+          <div aria-hidden="true" className="pointer-events-none absolute inset-x-2 inset-y-0 flex justify-between">
+            {hours.map((hour) => (
+              <div key={hour} className="relative w-0">
+                <span className="absolute -translate-x-1/2 font-mono text-[11px] text-[#4B4F57]">{String(hour).padStart(2, "0")}</span>
+                <span className="absolute inset-y-5 border-l border-dashed border-[#DCDCD8]" />
+              </div>
+            ))}
+          </div>
+          {shifts.map((shift) => {
+            const start = shift.start!;
+            const end = shift.end!;
+            const need = (kind: "weekday" | "weekend") => coverageText(coverageRange(rules, shift.code, kind)) || "—";
+            return (
+              <div key={shift.code} className="relative">
+                <button
+                  type="button"
+                  onClick={() => focusShift(shift.code)}
+                  className="w-full rounded text-left focus-visible:outline-2 focus-visible:outline-[#C4247C]"
+                >
+                  <span className="flex flex-wrap items-baseline justify-between gap-x-2 text-xs text-[#111214]">
+                    <span className="font-semibold wrap-anywhere">{shift.code} {shift.name}</span>
+                    <span className="font-mono">{need("weekday")} / {need("weekend")}</span>
+                  </span>
+                  <span className="relative mt-1 block h-4">
+                    <span aria-hidden="true" className={`absolute inset-y-0 min-w-px overflow-hidden rounded-md ${codeClass(shift.code, false, shop.config)}`} style={{ left: `${position(start)}%`, width: `${position(end) - position(start)}%` }}>
+                      <span className="block h-full bg-current opacity-80" />
+                    </span>
+                  </span>
+                  <span className="font-mono text-[11px] text-[#4B4F57]">{start}~{end}</span>
+                </button>
+              </div>
+            );
+          })}
+        </div>
+      ) : <p className={ui.help}>시각을 설정한 근무조가 없어요.</p>}
+    </aside>
+  );
+}
+
 /** 유효한 값은 바로 저장하고, 아니면 입력 중인 값과 오류를 행에 남긴다. 코드와 세는 근무조는 고치지 않는다. */
-function ShiftRow({ shift, shifts }: { shift: ShiftDef; shifts: ShiftDef[] }) {
+function ShiftRow({ shift, config, nameId, compact }: { shift: ShiftDef; config: ShopConfig; nameId: string; compact: boolean }) {
+  const { shifts } = config;
   const setShift = useAppStore((s) => s.setShift);
   const setShiftActive = useAppStore((s) => s.setShiftActive);
   const removeShift = useAppStore((s) => s.removeShift);
@@ -95,7 +160,7 @@ function ShiftRow({ shift, shifts }: { shift: ShiftDef; shifts: ShiftDef[] }) {
     <tr className="border-b border-[#F5F5F4]">
       <td className={`px-2 py-1 font-mono font-semibold ${muted}`}>
         <span className="flex items-center gap-2">
-          {shift.code}
+          <span className={compact && active ? `rounded-md px-1.5 py-1 ${codeClass(shift.code, false, config)}` : undefined}>{shift.code}</span>
           {!active && <span className={`${ui.badge} ${ui.badgeTone.excluded} font-sans`}>꺼짐</span>}
         </span>
       </td>
@@ -105,6 +170,7 @@ function ShiftRow({ shift, shifts }: { shift: ShiftDef; shifts: ShiftDef[] }) {
             <input
               value={name ?? shift.name}
               onChange={(e) => onName(e.target.value)}
+              id={nameId}
               aria-label={`${shift.code} 이름`}
               aria-invalid={name !== null || undefined}
               className={`${ui.cell} w-32 ${name !== null ? ui.cellErr : ui.cellOk}`}
