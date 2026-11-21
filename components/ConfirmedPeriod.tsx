@@ -6,6 +6,7 @@ import { translate } from "@/lib/api";
 import { DEMO_LEAVE_PREFIX, demoLeaveCard } from "@/lib/demo";
 import { isOperating } from "@/lib/continuity";
 import { formatRange, periodDays, periodEnd } from "@/lib/period";
+import { scheduleSvg } from "@/lib/schedule-image";
 import {
   canRevertToConfirmed,
   cardsInOrder,
@@ -116,6 +117,25 @@ export default function ConfirmedPeriod() {
   };
 
   const csv = () => result && downloadCsv(period, employees, result);
+  const svg = () =>
+    result &&
+    scheduleSvg({
+      title: `${shop.name ? `${shop.name} · ` : ""}${scheduleName(period, shop.unit)}`,
+      employees,
+      period,
+      holidays: period.holidays,
+      assignments: result.assignments,
+      config: shop.config,
+    });
+  const fileName = `근무표-${period.start_date}_${periodEnd(period)}`;
+  const image = () => {
+    const s = svg();
+    if (s) void downloadPng(s, `${fileName}.png`);
+  };
+  const print = () => {
+    const s = svg();
+    if (s) printSvg(s, fileName);
+  };
   const todayInfo = isOperating(period, now) ? periodDays(period).find((d) => d.date === now) : undefined;
 
   return (
@@ -126,8 +146,8 @@ export default function ConfirmedPeriod() {
             ← 근무표 목록
           </button>
         </div>
-        <div className="flex items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
             <h1 ref={titleRef} tabIndex={-1} className={`${ui.pageTitle} outline-none`}>
               {scheduleName(period, shop.unit)}
             </h1>
@@ -138,7 +158,7 @@ export default function ConfirmedPeriod() {
               <span className={`${ui.badge} ${ui.badgeTone.confirmed}`}>확정</span>
             )}
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex min-w-0 items-center gap-3">
             {sv.loading && (
               <span role="status" className={`${ui.help} flex items-center gap-1.5`}>
                 <Spinner />
@@ -246,6 +266,12 @@ export default function ConfirmedPeriod() {
               <div className="flex items-center gap-2">
                 <button type="button" onClick={csv} disabled={busy} className={!ended && (unconfirmed || revertable) ? ui.text : ui.secondary}>
                   CSV 받기
+                </button>
+                <button type="button" onClick={image} disabled={busy} className={!ended && (unconfirmed || revertable) ? ui.text : ui.secondary}>
+                  이미지 받기
+                </button>
+                <button type="button" onClick={print} disabled={busy} className={!ended && (unconfirmed || revertable) ? ui.text : ui.secondary}>
+                  인쇄
                 </button>
                 {!ended && unconfirmed && outdated && <p className={`${ui.help} mr-1`}>지금 조건으로 만든 근무표만 확정할 수 있어요</p>}
                 {!ended && unconfirmed && (
@@ -362,4 +388,42 @@ function DemoChangeBar({ sample, added, busy, onAdd }: { sample: string; added: 
       {added && <p className={ui.help}>오른쪽 카드에서 [적용]을 누르면 바뀌는 칸을 최소로 줄여 다시 만들어요.</p>}
     </div>
   );
+}
+
+/** SVG를 2배 크기 PNG로 그려 내려받는다. 단체 대화방에 바로 올릴 수 있게. */
+async function downloadPng(svg: string, name: string) {
+  const img = new Image();
+  img.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
+  await img.decode();
+  const canvas = document.createElement("canvas");
+  canvas.width = img.width * 2;
+  canvas.height = img.height * 2;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return;
+  ctx.scale(2, 2);
+  ctx.drawImage(img, 0, 0);
+  const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/png"));
+  if (!blob) return;
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = name;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+/** 보이지 않는 iframe에 근무표 그림만 넣고 인쇄 창을 연다(가로 방향, 한 장 너비에 맞춤). */
+function printSvg(svg: string, title: string) {
+  const frame = document.createElement("iframe");
+  frame.setAttribute("aria-hidden", "true");
+  frame.style.cssText = "position:fixed;width:0;height:0;border:0;visibility:hidden";
+  frame.srcdoc = `<!doctype html><html><head><meta charset="utf-8"><title>${title}</title><style>@page{size:landscape;margin:10mm}html,body{margin:0}svg{width:100%;height:auto}</style></head><body>${svg}</body></html>`;
+  frame.onload = () => {
+    const win = frame.contentWindow;
+    if (!win) return;
+    win.addEventListener("afterprint", () => frame.remove());
+    win.focus();
+    win.print();
+  };
+  document.body.appendChild(frame);
 }

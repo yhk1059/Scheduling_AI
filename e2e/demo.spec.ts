@@ -98,6 +98,10 @@ test("S20. 체험 저니", async ({ page }) => {
   await page.getByRole("button", { name: "근무표 확인하기" }).click();
   await page.getByRole("button", { name: "확정", exact: true }).click();
   await expect(page.getByText("체험이라 직원 링크는 잠그지 않았어요")).toBeVisible();
+  // 단체 대화방에 올릴 이미지로 받는다
+  const download = page.waitForEvent("download");
+  await page.getByRole("button", { name: "이미지 받기" }).click();
+  expect((await download).suggestedFilename()).toMatch(/^근무표-.+\.png$/);
   await page.getByRole("button", { name: /^예시 넣기/ }).click();
   await expect(page.getByRole("button", { name: "예시 병가를 넣었어요" })).toBeDisabled();
   await page.getByRole("button", { name: "적용", exact: true }).click();
