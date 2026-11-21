@@ -55,20 +55,20 @@ export function ReplyCard({
   className?: string;
 }) {
   return (
-    <article className={`flex flex-col gap-2.5 rounded-lg border border-[#E2E2DC] bg-white px-4 py-3.5 ${className}`}>
+    <article className={`flex flex-col gap-2.5 rounded-lg border border-[#EDEDEA] bg-white px-4 py-3.5 ${className}`}>
       <div className="flex items-center justify-between gap-3">
-        <h3 className="text-sm font-semibold text-[#1B1B18]">{title}</h3>
-        <span className={`${ui.badge} ${hardness === "hard" ? "bg-[#1B1B18] text-white" : "border border-[#C9C9C1] bg-white text-[#3D3D38]"}`}>
+        <h3 className="text-sm font-semibold text-[#111214]">{title}</h3>
+        <span className={`${ui.badge} ${hardness === "hard" ? "bg-[#111214] text-white" : "border border-[#DCDCD8] bg-white text-[#4B4F57]"}`}>
           {hardnessLabel(hardness)}
         </span>
       </div>
-      <p className="flex items-start gap-1.5 text-sm text-[#1B1B18]">
+      <p className="flex items-start gap-1.5 text-sm text-[#111214]">
         <QuoteGlyph size={16} />
         {quote}
       </p>
-      <div className="ml-2 flex flex-col gap-1 border-l-2 border-[#CFE4EA] pl-3.5">
-        <span className="font-mono text-[11px] text-[#155E75]">이렇게 읽었어요</span>
-        <span className="text-sm text-[#1B1B18]">{reading}</span>
+      <div className="ml-2 flex flex-col gap-1 border-l-2 border-[#EDEDEA] pl-3.5">
+        <span className="font-mono text-[11px] text-[#C4247C]">이렇게 읽었어요</span>
+        <span className="text-sm text-[#111214]">{reading}</span>
       </div>
       {pending ? (
         <div className="flex justify-end gap-1">
@@ -98,13 +98,13 @@ type MiniCell = { code: Code; changed?: boolean };
 
 /** 랜딩 조각용 작은 근무표(이름 + 날짜 칸). 앱 그리드는 518px라 세 칼럼 안에 들어가지 않는다. */
 function MiniGrid({ days, rows, totals }: { days: typeof WEEK_DAYS; rows: { name: string; cells: MiniCell[] }[]; totals?: { label: string; values: number[] } }) {
-  const dayColor = (d: (typeof WEEK_DAYS)[number]) => (d.dow === "일" ? "text-[#B42318]" : d.dow === "토" ? "text-[#155E75]" : "text-[#66665E]");
+  const dayColor = (d: (typeof WEEK_DAYS)[number]) => (d.dow === "일" ? "text-[#B42318]" : d.dow === "토" ? "text-[#C4247C]" : "text-[#6B6F78]");
   return (
     <div className="flex w-max flex-col gap-0.5">
       <div className="flex items-center gap-0.5">
         <span className="w-16" />
         {days.map((d) => (
-          <span key={d.date} className={`inline-flex w-[30px] flex-col items-center rounded-xs font-mono text-[11px] leading-tight ${d.weekend ? "bg-[#F1EEE6]" : ""} ${dayColor(d)}`}>
+          <span key={d.date} className={`inline-flex w-[30px] flex-col items-center rounded-xs font-mono text-[11px] leading-tight ${d.weekend ? "bg-[#F5F5F4]" : ""} ${dayColor(d)}`}>
             {d.date}
             <span>{d.dow}</span>
           </span>
@@ -112,19 +112,19 @@ function MiniGrid({ days, rows, totals }: { days: typeof WEEK_DAYS; rows: { name
       </div>
       {rows.map((r) => (
         <div key={r.name} className="flex items-center gap-0.5">
-          <span className="w-16 truncate text-sm text-[#1B1B18]">{r.name}</span>
+          <span className="w-16 truncate text-sm text-[#111214]">{r.name}</span>
           {r.cells.map((c, i) => (
-            <span key={i} className={`${CELL} ${codeClass(c.code, !!days[i].weekend)} ${c.changed ? "shadow-[inset_0_0_0_2px_#D97706]" : ""}`}>
+            <span key={i} className={`${CELL} ${codeClass(c.code, !!days[i].weekend)} ${c.changed ? "shadow-[inset_0_0_0_2px_#FF7A1A]" : ""}`}>
               {c.code === "O" ? "" : c.code}
             </span>
           ))}
         </div>
       ))}
       {totals && (
-        <div className="mt-1.5 flex items-center gap-0.5 border-t border-[#EFEFEB] pt-2">
-          <span className="w-16 text-xs font-medium text-[#66665E]">{totals.label}</span>
+        <div className="mt-1.5 flex items-center gap-0.5 border-t border-[#F5F5F4] pt-2">
+          <span className="w-16 text-xs font-medium text-[#6B6F78]">{totals.label}</span>
           {totals.values.map((v, i) => (
-            <span key={i} className={`flex h-7 w-[30px] items-center justify-center rounded-xs font-mono text-[13px] font-medium text-[#1B1B18] ${days[i].weekend ? "bg-[#F1EEE6]" : ""}`}>
+            <span key={i} className={`flex h-7 w-[30px] items-center justify-center rounded-xs font-mono text-[13px] font-medium text-[#111214] ${days[i].weekend ? "bg-[#F5F5F4]" : ""}`}>
               {v}
             </span>
           ))}
@@ -148,14 +148,14 @@ export function ScheduleFragment() {
       <div className="overflow-x-auto">
         <MiniGrid days={WEEK_DAYS} rows={SCENE_ROWS} totals={{ label: "C 합계", values: C_TOTALS }} />
       </div>
-      <div className="flex items-center gap-4 border-t border-[#EFEFEB] pt-3">
+      <div className="flex items-center gap-4 border-t border-[#F5F5F4] pt-3">
         <span className="flex flex-col gap-0.5">
           <span className={ui.help}>희망 반영</span>
-          <span className={`${ui.bigNumber} text-[#1B1B18]`}>9/9</span>
+          <span className={`${ui.bigNumber} text-[#111214]`}>9/9</span>
         </span>
         <span className="flex flex-col gap-0.5">
           <span className={ui.help}>못 지킨 가능하면 규칙</span>
-          <span className={`${ui.bigNumber} text-[#1B1B18]`}>0</span>
+          <span className={`${ui.bigNumber} text-[#111214]`}>0</span>
         </span>
         <span className={`${ui.primarySm} ml-auto`}>확정</span>
       </div>
@@ -174,9 +174,9 @@ const CHANGE_ROWS: { name: string; cells: MiniCell[] }[] = [
 export function ChangeFragment() {
   return (
     <div className={`${ui.card} flex flex-col gap-3`}>
-      <p className="text-sm text-[#1B1B18]">최지훈 · 11/4~11/6 · 병가</p>
+      <p className="text-sm text-[#111214]">최지훈 · 11/4~11/6 · 병가</p>
       <MiniGrid days={CHANGE_DAYS} rows={CHANGE_ROWS} />
-      <p className="text-[13px] text-[#7A4506]">2명, 5칸 변경 · 주황 테두리 칸이 바뀐 곳이에요.</p>
+      <p className="text-[13px] text-[#B93815]">2명, 5칸 변경 · 주황 테두리 칸이 바뀐 곳이에요.</p>
     </div>
   );
 }
@@ -191,7 +191,7 @@ export default function HeroSequence() {
           <span className="flex max-sm:hidden">
             <Mark size={18} />
           </span>
-          <span className="relative min-w-0 flex-1 overflow-hidden text-sm whitespace-nowrap text-[#1B1B18] sm:text-[15px]">
+          <span className="relative min-w-0 flex-1 overflow-hidden text-sm whitespace-nowrap text-[#111214] sm:text-[15px]">
             <span className="relative inline-block">
               <span className="invisible">{TYPED}</span>
               <span className="hero-typing">{TYPED}</span>

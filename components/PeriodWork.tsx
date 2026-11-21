@@ -63,7 +63,7 @@ export default function PeriodWork() {
         </div>
         <div className="flex items-center gap-3">
           <h1 className={ui.pageTitle}>{scheduleName(period, unit)}</h1>
-          <span className="font-mono text-sm text-[#66665E]">{formatRange(period)}</span>
+          <span className="font-mono text-sm text-[#6B6F78]">{formatRange(period)}</span>
           <span className={`${ui.badge} ${ui.badgeTone.draft}`}>작성 중</span>
         </div>
         <Stepper label="근무표 작성 단계" labels={["가능 시간", "매장 조건", "근무표"]} current={step} reached={period.result ? 3 : step} onSelect={toStep} />
@@ -136,11 +136,11 @@ function LinksSection({ period }: { period: WorkPeriod }) {
             <h3 className={ui.cardTitle}>직원 링크</h3>
             <p className={ui.help}>체험에서는 직원 링크를 보낼 수 없어요. 직원이 가능 시간을 모두 제출한 상태로 시작해요</p>
           </div>
-          <p className="text-[13px] text-[#1B1B18]">
+          <p className="text-[13px] text-[#111214]">
             <span className="font-mono">{employees.length}</span>명 중 <span className="font-mono">{done}</span>명 제출
           </p>
-          <div aria-hidden="true" className="h-1.5 overflow-hidden rounded bg-[#E2E2DC]">
-            <div className="h-full bg-[#155E75]" style={{ width: `${employees.length === 0 ? 0 : (done / employees.length) * 100}%` }} />
+          <div aria-hidden="true" className="h-1.5 overflow-hidden rounded bg-[#EDEDEA]">
+            <div className="h-full bg-[#C4247C]" style={{ width: `${employees.length === 0 ? 0 : (done / employees.length) * 100}%` }} />
           </div>
           {absent.length > 0 && <p className={ui.help}>미제출: {absent.map((n) => n.name).join(", ")}</p>}
         </section>
@@ -183,17 +183,17 @@ function LinksSection({ period }: { period: WorkPeriod }) {
         </div>
         {current && (
           <>
-            <p className="truncate font-mono text-[13px] text-[#3D3D38]">{url}</p>
+            <p className="truncate font-mono text-[13px] text-[#4B4F57]">{url}</p>
             <div className="flex items-center justify-between gap-3">
-              <p className="text-[13px] text-[#1B1B18]">
+              <p className="text-[13px] text-[#111214]">
                 <span className="font-mono">{employees.length}</span>명 중 <span className="font-mono">{submitted}</span>명 제출
               </p>
               <button type="button" onClick={reload} className={ui.textSm}>
                 새로고침
               </button>
             </div>
-            <div aria-hidden="true" className="h-1.5 overflow-hidden rounded bg-[#E2E2DC]">
-              <div className="h-full bg-[#155E75]" style={{ width: `${employees.length === 0 ? 0 : (submitted / employees.length) * 100}%` }} />
+            <div aria-hidden="true" className="h-1.5 overflow-hidden rounded bg-[#EDEDEA]">
+              <div className="h-full bg-[#C4247C]" style={{ width: `${employees.length === 0 ? 0 : (submitted / employees.length) * 100}%` }} />
             </div>
             {missing.length > 0 && <p className={ui.help}>미제출: {missing.map((n) => n.name).join(", ")}</p>}
           </>
@@ -287,8 +287,8 @@ function CoverageSummary({ period }: { period: WorkPeriod }) {
   const [open, setOpen] = useState(false);
   if (!shop) return null;
   const rules = liveShopRules(shop, period);
-  const th = "py-1.5 pr-6 text-left text-xs font-medium text-[#66665E]";
-  const td = "py-1.5 pr-6 font-mono text-[13px] text-[#1B1B18]";
+  const th = "py-1.5 pr-6 text-left text-xs font-medium text-[#6B6F78]";
+  const td = "py-1.5 pr-6 font-mono text-[13px] text-[#111214]";
   // 전체 필요 인원 뒤에 직급별 필요 인원("홀 2명 · 주방 2명")을 잇는다
   const need = (code: Code, kind: DayKind) =>
     [coverageText(effectiveCoverage(rules, code, kind, period, period.holidays)), ...tagCoverage(rules, code, kind).map((t) => `${t.tag} ${coverageText(t)}`)]
@@ -300,7 +300,7 @@ function CoverageSummary({ period }: { period: WorkPeriod }) {
       <div className="flex items-start justify-between gap-3">
         <table className="border-collapse">
           <thead>
-            <tr className="border-b border-[#E2E2DC]">
+            <tr className="border-b border-[#EDEDEA]">
               <th className={th}>근무조</th>
               <th className={th}>시각</th>
               <th className={th}>평일</th>
@@ -309,8 +309,8 @@ function CoverageSummary({ period }: { period: WorkPeriod }) {
           </thead>
           <tbody>
             {coverageCodes(shop.config).map((s) => (
-              <tr key={s.code} className="border-b border-[#EFEFEB] last:border-b-0">
-                <td className="py-1.5 pr-6 text-[13px] font-medium text-[#1B1B18]">{s.name}</td>
+              <tr key={s.code} className="border-b border-[#F5F5F4] last:border-b-0">
+                <td className="py-1.5 pr-6 text-[13px] font-medium text-[#111214]">{s.name}</td>
                 <td className={td}>
                   {s.start}~{s.end}
                 </td>
@@ -351,8 +351,8 @@ function PrepareSummary({ period }: { period: WorkPeriod }) {
   return (
     <div className="flex flex-col gap-3">
       <section className={`${ui.card} flex items-center justify-between gap-3`}>
-        <p className="text-sm text-[#3D3D38]">
-          <span className="font-mono font-medium text-[#1B1B18]">{formatRange(period)}</span> ·{" "}
+        <p className="text-sm text-[#4B4F57]">
+          <span className="font-mono font-medium text-[#111214]">{formatRange(period)}</span> ·{" "}
           {period.holidays.length > 0 ? (
             <>
               공휴일 <span className="font-mono">{period.holidays.length}</span>일
@@ -381,7 +381,7 @@ function PrepareSummary({ period }: { period: WorkPeriod }) {
           <section className={`${ui.card} flex flex-col gap-3`}>
             <DatesSection period={period} />
             <div className="flex flex-col gap-1">
-              <h3 className="text-[13px] font-semibold text-[#1B1B18]">공휴일</h3>
+              <h3 className="text-[13px] font-semibold text-[#111214]">공휴일</h3>
               <p className={ui.help}>한국 공휴일은 자동으로 체크돼요. 날짜를 누르면 바꿀 수 있어요. 주말과 같은 인원 기준을 써요.</p>
             </div>
             <HolidayCalendar period={period} />
@@ -390,7 +390,7 @@ function PrepareSummary({ period }: { period: WorkPeriod }) {
           <section className={`${ui.card} flex items-center justify-between gap-3`}>
             <div className="flex flex-col gap-1">
               <h3 className={ui.cardTitle}>명단 확인</h3>
-              <p className="text-sm text-[#3D3D38]">
+              <p className="text-sm text-[#4B4F57]">
                 직원 <span className="font-mono">{active}</span>명
                 {hasPrevious &&
                   (added.length === 0 && deactivated.length === 0 ? (
@@ -471,7 +471,7 @@ function DatesSection({ period }: { period: WorkPeriod }) {
           {input}
           <div className="flex flex-col gap-1">
             <span className={ui.label}>끝 날짜</span>
-            <span className="flex h-10 items-center font-mono text-sm text-[#1B1B18]">
+            <span className="flex h-10 items-center font-mono text-sm text-[#111214]">
               {periodEnd(period).split("-").map(Number).join(".")} · {period.length}일
             </span>
           </div>
@@ -483,8 +483,8 @@ function DatesSection({ period }: { period: WorkPeriod }) {
         </div>
       ) : (
         <div className="flex items-center gap-3">
-          <p className="text-sm text-[#3D3D38]">
-            <span className="font-mono font-medium text-[#1B1B18]">{formatRange(period)}</span> ·{" "}
+          <p className="text-sm text-[#4B4F57]">
+            <span className="font-mono font-medium text-[#111214]">{formatRange(period)}</span> ·{" "}
             <span className="font-mono">{period.length}</span>일
           </p>
           {period.status === "draft" && (
@@ -503,7 +503,7 @@ function DatesSection({ period }: { period: WorkPeriod }) {
           <p className={ui.help}>{monthly ? `1~${MAX_MONTH_START_DAY}일 중 아무 날에서 시작할 수 있어요.` : "아무 날에서 시작할 수 있어요."}</p>
         )
       )}
-      {broken && <p className="text-sm text-[#7A4506]">지난 근무표와 이어지지 않아서 지난 근무를 직접 입력해요</p>}
+      {broken && <p className="text-sm text-[#B93815]">지난 근무표와 이어지지 않아서 지난 근무를 직접 입력해요</p>}
     </div>
   );
 }
@@ -536,7 +536,7 @@ function CarryOverTable({ period, prev }: { period: WorkPeriod; prev: WorkPeriod
       <div className="overflow-x-auto" aria-label={`${formatRange(period)} 지난 근무 마지막 며칠`}>
         <div className="flex w-max flex-col gap-0.5">
           <div className="grid gap-x-0.5" style={grid}>
-            <span className="flex items-end text-xs font-medium text-[#66665E]">이름</span>
+            <span className="flex items-end text-xs font-medium text-[#6B6F78]">이름</span>
             {days.map((d, i) => (
               <DayHead
                 key={d}
@@ -549,7 +549,7 @@ function CarryOverTable({ period, prev }: { period: WorkPeriod; prev: WorkPeriod
           </div>
           {rows.map((r) => (
             <div key={r.employee_id} className="grid gap-x-0.5" style={grid}>
-              <span className="flex h-7 items-center truncate text-sm text-[#1B1B18]">{name(r.employee_id)}</span>
+              <span className="flex h-7 items-center truncate text-sm text-[#111214]">{name(r.employee_id)}</span>
               {r.shifts.map((code, i) => {
                 const d = prev.length - r.shifts.length + 1 + i;
                 return (
@@ -656,12 +656,12 @@ function CarryOverPaste({ period }: { period: WorkPeriod }) {
             </li>
           ))}
           {result.warnings.map((w, i) => (
-            <li key={`w${i}`} className="text-xs font-medium text-[#A15C07]">
+            <li key={`w${i}`} className="text-xs font-medium text-[#B93815]">
               {w}
             </li>
           ))}
           {result.errors.length === 0 && (
-            <li className="text-xs font-medium text-[#1E6B3F]">{result.rows.length}명의 지난 근무를 반영했어요.</li>
+            <li className="text-xs font-medium text-[#067647]">{result.rows.length}명의 지난 근무를 반영했어요.</li>
           )}
           {result.errors.length > 0 && <li className={ui.help}>오류를 고친 뒤 다시 표로 만들어 주세요.</li>}
         </ul>

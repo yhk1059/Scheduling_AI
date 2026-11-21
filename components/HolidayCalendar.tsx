@@ -30,12 +30,12 @@ export default function HolidayCalendar({ period }: { period: WorkPeriod }) {
         const length = new Date(Date.UTC(year, month, 0)).getUTCDate();
         return (
           <div key={key} className="flex flex-col gap-1.5">
-            <span className="text-[13px] font-semibold text-[#1B1B18]">
+            <span className="text-[13px] font-semibold text-[#111214]">
               {year}년 {month}월
             </span>
             <div className="inline-grid grid-cols-[repeat(7,40px)] gap-0.5">
               {WEEKDAYS.map((w) => (
-                <span key={w} className="py-1 text-center text-xs font-medium text-[#66665E]">
+                <span key={w} className="py-1 text-center text-xs font-medium text-[#6B6F78]">
                   {w}
                 </span>
               ))}
@@ -51,8 +51,8 @@ export default function HolidayCalendar({ period }: { period: WorkPeriod }) {
                     <span
                       key={dom}
                       aria-hidden="true"
-                      className={`flex h-8 items-center justify-center rounded-xs border font-mono text-[13px] text-[#9A9A91] ${
-                        isToday ? "border-[#1B1B18]" : "border-transparent"
+                      className={`flex h-8 items-center justify-center rounded-xs border font-mono text-[13px] text-[#9499A2] ${
+                        isToday ? "border-[#111214]" : "border-transparent"
                       }`}
                     >
                       {dom}
@@ -69,10 +69,10 @@ export default function HolidayCalendar({ period }: { period: WorkPeriod }) {
                     aria-label={`${month}월 ${dom}일 공휴일${holiday ? " 해제" : " 지정"}`}
                     title={holidayName(`${key}-${String(dom).padStart(2, "0")}`) ?? undefined}
                     onClick={() => toggleHoliday(period.id, day)}
-                    className={`h-8 rounded-xs border font-mono text-[13px] transition-colors duration-[120ms] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#155E75] ${
+                    className={`h-8 rounded-xs border font-mono text-[13px] transition-colors duration-[120ms] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#C4247C] ${
                       holiday
-                        ? `bg-[#155E75] font-semibold text-white ${isToday ? "border-[#1B1B18]" : "border-[#155E75]"}`
-                        : `bg-white text-[#1B1B18] hover:bg-[#EFEFEB] ${isToday ? "border-[#1B1B18]" : "border-[#E2E2DC]"}`
+                        ? `bg-[#C4247C] font-semibold text-white ${isToday ? "border-[#111214]" : "border-[#C4247C]"}`
+                        : `bg-white text-[#111214] hover:bg-[#F5F5F4] ${isToday ? "border-[#111214]" : "border-[#EDEDEA]"}`
                     }`}
                   >
                     {dom}

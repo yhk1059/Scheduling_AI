@@ -2,21 +2,24 @@ import Link from "next/link";
 import { PRODUCT_NAME } from "@/lib/product";
 
 const MARK_COLORS = {
-  accent: { bg: "#155E75", fg: "#FFFFFF" },
-  inverse: { bg: "#FFFFFF", fg: "#155E75" },
-  muted: { bg: "#66665E", fg: "#FFFFFF" },
+  accent: { bg: "#111214", fg: "#FFFFFF" },
+  inverse: { bg: "#FFFFFF", fg: "#C4247C" },
+  muted: { bg: "#6B6F78", fg: "#FFFFFF" },
 };
 
 const QUOTE_PATH =
   "M10.5 7.5c-2.6.6-4 2.5-4 5v4H11v-4.5H9c0-1 .5-1.7 1.5-2V7.5zM17.5 7.5c-2.6.6-4 2.5-4 5v4H18v-4.5h-2c0-1 .5-1.7 1.5-2V7.5z";
 
-/** 여는 따옴표 마크. */
+/** 네 가지 근무 색상을 담은 앱 마크. */
 export function Mark({ size, tone = "accent" }: { size: number; tone?: "accent" | "inverse" | "muted" }) {
   const { bg, fg } = MARK_COLORS[tone];
   return (
     <svg aria-hidden="true" viewBox="0 0 24 24" width={size} height={size} className="shrink-0">
       <rect width="24" height="24" rx="6" fill={bg} />
-      <path fill={fg} d={QUOTE_PATH} />
+      <rect x="5" y="6" width="6" height="5" rx="1.5" fill={tone === "muted" ? fg : "#2F6BFF"} />
+      <rect x="13" y="6" width="6" height="5" rx="1.5" fill={tone === "muted" ? fg : "#12B76A"} />
+      <rect x="5" y="13" width="6" height="5" rx="1.5" fill={tone === "muted" ? fg : "#FF7A1A"} />
+      <rect x="13" y="13" width="6" height="5" rx="1.5" fill={tone === "muted" ? fg : "#EE46BC"} />
     </svg>
   );
 }
@@ -25,7 +28,7 @@ export function Mark({ size, tone = "accent" }: { size: number; tone?: "accent" 
 export function QuoteGlyph({ size }: { size: number }) {
   return (
     <svg aria-hidden="true" viewBox="0 0 24 24" width={size} height={size} className="shrink-0">
-      <path fill="#155E75" d={QUOTE_PATH} />
+      <path fill="#C4247C" d={QUOTE_PATH} />
     </svg>
   );
 }
@@ -48,7 +51,7 @@ export default function Wordmark({
   tone?: "accent" | "inverse";
 }) {
   const { mark, text } = SIZES[size];
-  const className = `inline-flex items-center ${text} ${tone === "inverse" ? "text-white" : "text-[#1B1B18]"}`;
+  const className = `inline-flex items-center ${text} ${tone === "inverse" ? "text-white" : "text-[#111214]"}`;
   const content = (
     <>
       <Mark size={mark} tone={tone} />
@@ -60,7 +63,7 @@ export default function Wordmark({
     <Link
       href={href}
       aria-label={`${PRODUCT_NAME} 홈`}
-      className={`${className} rounded-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#155E75]`}
+      className={`${className} rounded-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#C4247C]`}
     >
       {content}
     </Link>

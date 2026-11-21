@@ -225,7 +225,7 @@ export default function RulesStep({
     <>
       <div className="flex flex-col gap-1">
         <p className={ui.cardTitle}>{copy.prompt}</p>
-        <p className="text-[13px] text-[#3D3D38]">{copy.description}</p>
+        <p className="text-[13px] text-[#4B4F57]">{copy.description}</p>
       </div>
       <form
         className={`${ui.bar} ${tooLong ? "border-[#B42318]!" : ""}`}
@@ -261,7 +261,7 @@ export default function RulesStep({
         </div>
       )}
       {failure && (
-        <div role="alert" className="flex items-center gap-2 text-sm text-[#9F1F14]">
+        <div role="alert" className="flex items-center gap-2 text-sm text-[#B42318]">
           {failure.message}
           <button type="button" disabled={loading} onClick={() => void run(failure.text)} className={ui.textSm}>
             다시 시도
@@ -271,13 +271,13 @@ export default function RulesStep({
       <div className="flex items-start justify-between gap-3">
         <div className="text-sm">
           {notice?.kind === "clarify" && (
-            <p className="text-[#1B1B18]">
-              {notice.text} <span className="text-xs font-medium text-[#66665E]">내용을 보완해서 다시 입력해 주세요.</span>
+            <p className="text-[#111214]">
+              {notice.text} <span className="text-xs font-medium text-[#6B6F78]">내용을 보완해서 다시 입력해 주세요.</span>
             </p>
           )}
-          {notice?.kind === "unsupported" && <p className="text-[#7A4506]">{notice.text}</p>}
+          {notice?.kind === "unsupported" && <p className="text-[#B93815]">{notice.text}</p>}
         </div>
-        <span className={`shrink-0 font-mono text-xs ${tooLong ? "text-[#B42318]" : "text-[#9A9A91]"}`}>
+        <span className={`shrink-0 font-mono text-xs ${tooLong ? "text-[#B42318]" : "text-[#9499A2]"}`}>
           {text.length}/{MAX_TEXT_CHARS}
         </span>
       </div>
@@ -286,7 +286,7 @@ export default function RulesStep({
 
   const list =
     items.length === 0 ? (
-      copy.empty && <p className="text-sm text-[#66665E]">{copy.empty}</p>
+      copy.empty && <p className="text-sm text-[#6B6F78]">{copy.empty}</p>
     ) : (
       <div className="flex flex-col gap-3">
         {pendingCount >= 2 && (
@@ -371,7 +371,7 @@ function DemoInputNote() {
     <div className="flex items-start justify-between gap-3">
       <div className="flex flex-col gap-1">
         <p className={ui.cardTitle}>체험에서는 말로 적을 수 없어요</p>
-        <p className="text-[13px] text-[#3D3D38]">
+        <p className="text-[13px] text-[#4B4F57]">
           카드를 끄고 켜거나 숫자를 바꾸고, ③에서 근무표를 만들어 보세요. 내 매장에서는 문장을 적으면 카드가 돼요.
         </p>
         {error && (

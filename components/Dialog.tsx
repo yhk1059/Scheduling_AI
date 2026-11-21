@@ -1,6 +1,7 @@
 "use client";
 
 import { type ReactNode, useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
 
 import { ui } from "./ui";
 
@@ -48,8 +49,9 @@ export default function Dialog({
     };
   }, []);
 
-  return (
-    <div className="fixed inset-0 z-10 flex items-center justify-center bg-[#1B1B18]/40 px-4">
+  // body에 그린다. 헤더처럼 backdrop-filter가 있는 조상 안에서는 fixed가 화면이 아니라 그 조상 기준이 된다.
+  return createPortal(
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#111214]/40 px-4">
       <div
         ref={ref}
         role="dialog"
@@ -60,7 +62,7 @@ export default function Dialog({
         <h2 id="dialog-title" className={ui.sectionTitle}>
           {title}
         </h2>
-        <div className="flex flex-col gap-2.5 text-sm leading-relaxed text-[#3D3D38]">{children}</div>
+        <div className="flex flex-col gap-2.5 text-sm leading-relaxed text-[#4B4F57]">{children}</div>
         <div className="flex justify-end gap-2">
           {secondary && (
             <button type="button" onClick={secondary.onClick} disabled={secondary.disabled} className={ui.secondary}>
@@ -79,6 +81,7 @@ export default function Dialog({
           )}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

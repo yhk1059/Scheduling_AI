@@ -1,13 +1,13 @@
 @import "tailwindcss";
 
 @theme inline {
-  --font-sans: var(--font-plex-sans-kr), ui-sans-serif, system-ui, sans-serif;
-  --font-mono: var(--font-plex-mono), ui-monospace, monospace;
+  --font-sans: "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", Menlo, "Pretendard Variable", monospace;
 }
 
 body {
-  background: #f6f6f3;
-  color: #1b1b18;
+  background: #ffffff;
+  color: #111214;
 }
 
 /* 랜딩 히어로 시퀀스. 기본 스타일이 끝 상태이고, backwards 채움으로 시작 전 모습을 만든다. */
@@ -18,7 +18,7 @@ body {
 }
 @keyframes hero-caret {
   50% {
-    border-color: #155e75;
+    border-color: #C4247C;
   }
 }
 @keyframes hero-rise {
@@ -107,4 +107,45 @@ body {
   .problem-sheet * {
     animation: none !important;
   }
+}
+
+
+/* 디자인 시스템의 공통 상호작용과 랜딩 화면. */
+body { word-break: keep-all; }
+button:not(:disabled), a { -webkit-tap-highlight-color: transparent; }
+button:not(:disabled) { cursor: pointer; }
+:focus-visible { outline: 2px solid #C4247C; outline-offset: 3px; }
+::selection { background: #FDEAF4; color: #111214; }
+.landing section[id] { scroll-margin-top: 88px; }
+.landing-hero { max-width: 1200px; margin: auto; border-inline: 1px solid #EDEDEA; }
+.hero-heading { isolation: isolate; position: relative; padding-top: 112px; padding-bottom: 64px; }
+.hero-heading::before { content: ""; position: absolute; inset: 0; z-index: -1; background-image: radial-gradient(#DCDCD8 1px, transparent 1px); background-size: 28px 28px; mask-image: radial-gradient(ellipse at 50% 20%, #000, transparent 70%); }
+.hero-heading h1 { margin-bottom: 40px; font-size: clamp(52px, 7.4vw, 104px); font-weight: 700; letter-spacing: -.045em; line-height: 1.08; }
+.hero-sticker { display: inline-flex; align-items: center; justify-content: center; width: .86em; height: .86em; margin: 0 .16em; vertical-align: -.1em; color: white; animation: sticker-bob 4.8s ease-in-out infinite; }
+.hero-sticker svg { width: 52%; height: 52%; }
+.calendar-sticker { background: #2F6BFF; border-radius: .26em; rotate: -8deg; }
+.sparkle-sticker { background: #EE46BC; border-radius: 50%; rotate: 8deg; animation-delay: -2.4s; font-size: .9em; }
+.hero-caption { position: relative; display: flex; align-items: center; justify-content: center; gap: 12px; border-block: 1px solid #EDEDEA; padding: 14px 20px; color: #6B6F78; font-size: 13px; }
+.hero-stage { position: relative; padding-top: 64px; padding-bottom: 88px; }
+.hero-window { overflow: hidden; border: 1px solid #EDEDEA; border-radius: 18px; background: white; box-shadow: 0 24px 56px -24px rgb(17 18 20 / 22%), 0 1px 3px rgb(17 18 20 / 6%); }
+.hero-window-bar { height: 42px; display: flex; justify-content: space-between; align-items: center; padding-inline: 18px; border-bottom: 1px solid #EDEDEA; color: #6B6F78; font-size: 12px; }
+.hero-window-bar > :first-child { color: #DCDCD8; letter-spacing: 4px; }
+.hero-window .hero-seq { border: 0; border-radius: 0; background: white; }
+.hero-window .hero-seq > [inert] { display: grid; grid-template-columns: minmax(180px, 1fr) minmax(0, 3fr); align-items: start; }
+.hero-window .hero-seq > [inert] > :first-child { grid-column: 1 / -1; }
+.hero-window .hero-table { min-width: 0; }
+.hero-float { position: absolute; z-index: 2; display: inline-flex; align-items: center; gap: 8px; padding: 12px 18px; border-radius: 999px; font-size: 13px; font-weight: 600; box-shadow: 0 12px 32px -16px rgb(17 18 20 / 25%); }
+.hero-float-request { right: 8%; top: 42px; background: #FFEBDB; color: #B93815; rotate: 5deg; }
+.hero-float-result { right: 6%; bottom: 66px; background: white; border: 1px solid #EDEDEA; }
+@keyframes sticker-bob { 0%, 100% { translate: 0 0; } 50% { translate: 0 -6px; } }
+@media (max-width: 767px) {
+  .hero-heading { padding-top: 64px; padding-bottom: 40px; }
+  .hero-stage { padding-top: 40px; padding-bottom: 56px; }
+  .hero-window .hero-seq > [inert] { display: flex; flex-direction: column; }
+  .hero-window .hero-seq > [inert] > * { width: 100%; }
+  .hero-float-request { top: 20px; right: 24px; font-size: 11px; }
+  .hero-float-result { bottom: 34px; right: 24px; font-size: 11px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hero-sticker { animation: none; }
 }

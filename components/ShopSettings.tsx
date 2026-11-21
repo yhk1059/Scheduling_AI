@@ -30,7 +30,7 @@ export default function ShopSettings() {
     <div className="flex flex-col gap-5">
       <div className="flex flex-col gap-3">
         <h1 className={ui.pageTitle}>매장 설정</h1>
-        <div role="tablist" className="flex gap-5 border-b border-[#E2E2DC]">
+        <div role="tablist" className="flex gap-5 border-b border-[#EDEDEA]">
           {TABS.map((t) => (
             <button
               key={t.tab}
@@ -39,10 +39,10 @@ export default function ShopSettings() {
               onClick={() => go({ screen: "settings", tab: t.tab })}
               aria-selected={tab === t.tab}
               aria-current={tab === t.tab ? "page" : undefined}
-              className={`-mb-px h-11 border-b-2 px-1 text-sm transition-colors duration-[120ms] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#155E75] ${
+              className={`-mb-px h-11 border-b-2 px-1 text-sm transition-colors duration-[120ms] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#C4247C] ${
                 tab === t.tab
-                  ? "border-[#155E75] font-semibold text-[#1B1B18]"
-                  : "border-transparent font-medium text-[#3D3D38] hover:text-[#1B1B18]"
+                  ? "border-[#C4247C] font-semibold text-[#111214]"
+                  : "border-transparent font-medium text-[#4B4F57] hover:text-[#111214]"
               }`}
             >
               {t.label}
@@ -80,12 +80,12 @@ function UnconvertedNotice() {
   const dismiss = useAppStore((s) => s.dismissUnconverted);
   if (items.length === 0) return null;
   return (
-    <section role="status" className="flex flex-col gap-2 rounded-lg border border-[#F1D3A8] bg-[#FDF0DC] px-4 py-2.5 text-sm text-[#7A4506]">
+    <section role="status" className="flex flex-col gap-2 rounded-2xl border border-[#FFD3B0] bg-[#FFEBDB] px-4 py-2.5 text-sm text-[#B93815]">
       <p>옛 규칙 {items.length}개를 새 형식으로 옮기지 못했어요. 다시 입력해 주세요</p>
       <ul className="flex flex-col gap-1">
         {items.map((u, i) => (
           <li key={i} className="flex items-center justify-between gap-3">
-            <span className="text-[#1B1B18]">“{u.source_text}”</span>
+            <span className="text-[#111214]">“{u.source_text}”</span>
             <button type="button" onClick={() => dismiss(i)} className={ui.textSm}>
               지우기
             </button>
@@ -160,7 +160,7 @@ export function RosterSection() {
       </div>
       <EmployeeTable employees={shop.employees} />
       {orphanCount > 0 && (
-        <p className="text-xs font-medium text-[#A15C07]">
+        <p className="text-xs font-medium text-[#B93815]">
           명단에 없거나 근무표에서 뺀 직원을 가리키는 매장 조건이 {orphanCount}개 있어요. [매장 조건] 탭에서 확인해 주세요.
         </p>
       )}
@@ -187,7 +187,7 @@ export function CoverageSection({ collapsible = false }: { collapsible?: boolean
   return (
     <section className={`${ui.card} flex flex-col gap-3`}>
       <div className="flex items-center justify-between gap-3">
-        <p className="text-sm text-[#3D3D38]">필요 인원을 숫자로 넣을 수도 있어요.</p>
+        <p className="text-sm text-[#4B4F57]">필요 인원을 숫자로 넣을 수도 있어요.</p>
         <button type="button" aria-expanded={open} onClick={() => setOpen((o) => !o)} className={ui.textSm}>
           숫자로 입력하기
         </button>
@@ -211,10 +211,10 @@ function EmployeeTable({ employees }: { employees: ShopEmployee[] }) {
           <option key={t} value={t} />
         ))}
       </datalist>
-      <div className="overflow-x-auto rounded-lg border border-[#E2E2DC] bg-white">
+      <div className="overflow-x-auto rounded-lg border border-[#EDEDEA] bg-white">
         <table className="w-full border-collapse text-[13px]">
           <thead>
-            <tr className="border-b border-[#E2E2DC] text-left text-xs font-medium text-[#66665E]">
+            <tr className="border-b border-[#EDEDEA] text-left text-xs font-medium text-[#6B6F78]">
               <th className="w-10 px-2 py-2 font-mono font-medium">#</th>
               <th className="px-2 py-2 font-medium">이름</th>
               <th className="px-2 py-2 font-medium">직급</th>
@@ -304,13 +304,13 @@ function TagInput({
     <div className="flex flex-col gap-0.5">
       <div className="flex flex-wrap items-center gap-1">
         {tags.map((t) => (
-          <span key={t} className="inline-flex h-7 items-center gap-1 rounded-full border border-[#C9C9C1] bg-white pr-1 pl-3 text-xs font-normal text-[#3D3D38]">
+          <span key={t} className="inline-flex h-7 items-center gap-1 rounded-full border border-[#DCDCD8] bg-white pr-1 pl-3 text-xs font-normal text-[#4B4F57]">
             {t}
             <button
               type="button"
               onClick={() => onRemove(t)}
               aria-label={`${label} ${t} 빼기`}
-              className="inline-flex size-5 items-center justify-center rounded-full text-[#66665E] hover:bg-[#EFEFEB] hover:text-[#1B1B18] focus-visible:outline-2 focus-visible:outline-[#155E75]"
+              className="inline-flex size-5 items-center justify-center rounded-full text-[#6B6F78] hover:bg-[#F5F5F4] hover:text-[#111214] focus-visible:outline-2 focus-visible:outline-[#C4247C]"
             >
               <svg aria-hidden="true" viewBox="0 0 12 12" className="size-3" fill="none" stroke="currentColor" strokeWidth="1.6">
                 <path d="M3 3l6 6M9 3l-6 6" />
@@ -328,7 +328,7 @@ function TagInput({
             placeholder="직급"
             aria-label={label}
             aria-invalid={msg !== null || undefined}
-            className={`${cellInput} w-24 placeholder:text-[#707068] ${msg ? ui.cellErr : ui.cellOk}`}
+            className={`${cellInput} w-24 placeholder:text-[#6B6F78] ${msg ? ui.cellErr : ui.cellOk}`}
           />
         )}
       </div>
@@ -365,8 +365,8 @@ function EmployeeRow({ employee, index, employees }: { employee: ShopEmployee; i
   const row = index + 1;
   const err = ui.cellErr;
   return (
-    <tr className="border-b border-[#EFEFEB] last:border-b-0">
-      <td className="px-2 py-1 font-mono text-xs text-[#66665E]">{row}</td>
+    <tr className="border-b border-[#F5F5F4] last:border-b-0">
+      <td className="px-2 py-1 font-mono text-xs text-[#6B6F78]">{row}</td>
       {employee.active ? (
         <>
           <td className="px-1 py-1">
@@ -393,12 +393,12 @@ function EmployeeRow({ employee, index, employees }: { employee: ShopEmployee; i
       ) : (
         <>
           <td className="px-2 py-1">
-            <span className="flex items-center gap-2 text-[#66665E]">
+            <span className="flex items-center gap-2 text-[#6B6F78]">
               {employee.name}
               <span className={`${ui.badge} ${ui.badgeTone.excluded}`}>제외</span>
             </span>
           </td>
-          <td className="px-2 py-1 text-[#66665E]">{employee.tags.join(", ")}</td>
+          <td className="px-2 py-1 text-[#6B6F78]">{employee.tags.join(", ")}</td>
         </>
       )}
       <td className="px-1 py-1">
@@ -457,8 +457,8 @@ function NewEmployeeRow({ employees }: { employees: ShopEmployee[] }) {
   const err = ui.cellErr;
   const showName = tried && nameMsg;
   return (
-    <tr className="bg-[#FAFAF7]">
-      <td className="px-2 py-1 font-mono text-xs text-[#66665E]">+</td>
+    <tr className="bg-[#F5F5F4]">
+      <td className="px-2 py-1 font-mono text-xs text-[#6B6F78]">+</td>
       <td className="px-1 py-1">
         <input
           ref={nameRef}
@@ -468,7 +468,7 @@ function NewEmployeeRow({ employees }: { employees: ShopEmployee[] }) {
           placeholder="이름"
           aria-label="새 직원 이름"
           aria-invalid={showName ? true : undefined}
-          className={`${cellInput} w-48 placeholder:text-[#707068] ${showName ? err : ui.cellOk}`}
+          className={`${cellInput} w-48 placeholder:text-[#6B6F78] ${showName ? err : ui.cellOk}`}
         />
         {showName && <p className={`${ui.error} mt-0.5`}>{nameMsg}</p>}
       </td>
@@ -529,7 +529,7 @@ function RowMenu({ name, onDelete }: { name: string; onDelete: () => void }) {
         </svg>
       </button>
       {open && (
-        <div role="menu" className={`absolute top-full right-0 z-10 mt-1 rounded-md border border-[#E2E2DC] bg-white p-1 ${ui.shadow}`}>
+        <div role="menu" className={`absolute top-full right-0 z-10 mt-1 rounded-md border border-[#EDEDEA] bg-white p-1 ${ui.shadow}`}>
           <button
             type="button"
             role="menuitem"

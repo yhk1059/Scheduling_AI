@@ -92,7 +92,7 @@ export default function CoverageForm({
         <tbody>
           {SHIFTS.map(({ shift, label }) => (
             <tr key={shift}>
-              <th className="py-1 pr-3 text-left text-[13px] font-medium text-[#1B1B18]">
+              <th className="py-1 pr-3 text-left text-[13px] font-medium text-[#111214]">
                 <span className="font-mono">{shift}</span> {label}
               </th>
               {DAY_KINDS.map(({ kind, label: kindLabel }) => {
@@ -117,9 +117,9 @@ export default function CoverageForm({
                   <td key={kind} className="px-2 py-1">
                     <span className="flex items-center gap-1.5">
                       {input("min", min)}
-                      <span className="text-[13px] text-[#66665E]">~</span>
+                      <span className="text-[13px] text-[#6B6F78]">~</span>
                       {input("max", max)}
-                      <span className="w-12 text-[13px] text-[#66665E]">
+                      <span className="w-12 text-[13px] text-[#6B6F78]">
                         명{min !== "" && max === "" ? " 이상" : ""}
                       </span>
                     </span>

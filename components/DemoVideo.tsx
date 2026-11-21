@@ -2,6 +2,7 @@
 
 // 데모 영상(ADR-022). 랜딩 상단 바의 [데모 영상]이 대화상자로 연다. 영상은 public/demo.mp4(npm run record:dining으로 다시 만든다).
 import { type ReactNode, useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 
 import { ui } from "./ui";
 
@@ -41,8 +42,9 @@ function DemoVideoDialog({ onClose }: { onClose: () => void }) {
     };
   }, []);
 
-  return (
-    <div className="fixed inset-0 z-10 flex items-center justify-center bg-[#1B1B18]/60 px-6">
+  // body에 그린다. 상단 바의 backdrop-filter 안에서는 fixed가 화면 기준이 아니게 된다.
+  return createPortal(
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#111214]/60 px-6">
       <div
         role="dialog"
         aria-modal="true"
@@ -58,10 +60,11 @@ function DemoVideoDialog({ onClose }: { onClose: () => void }) {
             닫기
           </button>
         </div>
-        <video src={DEMO_VIDEO} controls autoPlay playsInline aria-label="데모 영상" className="aspect-[16/10] w-full rounded-lg bg-[#1B1B18]">
+        <video src={DEMO_VIDEO} controls autoPlay playsInline aria-label="데모 영상" className="aspect-[16/10] w-full rounded-lg bg-[#111214]">
           이 브라우저에서는 영상을 재생할 수 없어요.
         </video>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

@@ -18,7 +18,7 @@ export default function ShopSetup() {
     <div className="flex flex-col gap-5">
       <div className="flex flex-col gap-1">
         <h1 className={ui.pageTitle}>매장 준비</h1>
-        {!ready && <p className="text-sm leading-relaxed text-[#3D3D38]">아직 명단이 없어요.</p>}
+        {!ready && <p className="text-sm leading-relaxed text-[#4B4F57]">아직 명단이 없어요.</p>}
       </div>
       <BasicSection />
       <RosterSection />

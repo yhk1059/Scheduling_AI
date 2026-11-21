@@ -85,8 +85,8 @@ export default function AppShell({ demo = false }: { demo?: boolean }) {
 
   return (
     <div className="flex flex-1 flex-col">
-      <header className="border-b border-[#E2E2DC] bg-white">
-        <div className="mx-auto flex h-[60px] max-w-[1360px] items-center justify-between px-10">
+      <header className="sticky top-0 z-40 border-b border-[#EDEDEA] bg-white/85 backdrop-blur-md">
+        <div className="mx-auto flex flex-wrap gap-3 py-3 min-h-16 max-w-[1200px] items-center justify-between px-4 sm:px-6">
           <div className="flex items-center gap-3">
             {/* 매장 준비를 건너뛰지 않게 그 화면에서는 앱 홈으로 보내지 않는다 */}
             {demo ? (
@@ -96,7 +96,7 @@ export default function AppShell({ demo = false }: { demo?: boolean }) {
                 type="button"
                 aria-label={`${PRODUCT_NAME} 홈`}
                 onClick={() => go({ screen: "home" })}
-                className="inline-flex rounded-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#155E75]"
+                className="inline-flex rounded-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#C4247C]"
               >
                 <Wordmark size="bar" />
               </button>
@@ -105,10 +105,10 @@ export default function AppShell({ demo = false }: { demo?: boolean }) {
             )}
             {started && (
               <>
-                <span aria-hidden="true" className="h-5 w-px bg-[#E2E2DC]" />
-                <span className="text-sm font-medium text-[#1B1B18]">
+                <span aria-hidden="true" className="h-5 w-px bg-[#EDEDEA]" />
+                <span className="text-sm font-medium text-[#111214]">
                   {shop.name || "이름 없는 매장"}
-                  <span className="text-[13px] font-normal text-[#66665E]"> · {unitShort(shop.unit)}</span>
+                  <span className="text-[13px] font-normal text-[#6B6F78]"> · {unitShort(shop.unit)}</span>
                 </span>
               </>
             )}
@@ -116,17 +116,17 @@ export default function AppShell({ demo = false }: { demo?: boolean }) {
           {demo ? <DemoBar /> : !loginScreen && <AccountBar />}
         </div>
         {started && view.screen !== "setup" && (
-          <nav className="mx-auto flex h-11 max-w-[1360px] px-10">
+          <nav className="mx-auto flex max-w-[1200px] gap-1 px-4 pb-3 sm:px-6">
             {tabs.map((t) => (
               <button
                 key={t.label}
                 type="button"
                 onClick={t.onClick}
                 aria-current={t.current ? "page" : undefined}
-                className={`mr-5 h-11 border-b-2 px-1 text-sm transition-colors duration-[120ms] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#155E75] ${
+                className={`h-9 rounded-full px-4 text-sm transition-colors duration-[120ms] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#C4247C] ${
                   t.current
-                    ? "border-[#155E75] font-semibold text-[#1B1B18]"
-                    : "border-transparent font-medium text-[#3D3D38] hover:text-[#1B1B18]"
+                    ? "bg-[#111214] font-semibold text-white"
+                    : "font-medium text-[#4B4F57] hover:bg-[#F5F5F4] hover:text-[#111214]"
                 }`}
               >
                 {t.label}
@@ -136,12 +136,13 @@ export default function AppShell({ demo = false }: { demo?: boolean }) {
         )}
       </header>
 
-      <main className="mx-auto flex w-full max-w-[1360px] flex-col gap-5 px-10 py-6">
+      <main className="mx-auto flex w-full max-w-[1200px] flex-col gap-6 px-4 sm:px-6 py-10">
         {demo && (
           <p
             role="status"
-            className="rounded-lg border border-[#CFE4EA] bg-[#F0F6F8] px-4 py-2.5 text-sm text-[#1B1B18]"
+            className="flex items-center gap-2.5 rounded-2xl bg-[#F5F5F4] px-5 py-3 text-sm text-[#111214]"
           >
+            <span aria-hidden="true" className="size-2 shrink-0 rounded-full bg-[#EE46BC]" />
             샘플 매장 한강 다이닝을 눌러 보고 있어요. 바꾼 내용은 저장되지 않고, 새로고침하면 처음으로 돌아가요.
           </p>
         )}
@@ -169,7 +170,7 @@ export default function AppShell({ demo = false }: { demo?: boolean }) {
         )}
 
         {loading ? (
-          <p role="status" className="text-sm text-[#3D3D38]">
+          <p role="status" className="text-sm text-[#4B4F57]">
             불러오는 중…
           </p>
         ) : !demo && auth === null ? (

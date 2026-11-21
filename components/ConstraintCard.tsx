@@ -117,7 +117,7 @@ function ExampleStrip({
               직원
             </th>
             {example.days.map((d, i) => (
-              <th key={d} scope="col" className="w-6 text-center font-mono text-[11px] font-medium whitespace-nowrap text-[#66665E]">
+              <th key={d} scope="col" className="w-6 text-center font-mono text-[11px] font-medium whitespace-nowrap text-[#6B6F78]">
                 {i === 0 ? monthDay(range, d) : dayHeader(range, d)}
               </th>
             ))}
@@ -126,7 +126,7 @@ function ExampleStrip({
         <tbody>
           {example.employee_ids.map((id) => (
             <tr key={id}>
-              <th scope="row" className="max-w-[96px] truncate pr-1.5 text-left text-xs font-medium text-[#1B1B18]">
+              <th scope="row" className="max-w-[96px] truncate pr-1.5 text-left text-xs font-medium text-[#111214]">
                 {nameOf(id)}
               </th>
               {example.days.map((d, i) => {
@@ -151,7 +151,7 @@ function ExampleStrip({
           ))}
         </tbody>
       </table>
-      <p className="text-xs text-[#3D3D38]">{example.detail}</p>
+      <p className="text-xs text-[#4B4F57]">{example.detail}</p>
     </div>
   );
 }
@@ -192,11 +192,11 @@ function WarningIcon() {
 
 // --- 카드: 내 말(원문)과 "이렇게 읽었어요" 해석이 이어지는 답장 모양 ---
 
-const CARD = "flex flex-col gap-3.5 rounded-lg border bg-white px-5 py-[18px]";
+const CARD = "flex flex-col gap-3.5 rounded-3xl border bg-white px-6 py-5";
 
 function Quote({ text, dim = false, compact = false }: { text: string; dim?: boolean; compact?: boolean }) {
   return (
-    <p className={`flex items-start gap-1.5 ${compact ? "text-sm" : "text-[15px]"} leading-5 ${dim ? "text-[#66665E]" : "text-[#1B1B18]"}`}>
+    <p className={`flex items-start gap-1.5 ${compact ? "text-sm" : "text-[15px]"} leading-5 ${dim ? "text-[#6B6F78]" : "text-[#111214]"}`}>
       <QuoteGlyph size={compact ? 16 : 20} />
       <span>{text}</span>
     </p>
@@ -205,10 +205,10 @@ function Quote({ text, dim = false, compact = false }: { text: string; dim?: boo
 
 function Reading({ sentence, dim = false, children }: { sentence: ReactNode; dim?: boolean; children?: ReactNode }) {
   return (
-    <div className="ml-2 flex flex-col gap-2.5 border-l-2 border-[#CFE4EA] pl-3.5">
+    <div className="ml-2 flex flex-col gap-2.5 border-l-2 border-[#EDEDEA] pl-3.5">
       <div className="flex flex-col gap-1">
         <span className={`${ui.eyebrow} text-[11px]!`}>이렇게 읽었어요</span>
-        <p className={`text-sm ${dim ? "text-[#66665E]" : "text-[#1B1B18]"}`}>{sentence}</p>
+        <p className={`text-sm ${dim ? "text-[#6B6F78]" : "text-[#111214]"}`}>{sentence}</p>
       </div>
       {children}
     </div>
@@ -221,7 +221,7 @@ function HardnessToggle({ value, disabled, onChange }: { value: Hardness; disabl
       role="group"
       aria-label="반드시/가능하면"
       title={disabled ? "휴가와 고정 근무는 항상 반드시 지켜요" : undefined}
-      className="inline-flex overflow-hidden rounded-md border border-[#C9C9C1]"
+      className="inline-flex overflow-hidden rounded-md border border-[#DCDCD8]"
     >
       {(["hard", "soft"] as const).map((h) => (
         <button
@@ -230,7 +230,7 @@ function HardnessToggle({ value, disabled, onChange }: { value: Hardness; disabl
           disabled={disabled}
           aria-pressed={value === h}
           onClick={() => onChange(h)}
-          className="h-7 bg-white px-3 text-xs font-medium text-[#66665E] disabled:cursor-not-allowed aria-pressed:bg-[#1B1B18] aria-pressed:text-white"
+          className="h-7 bg-white px-3 text-xs font-medium text-[#6B6F78] disabled:cursor-not-allowed aria-pressed:bg-[#111214] aria-pressed:text-white"
         >
           {hardnessLabel(h)}
         </button>
@@ -272,15 +272,15 @@ export function ShiftChangeCardView({ card }: { card: ShiftChangeCard }) {
   if (!config) return null;
   const store = useAppStore.getState();
   return (
-    <article className={`${CARD} border-[#C9C9C1]`}>
+    <article className={`${CARD} border-[#DCDCD8]`}>
       <div className="flex items-center justify-between gap-3">
         <h3 className={ui.cardTitle}>근무 형태</h3>
-        <span className={`${ui.badge} bg-[#EFEFEB] text-[#3D3D38]`}>근무 형태</span>
+        <span className={`${ui.badge} bg-[#F5F5F4] text-[#4B4F57]`}>근무 형태</span>
       </div>
       {card.source_text && <Quote text={card.source_text} />}
       <Reading sentence={describeShiftChange(card.change, config)} />
       <div className="flex items-center justify-between gap-3">
-        <span className={`${ui.badge} bg-[#FDF0DC] text-[#7A4506]`}>적용 대기</span>
+        <span className={`${ui.badge} bg-[#FFEBDB] text-[#B93815]`}>적용 대기</span>
         <div className="flex items-center gap-1">
           <button type="button" onClick={() => store.removeRule(card.id)} className={ui.danger}>
             삭제
@@ -386,12 +386,12 @@ export default function ConstraintCard({
   };
 
   return (
-    <article className={`${CARD} ${compact ? "px-4! py-3.5!" : ""} ${pending ? "border-[#C9C9C1]" : "border-[#E2E2DC]"}`}>
+    <article className={`${CARD} ${compact ? "px-4! py-3.5!" : ""} ${pending ? "border-transparent bg-[#FDEAF4]!" : "border-[#EDEDEA]"}`}>
       <div className="flex items-center justify-between gap-3">
-        <h3 className={compact ? "text-sm font-semibold text-[#1B1B18]" : ui.cardTitle}>{presetName(card)}</h3>
+        <h3 className={compact ? "text-sm font-semibold text-[#111214]" : ui.cardTitle}>{presetName(card)}</h3>
         {/* 휴가 카드는 항상 반드시라 토글 대신 배지를 둔다 */}
         {isLeaveRule(card) ? (
-          <span className={`${ui.badge} bg-[#1B1B18] text-white`}>반드시</span>
+          <span className={`${ui.badge} bg-[#111214] text-white`}>반드시</span>
         ) : (
           <div className="flex items-center gap-2">
             {hardness === "soft" && card.type !== "fixed_assignment" && (
@@ -413,7 +413,7 @@ export default function ConstraintCard({
 
       <Reading sentence={<RuleText sentence={describeRule(card, config, employees, range)} />} dim={dim}>
         {draft && (
-          <div className="flex flex-col gap-2.5 rounded-sm border border-[#E2E2DC] px-2.5 py-2">
+          <div className="flex flex-col gap-2.5 rounded-sm border border-[#EDEDEA] px-2.5 py-2">
             <div className="flex flex-wrap items-end gap-3">
               {fields.map((f) => (
                 <FieldInput key={f.key} field={f} value={draft[f.key]} onChange={(v) => setDraft({ ...draft, [f.key]: v })} />
@@ -444,41 +444,41 @@ export default function ConstraintCard({
       </Reading>
 
       {orphan && (
-        <p className="flex items-center gap-1.5 text-xs font-medium text-[#A15C07]">
+        <p className="flex items-center gap-1.5 text-xs font-medium text-[#B93815]">
           <WarningIcon />
           명단에 없는 직원을 가리켜요. 삭제하거나 명단을 고쳐 주세요.
         </p>
       )}
 
       {pending && conflict && conflictName && (
-        <p className="flex flex-wrap items-center gap-1.5 text-xs font-medium text-[#A15C07]">
+        <p className="flex flex-wrap items-center gap-1.5 text-xs font-medium text-[#B93815]">
           <WarningIcon />
           기존 규칙 {conflictName}{josa(conflictName, "과", "와")} 함께 지킬 수 없어요
           <button type="button" onClick={() => store.removeRule(conflict.id)} className={ui.textSm}>
             기존 규칙 끄기
           </button>
-          <span className="font-normal text-[#66665E]">매장 조건에서 꺼져요</span>
+          <span className="font-normal text-[#6B6F78]">매장 조건에서 꺼져요</span>
         </p>
       )}
 
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-2">
-          {isDefault && <span className={`${ui.badge} bg-[#EFEFEB] text-[#3D3D38]`}>기본</span>}
+          {isDefault && <span className={`${ui.badge} bg-[#F5F5F4] text-[#4B4F57]`}>기본</span>}
           {off ? (
-            <span className={`${ui.badge} bg-[#FDF0DC] text-[#7A4506]`}>이번 근무표에서 꺼짐</span>
+            <span className={`${ui.badge} bg-[#FFEBDB] text-[#B93815]`}>이번 근무표에서 꺼짐</span>
           ) : shopOff ? (
             <>
-              <span className={`${ui.badge} bg-[#EFEFEB] text-[#66665E]`}>매장 조건에서 꺼짐</span>
+              <span className={`${ui.badge} bg-[#F5F5F4] text-[#6B6F78]`}>매장 조건에서 꺼짐</span>
               {/* 매장 설정 탭에서는 그 화면이 곧 매장 설정이라 두지 않는다 */}
               {onToggleOff && <span className={ui.help}>매장 설정에서도 꺼졌어요. 다음 근무표에도 적용돼요</span>}
             </>
           ) : pending ? (
-            <span className={`${ui.badge} bg-[#FDF0DC] text-[#7A4506]`}>적용 대기</span>
+            <span className={`${ui.badge} bg-[#FFEBDB] text-[#B93815]`}>적용 대기</span>
           ) : (
-            <span className={`${ui.badge} bg-[#E6F2EA] text-[#1E6B3F]`}>{appliedLabel}</span>
+            <span className={`${ui.badge} bg-[#DDF7E9] text-[#067647]`}>{appliedLabel}</span>
           )}
           {pending && replaces && (
-            <span className="text-xs font-medium text-[#66665E]" title={`“${replaces.source_text}”`}>
+            <span className="text-xs font-medium text-[#6B6F78]" title={`“${replaces.source_text}”`}>
               기존 규칙 대체
             </span>
           )}
@@ -506,7 +506,7 @@ export default function ConstraintCard({
                 삭제
               </button>
               {withConfig && (
-                <span className="ml-2 text-xs font-medium text-[#66665E]">
+                <span className="ml-2 text-xs font-medium text-[#6B6F78]">
                   근무 코드 <span className="font-mono">{withConfig}</span> 추가가 함께 적용돼요
                 </span>
               )}

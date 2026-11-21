@@ -46,7 +46,7 @@ import { ui } from "./ui";
 
 export const WEEKDAYS = ["일", "월", "화", "수", "목", "금", "토"];
 
-/** 근무표 날짜 머리 두 줄(날짜 / 요일). 토요일 청록, 일요일·공휴일 빨강. */
+/** 근무표 날짜 머리 두 줄(날짜 / 요일). 토요일 강조색, 일요일·공휴일 빨강. */
 export function DayHead({
   label,
   weekday,
@@ -60,11 +60,11 @@ export function DayHead({
   weekend: boolean;
   today?: boolean;
 }) {
-  const color = weekday === 0 || holiday ? "text-[#B42318]" : weekday === 6 ? "text-[#155E75]" : "text-[#66665E]";
+  const color = weekday === 0 || holiday ? "text-[#B42318]" : weekday === 6 ? "text-[#C4247C]" : "text-[#6B6F78]";
   return (
     <span
-      className={`flex flex-col items-center rounded-xs py-0.5 text-[11px] ${weekend ? "bg-[#F1EEE6]" : ""} ${color} ${
-        isToday ? "border-b-2 border-[#155E75]" : ""
+      className={`flex flex-col items-center rounded-xs py-0.5 text-[11px] ${weekend ? "bg-[#F5F5F4]" : ""} ${color} ${
+        isToday ? "border-b-2 border-[#C4247C]" : ""
       }`}
     >
       <span className="font-mono font-medium tracking-[-0.04em] whitespace-nowrap">{label}</span>
@@ -74,27 +74,27 @@ export function DayHead({
 }
 
 export const CELL =
-  "relative w-[30px] h-7 rounded-xs inline-flex items-center justify-center font-mono transition-colors duration-[120ms]";
-/** 근무조 색 단계(shiftTones): 이른 근무 밝게 → 늦은 근무 진하게. 기본 오픈·미들·마감은 0·2·4. */
+  "relative w-[30px] h-7 rounded-lg inline-flex items-center justify-center font-mono transition-colors duration-[120ms]";
+/** 근무조 색 단계(shiftTones): 오픈은 파랑, 미들은 초록, 마감은 보라. 기본 오픈·미들·마감은 0·2·4. */
 const TONE_CLASS = [
-  "bg-[#FFF1C2] text-[#5C4300]",
-  "bg-[#FCDDA0] text-[#5C3A00]",
-  "bg-[#F9CFAE] text-[#6E2A04]",
-  "bg-[#56657F] text-white",
-  "bg-[#263248] text-white",
+  "bg-[#E5EDFF] text-[#1E4FD8]",
+  "bg-[#E0F2FE] text-[#075985]",
+  "bg-[#DDF7E9] text-[#067647]",
+  "bg-[#FCE7F6] text-[#C11574]",
+  "bg-[#EEE9FF] text-[#5925DC]",
 ];
 /** 근무조를 합친 코드(더블 등) */
-const MULTI_CLASS = "bg-[#E4DDF4] text-[#3E2A73]";
+const MULTI_CLASS = "bg-[#EEE9FF] text-[#5925DC]";
 /** 근무 형태에 없는 코드 */
-const OTHER_CODE_CLASS = "bg-[#E2E2DC] text-[#1B1B18]";
-const OFF_CLASS = "text-[#6B6B63] font-normal border border-[#E2E2DC]";
+const OTHER_CODE_CLASS = "bg-[#EDEDEA] text-[#111214]";
+const OFF_CLASS = "bg-[#FFEBDB] text-[#B93815] font-normal border border-transparent";
 
 /** 근무 코드 색과 글자 크기(3자 코드는 작게). 색은 근무 형태의 시작 시각 순서로 정한다. */
 export function codeClass(code: Code, weekend: boolean, config: ShopConfig = DEFAULT_CONFIG): string {
   const tone = shiftTones(config)[code];
   const color =
     tone === "off"
-      ? `${OFF_CLASS} ${weekend ? "bg-[#F1EEE6]" : "bg-white"}`
+      ? `${OFF_CLASS} ${weekend ? "ring-1 ring-inset ring-[#FFB27A]" : ""}`
       : `${tone === "multi" ? MULTI_CLASS : tone === undefined ? OTHER_CODE_CLASS : TONE_CLASS[tone]} font-semibold border border-transparent`;
   return `${color} ${code.length >= 3 ? "text-[11px]" : "text-[13px]"}`;
 }
@@ -289,7 +289,7 @@ export function downloadCsv(period: WorkPeriod, employees: Employee[], result: S
 /** API 오류 알림 + [다시 시도]. */
 export function ToastAlert({ toast, busy, onClose }: { toast: NonNullable<Toast>; busy: boolean; onClose: () => void }) {
   return (
-    <div role="alert" className="flex items-center gap-3 rounded-lg border border-[#E8B4AE] bg-white py-2 pr-2 pl-4 text-sm text-[#9F1F14]">
+    <div role="alert" className="flex items-center gap-3 rounded-2xl border border-[#FECDCA] bg-white py-2 pr-2 pl-4 text-sm text-[#B42318]">
       <span className="flex-1">{toast.message}</span>
       <button type="button" onClick={toast.retry} disabled={busy} className={ui.textSm}>
         다시 시도
@@ -422,9 +422,9 @@ export function ScheduleBody({
       {stale && (
         <div
           role="status"
-          className="flex items-center justify-between rounded-lg border border-[#F1D3A8] bg-[#FDF0DC] py-1.5 pr-2 pl-4 text-sm text-[#7A4506]"
+          className="flex items-center justify-between rounded-2xl border border-[#FFD3B0] bg-[#FFEBDB] py-1.5 pr-2 pl-4 text-sm text-[#B93815]"
         >
-          <span className={`${ui.badge} bg-white text-[#7A4506]`}>입력이 바뀌었어요. 다시 만들어 주세요</span>
+          <span className={`${ui.badge} bg-white text-[#B93815]`}>입력이 바뀌었어요. 다시 만들어 주세요</span>
           <button type="button" onClick={sv.run} disabled={busy} className={ui.secondarySm}>
             다시 만들기
           </button>
@@ -436,13 +436,13 @@ export function ScheduleBody({
       {result && (
         <>
           {/* 요약과 버튼은 스크롤해도 위에 붙는다. 근무표를 보면서 바로 확정할 수 있게 */}
-          <div className="sticky top-0 z-10 -mx-10 flex min-h-14 flex-wrap items-center gap-x-6 gap-y-2 border-b border-[#E2E2DC] bg-[#F6F6F3] px-10 py-2.5">
+          <div className="sticky top-0 z-10 -mx-4 sm:-mx-6 flex min-h-14 flex-wrap items-center gap-x-6 gap-y-2 border-b border-[#EDEDEA] bg-[#FFFFFF] px-4 sm:px-6 py-2.5">
             <SummaryLine result={result} infeasible={outcome !== null} confirmed={isConfirmed} draft={isDraft} legacy={legacy} care={care} disabled={disabledRules} />
             {toolbar && <div className="ml-auto flex items-center gap-2">{toolbar}</div>}
           </div>
           {summaryLead}
-          {legacy && <p className="text-sm text-[#66665E]">변환 전에 확정한 근무표예요. 희망 반영과 못 지킨 규칙은 보여 주지 않아요.</p>}
-          {evidence && <p className="text-sm text-[#3D3D38]">{evidence}</p>}
+          {legacy && <p className="text-sm text-[#6B6F78]">변환 전에 확정한 근무표예요. 희망 반영과 못 지킨 규칙은 보여 주지 않아요.</p>}
+          {evidence && <p className="text-sm text-[#4B4F57]">{evidence}</p>}
         </>
       )}
 
@@ -484,7 +484,7 @@ export function ScheduleBody({
           />
           {/* 근무표를 먼저 보도록 통계는 접어 두고, 펼치면 근무표 바로 아래에 둔다 */}
           {!statsOpen && (
-            <div className="flex justify-end border-t border-[#EFEFEB] pt-2">
+            <div className="flex justify-end border-t border-[#F5F5F4] pt-2">
               <button type="button" aria-expanded={false} onClick={() => setStatsOpen(true)} className={ui.textSm}>
                 개인별 통계 보기
               </button>
@@ -605,7 +605,7 @@ export default function ScheduleStep() {
         busy={busy}
         outcomeAtGrid
         hint={
-          <p className="text-[13px] text-[#66665E]">
+          <p className="text-[13px] text-[#6B6F78]">
             <span>칸을 누르면 바꿀 수 있어요.</span>{" "}
             <span className="whitespace-nowrap">
               <InlineLock /> 고정한 칸은 다시 만들 때 그대로 둬요
@@ -641,7 +641,7 @@ export default function ScheduleStep() {
             </button>
             {!result ? (
               <div className="flex items-center gap-3">
-                <p className="max-w-[420px] text-right text-sm leading-relaxed text-[#3D3D38]">
+                <p className="max-w-[420px] text-right text-sm leading-relaxed text-[#4B4F57]">
                   {scheduleInputsText(scheduleInputs(shop, period, periods)).map((p, i) =>
                     "value" in p ? (
                       <span key={i} className="font-mono">
@@ -748,7 +748,7 @@ export function OutcomePanel({
   const hardList = constraints.filter((c) => (c.hardness ?? "hard") === "hard" && !isAvailabilityRule(c.id));
 
   return (
-    <section className="flex flex-col gap-3.5 rounded-lg border border-[#E8B4AE] bg-white px-[18px] py-4">
+    <section className="flex flex-col gap-3.5 rounded-2xl border border-[#FECDCA] bg-white px-[18px] py-4">
       <div className="flex items-center gap-2">
         <span className={`${ui.badge} ${ui.badgeTone.none}`}>{outcome.kind === "timeout" ? "시간 초과" : "근무표 없음"}</span>
         <h2 className={ui.cardTitle}>
@@ -759,7 +759,7 @@ export function OutcomePanel({
 
       {unsubmitted && (
         <div className="flex flex-col items-start gap-1.5">
-          <p className="text-sm text-[#1B1B18]">
+          <p className="text-sm text-[#111214]">
             {noneSubmitted
               ? "아직 가능 시간을 제출한 직원이 없어요. ①에서 링크를 보내고 제출을 기다려 주세요"
               : `${availabilityNames.join(", ")}의 가능 시간이 아직 없어요. 제출을 기다리거나 ①에서 확인해 주세요`}
@@ -775,7 +775,7 @@ export function OutcomePanel({
       {!unsubmitted && (
         <>
       {outcome.kind === "infeasible" && explaining && !explanation && (
-        <p className="flex items-center gap-2 text-sm text-[#66665E]">
+        <p className="flex items-center gap-2 text-sm text-[#6B6F78]">
           <Spinner />
           원인을 분석하는 중…
         </p>
@@ -784,10 +784,10 @@ export function OutcomePanel({
       {proposals.length > 0 && (
         <div className="flex flex-col gap-1">
           <div className="flex flex-wrap items-baseline gap-x-2">
-            <h3 className="text-sm font-semibold text-[#1B1B18]">이렇게 바꾸면 만들 수 있어요</h3>
+            <h3 className="text-sm font-semibold text-[#111214]">이렇게 바꾸면 만들 수 있어요</h3>
             <span className={ui.help}>이번 근무표에만 적용돼요. 매장 조건은 그대로예요</span>
           </div>
-          <div className="flex flex-col divide-y divide-[#EFEFEB] border-y border-[#EFEFEB]">
+          <div className="flex flex-col divide-y divide-[#F5F5F4] border-y border-[#F5F5F4]">
             {proposals.map((p, i) => (
               <ProposalCard
                 key={i}
@@ -815,18 +815,18 @@ export function OutcomePanel({
 
       {!unknownCause && ruleConflicts.length > 0 && (
         <div className="flex flex-col gap-1.5">
-          <h3 className="text-sm font-semibold text-[#1B1B18]">함께 지킬 수 없는 규칙</h3>
+          <h3 className="text-sm font-semibold text-[#111214]">함께 지킬 수 없는 규칙</h3>
           <p className={ui.help}>하나를 끄면 바로 다시 만들어요. 원래 설정은 그대로 남아요.</p>
           <ul className="flex flex-col">
             {ruleConflicts.map((c) => {
               const found = constraints.find((x) => x.id === c.constraint_id);
               return (
-                <li key={c.constraint_id} className="flex items-center justify-between gap-3 border-b border-[#EFEFEB] py-1.5 last:border-b-0">
-                  <span className="flex items-baseline gap-2 text-sm text-[#1B1B18]">
-                    <span className="text-xs font-medium text-[#66665E]">{found ? presetName(found) : "규칙"}</span>
+                <li key={c.constraint_id} className="flex items-center justify-between gap-3 border-b border-[#F5F5F4] py-1.5 last:border-b-0">
+                  <span className="flex items-baseline gap-2 text-sm text-[#111214]">
+                    <span className="text-xs font-medium text-[#6B6F78]">{found ? presetName(found) : "규칙"}</span>
                     {c.source_text !== COVERAGE_SOURCE_TEXT && <>“{c.source_text}”</>}
                     {found && (
-                      <span className="font-mono text-xs text-[#66665E]">{describeRule(found, config, employees, period).text}</span>
+                      <span className="font-mono text-xs text-[#6B6F78]">{describeRule(found, config, employees, period).text}</span>
                     )}
                   </span>
                   {found && (
@@ -843,15 +843,15 @@ export function OutcomePanel({
 
       {availabilityNames.length > 0 && (
         <div className="flex flex-col gap-1.5">
-          <h3 className="text-sm font-semibold text-[#1B1B18]">가능 시간도 함께 걸려 있어요</h3>
-          <p className="text-sm text-[#1B1B18]">{availabilityNames.join(", ")}</p>
+          <h3 className="text-sm font-semibold text-[#111214]">가능 시간도 함께 걸려 있어요</h3>
+          <p className="text-sm text-[#111214]">{availabilityNames.join(", ")}</p>
           <p className={ui.help}>가능 시간은 직원이 정한 것이라 끌 수 없어요. 더 일할 수 있는지 물어보면 해결될 수도 있어요.</p>
         </div>
       )}
 
       {unknownCause && (
         <div className="flex flex-col gap-1.5">
-          <p className="text-sm text-[#1B1B18]">
+          <p className="text-sm text-[#111214]">
             {outcome.kind === "timeout"
               ? "'반드시' 규칙을 하나씩 꺼서 확인해 주세요."
               : "원인을 찾지 못했어요. 규칙을 하나씩 꺼서 확인해 주세요."}
@@ -861,10 +861,10 @@ export function OutcomePanel({
             {hardList.map((c) => {
               const on = c.enabled !== false;
               return (
-                <li key={c.id} className="flex items-center justify-between gap-3 border-b border-[#EFEFEB] py-1.5 last:border-b-0">
-                  <span className={`flex items-baseline gap-2 text-sm ${on ? "text-[#1B1B18]" : "text-[#66665E]"}`}>
-                    <span className="text-xs font-medium text-[#66665E]">{presetName(c)}</span>“{c.source_text}”
-                    <span className="font-mono text-xs text-[#66665E]">{describeRule(c, config, employees, period).text}</span>
+                <li key={c.id} className="flex items-center justify-between gap-3 border-b border-[#F5F5F4] py-1.5 last:border-b-0">
+                  <span className={`flex items-baseline gap-2 text-sm ${on ? "text-[#111214]" : "text-[#6B6F78]"}`}>
+                    <span className="text-xs font-medium text-[#6B6F78]">{presetName(c)}</span>“{c.source_text}”
+                    <span className="font-mono text-xs text-[#6B6F78]">{describeRule(c, config, employees, period).text}</span>
                   </span>
                   <button
                     type="button"
@@ -883,12 +883,12 @@ export function OutcomePanel({
       )}
 
       {explanation && (
-        <details className="border-t border-[#EFEFEB] pt-3">
-          <summary className="cursor-pointer text-[13px] font-semibold text-[#1B1B18]">왜 만들 수 없나요?</summary>
-          <p className="mt-1.5 text-sm leading-relaxed whitespace-pre-line text-[#3D3D38]">
+        <details className="border-t border-[#F5F5F4] pt-3">
+          <summary className="cursor-pointer text-[13px] font-semibold text-[#111214]">왜 만들 수 없나요?</summary>
+          <p className="mt-1.5 text-sm leading-relaxed whitespace-pre-line text-[#4B4F57]">
             {explanation.text}
             {explanation.fallback && (
-              <span className="text-[#66665E]"> 자동 설명을 만들지 못해 함께 지킬 수 없는 규칙만 보여 줘요.</span>
+              <span className="text-[#6B6F78]"> 자동 설명을 만들지 못해 함께 지킬 수 없는 규칙만 보여 줘요.</span>
             )}
           </p>
         </details>
@@ -920,21 +920,21 @@ function ProposalCard({
   return (
     <article className="flex items-center gap-6 py-3">
       <div className="flex min-w-0 flex-1 flex-col gap-1">
-        <h4 className="text-[13px] font-medium text-[#66665E]">{proposal.title}</h4>
+        <h4 className="text-[13px] font-medium text-[#6B6F78]">{proposal.title}</h4>
         {changes.length > 0 ? (
           <ul className="flex flex-col gap-0.5">
             {changes.map((t, i) => (
               <li key={i} className="flex flex-wrap items-baseline gap-x-2">
-                <span className="text-[15px] font-semibold text-[#1B1B18]">{t.change}</span>
-                <span className="text-xs text-[#66665E]">{t.quote}</span>
+                <span className="text-[15px] font-semibold text-[#111214]">{t.change}</span>
+                <span className="text-xs text-[#6B6F78]">{t.quote}</span>
               </li>
             ))}
           </ul>
         ) : (
-          <p className="text-sm leading-relaxed text-[#1B1B18]">{proposal.description}</p>
+          <p className="text-sm leading-relaxed text-[#111214]">{proposal.description}</p>
         )}
-        <p className="text-xs text-[#66665E]">
-          <span className="font-medium text-[#1E6B3F]">검증됨</span> · 희망 반영{" "}
+        <p className="text-xs text-[#6B6F78]">
+          <span className="font-medium text-[#067647]">검증됨</span> · 희망 반영{" "}
           <span className="font-mono">
             {s.preferences_met}/{s.preferences_total}
           </span>
@@ -980,20 +980,20 @@ function SummaryLine({
   disabled?: { name: string; text: string }[];
 }) {
   const { summary } = result;
-  const item = "flex items-baseline gap-1.5 text-sm text-[#66665E]";
-  const value = "font-mono text-[15px] font-semibold text-[#1B1B18]";
+  const item = "flex items-baseline gap-1.5 text-sm text-[#6B6F78]";
+  const value = "font-mono text-[15px] font-semibold text-[#111214]";
   return (
     <div className="flex flex-wrap items-center gap-x-5 gap-y-1.5">
         <span className="flex items-center gap-2">
           {infeasible ? (
-            <span className={`${ui.badge} bg-[#FBE9E7] text-[#9F1F14]`}>근무표 없음</span>
+            <span className={`${ui.badge} bg-[#FEE4E2] text-[#B42318]`}>근무표 없음</span>
           ) : (
-            <span className={`${ui.badge} bg-[#E6F2EA] text-[#1E6B3F]`}>반드시 규칙을 모두 지켰어요</span>
+            <span className={`${ui.badge} bg-[#DDF7E9] text-[#067647]`}>반드시 규칙을 모두 지켰어요</span>
           )}
-          {disabled.length > 0 && <span className={`${ui.badge} bg-[#FDF0DC] text-[#7A4506]`}>끈 규칙 {disabled.length}개</span>}
-          {!result.optimal && <span className={`${ui.badge} bg-[#FDF0DC] text-[#7A4506]`}>더 나은 배치가 있을 수 있어요</span>}
-          {confirmed && <span className={`${ui.badge} bg-[#E6F2EA] text-[#1E6B3F]`}>확정</span>}
-          {draft && <span className={`${ui.badge} border border-[#C9C9C1] bg-white text-[#3D3D38]`}>작성 중</span>}
+          {disabled.length > 0 && <span className={`${ui.badge} bg-[#FFEBDB] text-[#B93815]`}>끈 규칙 {disabled.length}개</span>}
+          {!result.optimal && <span className={`${ui.badge} bg-[#FFEBDB] text-[#B93815]`}>더 나은 배치가 있을 수 있어요</span>}
+          {confirmed && <span className={`${ui.badge} bg-[#DDF7E9] text-[#067647]`}>확정</span>}
+          {draft && <span className={`${ui.badge} border border-[#DCDCD8] bg-white text-[#4B4F57]`}>작성 중</span>}
         </span>
       {!legacy && (
         <>
@@ -1004,12 +1004,12 @@ function SummaryLine({
                 {summary.preferences_met}/{summary.preferences_total}
               </span>
             ) : (
-              <span className="text-[#1B1B18]">요청 없음</span>
+              <span className="text-[#111214]">요청 없음</span>
             )}
           </span>
           <span className={item}>
             <span>못 지킨 가능하면 규칙</span>
-            <span className={`${value} ${summary.soft_violation_count > 0 ? "text-[#A15C07]!" : ""}`}>{summary.soft_violation_count}</span>
+            <span className={`${value} ${summary.soft_violation_count > 0 ? "text-[#B93815]!" : ""}`}>{summary.soft_violation_count}</span>
           </span>
         </>
       )}
@@ -1028,7 +1028,7 @@ function SummaryLine({
       {care && (
         <span className={item}>
           <span>{care.label}</span>
-          <span className="font-medium text-[#1B1B18]">{care.text}</span>
+          <span className="font-medium text-[#111214]">{care.text}</span>
         </span>
       )}
     </div>
@@ -1053,7 +1053,7 @@ function CellEditor({
 }) {
   return (
     <div className="flex items-center gap-1.5">
-      <span className="mr-1 text-xs font-medium text-[#3D3D38]">
+      <span className="mr-1 text-xs font-medium text-[#4B4F57]">
         <span className="font-mono">{label}</span> 고정
       </span>
       {codes.map(({ code, name }) => (
@@ -1064,7 +1064,7 @@ function CellEditor({
           aria-label={`${code}${josa(code, "으로", "로")} 고정`}
           title={name}
           aria-pressed={fixed === code}
-          className={`${CELL} ${codeClass(code, false, config)} hover:opacity-80 aria-pressed:outline-2 aria-pressed:outline-[#155E75] aria-pressed:outline-offset-1`}
+          className={`${CELL} ${codeClass(code, false, config)} hover:opacity-80 aria-pressed:outline-2 aria-pressed:outline-[#C4247C] aria-pressed:outline-offset-1`}
         >
           {code}
         </button>
@@ -1165,7 +1165,7 @@ export function ScheduleGrid({
   const minWidth = 180 + period.length * 32 + codes.length * 36 + (showHistory ? 92 : 0);
   const cellWidth = fluid ? "w-full! h-8!" : "";
   const rowClass = "grid gap-x-0.5";
-  const weekendBg = (d: number) => (isWeekend(d) ? "bg-[#F1EEE6]" : "");
+  const weekendBg = (d: number) => (isWeekend(d) ? "bg-[#F5F5F4]" : "");
   const changed = new Set((result.diff ?? []).map((c) => `${c.employee_id}-${c.day}`));
   const violations = new Map<string, string[]>();
   for (const v of hideViolations ? [] : result.soft_violations) {
@@ -1173,7 +1173,7 @@ export function ScheduleGrid({
     const key = `${v.employee_id}-${v.day}`;
     violations.set(key, [...(violations.get(key) ?? []), v.detail]);
   }
-  const total = "flex h-7 self-center items-center justify-center font-mono text-[13px] font-medium text-[#1B1B18]";
+  const total = "flex h-7 self-center items-center justify-center font-mono text-[13px] font-medium text-[#111214]";
   const swatch = "inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-xs font-mono";
 
   return (
@@ -1183,12 +1183,12 @@ export function ScheduleGrid({
       {legend && (
         <ul aria-label="근무조" className="flex flex-wrap items-center gap-x-4 gap-y-1.5">
           {codes.map(({ code, name, start, end }) => (
-            <li key={code} className="flex items-center gap-1.5 text-[13px] text-[#3D3D38]">
+            <li key={code} className="flex items-center gap-1.5 text-[13px] text-[#4B4F57]">
               <span aria-hidden="true" className={`${swatch} ${codeClass(code, false, config)}`}>
                 {cellText(code)}
               </span>
               {code === OFF_CODE ? "빈칸 휴무" : name}
-              {start && end && <span className="font-mono text-xs text-[#66665E]">{start}~{end}</span>}
+              {start && end && <span className="font-mono text-xs text-[#6B6F78]">{start}~{end}</span>}
             </li>
           ))}
         </ul>
@@ -1199,18 +1199,18 @@ export function ScheduleGrid({
       <div className="overflow-x-auto">
         <div className={`flex flex-col gap-0.5 ${fluid ? "w-full" : "w-max"}`} style={fluid ? { minWidth } : undefined}>
           <div className={rowClass} style={grid}>
-            <span className="flex items-end text-xs font-medium text-[#66665E]">이름</span>
+            <span className="flex items-end text-xs font-medium text-[#6B6F78]">이름</span>
             {pdays.map(({ day: d, weekday: w }) => (
               <DayHead key={d} label={dayHeader(period, d)} weekday={w} holiday={holidays.includes(d)} weekend={isWeekend(d)} today={d === todayDay} />
             ))}
             {codes.map(({ code, name }) => (
-              <span key={code} title={name} className="flex items-end justify-center font-mono text-xs font-semibold text-[#66665E]">
+              <span key={code} title={name} className="flex items-end justify-center font-mono text-xs font-semibold text-[#6B6F78]">
                 {code}
               </span>
             ))}
             {/* 누적 부담(최근 4주) */}
             {showHistory && [`최근 4주\n${closingShift(config)?.name ?? "마감"}`, "최근 4주\n주말"].map((label) => (
-              <span key={label} className="flex items-end justify-center text-center text-[11px] leading-tight font-medium whitespace-pre-line text-[#66665E]">
+              <span key={label} className="flex items-end justify-center text-center text-[11px] leading-tight font-medium whitespace-pre-line text-[#6B6F78]">
                 {label}
               </span>
             ))}
@@ -1222,10 +1222,10 @@ export function ScheduleGrid({
             return (
               <div key={n.id} className={rowClass} style={grid}>
                 <span
-                  className={`flex h-7 self-center items-center truncate text-sm text-[#1B1B18] ${n.id === highlightId ? "rounded-xs bg-[#F0F6F8] px-1.5 font-semibold" : ""}`}
+                  className={`flex h-7 self-center items-center truncate text-sm text-[#111214] ${n.id === highlightId ? "rounded-xs bg-[#F5F5F4] px-1.5 font-semibold" : ""}`}
                 >
                   {n.name}
-                  {n.tags?.length ? <span className="ml-1.5 truncate text-xs font-medium text-[#66665E]">{n.tags.join(" · ")}</span> : null}
+                  {n.tags?.length ? <span className="ml-1.5 truncate text-xs font-medium text-[#6B6F78]">{n.tags.join(" · ")}</span> : null}
                 </span>
                 {row.map((code, i) => {
                   const d = i + 1;
@@ -1244,7 +1244,7 @@ export function ScheduleGrid({
                         className={`${CELL} ${cellWidth} ${codeClass(code, isWeekend(d), config)}`}
                       >
                         {cellText(code)}
-                        {warn && <span aria-hidden="true" className="absolute bottom-px left-px size-[5px] rounded-full bg-[#A15C07]" />}
+                        {warn && <span aria-hidden="true" className="absolute bottom-px left-px size-[5px] rounded-full bg-[#B93815]" />}
                       </div>
                     );
                   }
@@ -1261,12 +1261,12 @@ export function ScheduleGrid({
                       className={`${CELL} ${cellWidth} ${codeClass(code, isWeekend(d), config)} ${
                         past ? "cursor-not-allowed opacity-55" : "hover:opacity-80"
                       } disabled:cursor-wait ${
-                        changed.has(key) ? "shadow-[inset_0_0_0_2px_#D97706]" : ""
-                      } ${isSel ? "outline-2 outline-offset-1 outline-[#155E75]" : ""}`}
+                        changed.has(key) ? "shadow-[inset_0_0_0_2px_#FF7A1A]" : ""
+                      } ${isSel ? "outline-2 outline-offset-1 outline-[#C4247C]" : ""}`}
                     >
                       {cellText(code)}
                       {(past || fixed.has(key)) && <LockIcon />}
-                      {warn && <span aria-hidden="true" className="absolute bottom-px left-px size-[5px] rounded-full bg-[#A15C07]" />}
+                      {warn && <span aria-hidden="true" className="absolute bottom-px left-px size-[5px] rounded-full bg-[#B93815]" />}
                     </button>
                   );
                 })}
@@ -1286,8 +1286,8 @@ export function ScheduleGrid({
           })}
 
           {teams.map(({ code }, i) => (
-            <div key={code} className={`${rowClass} ${i === 0 ? "mt-1.5 border-t border-[#EFEFEB] pt-1.5" : ""}`} style={grid}>
-              <span className="flex h-7 items-center text-xs font-medium text-[#66665E]">{code} 합계</span>
+            <div key={code} className={`${rowClass} ${i === 0 ? "mt-1.5 border-t border-[#F5F5F4] pt-1.5" : ""}`} style={grid}>
+              <span className="flex h-7 items-center text-xs font-medium text-[#6B6F78]">{code} 합계</span>
               {dayList.map((d) => (
                 <span key={d} className={`${total} rounded-xs ${weekendBg(d)}`}>
                   {rows.filter((n) => covers(result.assignments[n.id][d - 1], code)).length}
@@ -1318,9 +1318,9 @@ export function StatsTable({
   onClose: () => void;
 }) {
   const codes = shownCodes(config, result.assignments);
-  const thBase = "px-3 py-2 text-xs font-medium whitespace-nowrap text-[#66665E]";
+  const thBase = "px-3 py-2 text-xs font-medium whitespace-nowrap text-[#6B6F78]";
   const th = `${thBase} text-right`;
-  const td = "px-3 py-1.5 text-right font-mono text-[13px] font-medium text-[#1B1B18]";
+  const td = "px-3 py-1.5 text-right font-mono text-[13px] font-medium text-[#111214]";
   const showHistory = [...history.values()].some((h) => h.closings > 0 || h.weekends > 0);
   return (
     <section className="flex flex-col gap-3">
@@ -1336,7 +1336,7 @@ export function StatsTable({
       <div className={`${ui.card} overflow-x-auto`}>
         <table className="w-full border-collapse">
           <thead>
-            <tr className="border-b border-[#E2E2DC]">
+            <tr className="border-b border-[#EDEDEA]">
               <th className={`${thBase} text-left`}>이름</th>
               {codes.map(({ code, name }) => (
                 <th key={code} title={name} className={`${th} font-mono`}>
@@ -1361,8 +1361,8 @@ export function StatsTable({
               const s = result.stats[n.id];
               if (!s) return null;
               return (
-                <tr key={n.id} className="border-b border-[#EFEFEB] last:border-b-0">
-                  <td className="px-3 py-1.5 text-sm text-[#1B1B18]">{n.name}</td>
+                <tr key={n.id} className="border-b border-[#F5F5F4] last:border-b-0">
+                  <td className="px-3 py-1.5 text-sm text-[#111214]">{n.name}</td>
                   {codes.map(({ code }) => (
                     <td key={code} className={td}>
                       {s.counts?.[code] ?? 0}
@@ -1374,7 +1374,7 @@ export function StatsTable({
                   {!legacy && (
                     <td className={td}>{s.preference_rate === null ? "–" : `${Math.round(s.preference_rate * 100)}%`}</td>
                   )}
-                  <td className={`${td} ${Math.round(s.deviation) > 0 ? "text-[#A15C07]!" : ""}`}>{formatDeviation(s.deviation)}</td>
+                  <td className={`${td} ${Math.round(s.deviation) > 0 ? "text-[#B93815]!" : ""}`}>{formatDeviation(s.deviation)}</td>
                   {showHistory && (
                     <>
                       <td className={td}>{history.get(n.id)?.closings ?? 0}</td>

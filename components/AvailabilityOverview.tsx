@@ -18,7 +18,7 @@ const SLOT_HEIGHT = 6;
 const HOUR_SLOTS = Array.from({ length: SLOT_COUNT / 6 }, (_, i) => i * 6);
 
 const dayColor = (day: PeriodDay, weekend: boolean) =>
-  day.weekday === 0 || (weekend && day.weekday !== 6) ? "text-[#B42318]" : day.weekday === 6 ? "text-[#155E75]" : "text-[#3D3D38]";
+  day.weekday === 0 || (weekend && day.weekday !== 6) ? "text-[#B42318]" : day.weekday === 6 ? "text-[#C4247C]" : "text-[#4B4F57]";
 
 /** ① 직원이 제출한 가능 시간 모아 보기: 날짜별 가능 인원 + 직원별 읽기 전용 캘린더. 2주 이상이면 모두 같은 주로 함께 넘긴다. */
 export default function AvailabilityOverview({
@@ -45,18 +45,18 @@ export default function AvailabilityOverview({
       <div className="flex items-center gap-2">
         <h3 className={ui.cardTitle}>직원별 가능 시간</h3>
         <p className={`${ui.help} mr-auto flex items-center gap-1.5`}>
-          <span aria-hidden="true" className="size-3 rounded-xs bg-[#155E75]" />
+          <span aria-hidden="true" className="size-3 rounded-xs bg-[#C4247C]" />
           칠한 곳이 일할 수 있는 시간이에요
         </p>
         {pages > 1 && (
           <>
-            <button type="button" disabled={page === 0} onClick={() => setPage((p) => p - 1)} className={`${ui.textSm} disabled:text-[#9A9A91]`}>
+            <button type="button" disabled={page === 0} onClick={() => setPage((p) => p - 1)} className={`${ui.textSm} disabled:text-[#9499A2]`}>
               이전 주
             </button>
-            <span className="font-mono text-xs text-[#66665E]">
+            <span className="font-mono text-xs text-[#6B6F78]">
               {page + 1}/{pages}
             </span>
-            <button type="button" disabled={page === pages - 1} onClick={() => setPage((p) => p + 1)} className={`${ui.textSm} disabled:text-[#9A9A91]`}>
+            <button type="button" disabled={page === pages - 1} onClick={() => setPage((p) => p + 1)} className={`${ui.textSm} disabled:text-[#9499A2]`}>
               다음 주
             </button>
           </>
@@ -66,8 +66,8 @@ export default function AvailabilityOverview({
       <div className={`${ui.card} sticky top-0 z-10`}>
         <table aria-label="날짜별 가능 인원" className="w-full table-fixed border-collapse">
           <thead>
-            <tr className="border-b border-[#E2E2DC]">
-              <th className="w-44 py-1.5 text-left text-xs font-medium text-[#66665E]">날짜별 가능 인원</th>
+            <tr className="border-b border-[#EDEDEA]">
+              <th className="w-44 py-1.5 text-left text-xs font-medium text-[#6B6F78]">날짜별 가능 인원</th>
               {shown.map((d) => (
                 <th key={d.date} className={`py-1.5 text-center text-xs font-medium ${dayColor(d, weekend(d))}`}>
                   {WEEKDAYS[d.weekday]}{" "}
@@ -80,15 +80,15 @@ export default function AvailabilityOverview({
           </thead>
           <tbody>
             {coverageCodes(config).map((s) => (
-              <tr key={s.code} className="border-b border-[#EFEFEB] last:border-b-0">
-                <th scope="row" className="py-1 text-left text-[13px] font-medium text-[#1B1B18]">
+              <tr key={s.code} className="border-b border-[#F5F5F4] last:border-b-0">
+                <th scope="row" className="py-1 text-left text-[13px] font-medium text-[#111214]">
                   {s.name}{" "}
-                  <span className="font-mono text-xs font-normal text-[#66665E]">
+                  <span className="font-mono text-xs font-normal text-[#6B6F78]">
                     {s.start}~{s.end}
                   </span>
                 </th>
                 {shown.map((d) => (
-                  <td key={d.date} className="py-1 text-center font-mono text-[13px] text-[#1B1B18]">
+                  <td key={d.date} className="py-1 text-center font-mono text-[13px] text-[#111214]">
                     {availableCount(slotsList, d.date, s, config)}
                   </td>
                 ))}
@@ -104,7 +104,7 @@ export default function AvailabilityOverview({
           return (
             <section key={n.id} aria-label={`${n.name} 가능 시간`} className={`${ui.card} flex min-w-0 flex-col gap-2 px-3! py-3!`}>
               <div className="flex h-[22px] items-center gap-1.5">
-                <h4 className="truncate text-[13px] font-semibold text-[#1B1B18]">{n.name}</h4>
+                <h4 className="truncate text-[13px] font-semibold text-[#111214]">{n.name}</h4>
                 {n.tags.map((tag) => (
                   <span key={tag} className={`${ui.badge} ${ui.badgeTone.base}`}>
                     {tag}
@@ -125,7 +125,7 @@ export default function AvailabilityOverview({
 function MiniCalendar({ days, slots, weekend }: { days: PeriodDay[]; slots: AvailabilitySlots; weekend: (d: PeriodDay) => boolean }) {
   return (
     <div
-      className="grid overflow-hidden rounded-md border border-[#E2E2DC] bg-white"
+      className="grid overflow-hidden rounded-md border border-[#EDEDEA] bg-white"
       style={{
         gridTemplateColumns: `28px repeat(${days.length}, minmax(0, 1fr))`,
         gridTemplateRows: `${HEAD_HEIGHT}px repeat(${SLOT_COUNT}, ${SLOT_HEIGHT}px)`,
@@ -135,7 +135,7 @@ function MiniCalendar({ days, slots, weekend }: { days: PeriodDay[]; slots: Avai
         <span
           key={d.date}
           aria-hidden="true"
-          className={`border-l border-[#E2E2DC] ${weekend(d) ? "bg-[#F6F4EE]" : ""}`}
+          className={`border-l border-[#EDEDEA] ${weekend(d) ? "bg-[#F5F5F4]" : ""}`}
           style={{ gridColumn: col + 2, gridRow: `1 / span ${SLOT_COUNT + 1}` }}
         />
       ))}
@@ -153,14 +153,14 @@ function MiniCalendar({ days, slots, weekend }: { days: PeriodDay[]; slots: Avai
         <span
           key={slot}
           aria-hidden="true"
-          className="border-t border-[#E2E2DC] pt-0.5 pr-1 text-right font-mono text-[10px] leading-none text-[#66665E]"
+          className="border-t border-[#EDEDEA] pt-0.5 pr-1 text-right font-mono text-[10px] leading-none text-[#6B6F78]"
           style={{ gridColumn: 1, gridRow: `${slot + 2} / span 6` }}
         >
           {String(6 + slot / 2).padStart(2, "0")}
         </span>
       ))}
       {HOUR_SLOTS.map((slot) => (
-        <span key={slot} aria-hidden="true" className="border-t border-[#E2E2DC]" style={{ gridColumn: "2 / -1", gridRow: slot + 2 }} />
+        <span key={slot} aria-hidden="true" className="border-t border-[#EDEDEA]" style={{ gridColumn: "2 / -1", gridRow: slot + 2 }} />
       ))}
       {days.flatMap((d, col) =>
         (slots[d.date] ?? []).map(([from, to]) => {
@@ -172,7 +172,7 @@ function MiniCalendar({ days, slots, weekend }: { days: PeriodDay[]; slots: Avai
               role="img"
               aria-label={label}
               title={label}
-              className="mx-px bg-[#155E75]"
+              className="mx-px bg-[#C4247C]"
               style={{ gridColumn: col + 2, gridRow: `${start + 2} / ${end + 2}` }}
             />
           );

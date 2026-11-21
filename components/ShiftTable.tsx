@@ -30,10 +30,10 @@ export default function ShiftTable() {
   return (
     <div className="flex flex-col gap-2">
       <p className={ui.help}>말로 &lsquo;피크 근무 11시~14시 추가&rsquo;라고 적어도 돼요.</p>
-      <div className="overflow-x-auto rounded-lg border border-[#E2E2DC] bg-white">
+      <div className="overflow-x-auto rounded-lg border border-[#EDEDEA] bg-white">
         <table className="w-full border-collapse text-[13px]">
           <thead>
-            <tr className="border-b border-[#E2E2DC] text-left text-xs font-medium text-[#66665E]">
+            <tr className="border-b border-[#EDEDEA] text-left text-xs font-medium text-[#6B6F78]">
               <th className="px-2 py-2 font-medium">코드</th>
               <th className="px-2 py-2 font-medium">이름</th>
               <th className="px-2 py-2 font-medium">시작 시각</th>
@@ -90,9 +90,9 @@ function ShiftRow({ shift, shifts }: { shift: ShiftDef; shifts: ShiftDef[] }) {
     setTimes(null);
   };
 
-  const muted = active ? "" : "text-[#66665E]";
+  const muted = active ? "" : "text-[#6B6F78]";
   return (
-    <tr className="border-b border-[#EFEFEB]">
+    <tr className="border-b border-[#F5F5F4]">
       <td className={`px-2 py-1 font-mono font-semibold ${muted}`}>
         <span className="flex items-center gap-2">
           {shift.code}
@@ -173,7 +173,7 @@ function ShiftRow({ shift, shifts }: { shift: ShiftDef; shifts: ShiftDef[] }) {
               type="button"
               disabled={partOff}
               onClick={() => setShiftActive(shift.code, true)}
-              className={`${ui.textSm} disabled:cursor-not-allowed disabled:text-[#9A9A91] disabled:hover:bg-transparent`}
+              className={`${ui.textSm} disabled:cursor-not-allowed disabled:text-[#9499A2] disabled:hover:bg-transparent`}
             >
               다시 켜기
             </button>
@@ -248,9 +248,9 @@ function NewShiftRow({ shifts }: { shifts: ShiftDef[] }) {
   }
   const show = (msg: string | null) => (tried ? msg : null);
   const cls = (msg: string | null) => (show(msg) ? ui.cellErr : ui.cellOk);
-  const placeholder = "placeholder:font-sans placeholder:text-[#707068]";
+  const placeholder = "placeholder:font-sans placeholder:text-[#6B6F78]";
   return (
-    <tr className="bg-[#FAFAF7] align-top">
+    <tr className="bg-[#F5F5F4] align-top">
       <td className="px-1 py-1">
         <input
           ref={codeRef}
