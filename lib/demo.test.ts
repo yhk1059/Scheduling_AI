@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { demoData, demoExplanation, demoLinkRows, requestSignature, type DemoDoc } from "./demo";
+import { demoData, demoExplanation, demoLeaveCard, demoLinkRows, requestSignature, type DemoDoc } from "./demo";
+import { isLeaveRule } from "./store";
 import { DEFAULT_CONFIG, STORAGE_VERSION } from "./rules";
 import type { Shop, ShopEmployee } from "./store";
 import type { ConstraintSpec, ScheduleRequest } from "./types.gen";
@@ -197,5 +198,23 @@ describe("demoLinkRows", () => {
       { token: "", employee_id: "e02", slots: availability.e02, submitted_at: "2026-11-01T09:00:00Z" },
       { token: "", employee_id: "e03", slots: {}, submitted_at: null },
     ]);
+  });
+});
+
+describe("demoLeaveCard", () => {
+  // 2026-11-23은 월요일 → 화~목은 11/24~11/26
+  const period = { start_date: "2026-11-23", length: 7 };
+  const assignments = {
+    e01: ["A", "O", "O", "A", "A", "O", "O"],
+    e02: ["A", "C", "C", "C", "O", "O", "O"],
+    e03: ["O", "M", "M", "O", "A", "A", "O"],
+  };
+
+  it("화~목에 가장 많이 일하는 직원의 병가 요청을 만든다", () => {
+    const card = demoLeaveCard(period, assignments, EMPLOYEES);
+    expect(isLeaveRule(card)).toBe(true);
+    expect(card).toMatchObject({ scope: "period", source_text: "서민호 11/24~11/26 병가" });
+    expect(JSON.stringify(card.type === "rule" && card.body)).toContain('"ids":["e02"]');
+    expect(JSON.stringify(card.type === "rule" && card.body)).toContain('"days":[2,3,4]');
   });
 });

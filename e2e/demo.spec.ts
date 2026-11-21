@@ -53,14 +53,6 @@ test("S20. 체험 저니", async ({ page }) => {
   await proposals.first().getByRole("button", { name: "수락" }).click();
   await expect(page.getByText("필수 규칙 모두 지킴", { exact: true })).toBeVisible();
 
-  // [확정]은 체험 안내로
-  await page.getByRole("button", { name: "확정", exact: true }).click();
-  const gate = page.getByRole("dialog", { name: "확정은 내 매장에서 할 수 있어요" });
-  await expect(gate).toBeVisible();
-  await expect(gate.getByRole("button", { name: "내 매장으로 시작하기" })).toBeVisible();
-  await gate.getByRole("button", { name: "닫기" }).click();
-  await expect(gate).toHaveCount(0);
-
   // ① 가능 시간: 모두 제출한 상태, 링크 없음
   await steps.getByRole("button", { name: "가능 시간" }).click();
   await expect(page.getByText(/20\s*명 중\s*20\s*명 제출/)).toBeVisible();
@@ -68,10 +60,6 @@ test("S20. 체험 저니", async ({ page }) => {
   await expect(page.getByRole("region", { name: "서민호 가능 시간" })).toBeVisible();
   await expect(page.getByRole("button", { name: "링크 복사" })).toHaveCount(0);
   await expectNoDevTerms(page, "체험 ① 가능 시간");
-
-  expect(apiPaths.filter((p) => p !== "/api/py/solve"), "체험은 /solve만 부른다").toEqual([]);
-  expect(apiPaths.length, "/solve 호출").toBeGreaterThan(0);
-  expect(supabaseCalls, "체험은 Supabase를 부르지 않는다").toEqual([]);
 
   // 좁은 화면에서는 패널이 표 아래에 놓이고 가로 넘침은 표 내부에만 생긴다.
   await page.setViewportSize({ width: 375, height: 812 });
@@ -88,6 +76,23 @@ test("S20. 체험 저니", async ({ page }) => {
   await page.getByRole("navigation").getByRole("button", { name: "매장 설정" }).click();
   await expect(page.getByRole("complementary", { name: "하루 타임라인" })).toBeVisible();
   await expectNoPageOverflow();
+  await page.setViewportSize({ width: 1280, height: 800 });
+
+  // 확정 → 예시 병가 → 최소 변경으로 다시 만들기 → 다시 확정 (이 브라우저 안에서만)
+  await page.getByRole("navigation").getByRole("button", { name: "근무표" }).click();
+  await page.getByRole("button", { name: "근무표 확인하기" }).click();
+  await page.getByRole("button", { name: "확정", exact: true }).click();
+  await expect(page.getByText("체험이라 직원 링크는 잠그지 않았어요")).toBeVisible();
+  await page.getByRole("button", { name: /^예시 넣기/ }).click();
+  await expect(page.getByRole("button", { name: "예시 병가를 넣었어요" })).toBeDisabled();
+  await page.getByRole("button", { name: "적용", exact: true }).click();
+  await expect(page.getByText(/\d+명, \d+칸 변경/)).toBeVisible();
+  await page.getByRole("button", { name: "다시 확정" }).click();
+  await expect(page.getByText(/바뀐 칸 \d+칸/)).toBeVisible();
+
+  expect(apiPaths.filter((p) => p !== "/api/py/solve"), "체험은 /solve만 부른다").toEqual([]);
+  expect(apiPaths.length, "/solve 호출").toBeGreaterThan(0);
+  expect(supabaseCalls, "체험은 Supabase를 부르지 않는다").toEqual([]);
 
   // [나가기] → 랜딩. 다시 열면 처음 상태(저장되지 않음)
   await page.getByRole("button", { name: "나가기" }).click();

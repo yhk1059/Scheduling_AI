@@ -1,13 +1,12 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { type ReactNode, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 
 import { useAppStore } from "@/lib/store";
 import { onAuthChange, signInWithGoogle, supabaseConfigured } from "@/lib/supabase";
 
 import { LOGIN_ERROR } from "./Account";
-import Dialog from "./Dialog";
 import { ui } from "./ui";
 
 /** 체험을 끝내고 내 매장으로 간다. 로그인돼 있으면 /app으로, 아니면 Google 로그인으로. 실패하면 error. Account.tsx의 useGoogleLogin과 같은 모양이되 exitDemo를 먼저 부른다. */
@@ -64,25 +63,5 @@ export function DemoBar() {
         나가기
       </button>
     </div>
-  );
-}
-
-/** 체험에서 막는 동작을 눌렀을 때의 대화상자(확정 등). */
-export function DemoGateDialog({ title, children, onClose }: { title: string; children: ReactNode; onClose: () => void }) {
-  const { busy, error, start, label } = useStartOwnShop();
-  return (
-    <Dialog
-      title={title}
-      onClose={onClose}
-      secondary={{ label: "닫기", onClick: onClose }}
-      primary={{ label, onClick: () => void start(), disabled: busy }}
-    >
-      {children}
-      {error && (
-        <p role="alert" className={ui.error}>
-          {LOGIN_ERROR}
-        </p>
-      )}
-    </Dialog>
   );
 }

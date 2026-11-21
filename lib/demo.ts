@@ -2,10 +2,10 @@
 // LLM을 부르지 않도록 저장한 해 없음 설명을 요청이 같을 때만 돌려준다. 순수 함수만 둔다.
 import { isAvailabilityRule, type AvailabilitySlots } from "./availability";
 import { dateOfDay, dayOfDate, firstPeriodStart, monthDay, periodFrom, type PeriodRange } from "./period";
-import { stableJson } from "./rules";
+import { normalizeRule, OFF_CODE, stableJson } from "./rules";
 import { newPeriod, withDefaultRules, type Data, type Shop, type ShopEmployee } from "./store";
 import type { AvailabilityLink } from "./supabase";
-import type { ExplainResponse, ScheduleRequest } from "./types.gen";
+import type { ConstraintSpec, ExplainResponse, ScheduleRequest } from "./types.gen";
 
 /** lib/samples/demo-shop.json의 모양(step 1이 만든다). 날짜는 기준 주 base에 묶여 있고, 체험할 때 오늘 기준으로 옮긴다. */
 export interface DemoDoc {
@@ -93,4 +93,30 @@ export function demoLinkRows(
     const slots = availability[e.id];
     return { token: "", employee_id: e.id, slots: slots ?? {}, submitted_at: slots ? submittedAt : null };
   });
+}
+
+export const DEMO_LEAVE_PREFIX = "demo-leave-";
+
+/** 체험 확정 뒤 [예시 병가 넣기]의 요청 카드(LLM을 부르지 않는다). 화~목(2~4일째)에 가장 많이 일하는 직원의 병가. */
+export function demoLeaveCard(
+  period: PeriodRange,
+  assignments: Record<string, string[]>,
+  employees: { id: string; name: string }[],
+): ConstraintSpec {
+  const days = [2, 3, 4];
+  const works = (id: string) => days.filter((d) => (assignments[id]?.[d - 1] ?? OFF_CODE) !== OFF_CODE).length;
+  const who = employees.reduce((best, e) => (works(e.id) > works(best.id) ? e : best), employees[0]);
+  return normalizeRule({
+    id: `${DEMO_LEAVE_PREFIX}${who.id}`,
+    type: "rule",
+    scope: "period",
+    hardness: "hard",
+    source_text: `${who.name} ${monthDay(period, days[0])}~${monthDay(period, days.at(-1)!)} 병가`,
+    values: { max: { value: 0, label: "최대 횟수" } },
+    body: {
+      kind: "require",
+      for_each: { per: "person", people: { ids: [who.id] }, days: { days } },
+      then: { left: { shifts: { not_in: [OFF_CODE] } }, op: "le", right: { value: "max" } },
+    },
+  } as ConstraintSpec);
 }

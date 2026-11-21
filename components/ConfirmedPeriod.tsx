@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 
 import { translate } from "@/lib/api";
+import { DEMO_LEAVE_PREFIX, demoLeaveCard } from "@/lib/demo";
 import { isOperating } from "@/lib/continuity";
 import { formatRange, periodDays, periodEnd } from "@/lib/period";
 import {
@@ -41,6 +42,7 @@ export default function ConfirmedPeriod() {
   const removeRequest = useAppStore((s) => s.removeRequest);
   const addPendingRequests = useAppStore((s) => s.addPendingRequests);
   const go = useAppStore((s) => s.go);
+  const demo = useAppStore((s) => s.demo);
   const sv = useSolve(period?.id ?? "");
 
   const [entry] = useState(() => (period ? takeConfirmedEntry(period.id) : null));
@@ -104,6 +106,15 @@ export default function ConfirmedPeriod() {
     setChangeIds([]);
   };
 
+  // 체험은 LLM을 부르지 않고 예시 병가 카드를 넣는다. 이미 넣었으면 그 카드를 쓴다(다시 만든 결과로 사람이 바뀌지 않게)
+  const added = [...period.pendingRequests, ...period.requests].find((c) => c.id.startsWith(DEMO_LEAVE_PREFIX));
+  const sample = demo && result ? (added ?? demoLeaveCard(range, result.assignments, employees)) : null;
+  const addSample = () => {
+    if (!sample) return;
+    addPendingRequests(periodId, [sample]);
+    setChangeIds((ids) => [...ids, sample.id]);
+  };
+
   const csv = () => result && downloadCsv(period, employees, result);
   const todayInfo = isOperating(period, now) ? periodDays(period).find((d) => d.date === now) : undefined;
 
@@ -136,7 +147,8 @@ export default function ConfirmedPeriod() {
             )}
             {lastVersion && (
               <span className={ui.help}>
-                마지막 확정 <span className="font-mono">{shortTime(lastVersion.confirmed_at)}</span> · 직원 링크는 잠겼어요. 직원은 같은 링크에서 근무표를 봐요
+                마지막 확정 <span className="font-mono">{shortTime(lastVersion.confirmed_at)}</span> ·{" "}
+                {demo ? "체험이라 직원 링크는 잠그지 않았어요" : "직원 링크는 잠겼어요. 직원은 같은 링크에서 근무표를 봐요"}
               </span>
             )}
           </div>
@@ -156,7 +168,16 @@ export default function ConfirmedPeriod() {
 
       {!ended && (
         <section className={`${ui.panel} grid grid-cols-[7fr_5fr] gap-6`}>
-          <ChangeBar inputRef={inputRef} busy={busy} translating={translating} onSubmit={translateChange} />
+          {sample ? (
+            <DemoChangeBar
+              sample={sample.source_text}
+              added={added !== undefined}
+              busy={busy}
+              onAdd={addSample}
+            />
+          ) : (
+            <ChangeBar inputRef={inputRef} busy={busy} translating={translating} onSubmit={translateChange} />
+          )}
           <div className="flex min-w-0 flex-col gap-3">
             {changeCards.length === 0 ? (
               <p className="text-sm text-[#6B6F78]">아직 변경이 없어요.</p>
@@ -239,7 +260,7 @@ export default function ConfirmedPeriod() {
               <ul className={`${ui.card} flex flex-col py-1.5!`}>
                 {period.versions
                   .map((v, i) => (
-                    <li key={v.confirmed_at} className="flex items-center gap-2 border-b border-[#F5F5F4] py-2 text-[13px] text-[#4B4F57] last:border-b-0">
+                    <li key={`${i}-${v.confirmed_at}`} className="flex items-center gap-2 border-b border-[#F5F5F4] py-2 text-[13px] text-[#4B4F57] last:border-b-0">
                       <span className="font-mono font-medium text-[#111214]">{shortTime(v.confirmed_at)}</span>· 확정 ·{" "}
                       {i === 0 ? (
                         "처음 확정"
@@ -318,6 +339,27 @@ function ChangeBar({
           {notice} <span className="text-xs font-medium text-[#6B6F78]">내용을 보완해서 다시 입력해 주세요.</span>
         </p>
       )}
+    </div>
+  );
+}
+
+/** 체험의 변경 입력 자리: 말로 적는 대신 예시 병가 카드를 넣는다. */
+function DemoChangeBar({ sample, added, busy, onAdd }: { sample: string; added: boolean; busy: boolean; onAdd: () => void }) {
+  return (
+    <div className="flex min-w-0 flex-col gap-3">
+      <div className="flex flex-col gap-1">
+        <h2 className={ui.cardTitle}>변경 입력</h2>
+        <p className="text-[13px] text-[#4B4F57]">
+          확정한 뒤 생긴 병가·휴가를 적으면, 확정 근무표에서 최소한으로 바꿔 다시 만들어요. 체험에서는 말로 적는 대신 예시 병가를 넣어 볼 수
+          있어요.
+        </p>
+      </div>
+      <div>
+        <button type="button" onClick={onAdd} disabled={busy || added} className={ui.secondary}>
+          {added ? "예시 병가를 넣었어요" : `예시 넣기: “${sample}”`}
+        </button>
+      </div>
+      {added && <p className={ui.help}>오른쪽 카드에서 [적용]을 누르면 바뀌는 칸을 최소로 줄여 다시 만들어요.</p>}
     </div>
   );
 }

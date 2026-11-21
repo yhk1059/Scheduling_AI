@@ -42,7 +42,6 @@ import type {
 import { statsFromAssignments } from "@/lib/stats";
 import { describeRule, formatDeviation, hardnessLabel, josa, presetName, violationWhere, type ScheduleInputs } from "@/lib/wording";
 
-import { DemoGateDialog } from "./Demo";
 import Dialog from "./Dialog";
 import { Spinner, today } from "./RulesStep";
 import { StepBar } from "./Stepper";
@@ -634,7 +633,6 @@ export default function ScheduleStep() {
   const { setToast } = sv;
   const [confirming, setConfirming] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
-  const [gateOpen, setGateOpen] = useState(false);
   const stepPeriodId = period?.id ?? "";
 
   // ③에 들어오면 가능 시간을 다시 읽는다. 달라졌으면 아래 배너가 뜬다
@@ -661,9 +659,9 @@ export default function ScheduleStep() {
 
   // 마지막 생성에 쓴 가능 시간과 다르면 확정하지 않고 배너로 알린다. 링크를 잠근 뒤에 확정한다
   const onConfirm = async () => {
-    // 체험은 링크를 잠그거나 저장하지 않고 내 매장으로 안내한다
+    // 체험은 직원 링크를 잠그거나 서버에 저장하지 않고, 이 브라우저 안에서만 확정한다
     if (demo) {
-      setGateOpen(true);
+      confirm(periodId);
       return;
     }
     setConfirming(true);
@@ -793,14 +791,6 @@ export default function ScheduleStep() {
         </Dialog>
       )}
 
-      {gateOpen && (
-        <DemoGateDialog title="확정은 내 매장에서 할 수 있어요" onClose={() => setGateOpen(false)}>
-          <p>
-            확정하면 직원 링크가 잠기고, 직원은 같은 링크에서 근무표를 봐요. 내 매장을 만들면 내 직원과 규칙으로 근무표를 만들고
-            확정할 수 있어요. 체험 내용은 옮겨지지 않아요.
-          </p>
-        </DemoGateDialog>
-      )}
     </div>
   );
 }
