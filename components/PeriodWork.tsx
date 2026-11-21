@@ -55,7 +55,7 @@ export default function PeriodWork() {
   const toStep = (s: PeriodStep) => go({ screen: "period", periodId: period.id, step: s });
   const notes = [
     `직원 ${shop?.employees.filter((n) => n.active).length ?? 0}명`,
-    `규칙 ${shop ? liveShopRules(shop, period).length : 0}개`,
+    `켜진 규칙 ${shop ? liveShopRules(shop, period).length : 0}개`,
     period.result ? "만들었어요" : "아직 없어요",
   ];
 

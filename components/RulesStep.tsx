@@ -328,7 +328,12 @@ export default function RulesStep({
       {groups.map(({ title, rows }, group) => (
         <section key={title} aria-label={title} className="flex flex-col gap-2">
           <div className="flex flex-wrap items-center justify-between gap-1">
-            <h3 className={ui.cardTitle}>{title} <span className={ui.help}>{rows.length}</span></h3>
+            <h3 className={ui.cardTitle}>
+              {title} <span className={ui.help}>{rows.length}</span>
+              {group === 1 && summarized.length > 0 && (
+                <span className={`${ui.help} ml-1.5 font-normal`}>· 필요 인원 규칙 {summarized.length}개는 위 표에 있어요</span>
+              )}
+            </h3>
             {group === 0 && pendingCount >= 2 && (
               <button type="button" onClick={applyAll} className={ui.secondarySm}>모두 적용</button>
             )}
