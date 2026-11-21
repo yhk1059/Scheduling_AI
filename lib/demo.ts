@@ -1,7 +1,7 @@
 // 랜딩 [체험하기](/demo)의 데이터. 저장한 체험 문서(lib/samples/demo-shop.json)를 오늘 기준 주로 옮기고,
 // LLM을 부르지 않도록 저장한 해 없음 설명을 요청이 같을 때만 돌려준다. 순수 함수만 둔다.
 import { isAvailabilityRule, type AvailabilitySlots } from "./availability";
-import { dateOfDay, dayOfDate, firstPeriodStart, periodFrom, type PeriodRange } from "./period";
+import { dateOfDay, dayOfDate, firstPeriodStart, monthDay, periodFrom, type PeriodRange } from "./period";
 import { stableJson } from "./rules";
 import { newPeriod, withDefaultRules, type Data, type Shop, type ShopEmployee } from "./store";
 import type { AvailabilityLink } from "./supabase";
@@ -60,14 +60,27 @@ export function requestSignature(req: Omit<ScheduleRequest, "input_version">): s
   return stableJson(rules);
 }
 
-/** 저장된 설명이 이 요청의 signature와 같으면 input_version을 붙여 돌려준다. 아니면 null. */
+/** 문장 속 기준 주의 "M/D"를 range의 같은 인덱스 날짜로 바꾼다. 기준 주 밖의 날짜와 더 긴 숫자의 일부는 그대로 둔다. */
+function shiftDateText(text: string, base: PeriodRange, range: PeriodRange): string {
+  const moved = new Map(Array.from({ length: base.length }, (_, i) => [monthDay(base, i + 1), monthDay(range, i + 1)]));
+  return text.replace(/(?<!\d)\d{1,2}\/\d{1,2}(?!\d)/g, (md) => moved.get(md) ?? md);
+}
+
+/** 저장된 설명이 이 요청의 signature와 같으면 input_version을 붙여 돌려준다. 문장의 날짜는 요청 근무표로 옮긴다. 아니면 null. */
 export function demoExplanation(
   doc: DemoDoc,
   req: Omit<ScheduleRequest, "input_version">,
   inputVersion: number,
 ): ExplainResponse | null {
   if (!doc.explanation || doc.explanation.signature !== requestSignature(req)) return null;
-  return { ...doc.explanation.response, input_version: inputVersion };
+  const { response } = doc.explanation;
+  const shift = (text: string) => shiftDateText(text, doc.base, req.period);
+  return {
+    ...response,
+    text: shift(response.text),
+    proposals: response.proposals.map((p) => ({ ...p, title: shift(p.title), description: shift(p.description) })),
+    input_version: inputVersion,
+  };
 }
 
 /** ①과 매장 홈이 링크 행 대신 쓰는 제출 현황. 가능 시간이 있는 직원은 submitted_at = submittedAt, 없으면 null. token은 빈 문자열. */

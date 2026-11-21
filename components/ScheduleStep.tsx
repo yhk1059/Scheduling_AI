@@ -7,6 +7,7 @@ import { toScheduleCsv } from "@/lib/csv";
 import { availabilityFromLinks, coversShift, isAvailabilityRule, mergeAvailabilityConflicts, unsubmittedCause } from "@/lib/availability";
 import { coverageDays } from "@/lib/coverage-conflict";
 import { demoExplanation } from "@/lib/demo";
+import { coverageShortages, type Shortage } from "@/lib/shortage";
 import { DEMO_DOC } from "@/lib/demo-doc";
 import { historyLoadFor, isOperating } from "@/lib/continuity";
 import { closingShift, DEFAULT_CONFIG, OFF_CODE, ruleShape, shiftTones } from "@/lib/rules";
@@ -419,6 +420,7 @@ export function ScheduleBody({
       constraints={constraints}
       employees={employees}
       period={period}
+      holidays={holidays}
       hasResult={result !== null}
       onAccept={(p) => {
         applyChanges(periodId, p.changes);
@@ -830,6 +832,7 @@ export function OutcomePanel({
   constraints,
   employees,
   period,
+  holidays,
   hasResult,
   onAccept,
   onDisable,
@@ -846,6 +849,7 @@ export function OutcomePanel({
   constraints: ConstraintSpec[];
   employees: Employee[];
   period: Period;
+  holidays: number[];
   hasResult: boolean;
   onAccept: (p: RelaxationProposal) => void;
   onDisable: (id: string) => void;
@@ -860,6 +864,11 @@ export function OutcomePanel({
   const unknownCause = outcome.kind === "timeout" || conflicts.length === 0;
   const ruleConflicts = conflicts.filter((c) => !isAvailabilityRule(c.constraint_id));
   const availabilityNames = conflicts.filter((c) => isAvailabilityRule(c.constraint_id)).map((c) => c.source_text.replace(/ 가능 시간$/, ""));
+  // 가능 시간만으로 인원을 채울 수 없는 날(규칙마다). 다른 규칙과 겹쳐 막힌 경우는 비어 있다
+  const shortages =
+    outcome.kind === "infeasible"
+      ? coverageShortages(outcome.conflicts.map((c) => c.constraint_id), constraints, employees, config, period, holidays)
+      : [];
   // 가능 시간은 직원이 정한 것이라 끌 수 없다
   const hardList = constraints.filter((c) => (c.hardness ?? "hard") === "hard" && !isAvailabilityRule(c.id));
 
@@ -931,7 +940,7 @@ export function OutcomePanel({
 
       {!unknownCause && ruleConflicts.length > 0 && (
         <div className="flex flex-col gap-1.5">
-          <h3 className="text-sm font-semibold text-[#111214]">함께 지킬 수 없는 규칙</h3>
+          <h3 className="text-sm font-semibold text-[#111214]">{ruleConflicts.length > 1 ? "함께 지킬 수 없는 규칙" : "지킬 수 없는 규칙"}</h3>
           <p className={ui.help}>하나를 끄면 바로 다시 만들어요. 원래 설정은 그대로 남아요.</p>
           <ul className="flex flex-col">
             {ruleConflicts.map((c) => {
@@ -950,6 +959,7 @@ export function OutcomePanel({
                       이번 근무표에서만 끄기
                     </button>
                   )}
+                  <ShortageLines shortages={shortages.filter((x) => x.constraintId === c.constraint_id)} config={config} period={period} />
                 </li>
               );
             })}
@@ -959,7 +969,7 @@ export function OutcomePanel({
 
       {availabilityNames.length > 0 && (
         <div className="flex flex-col gap-1.5">
-          <h3 className="text-sm font-semibold text-[#111214]">가능 시간도 함께 걸려 있어요</h3>
+          <h3 className="text-sm font-semibold text-[#111214]">가능 시간이 함께 걸린 직원</h3>
           <p className="text-sm text-[#111214]">{availabilityNames.join(", ")}</p>
           <p className={ui.help}>가능 시간은 직원이 정한 것이라 끌 수 없어요. 더 일할 수 있는지 물어보면 해결될 수도 있어요.</p>
         </div>
@@ -1012,6 +1022,34 @@ export function OutcomePanel({
         </>
       )}
     </section>
+  );
+}
+
+const WEEKDAY_SHORT = ["일", "월", "화", "수", "목", "금", "토"]; // 0=일
+
+/** 인원 규칙이 가능 시간으로 모자란 날. 근무조·필요 인원·들어올 수 있는 사람이 같은 날은 한 줄로 묶는다. */
+function ShortageLines({ shortages, config, period }: { shortages: Shortage[]; config: ShopConfig; period: Period }) {
+  if (!shortages.length) return null;
+  const days = periodDays(period);
+  const groups = new Map<string, Shortage[]>();
+  for (const s of shortages) {
+    const key = `${s.code}|${s.need}|${s.names.join(",")}`;
+    groups.set(key, [...(groups.get(key) ?? []), s]);
+  }
+  return (
+    <ul className="flex w-full flex-col gap-0.5 text-[13px] text-[#B42318]">
+      {[...groups.values()].map((group) => {
+        const { code, need, names } = group[0];
+        const when = group.map((s) => `${WEEKDAY_SHORT[days[s.day - 1].weekday]} ${monthDay(period, s.day)}`).join(", ");
+        const shift = config.shifts.find((x) => x.code === code)?.name ?? code;
+        const who = names.length ? `${names.join(", ")}만 들어올 수 있어요` : "들어올 수 있는 사람이 없어요";
+        return (
+          <li key={`${code}|${when}`}>
+            {when} {shift}: {who} · {need}명 필요
+          </li>
+        );
+      })}
+    </ul>
   );
 }
 

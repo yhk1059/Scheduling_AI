@@ -169,6 +169,23 @@ describe("demoExplanation", () => {
   it("저장된 설명이 없으면 null", () => {
     expect(demoExplanation(doc(), req, 1)).toBeNull();
   });
+
+  it("설명·제안 문장의 기준 주 날짜를 요청 근무표의 같은 요일 날짜로 옮긴다", () => {
+    const dated = {
+      text: "서민호는 11/10, 11/15에 마감이 불가능해 11/10에는 리더가 없어요. 1/10은 그대로예요.",
+      proposals: [{ title: "11/10만 끄기", description: "11/9~11/15 중 11/10", changes: [] }],
+      fallback: false,
+    };
+    const d = doc({ explanation: { signature: requestSignature(req), response: dated } });
+    // 기준 주 11/9(월)~11/15(일) → 11/23(월)~11/29(일)
+    const moved = { ...request([noOpenAfterClose, leaderClose]), period: { start_date: "2026-11-23", length: 7 } };
+    expect(demoExplanation(d, moved, 3)).toEqual({
+      text: "서민호는 11/24, 11/29에 마감이 불가능해 11/24에는 리더가 없어요. 1/10은 그대로예요.",
+      proposals: [{ title: "11/24만 끄기", description: "11/23~11/29 중 11/24", changes: [] }],
+      fallback: false,
+      input_version: 3,
+    });
+  });
 });
 
 describe("demoLinkRows", () => {
