@@ -1,25 +1,32 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { type ReactNode, useState } from "react";
+import { type ReactNode, useEffect, useState } from "react";
 
 import { useAppStore } from "@/lib/store";
-import { signInWithGoogle } from "@/lib/supabase";
+import { onAuthChange, signInWithGoogle, supabaseConfigured } from "@/lib/supabase";
 
 import { LOGIN_ERROR } from "./Account";
 import Dialog from "./Dialog";
 import { ui } from "./ui";
 
-/** 체험을 끝내고 Google 로그인으로 간다. 실패하면 error. Account.tsx의 useGoogleLogin과 같은 모양이되 exitDemo를 먼저 부른다. */
+/** 체험을 끝내고 내 매장으로 간다. 로그인돼 있으면 /app으로, 아니면 Google 로그인으로. 실패하면 error. Account.tsx의 useGoogleLogin과 같은 모양이되 exitDemo를 먼저 부른다. */
 export function useStartOwnShop() {
+  const router = useRouter();
   const exitDemo = useAppStore((s) => s.exitDemo);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(false);
+  const [signedIn, setSignedIn] = useState(false);
+  useEffect(() => (supabaseConfigured ? onAuthChange((user) => setSignedIn(user !== null)) : undefined), []);
   const start = async () => {
     setBusy(true);
     setError(false);
     // 체험 데이터가 로그인 뒤 내 매장으로 올라가지 않게 먼저 비운다
     exitDemo();
+    if (signedIn) {
+      router.push("/app");
+      return;
+    }
     try {
       await signInWithGoogle();
     } catch {
@@ -27,7 +34,7 @@ export function useStartOwnShop() {
       setError(true);
     }
   };
-  return { busy, error, start, label: busy ? "이동 중…" : "내 매장으로 시작하기" };
+  return { busy, error, start, label: busy ? "이동 중…" : signedIn ? "내 매장으로 가기" : "내 매장으로 시작하기" };
 }
 
 /** 체험 상단 바 오른쪽: "체험 중" 배지 + 안내 + [내 매장으로 시작하기] + [나가기]. */

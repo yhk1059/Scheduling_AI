@@ -1,6 +1,5 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
 import { demoData } from "@/lib/demo";
@@ -22,9 +21,8 @@ import ShopSettings from "./ShopSettings";
 import ShopSetup from "./ShopSetup";
 import { today } from "./RulesStep";
 
-/** demo: 로그인 없이 샘플 매장을 메모리에서 눌러 보는 체험(/demo). 로그인한 사용자는 /app으로 보낸다. */
+/** demo: 샘플 매장을 메모리에서 눌러 보는 체험(/demo). 로그인한 사용자도 열 수 있고, 내 매장에는 저장하지 않는다. */
 export default function AppShell({ demo = false }: { demo?: boolean }) {
-  const router = useRouter();
   const shop = useAppStore((s) => s.shop);
   const view = useAppStore((s) => s.view);
   const go = useAppStore((s) => s.go);
@@ -36,8 +34,6 @@ export default function AppShell({ demo = false }: { demo?: boolean }) {
   const retrySave = useAppStore((s) => s.retrySave);
   // 첫 세션 확인 전에는 로그인 화면을 띄우지 않는다
   const [authChecked, setAuthChecked] = useState(!supabaseConfigured);
-  // 체험에서는 세션을 store에 올리지 않고 있는지만 본다
-  const [hasUser, setHasUser] = useState(false);
   const loading = demo
     ? !authChecked || shop === null
     : !authChecked || (auth !== null && syncStatus === "loading");
@@ -47,8 +43,8 @@ export default function AppShell({ demo = false }: { demo?: boolean }) {
   useEffect(() => {
     if (!supabaseConfigured) return;
     return onAuthChange((user) => {
+      // 체험에서는 세션을 store에 올리지 않는다
       if (demo) {
-        setHasUser(user !== null);
         setAuthChecked(true);
         return;
       }
@@ -63,10 +59,9 @@ export default function AppShell({ demo = false }: { demo?: boolean }) {
 
   useEffect(() => {
     if (!demo || !authChecked) return;
-    if (hasUser) router.replace("/app");
     // StrictMode에서 두 번 돌아도 이미 체험 중이면 다시 채우지 않는다
-    else if (!useAppStore.getState().demo) useAppStore.getState().enterDemo(demoData(DEMO_DOC, today()));
-  }, [demo, authChecked, hasUser, router]);
+    if (!useAppStore.getState().demo) useAppStore.getState().enterDemo(demoData(DEMO_DOC, today()));
+  }, [demo, authChecked]);
 
   // 체험을 떠나면 메모리 상태를 비운다
   useEffect(() => {

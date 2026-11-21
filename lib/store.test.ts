@@ -2329,13 +2329,41 @@ describe("체험", () => {
     expect(store.getState().shop!.name).toBe("내 매장");
   });
 
-  it("로그인 상태에서는 체험을 시작하지 않는다", async () => {
+  it("로그인 상태에서도 체험을 시작하고, 체험 중 바꾼 내용은 서버에 저장하지 않는다", async () => {
     const f = fakeRemote({ data: serverDoc(), updatedAt: SERVER_AT });
     const store = synced(f.remote);
     await store.getState().signedIn(USER);
     store.getState().enterDemo(sampleData());
+    expect(store.getState().demo).toBe(true);
+    expect(store.getState().auth).toBeNull();
+    expect(store.getState().shop!.name).toBe("샘플");
+    store.getState().setShopName("바꿈");
+    await vi.advanceTimersByTimeAsync(SAVE_DEBOUNCE_MS * 2);
+    expect(JSON.stringify(f.calls.save)).not.toContain("바꿈");
+    expect(JSON.stringify(f.calls.save)).not.toContain("샘플");
+  });
+
+  it("로그인 상태에서 체험을 끝내고 다시 로그인하면 서버 문서를 다시 읽는다", async () => {
+    const f = fakeRemote({ data: serverDoc(), updatedAt: SERVER_AT });
+    const store = synced(f.remote);
+    await store.getState().signedIn(USER);
+    store.getState().enterDemo(sampleData());
+    store.getState().exitDemo();
+    await store.getState().signedIn(USER);
     expect(store.getState().demo).toBe(false);
     expect(store.getState().shop!.name).toBe("서버 매장");
+    expect(JSON.stringify(f.calls.save)).not.toContain("샘플");
+  });
+
+  it("저장 대기 중인 내 매장 변경은 체험에 들어가기 전에 서버에 올린다", async () => {
+    const f = fakeRemote({ data: serverDoc(), updatedAt: SERVER_AT });
+    const store = synced(f.remote);
+    await store.getState().signedIn(USER);
+    store.getState().setShopName("내 변경");
+    store.getState().enterDemo(sampleData());
+    await vi.advanceTimersByTimeAsync(SAVE_DEBOUNCE_MS * 2);
+    expect(f.calls.save).toHaveLength(1);
+    expect((savedState(f.calls.save[0]) as { shop: { name: string } }).shop.name).toBe("내 변경");
   });
 
   it("체험 중 로그인하면 체험을 끝내고 체험 데이터가 아닌 빈 매장을 올린다", async () => {

@@ -194,7 +194,7 @@ export interface AppState extends Data {
   signedOut: () => void;
   /** 체험 중(/demo). persist 저장소는 메모리이고 서버 저장은 없다 */
   demo: boolean;
-  /** 체험 시작. 로그인 상태(auth !== null)면 아무것도 하지 않는다. persist 저장소를 메모리로 바꾼 뒤 data를 올린다(replace). */
+  /** 체험 시작. 로그인 상태면 저장 대기 중인 변경을 올리고 서버 저장을 멈춘 뒤 auth를 내린다. persist 저장소를 메모리로 바꾼 뒤 data를 올린다(replace). */
   enterDemo: (data: Data) => void;
   /** 체험 끝. 체험 중이 아니면 아무것도 하지 않는다. 초기 상태로 되돌리고 persist 저장소를 원래(localStorage)로 되돌린다. 메모리 저장소는 비운다. */
   exitDemo: () => void;
@@ -1107,7 +1107,15 @@ export function createAppStore(getStorage: () => Storage, now: () => Date = () =
             storage.removeItem(STORAGE_KEY);
           },
           enterDemo: (data) => {
-            if (get().auth) return;
+            if (get().demo) return;
+            if (get().auth) {
+              // 저장 대기 중인 내 매장 변경은 지금 올린다. doc()은 체험 데이터로 바뀌기 전에 읽힌다
+              if (timer && ready) void save();
+              // 로그인은 store에서만 내린다. 체험이 끝나면 /app이 서버 문서를 다시 읽는다
+              ready = false;
+              cancelTimer();
+              set({ auth: null, sync: { status: "idle", savedAt: null } });
+            }
             // 저장소를 먼저 바꿔야 체험 데이터가 localStorage에 한 번도 쓰이지 않는다
             store.persist.setOptions({ storage: demoStorage });
             set({ demo: true });
