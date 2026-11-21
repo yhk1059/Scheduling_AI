@@ -15,7 +15,7 @@ import {
   type ShiftChangeCard,
   useAppStore,
 } from "@/lib/store";
-import { dayHeader, isWeekendDay, monthDay, type PeriodRange } from "@/lib/period";
+import { dayHeader, monthDay, type PeriodRange } from "@/lib/period";
 import type { ConstraintSpec, Employee, RuleExample } from "@/lib/types.gen";
 import { describeRule, describeShiftChange, hardnessLabel, josa, presetName, ruleQuote } from "@/lib/wording";
 
@@ -99,12 +99,10 @@ function ExampleStrip({
   example,
   employees,
   range,
-  holidays,
 }: {
   example: RuleExample;
   employees: Employee[];
   range: PeriodRange;
-  holidays: number[];
 }) {
   const config = useAppStore((s) => s.shop?.config);
   const nameOf = (id: string) => employees.find((n) => n.id === id)?.name ?? "직원";
@@ -142,7 +140,7 @@ function ExampleStrip({
                     className="p-0"
                   >
                     <span
-                      className={`${STRIP_CELL} ${codeClass(code, isWeekendDay(range, d, holidays), config)} ${bad ? "ring-1 ring-[#B42318]" : ""}`}
+                      className={`${STRIP_CELL} ${codeClass(code, config)} ${bad ? "ring-1 ring-[#B42318]" : ""}`}
                     >
                       {cellText(code)}
                     </span>
@@ -161,17 +159,15 @@ function Examples({
   examples,
   employees,
   range,
-  holidays,
 }: {
   examples: RuleExample[];
   employees: Employee[];
   range: PeriodRange;
-  holidays: number[];
 }) {
   return (
     <div className="flex flex-col gap-2">
       <p className={ui.help}>이런 근무면 이 규칙에 어긋나요</p>
-      <ExampleStrip example={examples[0]} employees={employees} range={range} holidays={holidays} />
+      <ExampleStrip example={examples[0]} employees={employees} range={range} />
     </div>
   );
 }
@@ -364,7 +360,6 @@ export default function ConstraintCard({
   const config = isRule ? shop.pendingConfig.reduce((c, x) => applyShiftChange(c, x.change), shop.config) : shop.config;
   const isBalance = card.type === "rule" && card.body.kind === "balance";
   const examples = (isRule ? shop.examples : period?.examples)?.[card.id] ?? [];
-  const holidays = isRule ? [] : (period?.holidays ?? []);
   // 폼으로 만든 필요 인원은 해석 문장, 원문 하나가 카드 여럿이면 원문과 해석 문장으로 가리킨다
   const conflictName = conflict && ruleQuote(conflict, shop.rules, config, employees, range);
   const hardness: Hardness = alwaysHard(card) ? "hard" : (card.hardness ?? (isBalance ? "soft" : "hard"));
@@ -433,7 +428,7 @@ export default function ConstraintCard({
             >
               {showExamples ? "예시 접기" : "어긋나는 예 보기"}
             </button>
-            {showExamples && <Examples examples={examples} employees={shop.employees} range={range} holidays={holidays} />}
+            {showExamples && <Examples examples={examples} employees={shop.employees} range={range} />}
           </div>
         )}
       </Reading>

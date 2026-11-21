@@ -52,7 +52,7 @@ export default function AvailabilityOverview({
               )}
             </div>
             <ul aria-label="근무조 범례" className="flex flex-wrap gap-2">
-              {codes.map((shift) => <li key={shift.code} className={`${ui.badge} gap-1 ${codeClass(shift.code, false, config)}`}><span className="font-mono">{shift.code}</span> {shift.name}</li>)}
+              {codes.map((shift) => <li key={shift.code} className={`${ui.badge} gap-1 ${codeClass(shift.code, config)}`}><span className="font-mono">{shift.code}</span> {shift.name}</li>)}
             </ul>
             <table aria-label="직원별 가능 시간" className="w-full table-fixed border-collapse text-center">
               <thead>
@@ -90,7 +90,7 @@ export default function AvailabilityOverview({
                               className={`group relative flex h-8 w-full items-center justify-center gap-0.5 rounded-md px-0.5 focus-visible:outline-2 focus-visible:outline-[#C4247C] ${ok.length ? "hover:bg-[#EDEDEA]" : "border border-dashed border-[#DCDCD8]"}`}
                             >
                               {ok.map((shift) => (
-                                <span key={shift.code} aria-hidden="true" className={`flex h-6 min-w-0 max-w-6 flex-1 items-center justify-center rounded font-mono text-[11px]! ${codeClass(shift.code, false, config)}`}>{shift.code}</span>
+                                <span key={shift.code} aria-hidden="true" className={`flex h-6 min-w-0 max-w-6 flex-1 items-center justify-center rounded font-mono text-[11px]! ${codeClass(shift.code, config)}`}>{shift.code}</span>
                               ))}
                               <span aria-hidden="true" className={`pointer-events-none absolute bottom-full left-1/2 z-20 mb-1 -translate-x-1/2 whitespace-nowrap rounded-md bg-[#111214] px-2 py-1 font-mono text-[11px] text-white ${open ? "block" : "hidden group-hover:block"}`}>{time}</span>
                             </button>

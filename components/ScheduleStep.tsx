@@ -94,11 +94,11 @@ const OTHER_CODE_CLASS = "bg-[#EDEDEA] text-[#111214]";
 const OFF_CLASS = "bg-[#FFEBDB] text-[#B93815] font-normal border border-transparent";
 
 /** 근무 코드 색과 글자 크기(3자 코드는 작게). 색은 근무 형태의 시작 시각 순서로 정한다. */
-export function codeClass(code: Code, weekend: boolean, config: ShopConfig = DEFAULT_CONFIG): string {
+export function codeClass(code: Code, config: ShopConfig = DEFAULT_CONFIG): string {
   const tone = shiftTones(config)[code];
   const color =
     tone === "off"
-      ? `${OFF_CLASS} ${weekend ? "ring-1 ring-inset ring-[#FFB27A]" : ""}`
+      ? OFF_CLASS
       : `${tone === "multi" ? MULTI_CLASS : tone === undefined ? OTHER_CODE_CLASS : TONE_CLASS[tone]} font-semibold border border-transparent`;
   return `${color} ${code.length >= 3 ? "text-[11px]" : "text-[13px]"}`;
 }
@@ -1252,7 +1252,7 @@ function CellEditor({
             aria-describedby={outside ? outsideId : undefined}
             title={outside ? `${name} · 가능 시간 밖` : name}
             aria-pressed={fixed === code}
-            className={`${available ? "rounded-lg px-2 py-1.5" : CELL} ${codeClass(code, false, config)} ${outside ? "opacity-50" : ""} ${current === code ? "ring-1 ring-inset ring-[#111214]" : ""} hover:opacity-80 aria-pressed:outline-2 aria-pressed:outline-[#C4247C] aria-pressed:outline-offset-1`}
+            className={`${available ? "rounded-lg px-2 py-1.5" : CELL} ${codeClass(code, config)} ${outside ? "opacity-50" : ""} ${current === code ? "ring-1 ring-inset ring-[#111214]" : ""} hover:opacity-80 aria-pressed:outline-2 aria-pressed:outline-[#C4247C] aria-pressed:outline-offset-1`}
           >
             {available ? name : code}
           </button>
@@ -1377,7 +1377,7 @@ export function ScheduleGrid({
         <ul aria-label="근무조" className="flex flex-wrap items-center gap-x-4 gap-y-1.5">
           {codes.map(({ code, name, start, end }) => (
             <li key={code} className="flex items-center gap-1.5 text-[13px] text-[#4B4F57]">
-              <span aria-hidden="true" className={`${swatch} ${codeClass(code, false, config)}`}>
+              <span aria-hidden="true" className={`${swatch} ${codeClass(code, config)}`}>
                 {cellText(code)}
               </span>
               {code === OFF_CODE ? "빈칸 휴무" : name}
@@ -1435,7 +1435,7 @@ export function ScheduleGrid({
                         aria-label={`${n.name} ${m}월 ${dom}일 ${code}`}
                         title={warn ? warn.join(", ") : undefined}
                         style={cellStyle?.(n.id, d)}
-                        className={`${CELL} ${cellWidth} ${codeClass(code, isWeekend(d), config)}`}
+                        className={`${CELL} ${cellWidth} ${codeClass(code, config)}`}
                       >
                         {cellText(code)}
                         {warn && <span aria-hidden="true" className="absolute bottom-px left-px size-[5px] rounded-full bg-[#B93815]" />}
@@ -1454,7 +1454,7 @@ export function ScheduleGrid({
                       aria-label={`${n.name} ${m}월 ${dom}일 ${code}`}
                       title={past ? "지난 날짜는 바꿀 수 없어요" : warn ? warn.join(", ") : undefined}
                       style={cellStyle?.(n.id, d)}
-                      className={`${CELL} ${cellWidth} ${codeClass(code, isWeekend(d), config)} ${
+                      className={`${CELL} ${cellWidth} ${codeClass(code, config)} ${
                         past ? "cursor-not-allowed opacity-55" : "hover:opacity-80"
                       } disabled:cursor-wait ${
                         changed.has(key) ? "shadow-[inset_0_0_0_2px_#FF7A1A]" : ""

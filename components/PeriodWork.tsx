@@ -569,7 +569,7 @@ function CarryOverTable({ period, prev }: { period: WorkPeriod; prev: WorkPeriod
                   <div
                     key={d}
                     aria-label={`${name(r.employee_id)} ${monthDay(prev, d)} ${code}`}
-                    className={`${CELL} ${codeClass(code, isWeekendDay(prev, d, prev.holidays), shop?.config)}`}
+                    className={`${CELL} ${codeClass(code, shop?.config)}`}
                   >
                     {cellText(code)}
                   </div>

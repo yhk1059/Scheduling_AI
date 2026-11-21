@@ -27,7 +27,7 @@ export default function LoginScreen() {
               {i === STEPS.length - 1 && (
                 <span aria-hidden="true" className="flex gap-0.5">
                   {["A", "M", "C", "O"].map((code) => (
-                    <span key={code} className={`${CELL} ${codeClass(code, false)}`}>
+                    <span key={code} className={`${CELL} ${codeClass(code)}`}>
                       {cellText(code)}
                     </span>
                   ))}

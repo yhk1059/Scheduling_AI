@@ -115,7 +115,7 @@ function ShiftTimeline({ shop, focusShift }: { shop: Shop; focusShift: (code: st
                     </span>
                   ))}
                   <span className="relative mt-1 block h-4">
-                    <span aria-hidden="true" className={`absolute inset-y-0 min-w-px overflow-hidden rounded-md ${codeClass(shift.code, false, shop.config)}`} style={{ left: `${position(start)}%`, width: `${position(end) - position(start)}%` }}>
+                    <span aria-hidden="true" className={`absolute inset-y-0 min-w-px overflow-hidden rounded-md ${codeClass(shift.code, shop.config)}`} style={{ left: `${position(start)}%`, width: `${position(end) - position(start)}%` }}>
                       <span className="block h-full bg-current opacity-80" />
                     </span>
                   </span>
@@ -170,7 +170,7 @@ function ShiftRow({ shift, config, nameId, compact }: { shift: ShiftDef; config:
     <tr className="border-b border-[#F5F5F4]">
       <td className={`px-2 py-1 font-mono font-semibold ${muted}`}>
         <span className="flex items-center gap-2">
-          <span className={compact && active ? `rounded-md px-1.5 py-1 ${codeClass(shift.code, false, config)}` : undefined}>{shift.code}</span>
+          <span className={compact && active ? `rounded-md px-1.5 py-1 ${codeClass(shift.code, config)}` : undefined}>{shift.code}</span>
           {!active && <span className={`${ui.badge} ${ui.badgeTone.excluded} font-sans`}>꺼짐</span>}
         </span>
       </td>

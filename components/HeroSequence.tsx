@@ -114,7 +114,7 @@ function MiniGrid({ days, rows, totals }: { days: typeof WEEK_DAYS; rows: { name
         <div key={r.name} className="flex items-center gap-0.5">
           <span className="w-16 truncate text-sm text-[#111214]">{r.name}</span>
           {r.cells.map((c, i) => (
-            <span key={i} className={`${CELL} ${codeClass(c.code, !!days[i].weekend)} ${c.changed ? "shadow-[inset_0_0_0_2px_#FF7A1A]" : ""}`}>
+            <span key={i} className={`${CELL} ${codeClass(c.code)} ${c.changed ? "shadow-[inset_0_0_0_2px_#FF7A1A]" : ""}`}>
               {c.code === "O" ? "" : c.code}
             </span>
           ))}
