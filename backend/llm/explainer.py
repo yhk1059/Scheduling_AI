@@ -20,14 +20,14 @@ from backend.llm.prompts import EXPLAIN_SYSTEM, EXPLAIN_TOOL, ExplainerOutput, P
 from backend.llm.pseudonym import pseudonymize, restore
 
 _spec_adapter = TypeAdapter(ConstraintSpec)
-_EMPTY_FALLBACK = "원인을 특정하지 못했습니다. 규칙을 하나씩 꺼서 확인해 주세요."
+_EMPTY_FALLBACK = "원인을 찾지 못했어요. 규칙을 하나씩 꺼 보며 확인해 주세요."
 
 
 def fallback_explanation(request: ScheduleRequest, conflicts: list[Conflict]) -> str:
     if not conflicts:
         return _EMPTY_FALLBACK
     quoted = ", ".join(f"“{c.source_text or c.type}”" for c in conflicts)
-    return f"다음 규칙들이 동시에 지켜질 수 없습니다: {quoted}."
+    return f"이 규칙들을 한꺼번에 지킬 수 없어요: {quoted}."
 
 
 def _conflict_item(c: Conflict, spec: Any, employees: list) -> dict:

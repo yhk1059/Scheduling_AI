@@ -19,7 +19,6 @@ import {
   unitName,
   unitShort,
   violationWhere,
-  shopRuleCount,
   ruleQuote,
 } from "./wording";
 
@@ -446,21 +445,6 @@ describe("describeRule: 새로 표현되는 규칙(설계 §2.6)", () => {
       then: { left: { ...count(["C"]), offset: [-2, -1] }, op: "le", right: 1 },
     });
     expect(d(seq)).toEqual(["연달아 규칙", "신입 직원 · 날마다 앞 2일 마감 1번 이하"]);
-  });
-});
-
-describe("shopRuleCount", () => {
-  it("필요 인원은 세지 않는다", () => {
-    const coverage = (kind: "weekday" | "weekend", code: string) =>
-      count({ days: { kind }, shifts: { in: [code] }, per: "day", min: 2, max: 2 });
-    const rules = [
-      coverage("weekday", "A"),
-      coverage("weekend", "C"),
-      offAfter(C, 1),
-      balance({ shifts: C }),
-    ];
-    expect(shopRuleCount(rules)).toBe(2);
-    expect(shopRuleCount([])).toBe(0);
   });
 });
 

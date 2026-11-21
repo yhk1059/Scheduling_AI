@@ -3,7 +3,6 @@
 import { type BrowserContext, expect, type Page, test } from "@playwright/test";
 
 import { ruleShape } from "../lib/rules";
-import { presetName } from "../lib/wording";
 import type { PeriodRange } from "../lib/period";
 import type { ConstraintSpec, ScheduleRequest } from "../lib/types.gen";
 import {
@@ -790,9 +789,9 @@ test("S12. 확정 → 확정 근무표 → 직원 링크 잠김", async ({ brows
 
   await page.getByRole("button", { name: "← 근무표 목록" }).click();
   await expect(page.getByText("운영 중", { exact: true })).toHaveCount(0);
-  // 필요 인원은 세지 않는다. 시간대 필요 인원(R4)도 LLM이 필요 인원 모양으로 세우면 빠진다
-  const conditions = (await readState(page)).shop.rules.filter((r) => presetName(r) !== "필요 인원").length;
-  await expect(page.getByRole("main")).toContainText(`직원 12명 · 매장 조건 ${conditions}개 · 1주 단위`);
+  // 켜진 매장 규칙을 센다(근무표 작성 단계의 "켜진 규칙"과 같은 수)
+  const conditions = (await readState(page)).shop.rules.filter((r) => r.enabled !== false).length;
+  await expect(page.getByRole("main")).toContainText(`직원 12명 · 켜진 규칙 ${conditions}개 · 1주 단위`);
   const task = sectionWith(WEEK_NAME);
   await expect(task).toContainText("확정했어요 · 10/28 09:00");
   await expect(task.getByRole("button", { name: "열기" })).toHaveClass(/bg-white/);

@@ -38,7 +38,7 @@ import type { AvailabilitySlots } from "./availability";
 import { dateOfDay } from "./period";
 import octDoc from "../e2e/fixtures/shop-oct.json";
 import { DEFAULT_CONFIG, normalizeRule, ruleShape, STORAGE_VERSION } from "./rules";
-import { describeRule, presetName, shopRuleCount } from "./wording";
+import { describeRule, presetName } from "./wording";
 import { balance, count, DEN_CONFIG, fixedCell, forbid as forbidRule, maxRun, OFF, WORK } from "./test-rules";
 import type { ConstraintSpec, Rule, RuleExample, ScheduleResult } from "./types.gen";
 
@@ -2211,12 +2211,11 @@ describe("공정성 기본 규칙", () => {
     ]);
   });
 
-  it("새 매장에 두 규칙이 있고 매장 조건 수에 들어간다", () => {
+  it("새 매장에 두 규칙이 있다", () => {
     const store = fresh();
     store.getState().startShop();
     const { rules } = store.getState().shop!;
     expect(ids(rules)).toEqual([MAX_RUN, BALANCE]);
-    expect(shopRuleCount(rules)).toBe(2);
   });
 
   it("있으면 그대로, 같은 모양의 사용자 규칙이 있으면 더하지 않는다", () => {

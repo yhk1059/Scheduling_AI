@@ -480,10 +480,6 @@ export function ruleQuote(rule: ConstraintSpec, siblings: ConstraintSpec[], conf
   return same > 1 ? `“${rule.source_text}” (${reading()})` : `“${rule.source_text}”`;
 }
 
-/** 매장 규칙 수. 필요 인원은 세지 않는다. */
-export function shopRuleCount(rules: ConstraintSpec[]): number {
-  return rules.filter((r) => presetName(r) !== "필요 인원").length;
-}
 
 /** ③ 만들기 전 요약에 쓰는 수(lib/store.ts scheduleInputs가 센다). */
 export interface ScheduleInputs {

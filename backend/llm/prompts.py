@@ -493,6 +493,7 @@ EXPLAIN_SYSTEM = f"""\
 - 왜 동시에 지킬 수 없는지 한국어 2~4문장으로 쉽게 설명한다. 제약 id나 type 이름 대신 원문(source_text) 표현과 값의 label을 쓴다.
 - 날짜를 말할 때는 day 인덱스 대신 달력 날짜를 "11/30"처럼 월/일로 쓴다.
 - 매니저가 읽는 글이다. 기간은 "이번 근무표"라고 쓰고, 근무는 코드 대신 이름(오픈, 마감 등)으로 쓴다.
+- 해요체("~할 수 없어요", "~예요")로 쓴다. proposals의 title·description도 같다.
 
 ## proposals (최대 {MAX_PROPOSALS}개, 효과가 크고 부담이 작은 순서)
 - 각 제안은 title(짧은 제목), description(한 문장), changes로 구성한다.

@@ -19,7 +19,7 @@ export default function LoginScreen() {
         <Wordmark size="hero" />
         <p className="text-[36px] leading-[1.25] font-semibold tracking-[-0.02em] text-[#111214]">말로 짜는 근무표</p>
         <p className="text-base leading-relaxed text-[#4B4F57]">
-          직원 명단만 넣으면 첫 근무표를 시작할 수 있어요. 매장 하나, 계정 하나로 쓰고, 근무표는 서버에 저장돼요.
+          직원 명단만 넣으면 첫 근무표를 시작할 수 있어요. 계정 하나로 매장 하나를 관리하고, 근무표는 저장돼서 다른 기기에서도 이어서 볼 수 있어요.
         </p>
         <ol className="flex flex-col gap-3 border-t border-[#EDEDEA] pt-5">
           {STEPS.map((step, i) => (

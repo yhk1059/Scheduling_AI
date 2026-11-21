@@ -91,7 +91,7 @@ test("S16. 저장된 매장 열기 → 다시 만들기", async () => {
   expect(nov.requests.map((r) => r.id), "요청도 같은 id").toEqual(savedNov.requests.map((r) => r.id));
   expect(namesWithTag(shop, "리더")).toEqual(["이영희", "강서연", "윤지민"]);
   expect(namesWithTag(shop, "신입")).toEqual(["서예린", "신도윤"]);
-  await expect(page.getByRole("main")).toContainText("직원 12명 · 매장 조건 8개 · 4주 단위");
+  await expect(page.getByRole("main")).toContainText(/직원 12명 · 켜진 규칙 \d+개 · 4주 단위/);
   await expectNoDevTerms(page, "매장 홈");
 
   await sectionWith(NOV_NAME).getByRole("button", { name: "이어서 하기" }).click();

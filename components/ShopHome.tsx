@@ -5,8 +5,8 @@ import { useEffect, useState } from "react";
 import { formatRange } from "@/lib/period";
 import { closingSpread } from "@/lib/stats";
 import { loadShareStatus, type AvailabilityLink } from "@/lib/supabase";
-import { homeSummary, isShopReady, upcomingRange, useAppStore, viewForPeriod, type WorkPeriod } from "@/lib/store";
-import { nextTask, scheduleName, TASK_STEPS, taskDoneSteps, unitShort, shopRuleCount } from "@/lib/wording";
+import { homeSummary, isShopReady, liveShopRules, upcomingRange, useAppStore, viewForPeriod, type WorkPeriod } from "@/lib/store";
+import { nextTask, scheduleName, TASK_STEPS, taskDoneSteps, unitShort } from "@/lib/wording";
 
 import { markConfirmedEntry } from "./confirmedEntry";
 import { today } from "./RulesStep";
@@ -363,8 +363,8 @@ export default function ShopHome() {
         <h1 className={ui.pageTitle}>{shop.name || "이름 없는 매장"}</h1>
         <div className="flex items-center gap-2 text-[13px] text-[#6B6F78]">
           <span>
-            직원 <span className="font-mono">{employeeCount}</span>명 · 매장 조건{" "}
-            <span className="font-mono">{shopRuleCount(shop.rules)}</span>개 · {unitShort(shop.unit)}
+            직원 <span className="font-mono">{employeeCount}</span>명 · 켜진 규칙{" "}
+            <span className="font-mono">{liveShopRules(shop, null).length}</span>개 · {unitShort(shop.unit)}
           </span>
           <button type="button" onClick={() => go({ screen: "settings", tab: "shifts" })} className={ui.text}>
             매장 설정

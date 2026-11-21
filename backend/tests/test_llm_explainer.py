@@ -162,6 +162,7 @@ def test_prompt_instructions():
         assert old not in EXPLAIN_SYSTEM
     assert "11/30" in EXPLAIN_SYSTEM and "days" in EXPLAIN_SYSTEM
     assert "대상 월" not in EXPLAIN_SYSTEM and "이번 달" not in EXPLAIN_SYSTEM
+    assert "해요체" in EXPLAIN_SYSTEM
 
 
 # --- 후처리 ---
@@ -441,12 +442,12 @@ def test_prompt_is_about_shops():
 def test_fallback_lists_conflict_source_texts():
     text = fallback_explanation(REQUEST, CONFLICTS)
     assert text == (
-        "다음 규칙들이 동시에 지켜질 수 없습니다: “주말 A 최소 3명”, “이영희 14~15일 휴가”, “박민수 14일 C 고정”."
+        "이 규칙들을 한꺼번에 지킬 수 없어요: “주말 A 최소 3명”, “이영희 14~15일 휴가”, “박민수 14일 C 고정”."
     )
 
 
 def test_fallback_empty_conflicts():
-    assert fallback_explanation(REQUEST, []) == "원인을 특정하지 못했습니다. 규칙을 하나씩 꺼서 확인해 주세요."
+    assert fallback_explanation(REQUEST, []) == "원인을 찾지 못했어요. 규칙을 하나씩 꺼 보며 확인해 주세요."
 
 
 def test_explainer_does_not_import_solver():

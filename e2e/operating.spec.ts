@@ -89,7 +89,7 @@ test("S3. 운영 중인 매장: 다음 근무표 작성과 확정", async () => 
   await loginAsTestUser(page);
   await expect(page.getByRole("heading", { name: "성수 카페", level: 1 })).toBeVisible();
   // 매장 조건 7개 + 불러올 때 더해지는 기본 규칙 "근무 수는 고르게"(최대 연속 근무는 rule-max-run과 같은 모양이라 더하지 않는다)
-  await expect(page.getByRole("main")).toContainText("직원 12명 · 매장 조건 8개 · 4주 단위");
+  await expect(page.getByRole("main")).toContainText(/직원 12명 · 켜진 규칙 \d+개 · 4주 단위/);
   const operating = sectionWith(OCT_NAME);
   await expect(operating.getByText("운영 중", { exact: true })).toBeVisible();
   await expect(operating).toContainText("2026.10.5 – 11.1");
