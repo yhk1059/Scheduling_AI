@@ -1,7 +1,7 @@
 // docs/BROWSER_TEST_SCENARIOS.md S20. 로그인하지 않은 컨텍스트로 /demo를 연다. Supabase와 LLM을 부르지 않고 /solve만 실제로 부른다.
 import { expect, test } from "@playwright/test";
 
-import { applyAllPending, expectNoDevTerms, expectNoProblems, pendingRuleRows, T0, trackProblems } from "./test-helpers";
+import { appliedRuleRows, applyAllPending, expectNoDevTerms, expectNoProblems, pendingRuleRows, T0, trackProblems } from "./test-helpers";
 
 let problems: string[] = [];
 
@@ -68,8 +68,15 @@ test("S20. 체험 저니", async ({ page }) => {
   )).toBe(true);
   await expectNoPageOverflow();
   await steps.getByRole("button", { name: "매장 조건" }).click();
-  await expect(page.getByRole("complementary", { name: "규칙 상세" })).toBeVisible();
+  // 좁은 화면에서는 옆 칸 없이, 누른 카드 바로 아래에 상세가 펼쳐지고 다시 누르면 접힌다
+  await expect(page.getByRole("complementary", { name: "규칙 상세" })).toHaveCount(0);
+  const ruleRow = appliedRuleRows(page).filter({ hasText: "2일 이상 쉬어요" });
+  await ruleRow.click();
+  const inlineDetail = page.getByRole("region", { name: "규칙 상세" });
+  await expect(inlineDetail).toBeVisible();
   await expectNoPageOverflow();
+  await ruleRow.click();
+  await expect(inlineDetail).toHaveCount(0);
   await steps.getByRole("button", { name: "근무표" }).click();
   await expect(page.getByRole("complementary", { name: "근무표 확인 패널" })).toBeVisible();
   await expectNoPageOverflow();

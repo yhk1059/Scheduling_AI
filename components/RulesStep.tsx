@@ -1,6 +1,6 @@
 "use client";
 
-import { useId, useState, type ReactNode } from "react";
+import { useId, useState, useSyncExternalStore, type ReactNode } from "react";
 
 import { ApiError, errorMessage, translate } from "@/lib/api";
 import { findCoverageConflict } from "@/lib/coverage-conflict";
@@ -94,6 +94,7 @@ export default function RulesStep({
 
   const detailId = useId();
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const wide = useWide();
   const [text, setText] = useState("");
   const [loading, setLoading] = useState(false);
   const [notice, setNotice] = useState<Notice>(null);
@@ -361,7 +362,7 @@ export default function RulesStep({
                     type="button"
                     aria-controls={detailId}
                     aria-pressed={id === selected.id}
-                    onClick={() => setSelectedId(id)}
+                    onClick={() => setSelectedId((cur) => (!wide && cur === id ? null : id))}
                     className={`grid w-full min-w-0 grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2 rounded-xl border border-[#EDEDEA] px-2 py-2.5 text-left text-[13px] focus-visible:outline-2 focus-visible:outline-[#C4247C] aria-pressed:border-[#C4247C] aria-pressed:bg-[#FDEAF4] sm:px-3 ${group === 0 ? "bg-[#FFF6FA]" : "bg-white"}`}
                   >
                     <span className="max-w-24 truncate rounded-full bg-[#F5F5F4] px-2 py-0.5 text-[11px] font-semibold text-[#4B4F57] sm:max-w-32" title={name}>{name}</span>
@@ -370,6 +371,12 @@ export default function RulesStep({
                       {off ? "꺼짐 · " : ""}{hardness ? hardnessLabel(hardness) : "설정"}
                     </span>
                   </button>
+                  {/* 좁은 화면: 고른 카드 바로 아래에 상세를 펼친다(옆 칸이 없어 목록 끝으로 밀리지 않게) */}
+                  {!wide && selectedId === id && (
+                    <section id={detailId} aria-label="규칙 상세" className="mt-2">
+                      {renderItem(selected)}
+                    </section>
+                  )}
                 </li>
               );
             })}
@@ -434,7 +441,7 @@ export default function RulesStep({
           {note}
           {afterList}
         </div>
-        {step && selected && (
+        {step && selected && wide && (
           <aside id={detailId} aria-label="규칙 상세" className={ui.workAside}>
             {renderItem(selected)}
           </aside>
@@ -472,5 +479,19 @@ export function Spinner() {
     <svg aria-hidden="true" viewBox="0 0 14 14" className="size-3.5 animate-spin" fill="none" stroke="currentColor" strokeWidth={1.6}>
       <path d="M7 1.5A5.5 5.5 0 1 1 1.5 7" strokeLinecap="round" />
     </svg>
+  );
+}
+
+/** lg(1024px) 이상이면 true. 규칙 상세를 옆 칸(넓음)에 둘지 카드 아래(좁음)에 둘지 정한다. */
+const WIDE_QUERY = "(min-width: 1024px)";
+function useWide(): boolean {
+  return useSyncExternalStore(
+    (onChange) => {
+      const mq = window.matchMedia(WIDE_QUERY);
+      mq.addEventListener("change", onChange);
+      return () => mq.removeEventListener("change", onChange);
+    },
+    () => window.matchMedia(WIDE_QUERY).matches,
+    () => true,
   );
 }
