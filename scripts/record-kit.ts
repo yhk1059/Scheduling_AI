@@ -16,7 +16,7 @@ export const pause = (page: Page, ms: number) => page.waitForTimeout(ms);
 export const cursorScript = (fakeEmail: string) => `
   addEventListener("DOMContentLoaded", () => {
     const c = document.createElement("div");
-    c.style.cssText = "position:fixed;left:0;top:0;width:18px;height:18px;margin:-9px 0 0 -9px;border-radius:50%;background:rgba(21,94,117,.55);border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.35);pointer-events:none;z-index:2147483647;transition:transform .12s;transform:translate(-100px,-100px)";
+    c.style.cssText = "position:fixed;left:0;top:0;width:18px;height:18px;margin:-9px 0 0 -9px;border-radius:50%;background:rgba(196,36,124,.55);border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.35);pointer-events:none;z-index:2147483647;transition:transform .12s;transform:translate(-100px,-100px)";
     document.documentElement.appendChild(c);
     // Next.js 개발 표시(왼쪽 아래 N 버튼)는 영상에 찍히지 않게 숨긴다
     const hide = document.createElement("style");
