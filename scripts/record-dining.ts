@@ -1,6 +1,7 @@
 // 랜딩 데모 영상(docs/DEMO_SCENARIO.md, 한강 다이닝) 녹화. 테스트 계정의 매장을 지우고 빈 매장부터 실제 앱을 Playwright로 돌리며 녹화한다.
 // 실행: npm run dev를 띄운 채 npm run record:dining → public/demo.mp4 (ffmpeg 필요). 화면이 바뀌면 다시 돌려 영상을 새로 만든다.
-// 직원 17명 입력, 가능 시간 19명 제출, 미리 넣는 매장 조건 8문장, LLM 대기는 녹화 뒤 잘라 낸다.
+// 직원 17명 입력, 가능 시간 19명 제출, 미리 넣는 매장 조건 3문장은 녹화 뒤 잘라 낸다.
+// LLM은 부르지 않는다: 매장 조건은 체험(/demo)과 같은 5문장이고, /translate·/explain은 체험 문서(lib/samples/demo-shop.json)에 저장한 응답으로 돌려준다.
 import { mkdirSync, renameSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -8,13 +9,28 @@ import { join } from "node:path";
 import { chromium, type Page } from "@playwright/test";
 import { createClient } from "@supabase/supabase-js";
 
-import { dateOfDay, localDate, type PeriodRange } from "../lib/period";
-import { type Shop, toScheduleRequest, type WorkPeriod } from "../lib/store";
-import type { ConstraintSpec } from "../lib/types.gen";
-import { LIVE_SENTENCES, PRESET_SENTENCES, ROSTER, SCREEN_EMPLOYEE, SHIFT_EDITS, SHOP_NAME, slotsFor, TYPED_STAFF } from "./dining-data";
+import { demoCards, demoExplanation } from "../lib/demo";
+import { DEMO_DOC } from "../lib/demo-doc";
+import { dateOfDay, type PeriodRange } from "../lib/period";
+import type { Shop, WorkPeriod } from "../lib/store";
+import type { ExplainRequest, TranslateOk } from "../lib/types.gen";
+import { DEMO_LIVE_SENTENCES, DEMO_PRESET_SENTENCES, ROSTER, SCREEN_EMPLOYEE, SHIFT_EDITS, SHOP_NAME, slotsFor, TYPED_STAFF } from "./dining-data";
 import { authStorageKey, click, cursorScript, encode, env, paint, pause, type Segment, type } from "./record-kit";
 
-export { LIVE_SENTENCES, PRESET_SENTENCES, ROSTER, SCREEN_EMPLOYEE, slotsFor, TYPED_STAFF };
+export { ROSTER, SCREEN_EMPLOYEE, slotsFor, TYPED_STAFF };
+/** 영상에서 직접 입력하는 문장과 미리 적용해 두는 문장(체험과 같다). */
+export const LIVE_SENTENCES = DEMO_LIVE_SENTENCES;
+export const PRESET_SENTENCES = DEMO_PRESET_SENTENCES;
+/** 미리 적용해 두는 규칙: 체험 문서의 적용된 규칙(기본 규칙 포함, 같은 id는 이 내용으로 바꾼다). */
+export const PRESET_RULES = DEMO_DOC.shop.rules;
+
+/** 체험 문서에 저장한 번역. 직접 입력 문장이 아니면 null. */
+export function storedTranslation(text: string, inputVersion: number): TranslateOk | null {
+  const constraints = demoCards(DEMO_DOC, text);
+  if (!constraints) return null;
+  const examples = Object.fromEntries(Object.entries(DEMO_DOC.shop.examples ?? {}).filter(([id]) => constraints.some((c) => c.id === id)));
+  return { status: "ok", input_version: inputVersion, constraints, examples };
+}
 
 const APP_URL = "http://localhost:3000";
 const SIZE = { width: 1440, height: 900 };
@@ -59,6 +75,28 @@ async function main() {
   const context = await browser.newContext({ viewport: SIZE, locale: "ko-KR", timezoneId: "Asia/Seoul", recordVideo: { dir: videoDir, size: SIZE } });
   await context.grantPermissions(["clipboard-read", "clipboard-write"], { origin: APP_URL });
   await context.addInitScript(cursorScript("manager@hangang.dining"));
+  // LLM 대신 저장된 응답. 실제 응답처럼 잠깐 기다린다(그 구간은 잘라 낸다). 저장된 응답이 맞지 않으면 요청을 끊고 녹화 끝에 그 이유로 실패한다
+  let mockFailure: string | null = null;
+  await context.route("**/api/py/translate", async (route) => {
+    const body = route.request().postDataJSON() as { text: string; input_version?: number };
+    const res = storedTranslation(body.text, body.input_version ?? 0);
+    if (!res) {
+      mockFailure = `"${body.text}"의 저장된 번역이 없어요`;
+      return route.abort();
+    }
+    await new Promise((r) => setTimeout(r, 800));
+    await route.fulfill({ json: res });
+  });
+  await context.route("**/api/py/explain", async (route) => {
+    const { request } = route.request().postDataJSON() as ExplainRequest;
+    const res = demoExplanation(DEMO_DOC, request, request.input_version);
+    if (!res) {
+      mockFailure = "저장된 설명과 지금 규칙이 달라요. npm run gen:demo-shop으로 체험 문서를 다시 만들어 주세요";
+      return route.abort();
+    }
+    await new Promise((r) => setTimeout(r, 800));
+    await route.fulfill({ json: res });
+  });
   const page = await context.newPage();
   const started = Date.now();
   const now = () => (Date.now() - started) / 1000;
@@ -73,7 +111,7 @@ async function main() {
       cuts.push([from, now()]);
     }
   };
-  const next = page.getByRole("button", { name: "다음", exact: true });
+  const next = page.getByRole("button", { name: /^다음:/ });
   const copyLink = page.getByRole("button", { name: "링크 복사" });
   /** /app을 다시 열면 서버에 마지막으로 저장된 화면(매장 홈, 매장 설정)일 수 있다. 그러면 [근무표] → [이어서 하기]로 ① 가능 시간에 들어간다. */
   const openPeriod = async () => {
@@ -107,7 +145,7 @@ async function main() {
     await type(page, page.getByRole("textbox", { name: "매장 이름" }), SHOP_NAME);
     const nameBox = page.getByRole("textbox", { name: "새 직원 이름" });
     // 직급 칸은 자동 완성 목록(datalist)이 붙어 textbox가 아니라 combobox다
-    const tagBox = page.getByRole("combobox", { name: "새 직원 직급" });
+    const tagBox = page.getByRole("combobox", { name: "새 직원 파트·직급" });
     for (const { name, tags } of ROSTER.filter((r) => TYPED_STAFF.includes(r.name))) {
       await type(page, nameBox, name);
       await click(page, tagBox);
@@ -197,29 +235,20 @@ async function main() {
     await page.mouse.wheel(0, 500);
     await pause(page, 2500);
 
-    // 매장 조건 8문장을 앱과 같은 요청으로 번역해 적용해 둔다
+    // 매장 조건 3문장은 저장된 규칙으로 적용해 둔다(같은 id의 기본 규칙은 저장된 내용으로 바꾼다)
     await cut(async () => {
       await page.getByText(/^저장됨/).waitFor();
       const { data: row, error } = await db.from("shops").select("data").single();
       if (error) throw new Error(error.message);
       const doc = row.data as ShopDoc;
-      const { shop, periods } = doc.state;
-      const { employees, period: range, holidays } = toScheduleRequest(shop, periods[0], periods, localDate(new Date()));
-      const context = { config: shop.config, employees, period: range, holidays, today: localDate(new Date()) };
-      const results = await Promise.all(
-        PRESET_SENTENCES.map(async (text) => {
-          const res = await fetch(`${APP_URL}/api/py/translate`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ text, scope: "shop", context, input_version: 0 }),
-          });
-          const body = (await res.json()) as { status: string; constraints?: ConstraintSpec[] };
-          if (!res.ok || body.status !== "ok") throw new Error(`"${text}" 번역 실패: ${JSON.stringify(body).slice(0, 300)}`);
-          return body.constraints!;
-        }),
-      );
-      const rules = [...shop.rules, ...results.flat()];
-      const { error: updateError } = await db.from("shops").update({ data: { ...doc, state: { ...doc.state, shop: { ...shop, rules } } } }).eq("owner_id", auth.user.id);
+      const { shop } = doc.state;
+      const presetIds = new Set(PRESET_RULES.map((r) => r.id));
+      const rules = [...shop.rules.filter((r) => !presetIds.has(r.id)), ...PRESET_RULES];
+      const examples = { ...shop.examples, ...Object.fromEntries(Object.entries(DEMO_DOC.shop.examples ?? {}).filter(([id]) => presetIds.has(id))) };
+      const { error: updateError } = await db
+        .from("shops")
+        .update({ data: { ...doc, state: { ...doc.state, shop: { ...shop, rules, examples } } } })
+        .eq("owner_id", auth.user.id);
       if (updateError) throw new Error(updateError.message);
       await openPeriod();
       await pause(page, 300);
@@ -278,10 +307,11 @@ async function main() {
 
     // 10. ③ 근무표: 반드시 → 가능하면 수락
     await click(page, proposal.getByRole("button", { name: "수락" }));
-    await page.getByText("반드시 규칙을 모두 지켰어요").waitFor({ timeout: 60_000 });
+    const allKept = page.getByText("반드시 규칙 모두 지킴", { exact: true }).first();
+    await allKept.waitFor({ timeout: 60_000 });
     mark("10 ③ 근무표");
     await pause(page, 1000);
-    await page.getByText("반드시 규칙을 모두 지켰어요").scrollIntoViewIfNeeded();
+    await allKept.scrollIntoViewIfNeeded();
     await pause(page, 3000);
     await page.locator('ul[aria-label="근무조"]').scrollIntoViewIfNeeded();
     await pause(page, 4000);
@@ -298,6 +328,7 @@ async function main() {
   } finally {
     await context.close();
     await browser.close();
+    if (mockFailure) throw new Error(mockFailure);
   }
 
   const webm = await page.video()?.path();
