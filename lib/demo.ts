@@ -1,7 +1,7 @@
 // 랜딩 [체험하기](/demo)의 데이터. 저장한 체험 문서(lib/samples/demo-shop.json)를 오늘 기준 주로 옮기고,
 // LLM을 부르지 않도록 저장한 해 없음 설명을 요청이 같을 때만 돌려준다. 순수 함수만 둔다.
-import { isAvailabilityRule, type AvailabilitySlots } from "./availability";
-import { dateOfDay, dayOfDate, firstPeriodStart, monthDay, periodFrom, type PeriodRange } from "./period";
+import { isAvailabilityRule, moveSlots, type AvailabilitySlots } from "./availability";
+import { firstPeriodStart, monthDay, periodFrom, type PeriodRange } from "./period";
 import { normalizeRule, OFF_CODE, stableJson } from "./rules";
 import { newPeriod, withDefaultRules, type Data, type Shop, type ShopEmployee } from "./store";
 import type { AvailabilityLink } from "./supabase";
@@ -21,16 +21,6 @@ export interface DemoDoc {
   explanation: { signature: string; response: Omit<ExplainResponse, "input_version"> } | null;
 }
 
-/** 기준 주의 날짜 키를 range의 같은 인덱스 날짜로 옮긴다. 기준 주 밖의 키는 버린다. */
-function shiftSlots(slots: AvailabilitySlots, base: PeriodRange, range: PeriodRange): AvailabilitySlots {
-  return Object.fromEntries(
-    Object.entries(slots).flatMap(([date, ranges]) => {
-      const day = dayOfDate(base, date);
-      return day === null ? [] : [[dateOfDay(range, day), ranges]];
-    }),
-  );
-}
-
 /**
  * 체험 시작 상태. 기준 주를 firstPeriodStart("1w", today)로 옮긴다(오늘이 월요일이면 오늘).
  * 공휴일은 빈 배열. 가능 시간의 날짜 키는 같은 요일로 옮기고 기준 주 밖의 키는 버린다.
@@ -39,7 +29,7 @@ function shiftSlots(slots: AvailabilitySlots, base: PeriodRange, range: PeriodRa
 export function demoData(doc: DemoDoc, today: string): Data {
   const range = periodFrom("1w", firstPeriodStart("1w", today));
   const availability = Object.fromEntries(
-    Object.entries(doc.availability).map(([id, slots]) => [id, shiftSlots(slots, doc.base, range)]),
+    Object.entries(doc.availability).map(([id, slots]) => [id, moveSlots(slots, doc.base, range)]),
   );
   // 공휴일이 끼면 주말 필요 인원이 달라져 시나리오가 깨진다
   const period = { ...newPeriod(range), holidays: [], availability, availabilityUsed: null };

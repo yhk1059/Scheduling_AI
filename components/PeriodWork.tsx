@@ -107,9 +107,10 @@ function AvailabilityWarning({ period, rows }: { period: WorkPeriod; rows: Avail
   if (!shop) return null;
   const availability = availabilityFromLinks(rows);
   const req = toScheduleRequest(shop, { ...period, availability }, periods, today());
-  const shortages = availabilityShortages(req.constraints ?? [], req.employees, shop.config, period, req.holidays ?? []);
+  const pending = req.employees.filter((n) => !availability[n.id]).map((n) => n.id);
+  const shortages = availabilityShortages(req.constraints ?? [], req.employees, shop.config, period, req.holidays ?? [], pending);
   if (!shortages.length) return null;
-  const unsubmitted = req.employees.some((n) => !availability[n.id]);
+  const unsubmitted = pending.length > 0;
   return (
     <section aria-label="가능 시간 미리 확인" className="flex flex-col gap-2 rounded-2xl border border-[#FECDCA] bg-white px-[18px] py-4">
       <h3 className={ui.cardTitle}>지금 받은 가능 시간으로는 사람이 모자란 날이 있어요</h3>
@@ -117,7 +118,7 @@ function AvailabilityWarning({ period, rows }: { period: WorkPeriod; rows: Avail
         이대로면 근무표를 만들 수 없어요. 그날 나올 수 있는 직원에게 다시 물어보거나, ② 매장 조건에서 필요 인원을 바꿔 주세요.
         {unsubmitted && " 아직 내지 않은 직원은 언제든 나올 수 있다고 보고 셌어요."}
       </p>
-      <ShortageLines shortages={shortages} config={shop.config} period={period} />
+      <ShortageLines shortages={shortages} config={shop.config} employees={req.employees} period={period} />
     </section>
   );
 }

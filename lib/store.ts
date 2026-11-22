@@ -5,10 +5,10 @@
 import { create } from "zustand";
 import { persist, type PersistStorage, type StorageValue } from "zustand/middleware";
 
-import { availabilityRules, isAvailabilityRule, sameAvailability, type AvailabilitySlots } from "./availability";
+import { availabilityRules, isAvailabilityRule, moveSlots, sameAvailability, type AvailabilitySlots } from "./availability";
 import type { DayKind } from "./coverage-conflict";
 import { holidayDays } from "./holidays";
-import { withoutDays } from "./shortage";
+import { droppedDays, withoutDays } from "./shortage";
 import {
   carryOverFrom,
   diffAssignments,
@@ -470,6 +470,19 @@ export function disabledRulesFor(shop: Shop, period: WorkPeriod): ConstraintSpec
     const rule = rules.find((r) => r.id === id);
     const c = rule ? (period.ruleOverrides[id] ?? rule) : period.requests.find((r) => r.id === id);
     return c ? [c] : [];
+  });
+}
+
+/** [그날만 빼고 만들기]로 날을 뺀 매장 규칙(끈 규칙 제외). rule은 수정본에 원래 날짜를 되돌린 모양, days는 뺀 날. */
+export function exceptedRulesFor(shop: Shop, period: WorkPeriod): { rule: ConstraintSpec; days: number[] }[] {
+  const { rules } = basis(shop, period);
+  return rules.flatMap((original) => {
+    const edited = period.ruleOverrides[original.id];
+    if (!edited || period.disabledIds.includes(original.id)) return [];
+    const days = droppedDays(original, edited, period, period.holidays);
+    if (!days.length || edited.type !== "rule" || edited.body.kind !== "require" || original.type !== "rule" || original.body.kind !== "require") return [];
+    const rule = { ...edited, body: { ...edited.body, for_each: { ...edited.body.for_each, days: original.body.for_each.days } } };
+    return [{ rule: normalizeRule(rule) as ConstraintSpec, days }];
   });
 }
 
@@ -1356,7 +1369,13 @@ export function createAppStore(getStorage: () => Storage, now: () => Date = () =
               periods.length === 0 && start !== undefined
                 ? periodFrom(shop.unit, start)
                 : upcomingRange(shop.unit, periods, today);
-            const period = newPeriod(range);
+            const prev = periods.at(-1);
+            // 체험은 직원 링크를 보낼 수 없어 지난 근무표의 가능 시간을 같은 순서의 날로 옮겨 제출한 상태로 시작한다
+            const availability =
+              get().demo && prev
+                ? Object.fromEntries(Object.entries(prev.availability).map(([id, slots]) => [id, moveSlots(slots, prev, range)]))
+                : {};
+            const period = { ...newPeriod(range), availability };
             bump({ periods: [...periods, period], view: { screen: "period", periodId: period.id, step: 1 } });
             return period.id;
           },

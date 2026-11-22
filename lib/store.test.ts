@@ -12,6 +12,7 @@ import {
   currentPeriod,
   defaultFairnessRules,
   disabledRulesFor,
+  exceptedRulesFor,
   FAIRNESS_RULE_IDS,
   findReplaced,
   hasCoverage,
@@ -781,6 +782,22 @@ describe("이번 기간만 끄기와 제안 수락", () => {
     expect(kept).toContain(1);
     expect(days(byId(store.getState().shop!.rules, "c"))).toBeUndefined();
     expect(store.getState().inputVersion).toBe(v + 1);
+  });
+
+  it("exceptedRulesFor는 그날만 뺀 매장 규칙을 원래 날짜로 되돌린 모양과 뺀 날로 돌려준다", () => {
+    const { store, id, period } = setup();
+    store.getState().addPendingRules([count({ shifts: { in: ["N"] }, per: "day", min: 1 }, { id: "c" })]);
+    store.getState().applyRule("c");
+    expect(exceptedRulesFor(store.getState().shop!, period())).toEqual([]);
+    store.getState().exceptDays(id, "c", [2, 3]);
+    // 값만 바꾼 수정본은 뺀 날이 없어 들지 않는다
+    store.getState().applyChanges(id, [{ action: "set_value", constraint_id: "r", name: "max_len", value: 4 }]);
+    const out = exceptedRulesFor(store.getState().shop!, period());
+    expect(out.map((e) => [e.rule.id, e.days])).toEqual([["c", [2, 3]]]);
+    expect(out[0].rule).toEqual(byId(store.getState().shop!.rules, "c"));
+    // 끈 규칙은 끈 규칙으로만 보여 준다
+    store.getState().setDisabled(id, "c", true);
+    expect(exceptedRulesFor(store.getState().shop!, period())).toEqual([]);
   });
 
   it("disabledRulesFor는 끈 매장 규칙·요청을 disabledIds 순으로, 수정본을 반영해 돌려주고 없는 id는 건너뛴다", () => {
@@ -2349,6 +2366,32 @@ describe("체험", () => {
     store.getState().startShop();
     store.getState().setShopName("내 매장");
     expect(storage.getItem(STORAGE_KEY)).toContain("내 매장");
+  });
+
+  it("체험에서 다음 근무표는 지난 근무표의 가능 시간을 같은 순서의 날로 옮겨 시작한다(직원 링크를 보낼 수 없어서)", () => {
+    const store = fresh();
+    const data = sampleData();
+    const first = data.periods[0];
+    const id = data.shop!.employees[0].id;
+    const slots = { [dateOfDay(first, 1)]: [["09:00", "15:00"]], [dateOfDay(first, 3)]: [["17:00", "23:00"]] } as AvailabilitySlots;
+    store.getState().enterDemo({ ...data, periods: [{ ...first, status: "confirmed", availability: { [id]: slots } }] });
+    const nextId = store.getState().createPeriod(TODAY)!;
+    const next = store.getState().periods.find((p) => p.id === nextId)!;
+    expect(next.start_date > first.start_date).toBe(true);
+    expect(next.availability).toEqual({
+      [id]: { [dateOfDay(next, 1)]: [["09:00", "15:00"]], [dateOfDay(next, 3)]: [["17:00", "23:00"]] },
+    });
+  });
+
+  it("체험이 아니면 다음 근무표의 가능 시간은 비어 있다", () => {
+    const store = fresh();
+    const data = sampleData();
+    const first = data.periods[0];
+    const id = data.shop!.employees[0].id;
+    const slots = { [dateOfDay(first, 1)]: [["09:00", "15:00"]] } as AvailabilitySlots;
+    store.setState({ ...data, periods: [{ ...first, status: "confirmed", availability: { [id]: slots } }] });
+    const nextId = store.getState().createPeriod(TODAY)!;
+    expect(store.getState().periods.find((p) => p.id === nextId)!.availability).toEqual({});
   });
 
   it("체험 중이 아니면 exitDemo는 아무것도 하지 않는다", () => {

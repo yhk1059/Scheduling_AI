@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 
 import { translate } from "@/lib/api";
 import { DEMO_LEAVE_PREFIX, demoLeaveCard } from "@/lib/demo";
-import { isOperating } from "@/lib/continuity";
+import { diffAssignments, isOperating } from "@/lib/continuity";
 import { formatRange, periodDays, periodEnd } from "@/lib/period";
 import { scheduleSvg } from "@/lib/schedule-image";
 import {
@@ -74,7 +74,8 @@ export default function ConfirmedPeriod() {
   const changeCards = cardsInOrder(period.pendingRequests.filter(ofChange), period.requests.filter(ofChange), period.cardOrder);
   // 다시 만들기가 끝나 결과에 반영됐을 때만 그렇게 적는다
   const appliedLabel = sv.busy || sv.outcome || sv.toast ? undefined : "적용됨 · 다시 만들었어요";
-  const diff = unconfirmed ? (result?.diff ?? []) : [];
+  // 솔버의 diff는 직전 결과와의 차이라 마지막 확정본과 직접 비교한다
+  const diff = unconfirmed && result && lastVersion ? diffAssignments(lastVersion.assignments, result.assignments) : [];
 
   const translateChange = async (input: string): Promise<string | null> => {
     setTranslating(true);

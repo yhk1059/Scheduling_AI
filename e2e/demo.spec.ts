@@ -43,7 +43,7 @@ test("S20. 체험 저니", async ({ page }) => {
   // ① 미리 경고: 만들기 전에 가능 시간만으로 모자란 날을 알려 준다
   await steps.getByRole("button", { name: "가능 시간" }).click();
   const warning = page.getByRole("region", { name: "가능 시간 미리 확인" });
-  await expect(warning).toContainText("마감: 들어올 수 있는 사람이 없어요");
+  await expect(warning).toContainText("마감 · 주방 리더 직원: 들어올 수 있는 사람이 없어요");
   await page.getByRole("button", { name: /^다음: 매장 조건/ }).click();
 
   // ③ 근무표 없음 → 저장된 설명과 제안이 바로 보인다

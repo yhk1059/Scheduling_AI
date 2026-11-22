@@ -20,6 +20,7 @@ import {
   unitShort,
   violationWhere,
   ruleQuote,
+  roleLabel,
 } from "./wording";
 
 const NOV = { start_date: "2026-11-01", length: 30 };
@@ -94,6 +95,20 @@ describe("describeShiftChange", () => {
     expect(describeShiftChange({ action: "add", shift: { code: "XM", name: "더블", hours: 12, parts: ["X", "M2"] } }, DEFAULT_CONFIG)).toBe(
       "근무 코드 추가 · XM 더블 · 12시간 · X와 M2로 세요",
     );
+  });
+});
+
+describe("roleLabel", () => {
+  const staff = [
+    { id: "k1", name: "서민호", tags: ["주방", "리더"] },
+    { id: "h1", name: "김도현", tags: ["홀", "리더"] },
+  ] as Employee[];
+
+  it("규칙이 고르는 사람을 부른다. 아무나면 빈 문자열이다", () => {
+    expect(roleLabel({ tags: ["리더"], exclude_tags: ["홀"] }, staff)).toBe("주방 리더 직원");
+    expect(roleLabel({ tags: ["홀"] }, staff)).toBe("홀 직원");
+    expect(roleLabel({}, staff)).toBe("");
+    expect(roleLabel(undefined, staff)).toBe("");
   });
 });
 

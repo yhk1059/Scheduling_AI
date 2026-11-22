@@ -9,7 +9,7 @@ import { coverageDays } from "@/lib/coverage-conflict";
 import { demoExplanation } from "@/lib/demo";
 import { coverageShortages, type Shortage } from "@/lib/shortage";
 import { DEMO_DOC } from "@/lib/demo-doc";
-import { historyLoadFor, isOperating } from "@/lib/continuity";
+import { diffAssignments, historyLoadFor, isOperating } from "@/lib/continuity";
 import { closingShift, DEFAULT_CONFIG, OFF_CODE, ruleShape, shiftTones } from "@/lib/rules";
 import { dateOfDay, dayHeader, dayOfDate, isWeekendDay, monthDay, periodDays, periodEnd } from "@/lib/period";
 import {
@@ -19,6 +19,7 @@ import {
   COVERAGE_SOURCE_TEXT,
   currentPeriod,
   disabledRulesFor,
+  exceptedRulesFor,
   refEmployees,
   scheduleInputs,
   type Shop,
@@ -40,7 +41,7 @@ import type {
   ShopConfig,
 } from "@/lib/types.gen";
 import { statsFromAssignments } from "@/lib/stats";
-import { describeRule, formatDeviation, hardnessLabel, josa, presetName, violationWhere, type ScheduleInputs } from "@/lib/wording";
+import { describeRule, formatDeviation, hardnessLabel, josa, presetName, roleLabel, violationWhere, type ScheduleInputs } from "@/lib/wording";
 
 import Dialog from "./Dialog";
 import { Spinner, today } from "./RulesStep";
@@ -369,8 +370,9 @@ export function ScheduleBody({
   const legacy = period.result !== null && isLegacyResult(period.result);
   const confirmed = period.versions.at(-1)?.assignments ?? null;
   const solved = period.result && withStats(period.result, shop.config, period, holidays);
-  // 확정본이 없으면 diff는 직전 결과와의 차이라 "확정본에서 바뀐 칸"으로 보여 주지 않는다
-  const result = solved && confirmed === null ? { ...solved, diff: null } : solved;
+  // 바뀐 칸은 마지막 확정본과 비교한다. 솔버의 diff는 직전 결과와의 차이라 확정 직후에도 남는다. 확정본이 없거나 같으면 보여 주지 않는다
+  const changed = solved && confirmed ? diffAssignments(confirmed, solved.assignments) : [];
+  const result = solved && { ...solved, diff: changed.length ? changed : null };
   const { outcome } = sv;
   const history = new Map(historyLoadFor(raw, shop.config).map((h) => [h.employee_id, { closings: h.closings, weekends: h.weekends }]));
   // 운영 중인 기간에서 오늘 이전 날짜는 잠긴다(toScheduleRequest의 pastDayLocks와 같은 범위)
@@ -426,6 +428,11 @@ export function ScheduleBody({
     name: presetName(c),
     text: describeRule(c, shop.config, employees, period).text,
   }));
+  const pdays = periodDays(period);
+  const exceptedRules = exceptedRulesFor(shop, period).map(({ rule, days }) => ({
+    text: describeRule(rule, shop.config, employees, period).text,
+    when: days.map((d) => `${WEEKDAY_SHORT[pdays[d - 1].weekday]} ${monthDay(period, d)}`).join(", "),
+  }));
   const unsubmitted = outcome?.kind === "infeasible" && unsubmittedFor(shop, period, outcome.conflicts);
   const noneSubmitted = !employees.some((n) => n.id in period.availability);
   const outcomePanel = outcome && (
@@ -458,7 +465,7 @@ export function ScheduleBody({
   );
 
   const summary = result && (
-    <SummaryLine result={result} infeasible={outcome !== null} confirmed={isConfirmed} draft={isDraft} legacy={legacy} care={care} disabled={disabledRules} stacked={reviewPanel} />
+    <SummaryLine result={result} infeasible={outcome !== null} confirmed={isConfirmed} draft={isDraft} legacy={legacy} care={care} disabled={disabledRules} excepted={exceptedRules} stacked={reviewPanel} />
   );
   const selectedEmployee = selected && employees.find((n) => n.id === selected.employeeId);
   const currentCode = selected && result?.assignments[selected.employeeId]?.[selected.day - 1];
@@ -935,6 +942,7 @@ export function OutcomePanel({
               key={c.constraint_id}
               shortages={shortages.filter((x) => x.constraintId === c.constraint_id)}
               config={config}
+              employees={employees}
               period={period}
               busy={busy}
               onExcept={(days) => onExcept(c.constraint_id, days)}
@@ -1072,12 +1080,15 @@ const WEEKDAY_SHORT = ["일", "월", "화", "수", "목", "금", "토"]; // 0=�
 export function ShortageLines({
   shortages,
   config,
+  employees,
   period,
   busy,
   onExcept,
 }: {
   shortages: Shortage[];
   config: ShopConfig;
+  /** 규칙이 고르는 사람을 부르는 데 쓴다("주방 리더 직원") */
+  employees: Employee[];
   period: Period;
   busy?: boolean;
   /** 없으면 [빼고 만들기] 버튼 없이 줄만 보여 준다(① 가능 시간의 미리 경고) */
@@ -1087,20 +1098,23 @@ export function ShortageLines({
   const days = periodDays(period);
   const groups = new Map<string, Shortage[]>();
   for (const s of shortages) {
-    const key = `${s.code}|${s.need}|${s.names.join(",")}`;
+    // 규칙이 다르면(홀 오픈 2명, 주방 오픈 2명) 같은 근무조·인원이어도 따로 적는다
+    const key = `${s.constraintId}|${s.code}|${s.need}|${s.names.join(",")}`;
     groups.set(key, [...(groups.get(key) ?? []), s]);
   }
   return (
     <ul className="flex w-full flex-col gap-1 text-[13px] text-[#B42318]">
-      {[...groups.values()].map((group) => {
-        const { code, need, names } = group[0];
+      {[...groups].map(([key, group]) => {
+        const { code, need, names, people } = group[0];
         const when = group.map((s) => `${WEEKDAY_SHORT[days[s.day - 1].weekday]} ${monthDay(period, s.day)}`).join(", ");
         const shift = config.shifts.find((x) => x.code === code)?.name ?? code;
+        const role = roleLabel(people, employees);
         const who = names.length ? `${names.join(", ")}만 들어올 수 있어요` : "들어올 수 있는 사람이 없어요";
         return (
-          <li key={`${code}|${when}`} className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
+          <li key={key} className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
             <span>
-              {when} {shift}: {who} · {need}명 필요
+              {when} {shift}
+              {role && ` · ${role}`}: {who} · {need}명 필요
             </span>
             {onExcept && (
               <button
@@ -1191,6 +1205,7 @@ function SummaryLine({
   legacy = false,
   care = null,
   disabled = [],
+  excepted = [],
   stacked = false,
 }: {
   result: ScheduleResult;
@@ -1203,6 +1218,8 @@ function SummaryLine({
   care?: { label: string; text: string } | null;
   /** 이번 근무표에서 끈 규칙(제목 · 해석 문장). 비어 있으면 칸을 그리지 않는다 */
   disabled?: { name: string; text: string }[];
+  /** [그날만 빼고 만들기]로 날을 뺀 규칙(해석 문장 · 뺀 날). 결과가 "모두 지킴"이어도 그날은 그 규칙 없이 만든 것을 함께 적는다 */
+  excepted?: { text: string; when: string }[];
   stacked?: boolean;
 }) {
   const { summary } = result;
@@ -1262,6 +1279,15 @@ function SummaryLine({
             </dd>
           </div>
         )}
+        {excepted.length > 0 && (
+          <div className={cell}>
+            <dt className={label}>그날만 뺀 규칙</dt>
+            <dd className={value}>
+              {dot("bg-[#FF7A1A]")}
+              <span className="font-mono">{excepted.length}</span>개
+            </dd>
+          </div>
+        )}
         {result.diff && (
           <div className={cell}>
             <dt className={label}>확정본에서 바뀐 칸</dt>
@@ -1280,6 +1306,15 @@ function SummaryLine({
       {!result.optimal && <span className={`${ui.badge} bg-[#FFEBDB] text-[#B93815]`}>더 나은 배치가 있을 수 있어요</span>}
       {confirmed && <span className={`${ui.badge} bg-[#DDF7E9] text-[#067647]`}>확정</span>}
       {draft && <span className={`${ui.badge} border border-[#DCDCD8] bg-white text-[#4B4F57]`}>작성 중</span>}
+      {excepted.length > 0 && (
+        <ul className="flex w-full flex-col gap-0.5 text-[13px] text-[#B93815]">
+          {excepted.map((e) => (
+            <li key={`${e.when}|${e.text}`}>
+              {e.when}에는 “{e.text}” 없이 만들었어요
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 }

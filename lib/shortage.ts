@@ -3,15 +3,16 @@ import { AVAILABILITY_RULE_PREFIX, isAvailabilityRule } from "./availability";
 import { coverageDays } from "./coverage-conflict";
 import type { PeriodRange } from "./period";
 import { OFF_CODE, ruleShape } from "./rules";
-import type { ConstraintSpec, Rule, ShopConfig } from "./types.gen";
+import type { ConstraintSpec, People, Rule, ShopConfig } from "./types.gen";
 
-/** 인원 규칙 하나가 하루 근무조에서 모자란 곳. names는 그날 그 근무조에 들어올 수 있는 사람(명단 순). */
+/** 인원 규칙 하나가 하루 근무조에서 모자란 곳. names는 그날 그 근무조에 들어올 수 있는 사람(명단 순), people은 규칙이 고르는 사람. */
 export interface Shortage {
   constraintId: string;
   day: number;
   code: string;
   need: number;
   names: string[];
+  people: People;
 }
 
 /** 가능 시간 규칙 avail-{직원 id}-{코드}에서 (직원, 코드) → 못 나오는 날. */
@@ -59,22 +60,29 @@ export function coverageShortages(
       const covering = codes.filter((x) => x.code === code || x.parts?.includes(code)).map((x) => x.code);
       return coverageDays(s.days, period, holidays).flatMap((day) => {
         const names = picked.filter((n) => covering.some((x) => !blocked.get(`${n.id}-${x}`)?.has(day))).map((n) => n.name);
-        return names.length < need ? [{ constraintId: c.id, day, code, need, names }] : [];
+        return names.length < need ? [{ constraintId: c.id, day, code, need, names, people }] : [];
       });
     });
   });
 }
 
-/** ① 가능 시간에서 만들기 전에 보는 경고. 반드시 인원 규칙 모두를 지금 받은 가능 시간으로 센다(가능하면 규칙은 모자라도 근무표가 나온다). */
+/**
+ * ① 가능 시간에서 만들기 전에 보는 경고. 반드시 인원 규칙 모두를 지금 받은 가능 시간으로 센다(가능하면 규칙은 모자라도 근무표가 나온다).
+ * pending(아직 내지 않은 직원)은 언제든 나올 수 있다고 보고 그 직원의 가능 시간 규칙을 빼고 센다.
+ */
 export function availabilityShortages(
   constraints: ConstraintSpec[],
   employees: { id: string; name: string; tags?: string[] }[],
   config: ShopConfig,
   period: PeriodRange,
   holidays: number[],
+  pending: string[] = [],
 ): Shortage[] {
-  const hard = constraints.filter((c) => (c.hardness ?? "hard") === "hard").map((c) => c.id);
-  return coverageShortages(hard, constraints, employees, config, period, holidays);
+  const waiting = (c: ConstraintSpec) =>
+    isAvailabilityRule(c.id) && c.type === "rule" && c.body.kind === "require" && !!c.body.for_each.people?.ids?.every((id) => pending.includes(id));
+  const counted = constraints.filter((c) => !waiting(c));
+  const hard = counted.filter((c) => (c.hardness ?? "hard") === "hard").map((c) => c.id);
+  return coverageShortages(hard, counted, employees, config, period, holidays);
 }
 
 /** 규칙이 고르던 날에서 drop을 뺀 수정본(그날만 예외). 날마다 세는 규칙(require)이 아니면 그대로 돌려준다. */
@@ -84,4 +92,11 @@ export function withoutDays(c: ConstraintSpec, drop: number[], period: PeriodRan
   const days = body.for_each.days ?? {};
   const keep = coverageDays(days, period, holidays).filter((d) => !drop.includes(d));
   return { ...c, body: { ...body, for_each: { ...body.for_each, days: { ...days, days: keep } } } };
+}
+
+/** withoutDays의 반대: 수정본이 원본에서 뺀 날. 날마다 세는 규칙(require)이 아니거나 뺀 날이 없으면 빈 배열이다. */
+export function droppedDays(original: ConstraintSpec, edited: ConstraintSpec, period: PeriodRange, holidays: number[]): number[] {
+  if (original.type !== "rule" || edited.type !== "rule" || original.body.kind !== "require" || edited.body.kind !== "require") return [];
+  const kept = coverageDays(edited.body.for_each.days, period, holidays);
+  return coverageDays(original.body.for_each.days, period, holidays).filter((d) => !kept.includes(d));
 }

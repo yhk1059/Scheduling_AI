@@ -1,5 +1,5 @@
 // 가능 시간 → 근무조 판정 → 반드시 규칙. 순수 함수. LLM을 거치지 않는다(ADR-020).
-import { dateOfDay, type PeriodRange } from "./period";
+import { dateOfDay, dayOfDate, type PeriodRange } from "./period";
 import { normalizeRule, OFF_CODE, stableJson } from "./rules";
 import type { Conflict, Rule, ShiftDef, ShopConfig } from "./types.gen";
 
@@ -118,6 +118,16 @@ export function copyDay(cells: Set<string>, from: string, to: string[]): Set<str
     for (const date of to) next.add(cellKey(date, slot));
   }
   return next;
+}
+
+/** from 기간의 날짜 키를 to 기간의 같은 인덱스 날짜로 옮긴다. from 밖의 키는 버린다. */
+export function moveSlots(slots: AvailabilitySlots, from: PeriodRange, to: PeriodRange): AvailabilitySlots {
+  return Object.fromEntries(
+    Object.entries(slots).flatMap(([date, ranges]) => {
+      const day = dayOfDate(from, date);
+      return day === null ? [] : [[dateOfDay(to, day), ranges]];
+    }),
+  );
 }
 
 /** 링크 행들 → 직원 id별 가능 시간. 아직 비어 있는 행은 뺀다. */

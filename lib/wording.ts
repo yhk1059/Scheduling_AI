@@ -168,7 +168,7 @@ function tagGroup(tags: string[], excluded: string[], employees: Employee[]): st
 const roleJosa = (w: string, a: string, b: string) => josa(w.replace(/\([^)]*\)$/, ""), a, b);
 
 /** 문장 속 사람: "리더 직원", "홀 리더 직원", "신입 빼고", "이영희 박민수 중". 비어 있으면 "". */
-function roleLabel(p: People | null | undefined, employees: Employee[]): string {
+export function roleLabel(p: People | null | undefined, employees: Employee[]): string {
   if (!p) return "";
   const excluded = p.exclude_tags?.join("·");
   if (p.ids?.length) {
