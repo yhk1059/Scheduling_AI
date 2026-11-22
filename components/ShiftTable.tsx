@@ -111,7 +111,7 @@ function ShiftTimeline({ shop, focusShift }: { shop: Shop; focusShift: (code: st
                   {lines.map(([label, text]) => (
                     <span key={label} className="mt-0.5 flex gap-2 text-xs text-[#111214]">
                       <span className="shrink-0 text-[#6B6F78]">{label}</span>
-                      <span className="font-mono">{text}</span>
+                      <span>{text}</span>
                     </span>
                   ))}
                   <span className="relative mt-1 block h-4">

@@ -173,8 +173,8 @@ describe("unitName / unitShort", () => {
 
 describe("hardnessLabel", () => {
   it("반드시 / 가능하면", () => {
-    expect(hardnessLabel("hard")).toBe("필수");
-    expect(hardnessLabel("soft")).toBe("선호");
+    expect(hardnessLabel("hard")).toBe("반드시");
+    expect(hardnessLabel("soft")).toBe("가능하면");
   });
 });
 

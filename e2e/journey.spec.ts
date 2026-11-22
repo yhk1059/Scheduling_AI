@@ -409,8 +409,8 @@ test("S8. ② 매장 조건", async () => {
   }
   await expect(page.getByText("필요 인원 없이 만들면 인원을 맞추지 않아요")).toHaveCount(0);
   await expect(page.getByText(/명 근무 · \d+명 쉼/)).toHaveCount(0);
-  // 요약표는 켜진 필수 필요 인원 규칙을 합친 값이다. 말로 만든 날마다 규칙도 같은 표에 든다(S18)
-  await expect(page.getByText("켜 둔 필수 인원 규칙을 한 표로 모았어요. 특정 날짜에만 적용되는 인원은 아래 카드에서 봐요")).toBeVisible();
+  // 요약표는 켜진 반드시 필요 인원 규칙을 합친 값이다. 말로 만든 날마다 규칙도 같은 표에 든다(S18)
+  await expect(page.getByText("반드시 지킬 필요 인원을 한 표로 모았어요. 특정 날짜에만 적용되는 인원은 아래 카드에서 봐요")).toBeVisible();
   await expect(summaryRow("오픈").locator("td").nth(2)).toHaveText("1~2명");
   await expect(summaryRow("마감").locator("td").nth(3)).toHaveText("3명");
   const weekdayMin = page.getByRole("textbox", { name: "평일 오픈 최소 인원" });
@@ -484,17 +484,17 @@ test("S8. ② 매장 조건", async () => {
   await expect(pendingRuleRows(page)).toHaveCount(total);
   for (const row of await pendingRuleRows(page).all()) {
     await row.click();
-    await expectCardChrome(pendingCards(page).first(), "필수");
+    await expectCardChrome(pendingCards(page).first(), "반드시");
   }
   await expect(page.getByText(`적용하지 않은 규칙 ${total}개는 빠져요`)).toBeVisible();
   await expectNoDevTerms(page, "② 매장 조건(적용 대기)");
 
   await pendingRuleRows(page).getByText("5일 넘게 연달아 일하지 않아요", { exact: true }).first().click();
-  const toggle = r2Card.getByRole("group", { name: "필수/선호" });
-  await toggle.getByRole("button", { name: "선호" }).click();
-  await expect(toggle.getByRole("button", { name: "선호" })).toHaveAttribute("aria-pressed", "true");
-  await toggle.getByRole("button", { name: "필수" }).click();
-  await expect(toggle.getByRole("button", { name: "필수" })).toHaveAttribute("aria-pressed", "true");
+  const toggle = r2Card.getByRole("group", { name: "반드시/가능하면" });
+  await toggle.getByRole("button", { name: "가능하면" }).click();
+  await expect(toggle.getByRole("button", { name: "가능하면" })).toHaveAttribute("aria-pressed", "true");
+  await toggle.getByRole("button", { name: "반드시" }).click();
+  await expect(toggle.getByRole("button", { name: "반드시" })).toHaveAttribute("aria-pressed", "true");
 
   await applyAllPending(page);
   // R2가 기본 규칙 최대 연속 근무를 대체하면 공정성 기본 규칙은 근무 수 고르게만 남는다
@@ -553,7 +553,7 @@ test("S9. ② 예외 입력과 ③ 근무표 만들기", async () => {
   const prefCard = pendingCards(page).filter({ hasText: "희망·기피 근무" });
   await expect(prefCard).toContainText("김철수 ·");
   await expect(prefCard).toContainText("휴무 희망");
-  await expectCardChrome(prefCard, "선호");
+  await expectCardChrome(prefCard, "가능하면");
   await expectNoDevTerms(page, "② 예외 입력(적용 대기)");
 
   await applyAllPending(page);
@@ -577,12 +577,12 @@ test("S9. ② 예외 입력과 ③ 근무표 만들기", async () => {
   await expect(workStepper().getByRole("button", { name: /매장 조건/ })).toBeEnabled();
   await expect(page.getByRole("textbox", { name: REQUEST_INPUT })).toHaveCount(0);
   // 만들기 전 요약 한 줄: 제출 수와 반드시·가능하면 규칙 수(필요 인원·요청 포함)
-  await expect(page.getByRole("main")).toContainText(/제출 12\/12명 · 필수 \d+개 · 선호 \d+개/);
+  await expect(page.getByRole("main")).toContainText(/제출 12\/12명 · 반드시 \d+개 · 가능하면 \d+개/);
   await expect(primaryButtons(page)).toHaveText("근무표 만들기");
   expect(await solve(() => page.getByRole("button", { name: "근무표 만들기" }).click())).toBe("ok");
-  await expect(page.getByText("필수 규칙을 모두 지켰어요", { exact: true })).toBeVisible();
+  await expect(page.getByText("반드시 규칙을 모두 지켰어요", { exact: true })).toBeVisible();
   await expect(page.getByText("희망 반영", { exact: true })).toBeVisible();
-  await expect(page.getByText("못 지킨 선호 규칙", { exact: true })).toBeVisible();
+  await expect(page.getByText("못 지킨 가능하면 규칙", { exact: true })).toBeVisible();
   await expect(page.getByText("칸을 누르면 바꿀 수 있어요.")).toBeVisible();
   await expect(primaryButtons(page)).toHaveCount(1);
   await expect(primaryButtons(page)).toHaveText("확정");
@@ -623,7 +623,7 @@ test("S9. ② 예외 입력과 ③ 근무표 만들기", async () => {
   await expect(page.getByText("입력이 바뀌었어요. 다시 만들어 주세요"), "새로고침만으로 입력 변경 배너가 뜨지 않는다").toHaveCount(0);
   expect(await solve(() => changed.getByRole("button", { name: "다시 만들기" }).click())).toBe("ok");
   await expect(changed).toHaveCount(0);
-  await expect(page.getByText("필수 규칙을 모두 지켰어요", { exact: true })).toBeVisible();
+  await expect(page.getByText("반드시 규칙을 모두 지켰어요", { exact: true })).toBeVisible();
 });
 
 /** 박민수는 칠한 칸이 근무조를 완전히 덮는 칸에만 배정된다. 칸 고정한 날은 뺀다. */
@@ -715,7 +715,7 @@ test("S10. 근무표 없음 → 설명과 검증된 제안", async () => {
   page.off("response", onResponse);
 
   await expect(page.getByText("이 조건으로는 근무표를 만들 수 없어요")).toHaveCount(0);
-  await expect(page.getByText("필수 규칙을 모두 지켰어요", { exact: true })).toBeVisible();
+  await expect(page.getByText("반드시 규칙을 모두 지켰어요", { exact: true })).toBeVisible();
   await expect(confirmButton).toBeEnabled();
   await expectHardRulesHold(page, WEEK, lastSolve);
   expect(leeLeave(lastSolve!.constraints ?? [])?.enabled, "이영희 휴가가 켜져 있음").not.toBe(false);
@@ -740,7 +740,7 @@ test("S11. 칸 고정 후 다시 만들기", async () => {
   expect(await solve(() => page.getByRole("button", { name: "O로 고정" }).click())).toBe("ok");
   const cell = page.getByRole("button", { name: `김철수 11월 ${dom}일 O` });
   await expect(cell.locator("svg")).toHaveCount(1);
-  await expect(page.getByText("필수 규칙을 모두 지켰어요", { exact: true })).toBeVisible();
+  await expect(page.getByText("반드시 규칙을 모두 지켰어요", { exact: true })).toBeVisible();
   await expectHardRulesHold(page, WEEK, lastSolve);
 
   const afterFix = await readGrid(page, WEEK);
@@ -754,7 +754,7 @@ test("S11. 칸 고정 후 다시 만들기", async () => {
   await page.getByRole("button", { name: `박민수 11월 4일 ${afterFix["박민수"][2]}` }).click();
   expect(await solve(() => page.getByRole("button", { name: "A로 고정" }).click())).toBe("ok");
   await expect(page.getByRole("button", { name: "박민수 11월 4일 A" }).locator("svg")).toHaveCount(1);
-  await expect(page.getByText("필수 규칙을 모두 지켰어요", { exact: true })).toBeVisible();
+  await expect(page.getByText("반드시 규칙을 모두 지켰어요", { exact: true })).toBeVisible();
   const park = await employeeId(page, "박민수");
   const parkA = (lastSolve!.constraints ?? []).find((c) => c.id === `avail-${park}-A`);
   const forbidden = parkA?.type === "rule" && parkA.body.kind === "require" ? parkA.body.for_each.days?.days : null;

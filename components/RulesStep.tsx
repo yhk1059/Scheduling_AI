@@ -4,6 +4,8 @@ import { useId, useState, useSyncExternalStore, type ReactNode } from "react";
 
 import { ApiError, errorMessage, translate } from "@/lib/api";
 import { findCoverageConflict } from "@/lib/coverage-conflict";
+import { DEMO_SENTENCES, demoCards } from "@/lib/demo";
+import { DEMO_DOC } from "@/lib/demo-doc";
 import { describeRule, describeShiftChange, hardnessLabel, presetName } from "@/lib/wording";
 import { firstPeriodStart, periodFrom, type PeriodRange, type PeriodUnit } from "@/lib/period";
 import {
@@ -192,7 +194,27 @@ export default function RulesStep({
     }
   };
 
+  // 체험: 예시 문장이면 저장된 카드를 꺼내고 LLM은 부르지 않는다(ADR-025)
+  const runDemo = (input: string) => {
+    setNotice(null);
+    const cards = demoCards(DEMO_DOC, input);
+    if (!cards) {
+      setNotice({ kind: "unsupported", text: "체험에서는 아래 예시 문장만 카드로 바꿔 볼 수 있어요. 내 매장에서는 어떤 문장이든 돼요." });
+      return;
+    }
+    const known = new Set([...shop.pendingRules, ...shop.rules].map((c) => c.id));
+    const fresh = cards.filter((c) => !known.has(c.id));
+    if (!fresh.length) {
+      setNotice({ kind: "unsupported", text: "이 문장은 이미 카드로 만들었어요." });
+      return;
+    }
+    addPendingRules(fresh);
+    setSelectedId(fresh[0].id);
+    setText("");
+  };
+
   const run = async (input: string) => {
+    if (demo) return runDemo(input);
     setLoading(true);
     setNotice(null);
     setFailure(null);
@@ -229,14 +251,19 @@ export default function RulesStep({
     }
   };
 
-  // 체험에서는 LLM을 부르지 않으므로 입력 바 대신 안내를 둔다
-  const input = demo ? (
-    <DemoInputNote />
-  ) : (
+  // 체험의 예외 입력은 저장된 카드가 없어 입력 바 대신 안내를 둔다. 매장 조건은 예시 문장만 카드로 바꾼다(LLM을 부르지 않는다)
+  const demoShop = demo && scope === "shop";
+  const examples: readonly string[] = demoShop ? DEMO_SENTENCES : copy.examples;
+  const input =
+    demo && !demoShop ? (
+      <DemoInputNote />
+    ) : (
     <>
       <div className="flex flex-col gap-1">
         <p className={ui.cardTitle}>{copy.prompt}</p>
-        <p className="text-[13px] text-[#4B4F57]">{copy.description}</p>
+        <p className="text-[13px] text-[#4B4F57]">
+          {demoShop ? "체험에서는 아래 예시 문장을 눌러 [규칙 만들기]를 해 보세요. 카드는 [적용]을 눌러야 반영돼요." : copy.description}
+        </p>
       </div>
       <form
         className={`${ui.bar} ${tooLong ? "border-[#B42318]!" : ""}`}
@@ -261,10 +288,10 @@ export default function RulesStep({
           {loading ? "읽는 중…" : copy.submit}
         </button>
       </form>
-      {copy.examples.length > 0 && (
+      {examples.length > 0 && (
         <div className="flex flex-wrap items-center gap-1.5">
           <span className={ui.help}>예시</span>
-          {copy.examples.map((ex) => (
+          {examples.map((ex) => (
             <button key={ex} type="button" onClick={() => setText(ex)} className={ui.chip}>
               {ex}
             </button>

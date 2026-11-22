@@ -30,13 +30,18 @@ test("S20. 체험 저니", async ({ page }) => {
   await expect(banner).toContainText("한강 다이닝");
   await expect(page.getByRole("status").filter({ hasText: "샘플 매장 한강 다이닝을 눌러 보고 있어요" })).toBeVisible();
 
-  // ② 매장 조건: 입력 바 대신 안내, 대기 카드가 있다
+  // ② 매장 조건: 대기 카드 없이 시작하고, 예시 문장만 카드로 바꿀 수 있다(LLM을 부르지 않고 저장된 카드)
   const steps = page.getByRole("list", { name: "근무표 작성 단계" });
   await expect(steps.locator('[aria-current="step"]')).toContainText("매장 조건");
-  await expect(page.getByText("체험에서는 말로 적을 수 없어요")).toBeVisible();
-  await expect(page.getByRole("textbox", { name: "매장 조건 입력" })).toHaveCount(0);
-  const pending = await pendingRuleRows(page).count();
-  expect(pending, "대기 카드").toBeGreaterThan(0);
+  await expect(pendingRuleRows(page)).toHaveCount(0);
+  await page.getByRole("textbox", { name: "매장 조건 입력" }).fill("일요일은 휴무로 해 주세요");
+  await page.getByRole("button", { name: "규칙 만들기" }).click();
+  await expect(page.getByText("체험에서는 아래 예시 문장만 카드로 바꿔 볼 수 있어요", { exact: false })).toBeVisible();
+  for (const ex of ["홀은 오픈 2명, 미들 1명, 마감 3명", "홀 마감과 주방 마감에는 리더가 꼭 1명씩 있어야 해"]) {
+    await page.getByRole("button", { name: ex, exact: true }).click();
+    await page.getByRole("button", { name: "규칙 만들기" }).click();
+  }
+  expect(await pendingRuleRows(page).count(), "대기 카드").toBeGreaterThan(0);
   await expectNoDevTerms(page, "체험 ② 매장 조건");
   await applyAllPending(page);
 
@@ -57,7 +62,7 @@ test("S20. 체험 저니", async ({ page }) => {
   await expect(proposals.first()).toBeVisible();
   // 저장된 설명(LLM 문장)이 보이는 화면이라 개발 용어 검사는 하지 않는다
   await proposals.first().getByRole("button", { name: "수락" }).click();
-  await expect(page.getByText("필수 규칙 모두 지킴", { exact: true })).toBeVisible();
+  await expect(page.getByText("반드시 규칙 모두 지킴", { exact: true })).toBeVisible();
 
   // ① 가능 시간: 모두 제출한 상태, 링크 없음
   await steps.getByRole("button", { name: "가능 시간" }).click();
@@ -117,8 +122,8 @@ test("S20. 체험 저니", async ({ page }) => {
   await page.getByRole("button", { name: "나가기" }).click();
   await expect(page).toHaveURL(/\/$/);
   await page.goto("/demo");
-  await expect(page.getByText("체험에서는 말로 적을 수 없어요")).toBeVisible();
-  await expect(pendingRuleRows(page)).toHaveCount(pending);
+  await expect(page.getByRole("textbox", { name: "매장 조건 입력" })).toBeVisible();
+  await expect(pendingRuleRows(page)).toHaveCount(0);
   const stored = await page.evaluate(() => localStorage.getItem("shop-scheduler"));
   expect(stored ?? "", "체험은 저장하지 않는다").not.toContain("한강 다이닝");
 });

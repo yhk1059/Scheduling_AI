@@ -34,11 +34,25 @@ export function demoData(doc: DemoDoc, today: string): Data {
   // 공휴일이 끼면 주말 필요 인원이 달라져 시나리오가 깨진다
   const period = { ...newPeriod(range), holidays: [], availability, availabilityUsed: null };
   return {
-    shop: withDefaultRules(doc.shop),
+    // 대기 카드는 예시 문장으로 [규칙 만들기]를 눌렀을 때 꺼낸다(demoCards)
+    shop: { ...withDefaultRules(doc.shop), pendingRules: [] },
     periods: [period],
     view: { screen: "period", periodId: period.id, step: 2 },
     inputVersion: 0,
   };
+}
+
+/** 체험 ②에서 말로 적어 볼 수 있는 문장(scripts/dining-data.ts의 DEMO_LIVE_SENTENCES). 문서의 대기 카드가 이 문장들의 번역이다. */
+export const DEMO_SENTENCES = ["홀은 오픈 2명, 미들 1명, 마감 3명", "홀 마감과 주방 마감에는 리더가 꼭 1명씩 있어야 해"];
+
+/**
+ * 체험의 [규칙 만들기]: 예시 문장이면 그 문장에서 나온 저장된 대기 카드를 돌려준다(LLM을 부르지 않는다, ADR-025).
+ * 번역은 한 문장을 여러 카드로 나누고 원문을 조각으로 둘 수 있어, 원문이 문장 안에 든 카드를 고른다. 예시 문장이 아니면 null.
+ */
+export function demoCards(doc: DemoDoc, text: string): ConstraintSpec[] | null {
+  const said = text.trim().replace(/\s+/g, " ");
+  if (!DEMO_SENTENCES.includes(said)) return null;
+  return doc.shop.pendingRules.filter((c) => said.includes(c.source_text));
 }
 
 /** 요청의 규칙 제약(type "rule", enabled !== false, avail- 제외)만 id 순으로 정렬해 stableJson한 문자열. */

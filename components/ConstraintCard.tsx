@@ -200,7 +200,7 @@ function Reading({ sentence, dim = false, children }: { sentence: ReactNode; dim
   return (
     <div className="ml-2 flex flex-col gap-2.5 border-l-2 border-[#EDEDEA] pl-3.5">
       <div className="flex flex-col gap-1">
-        <span className={`${ui.eyebrow} text-[11px]!`}>이렇게 이해했어요</span>
+        <span className={`${ui.eyebrow} text-[11px]!`}>이렇게 읽었어요</span>
         <p className={`text-base font-semibold leading-snug tracking-[-0.01em] ${dim ? "text-[#6B6F78]" : "text-[#111214]"}`}>{sentence}</p>
       </div>
       {children}
@@ -212,8 +212,8 @@ function HardnessToggle({ value, disabled, onChange }: { value: Hardness; disabl
   return (
     <div
       role="group"
-      aria-label="필수/선호"
-      title={disabled ? "휴가와 고정 근무는 항상 필수예요" : undefined}
+      aria-label="반드시/가능하면"
+      title={disabled ? "휴가와 고정 근무는 항상 반드시예요" : undefined}
       className="inline-flex overflow-hidden rounded-md border border-[#DCDCD8]"
     >
       {(["hard", "soft"] as const).map((h) => (
@@ -384,7 +384,7 @@ export default function ConstraintCard({
         <h3 className={compact ? "text-sm font-semibold text-[#111214]" : ui.cardTitle}>{presetName(card)}</h3>
         {/* 휴가 카드는 항상 반드시라 토글 대신 배지를 둔다 */}
         {isLeaveRule(card) ? (
-          <span className={`${ui.badge} bg-[#111214] text-white`}>필수</span>
+          <span className={`${ui.badge} bg-[#111214] text-white`}>반드시</span>
         ) : (
           <div className="flex items-center gap-2">
             {hardness === "soft" && card.type !== "fixed_assignment" && (

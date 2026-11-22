@@ -332,7 +332,7 @@ function CoverageSummary({ period }: { period: WorkPeriod }) {
   if (!shop) return null;
   const rules = liveShopRules(shop, period);
   const th = "py-1.5 pr-2 sm:pr-4 text-left text-xs font-medium text-[#6B6F78]";
-  const td = "py-1.5 pr-2 sm:pr-4 font-mono text-[13px] text-[#111214]";
+  const td = "py-1.5 pr-2 sm:pr-4 text-[13px] text-[#111214]";
   // 전체 필요 인원 뒤에 직급별 필요 인원("홀 2명 · 주방 2명")을 잇는다
   const need = (code: Code, kind: DayKind) =>
     [coverageText(effectiveCoverage(rules, code, kind, period, period.holidays)), ...tagCoverage(rules, code, kind).map((t) => `${t.tag} ${coverageText(t)}`)]
@@ -358,7 +358,7 @@ function CoverageSummary({ period }: { period: WorkPeriod }) {
             {coverageCodes(shop.config).map((s) => (
               <tr key={s.code} className="border-b border-[#F5F5F4] last:border-b-0">
                 <td className="py-1.5 pr-2 sm:pr-4 text-[13px] font-medium text-[#111214]">{s.name}</td>
-                <td className={td}>
+                <td className={`${td} font-mono`}>
                   {s.start}~{s.end}
                 </td>
                 <td className={td}>{need(s.code, "weekday")}</td>
@@ -372,7 +372,7 @@ function CoverageSummary({ period }: { period: WorkPeriod }) {
           {open ? "접기" : "바꾸기"}
         </button>
       </div>
-      {!open && <p className={ui.help}>켜 둔 필수 인원 규칙을 한 표로 모았어요. 특정 날짜에만 적용되는 인원은 아래 카드에서 봐요</p>}
+      {!open && <p className={ui.help}>반드시 지킬 필요 인원을 한 표로 모았어요. 특정 날짜에만 적용되는 인원은 아래 카드에서 봐요</p>}
       {open && <ShiftTable />}
     </section>
   );

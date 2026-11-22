@@ -22,6 +22,7 @@ import { josa, scheduleName } from "@/lib/wording";
 import { takeConfirmedEntry } from "./confirmedEntry";
 import ConstraintCard from "./ConstraintCard";
 import { Spinner, today } from "./RulesStep";
+import { StepBar } from "./Stepper";
 import { downloadCsv, InlineLock, ScheduleBody, toMessage, ToastAlert, useSolve, WEEKDAYS } from "./ScheduleStep";
 import { shortTime } from "./ShopHome";
 import { ui } from "./ui";
@@ -75,6 +76,8 @@ export default function ConfirmedPeriod() {
   // 다시 만들기가 끝나 결과에 반영됐을 때만 그렇게 적는다
   const appliedLabel = sv.busy || sv.outcome || sv.toast ? undefined : "적용됨 · 다시 만들었어요";
   // 솔버의 diff는 직전 결과와의 차이라 마지막 확정본과 직접 비교한다
+  // 확정본과 다른 표가 보이는 중(다시 확정 전)
+  const draftShown = !ended && unconfirmed;
   const diff = unconfirmed && result && lastVersion ? diffAssignments(lastVersion.assignments, result.assignments) : [];
 
   const translateChange = async (input: string): Promise<string | null> => {
@@ -119,15 +122,17 @@ export default function ConfirmedPeriod() {
     setChangeIds((ids) => [...ids, sample.id]);
   };
 
-  const csv = () => result && downloadCsv(period, employees, result);
+  // 받기·인쇄는 직원에게 보이는 것(마지막 확정본)이다. 다시 확정하기 전의 바뀐 표는 내보내지 않는다
+  const shared = draftShown && lastVersion ? lastVersion.assignments : result?.assignments;
+  const csv = () => result && shared && downloadCsv(period, employees, { ...result, assignments: shared });
   const svg = () =>
-    result &&
+    shared &&
     scheduleSvg({
       title: `${shop.name ? `${shop.name} · ` : ""}${scheduleName(period, shop.unit)}`,
       employees,
       period,
       holidays: period.holidays,
-      assignments: result.assignments,
+      assignments: shared,
       config: shop.config,
     });
   const fileName = `근무표-${period.start_date}_${periodEnd(period)}`;
@@ -258,32 +263,6 @@ export default function ConfirmedPeriod() {
         }
         actions={
           <>
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                {!ended && revertable && (
-                  <button type="button" onClick={revert} disabled={busy} className={ui.text}>
-                    변경 취소
-                  </button>
-                )}
-              </div>
-              <div className="flex items-center gap-2">
-                <button type="button" onClick={csv} disabled={busy} className={!ended && (unconfirmed || revertable) ? ui.text : ui.secondary}>
-                  CSV 받기
-                </button>
-                <button type="button" onClick={image} disabled={busy} className={!ended && (unconfirmed || revertable) ? ui.text : ui.secondary}>
-                  이미지 받기
-                </button>
-                <button type="button" onClick={print} disabled={busy} className={!ended && (unconfirmed || revertable) ? ui.text : ui.secondary}>
-                  인쇄
-                </button>
-                {!ended && unconfirmed && outdated && <p className={`${ui.help} mr-1`}>지금 조건으로 만든 근무표만 확정할 수 있어요</p>}
-                {!ended && unconfirmed && (
-                  <button type="button" onClick={reconfirm} disabled={busy || outdated} className={ui.primaryLg}>
-                    다시 확정
-                  </button>
-                )}
-              </div>
-            </div>
             <section className="flex flex-col gap-3">
               <h2 className={ui.sectionTitle}>확정 기록</h2>
               <ul className={`${ui.card} flex flex-col py-1.5!`}>
@@ -303,6 +282,31 @@ export default function ConfirmedPeriod() {
                   .reverse()}
               </ul>
             </section>
+            {/* 확정 뒤에도 할 일(다시 확정·공유)은 아래 고정 바에 둔다 */}
+            <StepBar caption={ended ? "끝난 근무표예요" : draftShown ? "바뀐 칸이 있어요. 다시 확정해야 직원에게 보여요" : "확정한 근무표예요"}>
+              {!ended && revertable && (
+                <button type="button" onClick={revert} disabled={busy} className={ui.text}>
+                  변경 취소
+                </button>
+              )}
+              {draftShown && (
+                <p className={`${ui.help} mr-1`}>{outdated ? "지금 조건으로 만든 근무표만 확정할 수 있어요" : "받기·인쇄는 마지막 확정본이에요"}</p>
+              )}
+              <button type="button" onClick={csv} disabled={busy} className={draftShown ? ui.text : ui.secondary}>
+                CSV 받기
+              </button>
+              <button type="button" onClick={image} disabled={busy} className={draftShown ? ui.text : ui.secondary}>
+                이미지 받기
+              </button>
+              <button type="button" onClick={print} disabled={busy} className={draftShown ? ui.text : ui.secondary}>
+                인쇄
+              </button>
+              {draftShown && (
+                <button type="button" onClick={reconfirm} disabled={busy || outdated} className={ui.primaryLg}>
+                  다시 확정
+                </button>
+              )}
+            </StepBar>
           </>
         }
       />

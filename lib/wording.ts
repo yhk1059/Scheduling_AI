@@ -45,9 +45,9 @@ export function describeShiftChange(change: ShiftChange, config: ShopConfig): st
   ].join(" · ");
 }
 
-/** "필수" | "선호". */
+/** "반드시" | "가능하면"(UI_GUIDE 문구). */
 export function hardnessLabel(h: "hard" | "soft"): string {
-  return h === "hard" ? "필수" : "선호";
+  return h === "hard" ? "반드시" : "가능하면";
 }
 
 /** [15,16,17,20] → [[15,17],[20,20]] */

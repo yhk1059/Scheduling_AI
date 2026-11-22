@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { requestSignature, demoData } from "./demo";
+import { DEMO_SENTENCES, demoCards, requestSignature, demoData } from "./demo";
 import { DEMO_DOC } from "./demo-doc";
 import { STORAGE_VERSION } from "./rules";
 import { createAppStore, refEmployees, toScheduleRequest } from "./store";
@@ -55,9 +55,26 @@ describe("DEMO_DOC", () => {
     expect(DEMO_DOC.explanation!.response.proposals.filter((p) => p.verified_summary).length).toBeGreaterThan(0);
   });
 
-  it("대기 카드를 모두 적용한 체험 상태의 요청이 저장한 설명의 signature와 같다", () => {
+  it("체험은 대기 카드 없이 시작하고, 예시 문장마다 그 문장의 저장된 카드를 돌려준다", () => {
+    expect(demoData(DEMO_DOC, TODAY).shop!.pendingRules).toEqual([]);
+    expect(DEMO_SENTENCES).toEqual(LIVE);
+    const cards = DEMO_SENTENCES.map((t) => demoCards(DEMO_DOC, t)!);
+    for (const [i, t] of DEMO_SENTENCES.entries()) {
+      expect(cards[i].length).toBeGreaterThan(0);
+      expect(cards[i].every((c) => sentenceOf(LIVE, c.source_text) === t)).toBe(true);
+    }
+    expect(cards.flat().map((c) => c.id).sort()).toEqual(shop.pendingRules.map((c) => c.id).sort());
+  });
+
+  it("예시 문장은 앞뒤·중간 공백이 달라도 같고, 다른 문장은 null이다", () => {
+    expect(demoCards(DEMO_DOC, `  ${LIVE[1].replace(" ", "  ")} `)).toEqual(demoCards(DEMO_DOC, LIVE[1]));
+    expect(demoCards(DEMO_DOC, "일요일은 휴무로 해 주세요")).toBeNull();
+  });
+
+  it("예시 문장으로 만든 카드를 모두 적용한 체험 상태의 요청이 저장한 설명의 signature와 같다", () => {
     const store = createAppStore(memoryStorage);
     store.setState(demoData(DEMO_DOC, TODAY));
+    for (const t of DEMO_SENTENCES) store.getState().addPendingRules(demoCards(DEMO_DOC, t)!);
     const s = store.getState();
     for (const c of [...s.shop!.pendingConfig, ...s.shop!.pendingRules]) store.getState().applyRule(c.id);
     const { shop: applied, periods } = store.getState();
