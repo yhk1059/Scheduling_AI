@@ -217,4 +217,19 @@ describe("demoLeaveCard", () => {
     expect(JSON.stringify(card.type === "rule" && card.body)).toContain('"ids":["e02"]');
     expect(JSON.stringify(card.type === "rule" && card.body)).toContain('"days":[2,3,4]');
   });
+
+  it("병가 날(화~목)에 근무로 고정한 칸이 있는 직원은 고르지 않는다(고정과 병가가 부딪혀 근무표가 없어진다)", () => {
+    const card = demoLeaveCard(period, assignments, EMPLOYEES, [{ employee_id: "e02", day: 3, shift: "C" }]);
+    // 서민호(3일)를 빼면 오지훈(2일)이 가장 많이 일한다
+    expect(JSON.stringify(card.type === "rule" && card.body)).toContain('"ids":["e03"]');
+  });
+
+  it("병가 날 밖의 고정이나 휴무 고정은 고를 때 막지 않는다", () => {
+    const fixed = [
+      { employee_id: "e02", day: 5, shift: "A" },
+      { employee_id: "e02", day: 2, shift: "O" },
+    ];
+    const card = demoLeaveCard(period, assignments, EMPLOYEES, fixed);
+    expect(JSON.stringify(card.type === "rule" && card.body)).toContain('"ids":["e02"]');
+  });
 });

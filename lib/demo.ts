@@ -87,15 +87,22 @@ export function demoLinkRows(
 
 export const DEMO_LEAVE_PREFIX = "demo-leave-";
 
-/** 체험 확정 뒤 [예시 병가 넣기]의 요청 카드(LLM을 부르지 않는다). 화~목(2~4일째)에 가장 많이 일하는 직원의 병가. */
+/**
+ * 체험 확정 뒤 [예시 병가 넣기]의 요청 카드(LLM을 부르지 않는다). 화~목(2~4일째)에 가장 많이 일하는 직원의 병가.
+ * 그날들에 근무로 고정한 칸(fixed)이 있는 직원은 병가와 부딪혀 근무표가 없어지므로 고르지 않는다(모두 그렇다면 그대로 고른다).
+ */
 export function demoLeaveCard(
   period: PeriodRange,
   assignments: Record<string, string[]>,
   employees: { id: string; name: string }[],
+  fixed: { employee_id: string; day: number; shift: string }[] = [],
 ): ConstraintSpec {
   const days = [2, 3, 4];
   const works = (id: string) => days.filter((d) => (assignments[id]?.[d - 1] ?? OFF_CODE) !== OFF_CODE).length;
-  const who = employees.reduce((best, e) => (works(e.id) > works(best.id) ? e : best), employees[0]);
+  const pinned = new Set(fixed.filter((f) => days.includes(f.day) && f.shift !== OFF_CODE).map((f) => f.employee_id));
+  const free = employees.filter((e) => !pinned.has(e.id));
+  const pool = free.length ? free : employees;
+  const who = pool.reduce((best, e) => (works(e.id) > works(best.id) ? e : best), pool[0]);
   return normalizeRule({
     id: `${DEMO_LEAVE_PREFIX}${who.id}`,
     type: "rule",

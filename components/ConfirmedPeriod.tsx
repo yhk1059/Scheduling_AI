@@ -63,7 +63,7 @@ export default function ConfirmedPeriod() {
   const now = today();
   const ended = periodEnd(period) < now;
   const busy = sv.busy || translating;
-  const { employees, period: range, holidays = [] } = toScheduleRequest(shop, period, periods, now);
+  const { employees, period: range, holidays = [], constraints = [] } = toScheduleRequest(shop, period, periods, now);
   const { result } = period;
   const lastVersion = period.versions.at(-1);
   const unconfirmed = hasUnconfirmedChanges(period);
@@ -110,7 +110,9 @@ export default function ConfirmedPeriod() {
 
   // 체험은 LLM을 부르지 않고 예시 병가 카드를 넣는다. 이미 넣었으면 그 카드를 쓴다(다시 만든 결과로 사람이 바뀌지 않게)
   const added = [...period.pendingRequests, ...period.requests].find((c) => c.id.startsWith(DEMO_LEAVE_PREFIX));
-  const sample = demo && result ? (added ?? demoLeaveCard(range, result.assignments, employees)) : null;
+  // 손으로 고정한 칸이 있는 직원은 예시 병가에서 뺀다(고정과 병가가 부딪혀 근무표가 없어진다)
+  const fixed = constraints.flatMap((c) => (c.type === "fixed_assignment" && c.enabled !== false ? [c.params] : []));
+  const sample = demo && result ? (added ?? demoLeaveCard(range, result.assignments, employees, fixed)) : null;
   const addSample = () => {
     if (!sample) return;
     addPendingRequests(periodId, [sample]);
