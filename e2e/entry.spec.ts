@@ -59,7 +59,7 @@ test("S1. 랜딩 → 데모 영상 → 로그인 → 매장 준비", async ({ pa
 
   await loginAsTestUser(page);
   await expect(setupHeading(page)).toBeVisible();
-  await expect(page.getByText("아직 명단이 없어요.")).toBeVisible();
+  await expect(page.getByText("아직 명단이 없어요", { exact: true })).toBeVisible();
 
   // 이미 로그인했으니 로그인 화면 없이 들어간다
   await page.goto("/");
@@ -72,7 +72,7 @@ test("S1-b. 앱을 로그인 없이 열면 로그인 화면", async ({ page }) =
   await page.goto("/app");
   const login = page.getByRole("button", { name: "Google로 로그인" });
   await expect(login).toBeVisible();
-  await expect(login).toHaveClass(/bg-\[#155E75\]/);
+  await expect(login).toHaveClass(/bg-\[#111214\] text-white/);
   await expect(page.getByRole("button", { name: "데모 영상" })).toHaveCount(0);
   await expect(page.getByRole("link", { name: "개인정보처리방침" })).toBeVisible();
   await expect(page.getByRole("link", { name: "샘플 매장으로 먼저 체험하기" })).toHaveCount(0);

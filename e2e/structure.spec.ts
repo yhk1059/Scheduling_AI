@@ -30,6 +30,8 @@ import {
   solveVia,
   submitFullDay,
   openStats,
+  prepareSummary,
+  summaryText,
 } from "./test-helpers";
 
 // [요일 종류, 근무 이름, 인원] (D5)
@@ -79,7 +81,7 @@ test("S14. 시작일 15일과 근무 형태(피크 추가, 더블), 직급 배�
   await page.goto("/app");
   await loginAsTestUser(page);
   await page.getByRole("textbox", { name: "매장 이름" }).fill("연남 카페");
-  await page.getByRole("combobox", { name: "근무표 주기" }).selectOption({ label: "한 달(1일~말일)" });
+  await page.getByRole("group", { name: "근무표 주기" }).getByText("한 달", { exact: true }).click();
   await addRoster(page, ROSTER);
   await expect(page.getByRole("button", { name: "6행 파트·직급 리더 빼기" })).toBeVisible();
   const { shop: afterRoster } = await readState(page);
@@ -106,7 +108,7 @@ test("S14. 시작일 15일과 근무 형태(피크 추가, 더블), 직급 배�
   await expectNoDevTerms(page, "① 가능 시간(시작일 15일)");
   await submitFullDay(FIRST, EMPLOYEE_COUNT);
   await page.getByRole("button", { name: "접기" }).first().click();
-  await page.getByRole("button", { name: "다음", exact: true }).click();
+  await page.getByRole("button", { name: /^다음:/ }).click();
 
   // ② 근무 형태: 요약표 [바꾸기] → 근무 코드 표에 피크(P) 추가 → 필요 인원 폼에 피크 행이 생긴다
   await expect(stepper().locator('[aria-current="step"]')).toContainText("매장 조건");
@@ -119,7 +121,7 @@ test("S14. 시작일 15일과 근무 형태(피크 추가, 더블), 직급 배�
   const change = page.getByRole("button", { name: "바꾸기" });
   await expect(change).toHaveAttribute("aria-expanded", "false");
   await change.click();
-  await expect(page.getByRole("button", { name: "접기" })).toHaveAttribute("aria-expanded", "true");
+  await expect(page.getByRole("button", { name: "접기", exact: true })).toHaveAttribute("aria-expanded", "true");
   await expect(page.getByRole("textbox", { name: "A 끝 시각" })).toHaveValue("15:00");
   await expect(page.getByRole("textbox", { name: "A 실근무 시간" })).toHaveValue("6");
   await expect(page.getByRole("cell", { name: "휴무", exact: true })).toHaveCount(0);
@@ -187,10 +189,10 @@ test("S14. 시작일 15일과 근무 형태(피크 추가, 더블), 직급 배�
 });
 
 test("S15. 피크·더블 근무표 → 다음 근무표 시작일 미루기", async () => {
-  await page.getByRole("button", { name: "다음", exact: true }).click();
+  await page.getByRole("button", { name: /^다음:/ }).click();
   await expect(scheduleTitle(page)).toBeVisible();
   expect(await solve(() => page.getByRole("button", { name: "근무표 만들기" }).click())).toBe("ok");
-  await expect(page.getByText("반드시 규칙을 모두 지켰어요", { exact: true })).toBeVisible();
+  await expect(page.getByText("반드시 규칙 모두 지킴", { exact: true })).toBeVisible();
   expect(lastSolve!.period).toEqual(FIRST);
   const peak = lastSolve!.config!.shifts.find((s) => s.code === "P");
   expect({ end: peak?.end, hours: peak?.hours }).toEqual({ end: "14:00", hours: 3 });
@@ -217,9 +219,9 @@ test("S15. 피크·더블 근무표 → 다음 근무표 시작일 미루기", a
   await primaryButtons(page).click();
   await expect(page.getByRole("heading", { level: 1 })).toHaveText("12/15~1/14 근무표");
   await expect(stepper().locator('[aria-current="step"]')).toContainText("가능 시간");
-  await expect(page.getByRole("main")).toContainText("지난 근무표에서 이어져요");
+  await expect(prepareSummary(page)).toContainText(summaryText({ "이어받는 근무": "지난 근무표에서" }));
   // 한국 공휴일이 자동으로 들어간다: 12/25 성탄절(11번째 날), 1/1 신정(18번째 날)
-  await expect(page.getByRole("main")).toContainText("2026.12.15 – 2027.1.14 · 공휴일 2일");
+  await expect(prepareSummary(page)).toContainText(summaryText({ 날짜: "2026.12.15 – 2027.1.14", 공휴일: "2일" }));
   expect((await readState(page)).periods.find((p) => p.start_date === "2026-12-15")?.holidays).toEqual([11, 18]);
   await expect(page.getByRole("button", { name: "링크 복사" })).toHaveCount(1);
   expect((await shownLinks(page)).filter((l) => firstLinks.includes(l)), "링크는 근무표마다 새로 만든다").toEqual([]);

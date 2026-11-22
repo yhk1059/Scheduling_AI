@@ -10,6 +10,7 @@ import type { Shop } from "../lib/store";
 import type { ScheduleRequest } from "../lib/types.gen";
 import {
   appliedCards,
+  appliedRuleRows,
   CARRY_OVER_DAYS,
   clearAccount,
   confirmedGrid,
@@ -37,6 +38,8 @@ import {
   seedShop,
   solveVia,
   openStats,
+  prepareSummary,
+  summaryText,
 } from "./test-helpers";
 
 const OCT: PeriodRange = { start_date: "2026-10-05", length: 28 };
@@ -113,7 +116,7 @@ test("S3. 운영 중인 매장: 다음 근무표 작성과 확정", async () => 
   await expect(page.getByText("작성 중", { exact: true })).toBeVisible();
   const stepper = page.getByRole("list", { name: "근무표 작성 단계" });
   await expect(stepper.locator('[aria-current="step"]')).toContainText("가능 시간");
-  await expect(page.getByRole("main")).toContainText("2026.11.2 – 11.29 · 공휴일 없음 · 직원 12명 · 지난 근무표에서 이어져요");
+  await expect(prepareSummary(page)).toContainText(summaryText({ 날짜: "2026.11.2 – 11.29", 공휴일: "없음", 직원: "12명", "이어받는 근무": "지난 근무표에서" }));
   const prepare = page.getByRole("button", { name: "바꾸기" });
   await expect(prepare).toHaveAttribute("aria-expanded", "false");
   await expect(page.getByRole("heading", { name: "명단 확인" })).toHaveCount(0);
@@ -127,29 +130,29 @@ test("S3. 운영 중인 매장: 다음 근무표 작성과 확정", async () => 
   await expect(page.getByRole("button", { name: "링크 복사" })).toHaveCount(1);
 
   // ② 매장 조건: 요약표(D2)와 적용된 규칙 카드 8장(기본 규칙 "근무 수는 고르게" 포함), 그 아래 펼쳐진 예외 패널에 요청 3개
-  await page.getByRole("button", { name: "다음", exact: true }).click();
+  await page.getByRole("button", { name: /^다음:/ }).click();
   await expect(stepper.locator('[aria-current="step"]')).toContainText("매장 조건");
   await expect(page.getByRole("heading", { name: "매장 조건", exact: true })).toBeVisible();
   const openRow = page.getByRole("row").filter({ hasText: "오픈" }).first();
   await expect(openRow).toContainText("09:00~15:00");
   await expect(page.getByRole("textbox", { name: "예외 입력" })).toBeVisible();
   await expect(pendingCards(page)).toHaveCount(0);
-  await expect(appliedCards(page)).toHaveCount(8 + 3);
+  await expect(appliedRuleRows(page)).toHaveCount(8);
   for (const summary of ["이영희 · 11/10~11/12 · 휴무", "박민수 · 주말·공휴일 · 마감 피하기", "정유진 · 11/20 · 오픈 희망"]) {
     await expect(appliedCards(page).filter({ hasText: summary })).toHaveCount(1);
   }
   await expectNoDevTerms(page, "② 매장 조건과 예외 입력");
 
   // ③ 근무표: 예외 입력 없이 바로 근무표 만들기
-  await page.getByRole("button", { name: "다음", exact: true }).click();
+  await page.getByRole("button", { name: /^다음:/ }).click();
   await expect(stepper.locator('[aria-current="step"]')).toContainText("근무표");
   await expect(scheduleTitle(page)).toBeVisible();
-  await expect(page.getByRole("main")).toContainText("제출 12/12명 · 반드시 12개 · 가능하면 5개 · 지난 근무 7일 이어받아요");
+  await expect(page.getByRole("main")).toContainText("제출 12/12명반드시 규칙 12개가능하면 규칙 5개지난 근무 7일 이어받음");
   await expect(page.getByRole("textbox", { name: "예외 입력" })).toHaveCount(0);
 
   // S3-c. 근무표 만들기: 최근 4주 열과 근거 한 줄
   expect(await solve(() => page.getByRole("button", { name: "근무표 만들기" }).click())).toBe("ok");
-  await expect(page.getByText("반드시 규칙을 모두 지켰어요", { exact: true })).toBeVisible();
+  await expect(page.getByText("반드시 규칙 모두 지킴", { exact: true })).toBeVisible();
   await expect(page.getByText("희망 반영", { exact: true })).toBeVisible();
   await expect(page.getByText("못 지킨 가능하면 규칙", { exact: true })).toBeVisible();
   await openStats(page);
@@ -221,8 +224,8 @@ test("S4. 확정 근무표: 변경 입력 → 최소 변경 → 다시 확정 ·
   await expect(page.getByRole("heading", { level: 1 }).locator("..")).toContainText("운영 중");
   await expect(page.getByRole("textbox", { name: "변경 입력" })).toBeFocused();
   await expect(page.getByRole("list", { name: "근무표 작성 단계" })).toHaveCount(0);
-  await expect(page.getByRole("button", { name: "요청 만들기" })).toHaveClass(/bg-\[#155E75\]/);
-  await expect(page.getByRole("button", { name: "CSV 받기" })).toHaveClass(/bg-white/);
+  await expect(page.getByRole("button", { name: "요청 만들기" })).toHaveClass(/bg-\[#111214\] text-white/);
+  await expect(page.getByRole("button", { name: "CSV 받기" })).toHaveClass(/bg-\[#F5F5F4\] text-\[#111214\]/);
   await openStats(page);
   await expect(sectionWith("개인별 통계").locator("tbody tr")).toHaveCount(EMPLOYEE_COUNT);
 
@@ -256,7 +259,7 @@ test("S4. 확정 근무표: 변경 입력 → 최소 변경 → 다시 확정 ·
     expect(await solve(() => pendingCards(page).first().getByRole("button", { name: "적용" }).click())).toBe("ok");
   }
 
-  await expect(page.getByText("반드시 규칙을 모두 지켰어요", { exact: true })).toBeVisible();
+  await expect(page.getByText("반드시 규칙 모두 지킴", { exact: true })).toBeVisible();
   await expect(page.getByText("작성 중", { exact: true })).toBeVisible();
   await expect(page.getByText("확정본에서 바뀐 칸", { exact: true })).toBeVisible();
   const locks = (lastSolve!.constraints ?? []).filter((c) => c.id.startsWith("lock-"));

@@ -214,11 +214,15 @@ export const pendingRuleRows = (page: Page) => page.getByRole("region", { name: 
 export const appliedRuleRows = (page: Page) => page.getByRole("region", { name: "적용됨" }).getByRole("list").getByRole("button");
 export const pendingCards = (page: Page) => page.locator("article").filter({ hasText: "적용 대기" });
 export const appliedCards = (page: Page) => page.locator("article").filter({ hasText: "적용됨" });
+/** ① 가능 시간의 준비 요약(날짜·공휴일·직원·이어받는 근무)과, 그 칸들을 이어 붙인 글자. */
+export const prepareSummary = (page: Page) => page.getByRole("region", { name: "준비 요약" });
+export const summaryText = (fields: Record<string, string>) => Object.entries(fields).map(([k, v]) => k + v).join("");
+
 export const scheduleTitle = (page: Page) => page.getByRole("heading", { name: "근무표", exact: true }).first();
 /** 진행 중이면 비활성이 되는 버튼. 근무표가 없으면 [근무표 만들기], 있으면 [CSV 받기]다. */
 const idleButton = (page: Page) => page.getByRole("button", { name: /^(근무표 만들기|CSV 받기)$/ });
 /** 누를 수 있는 Primary 버튼. 펼친 입력 바의 빈 [요청 만들기]는 비활성이라 세지 않는다. */
-export const primaryButtons = (page: Page) => page.locator('main button[class*="bg-[#155E75]"]:not(:disabled)');
+export const primaryButtons = (page: Page) => page.locator('main button[class*="bg-[#111214] text-white"]:not(:disabled)');
 
 export async function readState(page: Page): Promise<StoredState> {
   return page.evaluate(() => JSON.parse(localStorage.getItem("shop-scheduler")!).state);
