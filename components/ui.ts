@@ -37,7 +37,7 @@ export const ui = {
   /** 강조 바탕 패널. 한 화면에 하나. */
   panel: "rounded-3xl bg-[#F5F5F4] px-6 py-6",
   /** 자연어 입력 바 껍데기와 그 안의 입력. */
-  bar: "flex items-center h-14 bg-white border border-[#DCDCD8] rounded-full pl-5 pr-1.5 gap-2.5 focus-within:border-[#C4247C] focus-within:outline-2 focus-within:outline-[#C4247C] focus-within:-outline-offset-1",
+  bar: "flex items-center h-14 bg-white border border-[#868B94] rounded-full pl-5 pr-1.5 gap-2.5 focus-within:border-[#C4247C] focus-within:outline-2 focus-within:outline-[#C4247C] focus-within:-outline-offset-1",
   barInput: "flex-1 border-0 outline-0 text-[15px] bg-transparent min-w-0 text-[#111214] placeholder:text-[#6B6F78]",
   /** 큰 면 카드(로그인, 대화상자). */
   cardXl: "rounded-3xl bg-white border border-[#EDEDEA]",
@@ -58,10 +58,10 @@ export const ui = {
     base: "bg-[#F5F5F4] text-[#4B4F57]",
   },
   input:
-    "h-11 rounded-xl bg-white border border-[#9499A2] px-3.5 text-sm text-[#111214] placeholder:text-[#6B6F78] focus:outline-2 focus:outline-[#C4247C] focus:-outline-offset-1 focus:border-[#C4247C]",
+    "h-11 rounded-xl bg-white border border-[#868B94] px-3.5 text-sm text-[#111214] placeholder:text-[#6B6F78] focus:outline-2 focus:outline-[#C4247C] focus:-outline-offset-1 focus:border-[#C4247C]",
   /** 표 안 입력 칸(명단·근무 형태). 테두리 색은 상태에 따라 붙인다. */
   cell: "h-8 rounded-lg border bg-white px-2 text-[13px] text-[#111214] focus:outline-2 focus:outline-[#C4247C] focus:-outline-offset-1",
-  cellOk: "border-[#9499A2]",
+  cellOk: "border-[#868B94]",
   cellErr: "border-[#B42318] bg-[#FEE4E2] text-[#B42318]",
   label: "text-xs font-medium text-[#4B4F57]",
   help: "text-xs font-medium text-[#6B6F78]",
