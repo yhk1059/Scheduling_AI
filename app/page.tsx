@@ -230,7 +230,7 @@ export default function Home() {
         <section className="landing-hero">
           <div className={`${container} hero-heading`}>
             <h1>
-              Scheduling<span aria-hidden="true" className="hero-sticker calendar-sticker"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><rect x="3" y="5" width="18" height="16" rx="3" /><path d="M3 10h18M8 3v4M16 3v4" /></svg></span><br />
+              Scheduling<span aria-hidden="true" className="hero-sticker calendar-sticker"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><rect x="3" y="5" width="18" height="16" rx="3" /><path d="M3 10h18M8 3v4M16 3v4" /></svg></span>{" "}
               <span className="text-[#EE46BC]">AI</span><span aria-hidden="true" className="hero-sticker sparkle-sticker">✦</span>
             </h1>
             <div className="flex flex-wrap items-center justify-between gap-6">
