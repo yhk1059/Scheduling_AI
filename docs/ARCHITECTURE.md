@@ -4,10 +4,11 @@
 ```
 app/                  # Next.js 페이지 (UI 세부는 UI_GUIDE 확정 후)
 ├── page.tsx          # 랜딩 (/) — 정적, API 호출 없음
+├── how/page.tsx      # 만든 방식 (/how) — 정적, 포트폴리오 방문자용 기술 설명
 ├── a/[token]/page.tsx # 직원 가능 시간 입력 (/a/{공용 토큰}) — 로그인 없음, 토큰 DB 함수만 호출
 ├── demo/page.tsx     # 체험 (/demo) — <AppShell demo />, 로그인 없음, 샘플 매장을 메모리에만 (ADR-025)
 └── app/page.tsx      # 앱 (/app) — 시작, 매장 홈, 매장 설정, 기간 작업 (PRD 화면)
-components/           # UI 컴포넌트 (Demo.tsx: 체험 상단 바, 체험에서 막은 동작의 안내 대화상자)
+components/           # UI 컴포넌트 (Demo.tsx: 체험 상단 바, 체험에서 막은 동작의 안내 대화상자, landing.tsx: 랜딩과 /how가 같이 쓰는 섹션 틀·푸터)
 lib/
 ├── store.ts          # Zustand. 로그인한 매니저의 매장 문서와 동기화하고 localStorage는 캐시로만 쓴다
 ├── availability.ts   # 가능 시간 → 근무조 판정 → 반드시 규칙 (순수 함수)

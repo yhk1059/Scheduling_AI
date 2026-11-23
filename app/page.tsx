@@ -1,32 +1,13 @@
-import { Fragment, type ReactNode } from "react";
+import { Fragment } from "react";
 
 import Link from "next/link";
 
 import DemoVideoButton from "@/components/DemoVideo";
-import HeroSequence, { ChangeFragment, ReplyCard, ScheduleFragment } from "@/components/HeroSequence";
+import HeroSequence, { ChangeFragment } from "@/components/HeroSequence";
+import { LandingFooter, SectionHead, body, container, section } from "@/components/landing";
 import { ui } from "@/components/ui";
 import Wordmark, { Mark } from "@/components/Wordmark";
 import { PRODUCT_NAME } from "@/lib/product";
-
-// 저장소를 옮기면 이 한 줄만 바꾼다.
-const REPO_URL = "https://github.com/yhk1059/Scheduling_AI";
-const EVAL_URL = `${REPO_URL}/blob/main/eval/results.md`;
-
-const container = "mx-auto w-full max-w-[1200px] px-5 lg:px-14";
-const section = "border-t border-[#EDEDEA] py-16 lg:py-28";
-const sectionTitle = "text-[32px] leading-[1.15] lg:text-[52px] font-bold tracking-[-0.04em] text-[#111214]";
-const lead = "max-w-[640px] text-base leading-relaxed text-[#4B4F57]";
-const body = "text-sm leading-relaxed text-[#4B4F57]";
-
-function SectionHead({ eyebrow, title, children }: { eyebrow: string; title: string; children: ReactNode }) {
-  return (
-    <div className="flex flex-col gap-3">
-      <p className={ui.eyebrow}>{eyebrow}</p>
-      <h2 className={sectionTitle}>{title}</h2>
-      <p className={lead}>{children}</p>
-    </div>
-  );
-}
 
 // 문제 장면: 손으로 짠 엑셀 근무표. 토요일 칸을 고치면(주황 1) 다음 날 칸이 깨진다(빨강 2). 색은 앱 근무표와 같다.
 type Shift = "오픈" | "미들" | "마감" | "휴";
@@ -99,31 +80,25 @@ function HandSheet() {
   );
 }
 
-/** 문제 쪽 말풍선. 매니저와 직원의 말, 그 아래 말로에서는 누가 맡는지. */
-const CHAT: { who: "매니저" | "직원"; time: string; text: string; answers: [Actor, string][] }[] = [
+/** 문제 쪽 말풍선. 매니저와 직원의 말, 그 아래 이 서비스에서 달라지는 점 한 줄. */
+const CHAT: { who: "매니저" | "직원"; time: string; text: string; answer: string }[] = [
   {
     who: "매니저",
     time: "일요일 23:10",
     text: "토요일 마감 채우니까 이번엔 연속 6일이 됐어요… 다시 처음부터.",
-    answers: [["계산 엔진", "모든 칸을 한꺼번에 따져 규칙을 다 지키는 표를 찾아요."]],
+    answer: "조건을 모두 지키는 근무표를 한 번에 찾아 줘요.",
   },
   {
     who: "매니저",
     time: "월요일 00:40",
     text: "이 조건으로 되긴 되는 거예요? 어디부터 바꿔야 하지.",
-    answers: [
-      ["계산 엔진", "그런 표가 없으면 없다고 확실히 알려 줘요."],
-      ["AI", "어디를 바꾸면 되는지 설명해요."],
-    ],
+    answer: "안 되면 안 된다고, 무엇을 바꾸면 되는지 알려 줘요.",
   },
   {
     who: "직원",
     time: "월요일 08:12",
     text: "아까 말한 시간 바뀌었어요! 그리고 마감 다음 날 오픈은 안 되는 거 맞죠?",
-    answers: [
-      ["AI", "말을 규칙 카드로 적어요."],
-      ["사람", "맞는지 보고 적용해요."],
-    ],
+    answer: "직원이 링크에서 직접 고쳐요. 규칙은 한 번만 적어 두면 돼요.",
   },
 ];
 
@@ -141,12 +116,7 @@ function ChatPanel() {
           <p className="self-start rounded-xl rounded-tl-[3px] border border-[#EDEDEA] bg-white px-3.5 py-2.5 text-[15px] leading-[1.55] text-[#111214]">{m.text}</p>
           <div className="flex flex-col gap-1.5 rounded-lg bg-[#FDEAF4] px-3 py-2.5">
             <span className="font-mono text-[11px] text-[#C4247C]">{PRODUCT_NAME}에서는</span>
-            {m.answers.map(([actor, text]) => (
-              <span key={actor} className="flex items-start gap-2 text-sm leading-[22px] text-[#111214]">
-                <ActorChip actor={actor} />
-                {text}
-              </span>
-            ))}
+            <span className="text-sm leading-[22px] text-[#111214]">{m.answer}</span>
           </div>
         </div>
       ))}
@@ -154,47 +124,11 @@ function ChatPanel() {
   );
 }
 
-/** 앱의 근무표 없음 패널과 같은 순서: 검증된 제안 먼저, 이유는 [왜 만들 수 없나요?]를 펼친 모양으로 아래에. */
-function BlockedFragment() {
-  return (
-    <div className="flex flex-col gap-3.5 rounded-2xl border border-[#FECDCA] bg-white px-[18px] py-4">
-      <div className="flex flex-wrap items-center gap-2">
-        <span className={`${ui.badge} ${ui.badgeTone.none} whitespace-nowrap`}>근무표 없음</span>
-        <h3 className="text-[13px] font-semibold text-[#111214]">이 조건으로는 근무표를 만들 수 없어요</h3>
-      </div>
-      <div className="flex flex-col gap-1.5">
-        <h4 className="text-[13px] font-semibold text-[#111214]">이렇게 바꾸면 만들 수 있어요</h4>
-        <div className={`${ui.card} flex flex-col gap-2.5`}>
-          <div className="flex items-center justify-between gap-3">
-            <h5 className="text-[13px] font-semibold text-[#111214]">주말 마감 인원 줄이기</h5>
-            <span className={`${ui.badge} ${ui.badgeTone.confirmed} shrink-0`}>검증됨</span>
-          </div>
-          <div className="flex flex-col gap-0.5">
-            <span className="text-sm font-medium text-[#111214]">주말 마감 최소 3 → 2</span>
-            <span className="text-xs text-[#6B6F78]">“주말 마감은 3명”</span>
-          </div>
-          <p className="text-xs text-[#6B6F78]">
-            이렇게 바꾸면 근무표를 만들 수 있어요 · 희망 반영 <span className="font-mono">9/9</span>
-          </p>
-          <div className="flex justify-end gap-1">
-            <span className={ui.textSm}>무시</span>
-            <span className={ui.primarySm}>수락</span>
-          </div>
-        </div>
-      </div>
-      <div className="border-t border-[#F5F5F4] pt-3">
-        <p className="text-[13px] font-semibold text-[#111214]">왜 만들 수 없나요?</p>
-        <p className={`mt-1.5 ${body}`}>토요일 마감에 들어올 수 있는 사람이 2명뿐인데, 주말 마감은 3명이 필요해요.</p>
-      </div>
-    </div>
-  );
-}
-
-// 02 끝: 근무표가 나간 뒤에도 이어지는 일
+// 03: 근무표가 나간 뒤에도 이어지는 일
 const MORE_PAINS = [
-  { title: "“왜 나만 주말이 많아요?”", body: "직원마다 근무 수, 주말·공휴일 근무, 최근 4주 마감을 보여 줘요. 근거를 대기 쉬워요." },
-  { title: "확정 뒤에 생긴 병가", body: "확정한 근무표에서 최소한의 칸만 바꾸고 바뀐 칸을 표시해요. 이미 지난 날은 건드리지 않아요." },
-  { title: "다음 근무표로 이어받기", body: "명단과 매장 조건은 그대로 남아요. 지난 근무 마지막 며칠도 다음 근무표가 이어받아요." },
+  { title: "“왜 나만 주말이 많아요?”", body: "처음부터 공평하게 나눠 짜요. 직원별 근무 수, 주말 근무, 최근 4주 마감 횟수도 보여 드려서 숫자로 바로 답할 수 있어요." },
+  { title: "확정 뒤에 생긴 병가", body: "바뀌는 칸은 최소로 줄이고, 바뀐 칸은 표시해 드려요. 이미 지난 날은 건드리지 않아요." },
+  { title: "다음 근무표로 이어받기", body: "명단과 조건은 그대로 남아요. 지난 근무표의 마지막 며칠도 이어서 따져요. 일요일에 마감한 사람을 월요일 오픈에 넣지 않는 식이에요." },
 ];
 
 // 미니 캘린더에 칠한 시간(칸 번호). 요일마다 [시작, 끝)
@@ -257,84 +191,26 @@ function SummaryFragment() {
 
 const STEPS = [
   {
-    title: "가능 시간 링크",
-    body: "단체 대화방에 링크 하나만 올리면, 직원이 자기 이름을 골라 일할 수 있는 시간을 칠해요.",
+    title: "가능 시간 받기",
+    body: "단체 대화방에 링크 하나만 올리세요. 직원이 자기 이름을 고르고 일할 수 있는 시간을 칠해요. 메신저를 보며 옮겨 적을 필요가 없어요.",
     fragment: <CalendarFragment />,
   },
   {
-    title: "말로 매장 조건",
-    body: "필요 인원과 규칙을 평소 말투로 적으면 카드로 정리돼요. [적용]을 눌러야 반영돼요.",
+    title: "매장 조건 적기",
+    body: "“평일 마감은 3명”, “마감 다음 날 오픈은 안 돼요”처럼 평소 말투로 적으세요. 적은 말이 조건 카드로 정리돼요.",
     fragment: <BarFragment />,
   },
   {
     title: "근무표 만들기",
-    body: "버튼 하나로 근무표를 만들어요. 막히면 어떤 규칙끼리 부딪히는지 설명하고, 실제로 근무표가 나오는 해결책만 보여 줘요.",
+    body: "버튼을 누르면 조건을 모두 지킨 근무표가 나와요. 안 되는 조건이 있으면 어디가 부딪히는지와 어떻게 바꾸면 되는지 알려 줘요.",
     fragment: <SummaryFragment />,
   },
   {
-    title: "확정과 최소 변경",
-    body: "확정하면 직원 링크가 잠겨요. 병가가 생기면 말로 적어 주세요. 바뀌는 칸을 최소로 줄여 다시 만들어요.",
+    title: "확정하고 운영하기",
+    body: "확정하면 직원 입력이 마감돼요. 갑자기 병가가 나면 “최지훈 4~6일 병가”라고 적으세요. 다른 사람 근무는 최대한 그대로 두고 필요한 칸만 바꿔요.",
     fragment: <ChangeFragment />,
   },
 ];
-
-type Actor = "사람" | "AI" | "계산 엔진";
-
-/** 만든 방식의 세 장면. 근무표에 들어가는 길은 세 곳(적용·확정·수락)이고, 셋 다 사람이 연다. */
-/** 규칙 읽기 정확도 한 줄. 수치의 근거(평가 결과)로 바로 간다. */
-function AccuracyNote() {
-  return (
-    <div className="flex items-center gap-4 rounded-lg border border-[#EDEDEA] bg-white px-4 py-3">
-      <span className="font-mono text-[28px] leading-none font-semibold text-[#C4247C]">97%</span>
-      <div className="flex flex-col gap-0.5">
-        <span className="text-[13px] font-semibold text-[#111214]">말을 규칙으로 바르게 읽은 비율</span>
-        <span className={ui.help}>
-          매니저 말투 문장 102개 기준 ·{" "}
-          <a href={EVAL_URL} className="underline underline-offset-2 hover:text-[#111214]">
-            평가 자료 보기(GitHub)
-          </a>
-        </span>
-      </div>
-    </div>
-  );
-}
-
-const SCENES: { title: string; body: string; actors: [Actor, string][]; fragment: ReactNode; note?: ReactNode }[] = [
-  {
-    title: "말은 AI가 읽어요",
-    body: "매니저가 적은 말을 규칙으로 바꾸고 “이렇게 읽었어요”로 되돌려 줘요. 규칙으로 바꿀 수 없으면 카드 대신 다시 물어봐요. [적용]을 누르기 전에는 아무것도 반영되지 않아요.",
-    actors: [
-      ["AI", "읽어요"],
-      ["사람", "적용해요"],
-    ],
-    fragment: <ReplyCard title="연달아 금지" quote="마감 다음 날 오픈은 안 되게" reading="마감 다음 날에는 오픈을 넣지 않아요" pending />,
-    note: <AccuracyNote />,
-  },
-  {
-    title: "계산은 계산 엔진이 해요",
-    body: "계산 엔진이 규칙만 받아 모두 지키는 근무표를 찾거나, 그런 근무표가 없다는 것을 확인해요. AI는 근무표의 칸을 하나도 채우지 않아요. 확정하면 직원 링크가 잠겨요.",
-    actors: [
-      ["계산 엔진", "계산하고 확인해요"],
-      ["사람", "확정해요"],
-    ],
-    fragment: <ScheduleFragment />,
-  },
-  {
-    title: "막히면 셋이 함께 풀어요",
-    body: "근무표가 없다고 나오면, AI가 어떤 규칙끼리 부딪히는지 설명하고 바꿀 곳을 제안해요. 제안은 계산 엔진이 다시 계산해 실제로 근무표가 나오는 것만 남겨요. 그중에서 고르는 건 사람이에요.",
-    actors: [
-      ["AI", "설명·제안"],
-      ["계산 엔진", "다시 계산해 확인"],
-      ["사람", "수락해요"],
-    ],
-    fragment: <BlockedFragment />,
-  },
-];
-
-/** 행위자 칩. 사람만 강조색 면: 결정하는 자리라는 뜻. */
-function ActorChip({ actor }: { actor: Actor }) {
-  return <span className={`${ui.badge} shrink-0 whitespace-nowrap ${actor === "사람" ? "bg-[#C4247C] text-white" : ui.badgeTone.draft}`}>{actor}</span>;
-}
 
 export default function Home() {
   return (
@@ -343,7 +219,7 @@ export default function Home() {
         <div className={`${container} flex min-h-16 flex-wrap items-center justify-between gap-3 py-2`}>
           <Wordmark size="bar" href="/" />
           <nav aria-label="주요 메뉴" className="flex items-center gap-2 sm:gap-4">
-            <a href="#how" className={`${ui.text} max-sm:hidden`}>작동 방식</a>
+            <a href="#how" className={`${ui.text} max-sm:hidden`}>사용 방법</a>
             <DemoVideoButton className={ui.text}>데모 영상</DemoVideoButton>
             <Link href="/app" className={ui.primary}>로그인</Link>
           </nav>
@@ -354,11 +230,11 @@ export default function Home() {
         <section className="landing-hero">
           <div className={`${container} hero-heading`}>
             <h1>
-              근무표는<span aria-hidden="true" className="hero-sticker calendar-sticker"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><rect x="3" y="5" width="18" height="16" rx="3" /><path d="M3 10h18M8 3v4M16 3v4" /></svg></span><br />
-              <span className="text-[#EE46BC]">말로</span> 짜요<span aria-hidden="true" className="hero-sticker sparkle-sticker">✦</span>
+              Scheduling<span aria-hidden="true" className="hero-sticker calendar-sticker"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><rect x="3" y="5" width="18" height="16" rx="3" /><path d="M3 10h18M8 3v4M16 3v4" /></svg></span><br />
+              <span className="text-[#EE46BC]">AI</span><span aria-hidden="true" className="hero-sticker sparkle-sticker">✦</span>
             </h1>
             <div className="flex flex-wrap items-center justify-between gap-6">
-              <p className="text-lg leading-relaxed text-[#4B4F57] sm:text-xl">규칙은 평소 말투로 적고, 근무표는 버튼 하나로 만들어요.</p>
+              <p className="text-lg leading-relaxed text-[#4B4F57] sm:text-xl">직원은 링크로 가능 시간을 적고, 조건은 평소 말투로 적으세요. 근무표는 버튼 한 번에 나와요.</p>
               <div className="flex flex-wrap gap-2.5">
                 <Link href="/app" className={ui.primaryXl}>내 매장으로 시작하기</Link>
                 <Link href="/demo" className={ui.secondaryXl}>체험하기</Link>
@@ -369,16 +245,16 @@ export default function Home() {
           <div className={`${container} hero-stage`}>
             <span aria-hidden="true" className="hero-float hero-float-request">일요일은 휴무로 해 주세요</span>
             <div className="hero-window">
-              <div className="hero-window-bar"><span aria-hidden="true">● ● ●</span><span>우리 매장 · 근무표 미리보기</span><span className="font-mono text-[11px]">AI</span></div>
+              <div className="hero-window-bar"><span aria-hidden="true">● ● ●</span><span>우리 매장 · 근무표 미리보기</span><span aria-hidden="true" /></div>
               <HeroSequence />
             </div>
-            <span aria-hidden="true" className="hero-float hero-float-result"><span className="size-2 rounded-full bg-[#12B76A]" />규칙을 확인하고, 사람이 확정해요</span>
+            <span aria-hidden="true" className="hero-float hero-float-result"><span className="size-2 rounded-full bg-[#12B76A]" />조건을 모두 지킨 근무표가 나와요</span>
           </div>
         </section>
 
         <section id="problem" className={section}>
           <div className={`${container} flex flex-col gap-12`}>
-            <SectionHead eyebrow="01 · 문제" title="메신저와 엑셀, 머릿속 규칙으로 짜고 있어요">
+            <SectionHead eyebrow="01 · 이런 적 있죠?" title="메신저와 엑셀, 머릿속 규칙으로 짜고 있어요">
               직원 말은 메신저에, 규칙은 머릿속에, 근무표는 엑셀에 있어요. 한 칸을 고치면 다른 칸이 깨지고, 다 지키는 표가 있는지는 끝까지 알 수 없어요.
             </SectionHead>
             <div className="grid grid-cols-1 gap-10 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:items-start lg:gap-12">
@@ -399,8 +275,8 @@ export default function Home() {
 
         <section id="how" className={section}>
           <div className={`${container} flex flex-col gap-12`}>
-            <SectionHead eyebrow="02 · 동작 방식" title="링크 하나, 말 한 줄, 버튼 하나">
-              근무표마다 같은 순서예요. 한 번 적은 매장 조건은 다음 근무표에도 그대로 써요.
+            <SectionHead eyebrow="02 · 사용 방법" title="이번 주 근무표, 이 순서면 끝나요">
+              한 번 적은 직원 명단과 매장 조건은 다음 근무표에도 그대로 써요.
             </SectionHead>
             <ol className="workflow-steps flex flex-col gap-6">
               {STEPS.map((s, i) => (
@@ -414,44 +290,19 @@ export default function Home() {
                 </li>
               ))}
             </ol>
-            <div className="grid grid-cols-1 gap-6 border-t border-[#F5F5F4] pt-10 lg:grid-cols-3 lg:gap-8">
+          </div>
+        </section>
+
+        <section id="after" className={section}>
+          <div className={`${container} flex flex-col gap-12`}>
+            <SectionHead eyebrow="03 · 그다음" title="근무표 짠 다음에 생기는 일까지">
+              공지하고 끝이 아니에요. 운영하면서 생기는 일도 같이 챙겨요.
+            </SectionHead>
+            <div className="grid grid-cols-1 gap-6 lg:grid-cols-3 lg:gap-8">
               {MORE_PAINS.map((p) => (
                 <div key={p.title} className="flex flex-col gap-2 border-l border-[#DCDCD8] pl-5">
                   <h3 className="text-[15px] font-semibold text-[#111214]">{p.title}</h3>
                   <p className={body}>{p.body}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-        </section>
-
-        <section id="made" className={section}>
-          <div className={`${container} flex flex-col gap-12`}>
-            <div className="flex flex-col gap-2">
-              <SectionHead eyebrow="03 · 만든 방식" title="말은 AI가, 계산은 계산 엔진이, 결정은 사람이">
-                근무표에 들어가는 길은 세 곳뿐이고, 셋 다 사람이 버튼을 눌러야 열려요. AI가 낸 것은 사람이 확인하거나 계산 엔진이 다시 계산해 확인한 것만 반영돼요.
-              </SectionHead>
-              {/* 기술 이름은 궁금한 사람을 위해 한 줄로만 둔다 */}
-              <p className={ui.help}>AI는 Claude(LLM), 계산 엔진은 OR-Tools CP-SAT 솔버예요.</p>
-            </div>
-            <div className="grid grid-cols-1 gap-10 xl:grid-cols-3 xl:items-start xl:gap-8">
-              {SCENES.map((s) => (
-                <div key={s.title} className="flex max-w-[560px] flex-col gap-5 xl:max-w-none">
-                  {s.fragment}
-                  <div className="flex flex-col gap-2">
-                    <div className="flex flex-wrap items-center gap-1.5">
-                      {s.actors.map(([actor, verb], i) => (
-                        <span key={actor} className="flex items-center gap-1.5">
-                          {i > 0 && <span className="text-[13px] text-[#9499A2]">→</span>}
-                          <ActorChip actor={actor} />
-                          <span className="text-[13px] text-[#4B4F57]">{verb}</span>
-                        </span>
-                      ))}
-                    </div>
-                    <h3 className="text-[20px] font-semibold text-[#111214]">{s.title}</h3>
-                    <p className={body}>{s.body}</p>
-                  </div>
-                  {s.note}
                 </div>
               ))}
             </div>
@@ -485,22 +336,7 @@ export default function Home() {
         </section>
       </main>
 
-      <footer>
-        <div className={`${container} flex flex-col gap-3 py-8 text-xs font-medium text-[#6B6F78] lg:flex-row lg:items-center lg:justify-between`}>
-          <span className="flex items-center gap-2">
-            <Mark size={18} tone="muted" />
-            {PRODUCT_NAME}
-          </span>
-          <span className="flex items-center gap-4">
-            <Link href="/privacy" className="-my-3 inline-flex h-10 items-center hover:text-[#111214]">
-              개인정보처리방침
-            </Link>
-            <a href={REPO_URL} className="-my-3 inline-flex h-10 items-center hover:text-[#111214]">
-              GitHub
-            </a>
-          </span>
-        </div>
-      </footer>
+      <LandingFooter />
     </div>
   );
 }
