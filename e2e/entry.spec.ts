@@ -72,7 +72,7 @@ test("S1-b. 앱을 로그인 없이 열면 로그인 화면", async ({ page }) =
   await page.goto("/app");
   const login = page.getByRole("button", { name: "Google로 로그인" });
   await expect(login).toBeVisible();
-  await expect(login).toHaveClass(/bg-\[#111214\] text-white/);
+  await expect(login).toHaveClass(/bg-accent text-white/);
   await expect(page.getByRole("button", { name: "데모 영상" })).toHaveCount(0);
   await expect(page.getByRole("link", { name: "개인정보처리방침" })).toBeVisible();
   await expect(page.getByRole("link", { name: "샘플 매장으로 먼저 체험하기" })).toHaveCount(0);

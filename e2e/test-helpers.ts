@@ -222,7 +222,7 @@ export const scheduleTitle = (page: Page) => page.getByRole("heading", { name: "
 /** 진행 중이면 비활성이 되는 버튼. 근무표가 없으면 [근무표 만들기], 있으면 [CSV 받기]다. */
 const idleButton = (page: Page) => page.getByRole("button", { name: /^(근무표 만들기|CSV 받기)$/ });
 /** 누를 수 있는 Primary 버튼. 펼친 입력 바의 빈 [요청 만들기]는 비활성이라 세지 않는다. */
-export const primaryButtons = (page: Page) => page.locator('main button[class*="bg-[#111214] text-white"]:not(:disabled)');
+export const primaryButtons = (page: Page) => page.locator('main button[class*="bg-accent text-white"]:not(:disabled)');
 
 export async function readState(page: Page): Promise<StoredState> {
   return page.evaluate(() => JSON.parse(localStorage.getItem("shop-scheduler")!).state);

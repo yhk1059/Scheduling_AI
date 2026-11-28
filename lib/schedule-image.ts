@@ -6,9 +6,9 @@ import type { ShopConfig } from "./types.gen";
 const WEEKDAYS = ["일", "월", "화", "수", "목", "금", "토"];
 const FONT = "'Apple SD Gothic Neo','Malgun Gothic','Noto Sans KR',sans-serif";
 const RED = "#B42318";
-const INK = "#111214";
-const MUTED = "#6B6F78";
-const LINE = "#EDEDEA";
+const INK = "#1F1E1B";
+const MUTED = "#6A675F";
+const LINE = "#E4E2DC";
 
 const PAD = 24;
 const TITLE_H = 40;

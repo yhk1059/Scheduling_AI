@@ -70,7 +70,7 @@ export function TopLine({ label = "가능 시간 입력" }: { label?: string }) 
   return (
     <div className="flex h-5 items-center gap-1.5">
       <Wordmark size="small" />
-      <span className="text-[13px] text-[#6B6F78]">· {label}</span>
+      <span className="text-[13px] text-muted">· {label}</span>
     </div>
   );
 }
@@ -80,7 +80,7 @@ export function LoadMessage({ kind, onRetry, label }: { kind: "loading" | "error
     <main className={`${PAGE} flex-col gap-4 py-6`}>
       <TopLine label={label} />
       {kind === "loading" && (
-        <p role="status" className="text-sm text-[#4B4F57]">
+        <p role="status" className="text-sm text-body">
           불러오는 중…
         </p>
       )}
@@ -111,14 +111,14 @@ function NamePicker({ roster, onPick }: { roster: AvailabilityRoster; onPick: (e
         <h1 className={ui.pageTitle}>
           {roster.shop_name} · {roster.locked ? "근무표" : "가능 시간 입력"}
         </h1>
-        <span className="font-mono text-sm text-[#6B6F78]">{formatRange(range)}</span>
+        <span className="font-mono text-sm text-muted">{formatRange(range)}</span>
       </header>
       {roster.locked ? (
-        <p role="status" className="text-sm text-[#4B4F57]">
+        <p role="status" className="text-sm text-body">
           확정된 근무표예요. 내 이름을 고르면 근무표를 볼 수 있어요
         </p>
       ) : (
-        <p className="text-sm text-[#B93815] md:hidden">PC에서 입력해 주세요. 휴대폰에서는 드래그할 수 없어요</p>
+        <p className="text-sm text-warn md:hidden">PC에서 입력해 주세요. 휴대폰에서는 드래그할 수 없어요</p>
       )}
       <section className="flex flex-col gap-3">
         <h2 className={ui.sectionTitle}>내 이름을 골라 주세요</h2>
@@ -128,7 +128,7 @@ function NamePicker({ roster, onPick }: { roster: AvailabilityRoster; onPick: (e
               key={e.link_token}
               type="button"
               onClick={() => (e.submitted && !roster.locked ? setConfirming(e) : onPick(e))}
-              className="inline-flex h-11 items-center gap-2 rounded-full border border-[#DCDCD8] bg-white px-[18px] text-[15px] font-medium text-[#111214] transition-colors duration-[120ms] hover:bg-[#F5F5F4] active:bg-[#EDEDEA] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#C4247C]"
+              className="inline-flex h-11 items-center gap-2 rounded-full border border-line-strong bg-white px-[18px] text-[15px] font-medium text-ink transition-colors duration-[120ms] hover:bg-soft active:bg-pressed focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
             >
               {e.employee_name}{" "}
               {e.submitted && !roster.locked && <span className={`${ui.badge} ${ui.badgeTone.confirmed}`}>제출함</span>}
@@ -273,13 +273,13 @@ function Calendar({
           </h1>
           {pages > 1 && (
             <>
-              <button type="button" disabled={page === 0} onClick={() => goPage(page - 1)} className={`${ui.textSm} disabled:text-[#9499A2]`}>
+              <button type="button" disabled={page === 0} onClick={() => goPage(page - 1)} className={`${ui.textSm} disabled:text-disabled`}>
                 이전 주
               </button>
-              <span className="font-mono text-xs text-[#6B6F78]">
+              <span className="font-mono text-xs text-muted">
                 {page + 1}/{pages}
               </span>
-              <button type="button" disabled={page === pages - 1} onClick={() => goPage(page + 1)} className={`${ui.textSm} disabled:text-[#9499A2]`}>
+              <button type="button" disabled={page === pages - 1} onClick={() => goPage(page + 1)} className={`${ui.textSm} disabled:text-disabled`}>
                 다음 주
               </button>
             </>
@@ -291,7 +291,7 @@ function Calendar({
 
         <div className="grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)_260px] grid-rows-[minmax(0,1fr)] gap-5">
           <div
-            className="grid select-none self-start overflow-hidden rounded-lg border border-[#EDEDEA] bg-white"
+            className="grid select-none self-start overflow-hidden rounded-lg border border-line bg-white"
             style={{
               height: `min(100%, ${CALENDAR_MAX_HEIGHT}px)`,
               gridTemplateColumns: `56px repeat(${shown.length}, minmax(0, 1fr))`,
@@ -305,7 +305,7 @@ function Calendar({
             {SLOTS.filter((slot) => slot % 2 === 0).map((slot) => (
               <span
                 key={slot}
-                className="border-t border-t-[#EDEDEA] pt-0.5 pr-2 text-right font-mono text-[11px] leading-none text-[#6B6F78]"
+                className="border-t border-t-line pt-0.5 pr-2 text-right font-mono text-[11px] leading-none text-muted"
                 style={{ gridColumn: 1, gridRow: `${slot + 2} / span 2` }}
               >
                 {slotLabel(slot)[0]}
@@ -335,9 +335,9 @@ function Calendar({
                       // 마우스는 mousedown에서 처리했다. detail 0은 키보드(Space·Enter)다
                       if (!locked && e.detail === 0) toggle(d.date, slot);
                     }}
-                    className={`min-h-0 border-l border-[#EDEDEA] focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-[#C4247C] ${
-                      slot % 2 === 0 ? "border-t border-t-[#EDEDEA]" : "border-t border-t-[#F5F5F4]"
-                    } ${on ? "bg-[#C4247C]" : isWeekend(d) ? "bg-[#F5F5F4]" : "bg-white"} ${locked ? "cursor-not-allowed" : "cursor-pointer"}`}
+                    className={`min-h-0 border-l border-line focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent ${
+                      slot % 2 === 0 ? "border-t border-t-line" : "border-t border-t-soft"
+                    } ${on ? "bg-accent" : isWeekend(d) ? "bg-soft" : "bg-white"} ${locked ? "cursor-not-allowed" : "cursor-pointer"}`}
                   />
                 );
               }),
@@ -358,7 +358,7 @@ function Calendar({
             <PaintedSummary days={shown} cells={cells} onCopy={locked ? undefined : copyToAll} />
             {shifts.length > 0 && <ShiftsCard shifts={shifts} />}
             {!locked && (
-              <div className="flex flex-col gap-1 px-1 text-xs font-medium text-[#6B6F78]">
+              <div className="flex flex-col gap-1 px-1 text-xs font-medium text-muted">
                 <p>여러 날을 가로질러 드래그하면 한 번에 칠해져요</p>
                 <p>제출한 뒤에도 이 링크로 다시 고칠 수 있어요.</p>
                 <p>근무표가 확정되면 잠겨요.</p>
@@ -368,20 +368,20 @@ function Calendar({
         </div>
       </main>
 
-      <footer className="sticky bottom-0 h-[72px] shrink-0 border-t border-[#EDEDEA] bg-white">
+      <footer className="sticky bottom-0 h-[72px] shrink-0 border-t border-line bg-white">
         <div className="mx-auto flex h-full w-full max-w-[1360px] items-center justify-end gap-3 px-10">
           <Link href="/privacy" className={`${ui.text} mr-auto`}>
             개인정보처리방침
           </Link>
           {locked ? (
             // [이름 다시 고르기]는 머리 줄에 이미 있다
-            <p role="status" className="text-sm text-[#4B4F57]">
+            <p role="status" className="text-sm text-body">
               그사이 근무표가 확정됐어요. 이름 고르기로 돌아가면 근무표를 볼 수 있어요
             </p>
           ) : (
             <>
               {status === "saved" && (
-                <p role="status" className="text-sm text-[#067647]">
+                <p role="status" className="text-sm text-ok">
                   제출했어요. 이 링크로 다시 고칠 수 있어요
                 </p>
               )}
@@ -390,7 +390,7 @@ function Calendar({
                   제출하지 못했어요. 네트워크를 확인하고 다시 눌러 주세요
                 </p>
               )}
-              <p className="text-sm text-[#4B4F57]">
+              <p className="text-sm text-body">
                 <span className="font-mono">{paintedDays}</span>일 · <span className="font-mono">{cells.size / 2}</span>시간 칠했어요
               </p>
               <button type="button" onClick={() => void submit()} disabled={status === "saving"} className={ui.primaryXl}>
@@ -411,7 +411,7 @@ function PaintedSummary({ days, cells, onCopy }: { days: PeriodDay[]; cells: Set
   return (
     <section className={`${ui.card} flex flex-col gap-2`}>
       <h2 className={ui.cardTitle}>이번 주 칠한 시간</h2>
-      <ul className="flex flex-col gap-1 text-[13px] text-[#4B4F57]">
+      <ul className="flex flex-col gap-1 text-[13px] text-body">
         {days.map((d) => {
           const ranges = slots[d.date];
           return (
@@ -426,7 +426,7 @@ function PaintedSummary({ days, cells, onCopy }: { days: PeriodDay[]; cells: Set
               {ranges ? (
                 <span className="min-w-0 font-mono">{ranges.map(([from, to]) => `${from}~${to}`).join(", ")}</span>
               ) : (
-                <span className="text-[#6B6F78]">없음</span>
+                <span className="text-muted">없음</span>
               )}
               {ranges && onCopy && (
                 <button
@@ -442,7 +442,7 @@ function PaintedSummary({ days, cells, onCopy }: { days: PeriodDay[]; cells: Set
           );
         })}
       </ul>
-      <p className="border-t border-[#F5F5F4] pt-2 text-[13px] font-medium text-[#111214]">
+      <p className="border-t border-soft pt-2 text-[13px] font-medium text-ink">
         합계 <span className="font-mono">{hours}</span>시간
       </p>
     </section>
@@ -454,22 +454,22 @@ function ShiftsCard({ shifts }: { shifts: RosterShift[] }) {
   return (
     <section className={`${ui.card} flex flex-col gap-2`}>
       <h2 className={ui.cardTitle}>매장 근무조</h2>
-      <ul className="flex flex-col gap-1 text-[13px] text-[#4B4F57]">
+      <ul className="flex flex-col gap-1 text-[13px] text-body">
         {shifts.map((s) => (
           <li key={s.code} className="flex items-center gap-2">
-            <span className="inline-flex size-6 shrink-0 items-center justify-center rounded border border-[#DCDCD8] bg-white font-mono text-xs font-semibold text-[#111214]">
+            <span className="inline-flex size-6 shrink-0 items-center justify-center rounded border border-line-strong bg-white font-mono text-xs font-semibold text-ink">
               {s.code}
             </span>
             <span className="min-w-0 truncate">{s.name}</span>
             {s.start && s.end && (
-              <span className="ml-auto shrink-0 font-mono text-[#6B6F78]">
+              <span className="ml-auto shrink-0 font-mono text-muted">
                 {s.start}~{s.end}
               </span>
             )}
           </li>
         ))}
       </ul>
-      <p className="border-t border-[#F5F5F4] pt-2 text-xs text-[#6B6F78]">근무조 시간을 다 덮어야 그 근무에 들어갈 수 있어요.</p>
+      <p className="border-t border-soft pt-2 text-xs text-muted">근무조 시간을 다 덮어야 그 근무에 들어갈 수 있어요.</p>
     </section>
   );
 }
@@ -487,9 +487,9 @@ function isWeekend(day: PeriodDay): boolean {
 }
 
 function DayHeader({ day }: { day: PeriodDay }) {
-  const color = day.weekday === 0 ? "text-[#B42318]" : day.weekday === 6 ? "text-[#C4247C]" : "text-[#4B4F57]";
+  const color = day.weekday === 0 ? "text-error" : day.weekday === 6 ? "text-accent" : "text-body";
   return (
-    <span className={`flex items-center justify-center gap-1 border-l border-[#EDEDEA] text-xs font-medium ${isWeekend(day) ? "bg-[#F5F5F4]" : ""} ${color}`}>
+    <span className={`flex items-center justify-center gap-1 border-l border-line text-xs font-medium ${isWeekend(day) ? "bg-soft" : ""} ${color}`}>
       {WEEKDAYS[day.weekday]}{" "}
       <span className="font-mono">
         {day.month}/{day.dom}

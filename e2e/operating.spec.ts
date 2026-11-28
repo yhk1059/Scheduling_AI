@@ -224,8 +224,8 @@ test("S4. 확정 근무표: 변경 입력 → 최소 변경 → 다시 확정 ·
   await expect(page.getByRole("heading", { level: 1 }).locator("..")).toContainText("운영 중");
   await expect(page.getByRole("textbox", { name: "변경 입력" })).toBeFocused();
   await expect(page.getByRole("list", { name: "근무표 작성 단계" })).toHaveCount(0);
-  await expect(page.getByRole("button", { name: "요청 만들기" })).toHaveClass(/bg-\[#111214\] text-white/);
-  await expect(page.getByRole("button", { name: "CSV 받기" })).toHaveClass(/bg-\[#F5F5F4\] text-\[#111214\]/);
+  await expect(page.getByRole("button", { name: "요청 만들기" })).toHaveClass(/bg-accent text-white/);
+  await expect(page.getByRole("button", { name: "CSV 받기" })).toHaveClass(/bg-soft text-ink/);
   await openStats(page);
   await expect(sectionWith("개인별 통계").locator("tbody tr")).toHaveCount(EMPLOYEE_COUNT);
 

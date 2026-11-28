@@ -5,9 +5,56 @@
   --font-mono: ui-monospace, "SF Mono", Menlo, "Pretendard Variable", monospace;
 }
 
+/* 색 토큰. 값은 여기서만 바꾼다(UI_GUIDE "색상"). 차분한 톤: 따뜻한 미색 바탕 + 버건디 강조색 하나. */
+@theme {
+  /* 바탕과 선 */
+  --color-page: #F5F4F0;
+  --color-soft: #EDEBE6;
+  --color-pressed: #E4E2DC;
+  --color-line: #E4E2DC;
+  --color-line-strong: #D6D3CB;
+  --color-field: #86827B;
+  /* 글자 */
+  --color-ink: #1F1E1B;
+  --color-body: #55534E;
+  --color-muted: #6A675F;
+  --color-disabled: #A19E96;
+  /* 강조(Primary, 포커스, 현재 단계, 토요일) */
+  --color-accent: #8E3B5F;
+  --color-accent-hover: #76304F;
+  --color-accent-soft: #F4E8EE;
+  --color-accent-faint: #FAF4F7;
+  --color-accent-line: #E5C7D4;
+  /* 상태 */
+  --color-ok: #2F5E43;
+  --color-ok-soft: #E3EEE6;
+  --color-error: #B42318;
+  --color-error-soft: #FEE4E2;
+  --color-error-line: #FECDCA;
+  --color-warn: #B93815;
+  --color-warn-soft: #FFEBDB;
+  --color-warn-line: #FFD3B0;
+  --color-info: #2F4A73;
+  --color-info-soft: #E4EAF3;
+  --color-info-faint: #F1F4F9;
+  --color-changed: #FF7A1A;
+  --color-changed-ink: #2B1100;
+  /* 근무조 색 단계(시작 시각 순). 기본 오픈·미들·마감은 0·2·4 */
+  --color-shift-0: #E4EAF3;
+  --color-shift-0-ink: #2F4A73;
+  --color-shift-1: #E2EDF1;
+  --color-shift-1-ink: #2D5866;
+  --color-shift-2: #E3EEE6;
+  --color-shift-2-ink: #2F5E43;
+  --color-shift-3: #F5E6E8;
+  --color-shift-3-ink: #8A3B45;
+  --color-shift-4: #ECE8F1;
+  --color-shift-4-ink: #54456F;
+}
+
 body {
-  background: #ffffff;
-  color: #111214;
+  background: var(--color-page);
+  color: var(--color-ink);
 }
 
 /* 랜딩 히어로 시퀀스. 기본 스타일이 끝 상태이고, backwards 채움으로 시작 전 모습을 만든다. */
@@ -18,7 +65,7 @@ body {
 }
 @keyframes hero-caret {
   50% {
-    border-color: #C4247C;
+    border-color: var(--color-accent);
   }
 }
 @keyframes hero-rise {
@@ -114,34 +161,29 @@ body {
 body { word-break: keep-all; }
 button:not(:disabled), a { -webkit-tap-highlight-color: transparent; }
 button:not(:disabled) { cursor: pointer; }
-:focus-visible { outline: 2px solid #C4247C; outline-offset: 3px; }
-::selection { background: #FDEAF4; color: #111214; }
+:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 3px; }
+::selection { background: var(--color-accent-soft); color: var(--color-ink); }
 .landing section[id] { scroll-margin-top: 88px; }
 /* 앱 화면: 고정 헤더와 아래 단계 바가 키보드 포커스를 가리지 않게 스크롤 여백을 둔다 */
 html:has([data-app-shell]) { scroll-padding-top: 152px; scroll-padding-bottom: 104px; }
-.landing-hero { max-width: 1200px; margin: auto; border-inline: 1px solid #EDEDEA; }
+.landing-hero { max-width: 1200px; margin: auto; border-inline: 1px solid var(--color-line); }
 .hero-heading { isolation: isolate; position: relative; padding-top: 112px; padding-bottom: 16px; text-align: center; }
-.hero-heading::before { content: ""; position: absolute; inset: 0; z-index: -1; background-image: radial-gradient(#DCDCD8 1px, transparent 1px); background-size: 28px 28px; mask-image: radial-gradient(ellipse at 50% 20%, #000, transparent 70%); }
+.hero-heading::before { content: ""; position: absolute; inset: 0; z-index: -1; background-image: radial-gradient(var(--color-line-strong) 1px, transparent 1px); background-size: 28px 28px; mask-image: radial-gradient(ellipse at 50% 20%, #000, transparent 70%); }
 .hero-heading h1 { margin-bottom: 24px; font-size: clamp(52px, 7.4vw, 104px); font-weight: 700; letter-spacing: -.045em; line-height: 1.08; }
-.hero-sticker { display: inline-flex; align-items: center; justify-content: center; width: .86em; height: .86em; margin: 0 .16em; vertical-align: -.1em; color: white; animation: sticker-bob 4.8s ease-in-out infinite; }
-.hero-sticker svg { width: 52%; height: 52%; }
-.calendar-sticker { background: #2F6BFF; border-radius: .26em; rotate: -8deg; }
-.sparkle-sticker { background: #EE46BC; border-radius: 50%; rotate: 8deg; animation-delay: -2.4s; font-size: .9em; }
 .hero-stage { position: relative; padding-top: 56px; padding-bottom: 88px; }
-.hero-window { overflow: hidden; border: 1px solid #EDEDEA; border-radius: 18px; background: white; box-shadow: 0 24px 56px -24px rgb(17 18 20 / 22%), 0 1px 3px rgb(17 18 20 / 6%); }
+.hero-window { overflow: hidden; border: 1px solid var(--color-line); border-radius: 18px; background: white; box-shadow: 0 24px 56px -24px rgb(31 30 27 / 18%), 0 1px 3px rgb(31 30 27 / 5%); }
 /* 제품 창 위쪽 탭. 선택된 탭만 흰 면과 위 검정 선으로 창 본문에 이어진다 */
-.hero-tabs { display: flex; gap: 4px; overflow-x: auto; padding: 8px 8px 0; background: #F5F5F4; border-bottom: 1px solid #EDEDEA; }
-.hero-tab { display: inline-flex; flex-shrink: 0; align-items: center; gap: 8px; height: 42px; margin-bottom: -1px; padding-inline: 16px; border: 1px solid transparent; border-bottom: 0; border-radius: 10px 10px 0 0; color: #6B6F78; font-size: 14px; font-weight: 500; white-space: nowrap; transition: color 120ms, background-color 120ms; }
+.hero-tabs { display: flex; gap: 4px; overflow-x: auto; padding: 8px 8px 0; background: var(--color-soft); border-bottom: 1px solid var(--color-line); }
+.hero-tab { display: inline-flex; flex-shrink: 0; align-items: center; gap: 8px; height: 42px; margin-bottom: -1px; padding-inline: 16px; border: 1px solid transparent; border-bottom: 0; border-radius: 10px 10px 0 0; color: var(--color-muted); font-size: 14px; font-weight: 500; white-space: nowrap; transition: color 120ms, background-color 120ms; }
 .hero-tab svg { width: 14px; height: 14px; }
-.hero-tab:hover { color: #111214; }
-.hero-tab[aria-selected="true"] { background: white; border-color: #EDEDEA; box-shadow: inset 0 2px 0 #111214; color: #111214; font-weight: 600; }
+.hero-tab:hover { color: var(--color-ink); }
+.hero-tab[aria-selected="true"] { background: white; border-color: var(--color-line); box-shadow: inset 0 2px 0 var(--color-accent); color: var(--color-ink); font-weight: 600; }
 .hero-tab:focus-visible { outline-offset: -2px; }
 .hero-panel { animation: hero-fade 200ms ease-out; }
 .hero-window .hero-seq { border: 0; border-radius: 0; background: white; }
 .hero-window .hero-seq > [inert] { display: grid; grid-template-columns: minmax(180px, 1fr) minmax(0, 3fr); align-items: start; }
 .hero-window .hero-seq > [inert] > :first-child { grid-column: 1 / -1; }
 .hero-window .hero-table { min-width: 0; }
-@keyframes sticker-bob { 0%, 100% { translate: 0 0; } 50% { translate: 0 -6px; } }
 @media (max-width: 767px) {
   .hero-heading { padding-top: 64px; padding-bottom: 8px; }
   .hero-stage { padding-top: 40px; padding-bottom: 56px; }
@@ -150,7 +192,4 @@ html:has([data-app-shell]) { scroll-padding-top: 152px; scroll-padding-bottom: 1
   .hero-tabs { gap: 0; padding-inline: 4px; }
   .hero-tab { padding-inline: 10px; font-size: 13px; }
   .hero-tab svg { display: none; }
-}
-@media (prefers-reduced-motion: reduce) {
-  .hero-sticker { animation: none; }
 }

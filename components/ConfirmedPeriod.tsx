@@ -159,7 +159,7 @@ export default function ConfirmedPeriod() {
             <h1 ref={titleRef} tabIndex={-1} className={`${ui.pageTitle} outline-none`}>
               {scheduleName(period, shop.unit)}
             </h1>
-            <span className="font-mono text-sm text-[#6B6F78]">{formatRange(period)}</span>
+            <span className="font-mono text-sm text-muted">{formatRange(period)}</span>
             {isOperating(period, now) ? (
               <span className={`${ui.badge} ${ui.badgeTone.operating}`}>운영 중</span>
             ) : (
@@ -208,7 +208,7 @@ export default function ConfirmedPeriod() {
           )}
           <div className="flex min-w-0 flex-col gap-3">
             {changeCards.length === 0 ? (
-              <p className="text-sm text-[#6B6F78]">아직 변경이 없어요.</p>
+              <p className="text-sm text-muted">아직 변경이 없어요.</p>
             ) : (
               changeCards.map(({ card, pending }) =>
                 pending ? (
@@ -238,7 +238,7 @@ export default function ConfirmedPeriod() {
         summaryLead={
           diff.length > 0 && (
             <p role="status" className={`${ui.banner} min-w-[360px] flex-1 justify-start! self-stretch`}>
-              <span aria-hidden="true" className="size-4 shrink-0 rounded-xs bg-white shadow-[inset_0_0_0_2px_#FF7A1A]" />
+              <span aria-hidden="true" className="size-4 shrink-0 rounded-xs bg-white shadow-[inset_0_0_0_2px_var(--color-changed)]" />
               <span>
                 <strong className="font-semibold">
                   <span className="font-mono">{new Set(diff.map((c) => c.employee_id)).size}</span>명,{" "}
@@ -251,7 +251,7 @@ export default function ConfirmedPeriod() {
         }
         gridNote={
           todayInfo && (
-            <p className="text-[13px] text-[#4B4F57]">
+            <p className="text-[13px] text-body">
               오늘은{" "}
               <span className="font-mono">
                 {todayInfo.month}/{todayInfo.dom}
@@ -268,8 +268,8 @@ export default function ConfirmedPeriod() {
               <ul className={`${ui.card} flex flex-col py-1.5!`}>
                 {period.versions
                   .map((v, i) => (
-                    <li key={`${i}-${v.confirmed_at}`} className="flex items-center gap-2 border-b border-[#F5F5F4] py-2 text-[13px] text-[#4B4F57] last:border-b-0">
-                      <span className="font-mono font-medium text-[#111214]">{shortTime(v.confirmed_at)}</span>· 확정 ·{" "}
+                    <li key={`${i}-${v.confirmed_at}`} className="flex items-center gap-2 border-b border-soft py-2 text-[13px] text-body last:border-b-0">
+                      <span className="font-mono font-medium text-ink">{shortTime(v.confirmed_at)}</span>· 확정 ·{" "}
                       {i === 0 ? (
                         "처음 확정"
                       ) : (
@@ -341,12 +341,12 @@ function ChangeBar({
     <div className="flex min-w-0 flex-col gap-3">
       <div className="flex flex-col gap-1">
         <h2 className={ui.cardTitle}>변경 입력</h2>
-        <p className="text-[13px] text-[#4B4F57]">
+        <p className="text-[13px] text-body">
           확정한 뒤 생긴 병가·휴가를 적으면, 확정 근무표에서 최소한으로 바꿔 다시 만들어요. 이미 지난 날은 건드리지 않아요.
         </p>
       </div>
       <form
-        className={`${ui.bar} ${tooLong ? "border-[#B42318]!" : ""}`}
+        className={`${ui.bar} ${tooLong ? "border-error!" : ""}`}
         onSubmit={(e) => {
           e.preventDefault();
           if (!busy && !tooLong && text.trim() !== "") void submit();
@@ -368,8 +368,8 @@ function ChangeBar({
         </button>
       </form>
       {notice && (
-        <p className="text-sm text-[#111214]">
-          {notice} <span className="text-xs font-medium text-[#6B6F78]">내용을 보완해서 다시 입력해 주세요.</span>
+        <p className="text-sm text-ink">
+          {notice} <span className="text-xs font-medium text-muted">내용을 보완해서 다시 입력해 주세요.</span>
         </p>
       )}
     </div>
@@ -382,7 +382,7 @@ function DemoChangeBar({ sample, added, busy, onAdd }: { sample: string; added: 
     <div className="flex min-w-0 flex-col gap-3">
       <div className="flex flex-col gap-1">
         <h2 className={ui.cardTitle}>변경 입력</h2>
-        <p className="text-[13px] text-[#4B4F57]">
+        <p className="text-[13px] text-body">
           확정한 뒤 생긴 병가·휴가를 적으면, 확정 근무표에서 최소한으로 바꿔 다시 만들어요. 체험에서는 말로 적는 대신 예시 병가를 넣어 볼 수
           있어요.
         </p>

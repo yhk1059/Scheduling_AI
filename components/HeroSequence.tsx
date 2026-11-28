@@ -55,20 +55,20 @@ export function ReplyCard({
   className?: string;
 }) {
   return (
-    <article className={`flex flex-col gap-2.5 rounded-lg border border-[#EDEDEA] bg-white px-4 py-3.5 ${className}`}>
+    <article className={`flex flex-col gap-2.5 rounded-lg border border-line bg-white px-4 py-3.5 ${className}`}>
       <div className="flex items-center justify-between gap-3">
-        <h3 className="text-sm font-semibold text-[#111214]">{title}</h3>
-        <span className={`${ui.badge} ${hardness === "hard" ? "bg-[#111214] text-white" : "border border-[#DCDCD8] bg-white text-[#4B4F57]"}`}>
+        <h3 className="text-sm font-semibold text-ink">{title}</h3>
+        <span className={`${ui.badge} ${hardness === "hard" ? "bg-ink text-white" : "border border-line-strong bg-white text-body"}`}>
           {hardnessLabel(hardness)}
         </span>
       </div>
-      <p className="flex items-start gap-1.5 text-sm text-[#111214]">
+      <p className="flex items-start gap-1.5 text-sm text-ink">
         <QuoteGlyph size={16} />
         {quote}
       </p>
-      <div className="ml-2 flex flex-col gap-1 border-l-2 border-[#EDEDEA] pl-3.5">
-        <span className="font-mono text-[11px] text-[#C4247C]">이렇게 읽었어요</span>
-        <span className="text-sm text-[#111214]">{reading}</span>
+      <div className="ml-2 flex flex-col gap-1 border-l-2 border-line pl-3.5">
+        <span className="font-mono text-[11px] text-accent">이렇게 읽었어요</span>
+        <span className="text-sm text-ink">{reading}</span>
       </div>
       {pending ? (
         <div className="flex justify-end gap-1">
@@ -98,13 +98,13 @@ type MiniCell = { code: Code; changed?: boolean };
 
 /** 랜딩 조각용 작은 근무표(이름 + 날짜 칸). 앱 그리드는 518px라 세 칼럼 안에 들어가지 않는다. */
 function MiniGrid({ days, rows, totals }: { days: typeof WEEK_DAYS; rows: { name: string; cells: MiniCell[] }[]; totals?: { label: string; values: number[] } }) {
-  const dayColor = (d: (typeof WEEK_DAYS)[number]) => (d.dow === "일" ? "text-[#B42318]" : d.dow === "토" ? "text-[#C4247C]" : "text-[#6B6F78]");
+  const dayColor = (d: (typeof WEEK_DAYS)[number]) => (d.dow === "일" ? "text-error" : d.dow === "토" ? "text-accent" : "text-muted");
   return (
     <div className="flex w-max flex-col gap-0.5">
       <div className="flex items-center gap-0.5">
         <span className="w-16" />
         {days.map((d) => (
-          <span key={d.date} className={`inline-flex w-[30px] flex-col items-center rounded-xs font-mono text-[11px] leading-tight ${d.weekend ? "bg-[#F5F5F4]" : ""} ${dayColor(d)}`}>
+          <span key={d.date} className={`inline-flex w-[30px] flex-col items-center rounded-xs font-mono text-[11px] leading-tight ${d.weekend ? "bg-soft" : ""} ${dayColor(d)}`}>
             {d.date}
             <span>{d.dow}</span>
           </span>
@@ -112,19 +112,19 @@ function MiniGrid({ days, rows, totals }: { days: typeof WEEK_DAYS; rows: { name
       </div>
       {rows.map((r) => (
         <div key={r.name} className="flex items-center gap-0.5">
-          <span className="w-16 truncate text-sm text-[#111214]">{r.name}</span>
+          <span className="w-16 truncate text-sm text-ink">{r.name}</span>
           {r.cells.map((c, i) => (
-            <span key={i} className={`${CELL} ${codeClass(c.code)} ${c.changed ? "shadow-[inset_0_0_0_2px_#FF7A1A]" : ""}`}>
+            <span key={i} className={`${CELL} ${codeClass(c.code)} ${c.changed ? "shadow-[inset_0_0_0_2px_var(--color-changed)]" : ""}`}>
               {c.code === "O" ? "" : c.code}
             </span>
           ))}
         </div>
       ))}
       {totals && (
-        <div className="mt-1.5 flex items-center gap-0.5 border-t border-[#F5F5F4] pt-2">
-          <span className="w-16 text-xs font-medium text-[#6B6F78]">{totals.label}</span>
+        <div className="mt-1.5 flex items-center gap-0.5 border-t border-soft pt-2">
+          <span className="w-16 text-xs font-medium text-muted">{totals.label}</span>
           {totals.values.map((v, i) => (
-            <span key={i} className={`flex h-7 w-[30px] items-center justify-center rounded-xs font-mono text-[13px] font-medium text-[#111214] ${days[i].weekend ? "bg-[#F5F5F4]" : ""}`}>
+            <span key={i} className={`flex h-7 w-[30px] items-center justify-center rounded-xs font-mono text-[13px] font-medium text-ink ${days[i].weekend ? "bg-soft" : ""}`}>
               {v}
             </span>
           ))}
@@ -148,14 +148,14 @@ export function ScheduleFragment() {
       <div className="overflow-x-auto">
         <MiniGrid days={WEEK_DAYS} rows={SCENE_ROWS} totals={{ label: "C 합계", values: C_TOTALS }} />
       </div>
-      <div className="flex items-center gap-4 border-t border-[#F5F5F4] pt-3">
+      <div className="flex items-center gap-4 border-t border-soft pt-3">
         <span className="flex flex-col gap-0.5">
           <span className={ui.help}>희망 반영</span>
-          <span className={`${ui.bigNumber} text-[#111214]`}>9/9</span>
+          <span className={`${ui.bigNumber} text-ink`}>9/9</span>
         </span>
         <span className="flex flex-col gap-0.5">
           <span className={ui.help}>못 지킨 가능하면 규칙</span>
-          <span className={`${ui.bigNumber} text-[#111214]`}>0</span>
+          <span className={`${ui.bigNumber} text-ink`}>0</span>
         </span>
         <span className={`${ui.primarySm} ml-auto`}>확정</span>
       </div>
@@ -174,9 +174,9 @@ const CHANGE_ROWS: { name: string; cells: MiniCell[] }[] = [
 export function ChangeFragment() {
   return (
     <div className={`${ui.card} flex flex-col gap-3`}>
-      <p className="text-sm text-[#111214]">최지훈 · 11/4~11/6 · 병가</p>
+      <p className="text-sm text-ink">최지훈 · 11/4~11/6 · 병가</p>
       <MiniGrid days={CHANGE_DAYS} rows={CHANGE_ROWS} />
-      <p className="text-[13px] text-[#B93815]">2명, 5칸 변경 · 주황 테두리 칸이 바뀐 곳이에요.</p>
+      <p className="text-[13px] text-warn">2명, 5칸 변경 · 주황 테두리 칸이 바뀐 곳이에요.</p>
     </div>
   );
 }
@@ -187,7 +187,7 @@ const PAINT = [[3, 9], [3, 14], [0, 9], [3, 11], [0, 0], [0, 0], [3, 9]];
 const SUBMITTED = ["이영희", "최지훈", "강서연", "임하늘"];
 
 function AvailabilityScene() {
-  const dayColor = (dow: string) => (dow === "일" ? "text-[#B42318]" : dow === "토" ? "text-[#C4247C]" : "text-[#4B4F57]");
+  const dayColor = (dow: string) => (dow === "일" ? "text-error" : dow === "토" ? "text-accent" : "text-body");
   return (
     <div className="hero-seq grid min-h-[460px] gap-3.5 bg-white p-4 lg:grid-cols-[minmax(0,1fr)_300px] lg:p-[22px]">
       <div className={`${ui.card} flex min-w-0 flex-col gap-3`}>
@@ -195,18 +195,18 @@ function AvailabilityScene() {
           <h3 className={ui.cardTitle}>최지훈님 · 11/2~11/8 가능 시간</h3>
           <span className={ui.help}>칠한 칸이 일할 수 있는 시간이에요</span>
         </div>
-        <div className="grid overflow-hidden rounded-lg border border-[#EDEDEA]" style={{ gridTemplateColumns: "44px repeat(7, minmax(0, 1fr))" }}>
+        <div className="grid overflow-hidden rounded-lg border border-line" style={{ gridTemplateColumns: "44px repeat(7, minmax(0, 1fr))" }}>
           <span className="h-8" />
           {WEEK_DAYS.map((d) => (
-            <span key={d.date} className={`flex h-8 items-center justify-center gap-1 border-l border-[#EDEDEA] text-xs font-medium ${d.weekend ? "bg-[#F5F5F4]" : ""} ${dayColor(d.dow)}`}>
+            <span key={d.date} className={`flex h-8 items-center justify-center gap-1 border-l border-line text-xs font-medium ${d.weekend ? "bg-soft" : ""} ${dayColor(d.dow)}`}>
               {d.dow}
             </span>
           ))}
           {HOURS.map((h, slot) => (
             <Fragment key={h}>
-              <span className="h-5 border-t border-[#EDEDEA] pt-0.5 pr-2 text-right font-mono text-[11px] leading-none text-[#6B6F78]">{slot % 2 === 0 ? `${h}:00` : ""}</span>
+              <span className="h-5 border-t border-line pt-0.5 pr-2 text-right font-mono text-[11px] leading-none text-muted">{slot % 2 === 0 ? `${h}:00` : ""}</span>
               {WEEK_DAYS.map((d, i) => (
-                <span key={d.date} className={`h-5 border-t border-l border-[#EDEDEA] ${slot >= PAINT[i][0] && slot < PAINT[i][1] ? "bg-[#C4247C]" : d.weekend ? "bg-[#F5F5F4]" : "bg-white"}`} />
+                <span key={d.date} className={`h-5 border-t border-l border-line ${slot >= PAINT[i][0] && slot < PAINT[i][1] ? "bg-accent" : d.weekend ? "bg-soft" : "bg-white"}`} />
               ))}
             </Fragment>
           ))}
@@ -215,22 +215,22 @@ function AvailabilityScene() {
       <div className={`${ui.card} flex flex-col gap-3 self-start`}>
         <h3 className={ui.cardTitle}>직원 링크</h3>
         <div className="flex items-center gap-2">
-          <span className="min-w-0 flex-1 truncate rounded-lg bg-[#F5F5F4] px-3 py-1.5 font-mono text-xs text-[#4B4F57]">/a/7Kp2xQ</span>
+          <span className="min-w-0 flex-1 truncate rounded-lg bg-soft px-3 py-1.5 font-mono text-xs text-body">/a/7Kp2xQ</span>
           <span className={ui.secondarySm}>링크 복사</span>
         </div>
         <div className="flex flex-col gap-1.5">
-          <span className="text-sm text-[#111214]">
+          <span className="text-sm text-ink">
             <span className="font-mono">{SUBMITTED.length}</span>/<span className="font-mono">{EMPLOYEES.length}</span>명 제출
           </span>
-          <span className="h-1.5 overflow-hidden rounded-full bg-[#F5F5F4]">
-            <span className="block h-full rounded-full bg-[#111214]" style={{ width: `${(SUBMITTED.length / EMPLOYEES.length) * 100}%` }} />
+          <span className="h-1.5 overflow-hidden rounded-full bg-soft">
+            <span className="block h-full rounded-full bg-accent" style={{ width: `${(SUBMITTED.length / EMPLOYEES.length) * 100}%` }} />
           </span>
         </div>
-        <ul className="flex flex-col gap-1.5 border-t border-[#F5F5F4] pt-3">
+        <ul className="flex flex-col gap-1.5 border-t border-soft pt-3">
           {EMPLOYEES.map((n) => {
             const done = SUBMITTED.includes(n.name);
             return (
-              <li key={n.id} className="flex items-center justify-between text-sm text-[#111214]">
+              <li key={n.id} className="flex items-center justify-between text-sm text-ink">
                 {n.name}
                 <span className={`${ui.badge} ${done ? ui.badgeTone.applied : ui.badgeTone.draft}`}>{done ? "제출" : "미제출"}</span>
               </li>
@@ -266,7 +266,7 @@ function ChangeScene() {
           <span className="flex max-sm:hidden">
             <Mark size={18} />
           </span>
-          <span className="min-w-0 flex-1 truncate text-sm text-[#111214] sm:text-[15px]">{SICK}</span>
+          <span className="min-w-0 flex-1 truncate text-sm text-ink sm:text-[15px]">{SICK}</span>
           <span aria-hidden="true" className={ui.primaryBar}>
             요청 만들기
           </span>
@@ -294,7 +294,7 @@ function ChangeScene() {
               totalCodes={["C"]}
             />
           </div>
-          <p className="text-[13px] text-[#B93815]">
+          <p className="text-[13px] text-warn">
             <span className="font-mono">{new Set(CHANGES.map((c) => c.employee_id)).size}</span>명, <span className="font-mono">{CHANGES.length}</span>칸 변경 · 지난 날짜는 그대로 두고 필요한 칸만 바꿨어요.
           </p>
         </div>
@@ -370,7 +370,7 @@ export default function HeroSequence() {
           <span className="flex max-sm:hidden">
             <Mark size={18} />
           </span>
-          <span className="relative min-w-0 flex-1 overflow-hidden text-sm whitespace-nowrap text-[#111214] sm:text-[15px]">
+          <span className="relative min-w-0 flex-1 overflow-hidden text-sm whitespace-nowrap text-ink sm:text-[15px]">
             <span className="relative inline-block">
               <span className="invisible">{TYPED}</span>
               <span className="hero-typing">{TYPED}</span>

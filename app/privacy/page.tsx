@@ -56,18 +56,18 @@ export default function PrivacyPage() {
     <main className="mx-auto w-full max-w-[1360px] px-8 py-[72px]">
       <div className="flex max-w-[720px] flex-col gap-8">
         <div className="flex flex-col gap-2">
-          <Link href="/" className="text-xs font-medium text-[#C4247C] hover:text-[#2C2F35]">
+          <Link href="/" className="text-xs font-medium text-accent hover:text-accent-hover">
             ← 매장 직원 근무표
           </Link>
-          <h1 className="text-[22px] font-semibold text-[#111214]">개인정보처리방침</h1>
-          <p className="text-xs font-medium text-[#6B6F78]">
+          <h1 className="text-[22px] font-semibold text-ink">개인정보처리방침</h1>
+          <p className="text-xs font-medium text-muted">
             시행일 <span className="font-mono">{EFFECTIVE_DATE}</span>
           </p>
         </div>
         {SECTIONS.map((s) => (
           <section key={s.title} className="flex flex-col gap-2">
-            <h2 className="text-[15px] font-semibold text-[#111214]">{s.title}</h2>
-            <ul className="list-disc pl-5 text-sm leading-relaxed text-[#4B4F57]">
+            <h2 className="text-[15px] font-semibold text-ink">{s.title}</h2>
+            <ul className="list-disc pl-5 text-sm leading-relaxed text-body">
               {s.items.map((item) => (
                 <li key={item}>{item}</li>
               ))}

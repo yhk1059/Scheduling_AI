@@ -28,9 +28,9 @@ function TaskProgress({ done }: { done: number }) {
         const current = i === done;
         return (
           <li key={label} className="flex items-center gap-2 whitespace-nowrap">
-            {i > 0 && <span aria-hidden="true" className="h-px w-3 bg-[#DCDCD8] sm:w-6" />}
+            {i > 0 && <span aria-hidden="true" className="h-px w-3 bg-line-strong sm:w-6" />}
             {finished ? (
-              <span className="flex size-[22px] items-center justify-center rounded-full bg-[#FDEAF4] text-[#C4247C]">
+              <span className="flex size-[22px] items-center justify-center rounded-full bg-accent-soft text-accent">
                 <svg aria-hidden="true" viewBox="0 0 12 12" className="size-3" fill="none" stroke="currentColor" strokeWidth={1.8}>
                   <path d="M2.5 6.2 5 8.5l4.5-5" />
                 </svg>
@@ -38,13 +38,13 @@ function TaskProgress({ done }: { done: number }) {
             ) : (
               <span
                 className={`flex size-[22px] items-center justify-center rounded-full font-mono text-xs ${
-                  current ? "bg-[#C4247C] text-white" : "border border-[#DCDCD8] text-[#6B6F78]"
+                  current ? "bg-accent text-white" : "border border-line-strong text-muted"
                 }`}
               >
                 {i + 1}
               </span>
             )}
-            <span className={current ? "font-semibold text-[#111214]" : "text-[#4B4F57]"}>
+            <span className={current ? "font-semibold text-ink" : "text-body"}>
               {label}
               {finished && <span className="sr-only"> (완료)</span>}
             </span>
@@ -133,15 +133,15 @@ function ShareCard({ status }: { status: ReturnType<typeof useShareStatus> }) {
   if (demo) {
     return (
       <div className={`${ui.card} flex min-w-0 flex-col gap-2.5`}>
-        <h3 className="text-[13px] font-semibold text-[#111214]">직원 링크</h3>
-        <p className="text-[13px] text-[#111214]">
+        <h3 className="text-[13px] font-semibold text-ink">직원 링크</h3>
+        <p className="text-[13px] text-ink">
           <span className="font-mono">
             {submitted} / {total}
           </span>
           명 제출
         </p>
-        <div aria-hidden="true" className="h-1.5 overflow-hidden rounded bg-[#EDEDEA]">
-          <div className="h-full bg-[#C4247C]" style={{ width: `${total === 0 ? 0 : (submitted / total) * 100}%` }} />
+        <div aria-hidden="true" className="h-1.5 overflow-hidden rounded bg-pressed">
+          <div className="h-full bg-accent" style={{ width: `${total === 0 ? 0 : (submitted / total) * 100}%` }} />
         </div>
         {missing.length > 0 && <p className={ui.help}>미제출: {missing.join(", ")}</p>}
         <p className={ui.help}>체험에서는 직원 링크를 보낼 수 없어요</p>
@@ -152,7 +152,7 @@ function ShareCard({ status }: { status: ReturnType<typeof useShareStatus> }) {
   return (
     <div className={`${ui.card} flex min-w-0 flex-col gap-2.5`}>
       <div className="flex items-center justify-between gap-2">
-        <h3 className="text-[13px] font-semibold text-[#111214]">직원 링크</h3>
+        <h3 className="text-[13px] font-semibold text-ink">직원 링크</h3>
         {url && (
           <button type="button" onClick={() => void copy()} className={ui.secondarySm}>
             {copied === url ? "복사했어요" : "링크 복사"}
@@ -161,9 +161,9 @@ function ShareCard({ status }: { status: ReturnType<typeof useShareStatus> }) {
       </div>
       {url && (
         <>
-          <p className="truncate font-mono text-xs text-[#4B4F57]">{url}</p>
+          <p className="truncate font-mono text-xs text-body">{url}</p>
           <div className="flex items-center justify-between gap-2">
-            <p className="text-[13px] text-[#111214]">
+            <p className="text-[13px] text-ink">
               <span className="font-mono">
                 {submitted} / {total}
               </span>
@@ -173,14 +173,14 @@ function ShareCard({ status }: { status: ReturnType<typeof useShareStatus> }) {
               새로고침
             </button>
           </div>
-          <div aria-hidden="true" className="h-1.5 overflow-hidden rounded bg-[#EDEDEA]">
-            <div className="h-full bg-[#C4247C]" style={{ width: `${total === 0 ? 0 : (submitted / total) * 100}%` }} />
+          <div aria-hidden="true" className="h-1.5 overflow-hidden rounded bg-pressed">
+            <div className="h-full bg-accent" style={{ width: `${total === 0 ? 0 : (submitted / total) * 100}%` }} />
           </div>
           {missing.length > 0 && <p className={ui.help}>미제출: {missing.join(", ")}</p>}
         </>
       )}
       {failed ? (
-        <div role="alert" className="flex flex-col items-start gap-1 text-[13px] text-[#B42318]">
+        <div role="alert" className="flex flex-col items-start gap-1 text-[13px] text-error">
           링크를 불러오지 못했어요. 네트워크를 확인하고 다시 시도해 주세요
           <button type="button" onClick={reload} className={ui.textSm}>
             다시 시도
@@ -224,11 +224,11 @@ function TaskPanel() {
       <div className="flex min-w-0 flex-col items-start gap-3.5">
         <div className="flex items-center gap-2.5">
           <span className={ui.eyebrow}>지금 할 일</span>
-          <span className="font-mono text-xs text-[#6B6F78]">
+          <span className="font-mono text-xs text-muted">
             {formatRange(next.state === "none" ? upcomingRange(shop.unit, periods, now) : next.period)}
           </span>
         </div>
-        <div className="text-[22px] leading-[1.35] font-semibold text-[#111214]">
+        <div className="text-[22px] leading-[1.35] font-semibold text-ink">
           <h2 className="inline">{task.name}</h2>
           {task.kind === "none" &&
             (periods.length === 0 ? " · 첫 근무표를 만들 차례예요" : "를 만들 차례예요")}
@@ -247,7 +247,7 @@ function TaskPanel() {
           )}
         </div>
         {draft && (
-          <p className="text-sm leading-relaxed text-[#4B4F57]">
+          <p className="text-sm leading-relaxed text-body">
             {task.kind === "drafting" ? `아직 근무표를 만들지 않았어요. ${submittedText}` : submittedText}
           </p>
         )}
@@ -303,7 +303,7 @@ export default function ShopHome() {
   const table = (rows: WorkPeriod[]) => (
     <table className="w-full border-collapse text-[13px]">
       <thead>
-        <tr className="border-b border-[#EDEDEA] text-left text-xs font-medium text-[#6B6F78]">
+        <tr className="border-b border-line text-left text-xs font-medium text-muted">
           <th className="py-2 pr-4 font-medium">근무표</th>
           <th className="py-2 pr-4 font-medium">날짜</th>
           <th className="py-2 pr-4 font-medium">확정</th>
@@ -324,11 +324,11 @@ export default function ShopHome() {
             <tr
               key={p.id}
               onClick={() => open(p)}
-              className="cursor-pointer border-b border-[#F5F5F4] transition-colors duration-[120ms] last:border-b-0 hover:bg-[#FFFFFF]"
+              className="cursor-pointer border-b border-soft transition-colors duration-[120ms] last:border-b-0 hover:bg-white"
             >
-              <td className="py-1.5 pr-4 font-medium text-[#111214]">{name(p)}</td>
-              <td className="py-1.5 pr-4 font-mono text-[#4B4F57]">{formatRange(p)}</td>
-              <td className="py-1.5 pr-4 text-[#4B4F57]">
+              <td className="py-1.5 pr-4 font-medium text-ink">{name(p)}</td>
+              <td className="py-1.5 pr-4 font-mono text-body">{formatRange(p)}</td>
+              <td className="py-1.5 pr-4 text-body">
                 <span className="font-mono">{last ? shortTime(last.confirmed_at) : "—"}</span>
                 {again > 0 && (
                   <>
@@ -337,7 +337,7 @@ export default function ShopHome() {
                   </>
                 )}
               </td>
-              <td className="py-1.5 pr-4 font-mono text-[#4B4F57]">{spread ? `${spread.min} ~ ${spread.max}` : "—"}</td>
+              <td className="py-1.5 pr-4 font-mono text-body">{spread ? `${spread.min} ~ ${spread.max}` : "—"}</td>
               <td className="py-1.5 text-right">
                 <button
                   type="button"
@@ -361,7 +361,7 @@ export default function ShopHome() {
     <div className="flex flex-col gap-5">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <h1 className={ui.pageTitle}>{shop.name || "이름 없는 매장"}</h1>
-        <div className="flex items-center gap-2 text-[13px] text-[#6B6F78]">
+        <div className="flex items-center gap-2 text-[13px] text-muted">
           <span>
             직원 <span className="font-mono">{employeeCount}</span>명 · 켜진 규칙{" "}
             <span className="font-mono">{liveShopRules(shop, null).length}</span>개 · {unitShort(shop.unit)}
@@ -374,7 +374,7 @@ export default function ShopHome() {
 
       {!ready ? (
         <section className={`${ui.card} flex flex-wrap items-center justify-between gap-4`}>
-          <p className="text-sm leading-relaxed text-[#4B4F57]">
+          <p className="text-sm leading-relaxed text-body">
             명단을 입력하면 첫 근무표를 만들 수 있어요.
           </p>
           <button type="button" onClick={() => go({ screen: "settings", tab: "roster" })} className={ui.primary}>
@@ -384,20 +384,20 @@ export default function ShopHome() {
       ) : (
         <>
           {operating && (
-            <section className="flex items-center gap-3 rounded-lg border border-[#EDEDEA] bg-white px-5 py-3.5">
+            <section className="flex items-center gap-3 rounded-lg border border-line bg-white px-5 py-3.5">
               <span className={`${ui.badge} ${ui.badgeTone.operating}`}>운영 중</span>
-              <h2 className="text-base font-semibold text-[#111214]">
+              <h2 className="text-base font-semibold text-ink">
                 <button
                   type="button"
                   onClick={() => open(operating)}
-                  className="rounded-md underline-offset-2 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#C4247C]"
+                  className="rounded-md underline-offset-2 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
                 >
                   {name(operating)}
                 </button>
               </h2>
-              <span className="font-mono text-xs text-[#6B6F78]">{formatRange(operating)}</span>
+              <span className="font-mono text-xs text-muted">{formatRange(operating)}</span>
               {operatingAt && (
-                <span className="text-xs text-[#6B6F78]">
+                <span className="text-xs text-muted">
                   마지막 확정 <span className="font-mono">{shortTime(operatingAt)}</span>
                 </span>
               )}
@@ -425,7 +425,7 @@ export default function ShopHome() {
 
           <section className={`${ui.card} flex flex-col gap-3`}>
             <h2 className={ui.cardTitle}>지난 근무표</h2>
-            {past.length === 0 ? <p className="text-sm text-[#4B4F57]">확정한 근무표가 여기에 쌓여요.</p> : table(past)}
+            {past.length === 0 ? <p className="text-sm text-body">확정한 근무표가 여기에 쌓여요.</p> : table(past)}
           </section>
         </>
       )}

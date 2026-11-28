@@ -12,10 +12,10 @@ import { PRODUCT_NAME } from "@/lib/product";
 export const REPO_URL = "https://github.com/yhk1059/Scheduling_AI";
 
 export const container = "mx-auto w-full max-w-[1200px] px-5 lg:px-14";
-export const section = "border-t border-[#EDEDEA] py-16 lg:py-28";
-const sectionTitle = "text-[32px] leading-[1.15] lg:text-[52px] font-bold tracking-[-0.04em] text-[#111214]";
-const lead = "max-w-[640px] text-base leading-relaxed text-[#4B4F57]";
-export const body = "text-sm leading-relaxed text-[#4B4F57]";
+export const section = "border-t border-line py-16 lg:py-28";
+const sectionTitle = "text-[32px] leading-[1.15] lg:text-[52px] font-bold tracking-[-0.04em] text-ink";
+const lead = "max-w-[640px] text-base leading-relaxed text-body";
+export const body = "text-sm leading-relaxed text-body";
 
 export function SectionHead({ eyebrow, title, children }: { eyebrow: string; title: string; children: ReactNode }) {
   return (
@@ -28,10 +28,10 @@ export function SectionHead({ eyebrow, title, children }: { eyebrow: string; tit
 }
 
 export function LandingFooter() {
-  const link = "-my-3 inline-flex h-10 items-center hover:text-[#111214]";
+  const link = "-my-3 inline-flex h-10 items-center hover:text-ink";
   return (
     <footer>
-      <div className={`${container} flex flex-col gap-3 py-8 text-xs font-medium text-[#6B6F78] lg:flex-row lg:items-center lg:justify-between`}>
+      <div className={`${container} flex flex-col gap-3 py-8 text-xs font-medium text-muted lg:flex-row lg:items-center lg:justify-between`}>
         <span className="flex items-center gap-2">
           <Mark size={18} tone="muted" />
           {PRODUCT_NAME}

@@ -72,7 +72,7 @@ export default function PeriodWork() {
         </div>
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
           <h1 className={ui.pageTitle}>{scheduleName(period, unit)}</h1>
-          <span className="font-mono text-sm text-[#6B6F78]">{formatRange(period)}</span>
+          <span className="font-mono text-sm text-muted">{formatRange(period)}</span>
           <span className={`${ui.badge} ${ui.badgeTone.draft}`}>작성 중</span>
         </div>
         <Stepper label="근무표 작성 단계" labels={["가능 시간", "매장 조건", "근무표"]} notes={notes} current={step} reached={period.result ? 3 : step} onSelect={toStep} />
@@ -112,7 +112,7 @@ function AvailabilityWarning({ period, rows }: { period: WorkPeriod; rows: Avail
   if (!shortages.length) return null;
   const unsubmitted = pending.length > 0;
   return (
-    <section aria-label="가능 시간 미리 확인" className="flex flex-col gap-2 rounded-2xl border border-[#FECDCA] bg-white px-[18px] py-4">
+    <section aria-label="가능 시간 미리 확인" className="flex flex-col gap-2 rounded-2xl border border-error-line bg-white px-[18px] py-4">
       <h3 className={ui.cardTitle}>지금 받은 가능 시간으로는 사람이 모자란 날이 있어요</h3>
       <p className={ui.help}>
         이대로면 근무표를 만들 수 없어요. 그날 나올 수 있는 직원에게 다시 물어보거나, ② 매장 조건에서 필요 인원을 바꿔 주세요.
@@ -183,11 +183,11 @@ function LinksSection({ period }: { period: WorkPeriod }) {
           <h3 className={ui.cardTitle}>직원 링크</h3>
           <p className={ui.help}>체험에서는 직원 링크를 보낼 수 없어요. 직원이 가능 시간을 모두 제출한 상태로 시작해요</p>
         </div>
-        <p className="text-[13px] text-[#111214]">
+        <p className="text-[13px] text-ink">
           <span className="font-mono">{employees.length}</span>명 중 <span className="font-mono">{done}</span>명 제출
         </p>
-        <div aria-hidden="true" className="h-1.5 overflow-hidden rounded bg-[#EDEDEA]">
-          <div className="h-full bg-[#C4247C]" style={{ width: `${employees.length === 0 ? 0 : (done / employees.length) * 100}%` }} />
+        <div aria-hidden="true" className="h-1.5 overflow-hidden rounded bg-pressed">
+          <div className="h-full bg-accent" style={{ width: `${employees.length === 0 ? 0 : (done / employees.length) * 100}%` }} />
         </div>
         {absent.length > 0 && <p className={ui.help}>미제출: {absent.map((n) => n.name).join(", ")}</p>}
       </section>,
@@ -228,23 +228,23 @@ function LinksSection({ period }: { period: WorkPeriod }) {
       </div>
       {current && (
         <>
-          <p className="truncate font-mono text-[13px] text-[#4B4F57]">{url}</p>
+          <p className="truncate font-mono text-[13px] text-body">{url}</p>
           <div className="flex items-center justify-between gap-3">
-            <p className="text-[13px] text-[#111214]">
+            <p className="text-[13px] text-ink">
               <span className="font-mono">{employees.length}</span>명 중 <span className="font-mono">{submitted}</span>명 제출
             </p>
             <button type="button" onClick={reload} className={ui.textSm}>
               새로고침
             </button>
           </div>
-          <div aria-hidden="true" className="h-1.5 overflow-hidden rounded bg-[#EDEDEA]">
-            <div className="h-full bg-[#C4247C]" style={{ width: `${employees.length === 0 ? 0 : (submitted / employees.length) * 100}%` }} />
+          <div aria-hidden="true" className="h-1.5 overflow-hidden rounded bg-pressed">
+            <div className="h-full bg-accent" style={{ width: `${employees.length === 0 ? 0 : (submitted / employees.length) * 100}%` }} />
           </div>
           {missing.length > 0 && <p className={ui.help}>미제출: {missing.map((n) => n.name).join(", ")}</p>}
         </>
       )}
       {failed === key ? (
-        <div role="alert" className="flex items-center gap-2 text-sm text-[#B42318]">
+        <div role="alert" className="flex items-center gap-2 text-sm text-error">
           링크를 불러오지 못했어요. 네트워크를 확인하고 다시 시도해 주세요
           <button type="button" onClick={reload} className={ui.textSm}>
             다시 시도
@@ -331,8 +331,8 @@ function CoverageSummary({ period }: { period: WorkPeriod }) {
   const [open, setOpen] = useState(false);
   if (!shop) return null;
   const rules = liveShopRules(shop, period);
-  const th = "py-1.5 pr-2 sm:pr-4 text-left text-xs font-medium text-[#6B6F78]";
-  const td = "py-1.5 pr-2 sm:pr-4 text-[13px] text-[#111214]";
+  const th = "py-1.5 pr-2 sm:pr-4 text-left text-xs font-medium text-muted";
+  const td = "py-1.5 pr-2 sm:pr-4 text-[13px] text-ink";
   // 전체 필요 인원 뒤에 직급별 필요 인원("홀 2명 · 주방 2명")을 잇는다
   const need = (code: Code, kind: DayKind) =>
     [coverageText(effectiveCoverage(rules, code, kind, period, period.holidays)), ...tagCoverage(rules, code, kind).map((t) => `${t.tag} ${coverageText(t)}`)]
@@ -347,7 +347,7 @@ function CoverageSummary({ period }: { period: WorkPeriod }) {
         ) : (
         <table className="w-full border-collapse sm:w-auto">
           <thead>
-            <tr className="border-b border-[#EDEDEA]">
+            <tr className="border-b border-line">
               <th className={th}>근무조</th>
               <th className={th}>시각</th>
               <th className={th}>평일</th>
@@ -356,8 +356,8 @@ function CoverageSummary({ period }: { period: WorkPeriod }) {
           </thead>
           <tbody>
             {coverageCodes(shop.config).map((s) => (
-              <tr key={s.code} className="border-b border-[#F5F5F4] last:border-b-0">
-                <td className="py-1.5 pr-2 sm:pr-4 text-[13px] font-medium text-[#111214]">{s.name}</td>
+              <tr key={s.code} className="border-b border-soft last:border-b-0">
+                <td className="py-1.5 pr-2 sm:pr-4 text-[13px] font-medium text-ink">{s.name}</td>
                 <td className={`${td} font-mono`}>
                   {s.start}~{s.end}
                 </td>
@@ -394,7 +394,7 @@ function PrepareSummary({ period }: { period: WorkPeriod }) {
 
   return (
     <div className="flex flex-col gap-3">
-      <section aria-label="준비 요약" className="flex flex-wrap items-center gap-1 self-start rounded-2xl border border-[#DCDCD8] bg-white py-1.5 pr-1.5 pl-1">
+      <section aria-label="준비 요약" className="flex flex-wrap items-center gap-1 self-start rounded-2xl border border-line-strong bg-white py-1.5 pr-1.5 pl-1">
         <dl className="flex flex-wrap">
           {[
             ["날짜", formatRange(period)],
@@ -402,9 +402,9 @@ function PrepareSummary({ period }: { period: WorkPeriod }) {
             ["직원", `${active}명`],
             ["이어받는 근무", carry],
           ].map(([k, v]) => (
-            <div key={k} className="flex flex-col gap-0.5 border-r border-[#EDEDEA] px-4 py-1">
-              <dt className="text-xs text-[#6B6F78]">{k}</dt>
-              <dd className="text-[15px] font-semibold text-[#111214]">{v}</dd>
+            <div key={k} className="flex flex-col gap-0.5 border-r border-line px-4 py-1">
+              <dt className="text-xs text-muted">{k}</dt>
+              <dd className="text-[15px] font-semibold text-ink">{v}</dd>
             </div>
           ))}
         </dl>
@@ -427,7 +427,7 @@ function PrepareSummary({ period }: { period: WorkPeriod }) {
           <section className={`${ui.card} flex flex-col gap-3`}>
             <DatesSection period={period} />
             <div className="flex flex-col gap-1">
-              <h3 className="text-[13px] font-semibold text-[#111214]">공휴일</h3>
+              <h3 className="text-[13px] font-semibold text-ink">공휴일</h3>
               <p className={ui.help}>한국 공휴일은 자동으로 체크돼요. 날짜를 누르면 바꿀 수 있어요. 주말과 같은 인원 기준을 써요.</p>
             </div>
             <HolidayCalendar period={period} />
@@ -436,7 +436,7 @@ function PrepareSummary({ period }: { period: WorkPeriod }) {
           <section className={`${ui.card} flex items-center justify-between gap-3`}>
             <div className="flex flex-col gap-1">
               <h3 className={ui.cardTitle}>명단 확인</h3>
-              <p className="text-sm text-[#4B4F57]">
+              <p className="text-sm text-body">
                 직원 <span className="font-mono">{active}</span>명
                 {hasPrevious &&
                   (added.length === 0 && deactivated.length === 0 ? (
@@ -504,7 +504,7 @@ function DatesSection({ period }: { period: WorkPeriod }) {
         min={earliest}
         aria-invalid={error !== null || undefined}
         onChange={(e) => onChange(e.target.value)}
-        className={`${ui.input} w-44 font-mono ${error ? "border-[#B42318]" : ""}`}
+        className={`${ui.input} w-44 font-mono ${error ? "border-error" : ""}`}
       />
     </label>
   );
@@ -517,7 +517,7 @@ function DatesSection({ period }: { period: WorkPeriod }) {
           {input}
           <div className="flex flex-col gap-1">
             <span className={ui.label}>끝 날짜</span>
-            <span className="flex h-10 items-center font-mono text-sm text-[#111214]">
+            <span className="flex h-10 items-center font-mono text-sm text-ink">
               {periodEnd(period).split("-").map(Number).join(".")} · {period.length}일
             </span>
           </div>
@@ -529,8 +529,8 @@ function DatesSection({ period }: { period: WorkPeriod }) {
         </div>
       ) : (
         <div className="flex items-center gap-3">
-          <p className="text-sm text-[#4B4F57]">
-            <span className="font-mono font-medium text-[#111214]">{formatRange(period)}</span> ·{" "}
+          <p className="text-sm text-body">
+            <span className="font-mono font-medium text-ink">{formatRange(period)}</span> ·{" "}
             <span className="font-mono">{period.length}</span>일
           </p>
           {period.status === "draft" && (
@@ -549,7 +549,7 @@ function DatesSection({ period }: { period: WorkPeriod }) {
           <p className={ui.help}>{monthly ? `1~${MAX_MONTH_START_DAY}일 중 아무 날에서 시작할 수 있어요.` : "아무 날에서 시작할 수 있어요."}</p>
         )
       )}
-      {broken && <p className="text-sm text-[#B93815]">지난 근무표와 이어지지 않아서 지난 근무를 직접 입력해요</p>}
+      {broken && <p className="text-sm text-warn">지난 근무표와 이어지지 않아서 지난 근무를 직접 입력해요</p>}
     </div>
   );
 }
@@ -582,7 +582,7 @@ function CarryOverTable({ period, prev }: { period: WorkPeriod; prev: WorkPeriod
       <div className="overflow-x-auto" aria-label={`${formatRange(period)} 지난 근무 마지막 며칠`}>
         <div className="flex w-max flex-col gap-0.5">
           <div className="grid gap-x-0.5" style={grid}>
-            <span className="flex items-end text-xs font-medium text-[#6B6F78]">이름</span>
+            <span className="flex items-end text-xs font-medium text-muted">이름</span>
             {days.map((d, i) => (
               <DayHead
                 key={d}
@@ -595,7 +595,7 @@ function CarryOverTable({ period, prev }: { period: WorkPeriod; prev: WorkPeriod
           </div>
           {rows.map((r) => (
             <div key={r.employee_id} className="grid gap-x-0.5" style={grid}>
-              <span className="flex h-7 items-center truncate text-sm text-[#111214]">{name(r.employee_id)}</span>
+              <span className="flex h-7 items-center truncate text-sm text-ink">{name(r.employee_id)}</span>
               {r.shifts.map((code, i) => {
                 const d = prev.length - r.shifts.length + 1 + i;
                 return (
@@ -702,12 +702,12 @@ function CarryOverPaste({ period }: { period: WorkPeriod }) {
             </li>
           ))}
           {result.warnings.map((w, i) => (
-            <li key={`w${i}`} className="text-xs font-medium text-[#B93815]">
+            <li key={`w${i}`} className="text-xs font-medium text-warn">
               {w}
             </li>
           ))}
           {result.errors.length === 0 && (
-            <li className="text-xs font-medium text-[#067647]">{result.rows.length}명의 지난 근무를 반영했어요.</li>
+            <li className="text-xs font-medium text-ok">{result.rows.length}명의 지난 근무를 반영했어요.</li>
           )}
           {result.errors.length > 0 && <li className={ui.help}>오류를 고친 뒤 다시 표로 만들어 주세요.</li>}
         </ul>

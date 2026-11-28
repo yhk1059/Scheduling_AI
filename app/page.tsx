@@ -12,10 +12,10 @@ import { PRODUCT_NAME } from "@/lib/product";
 // 문제 장면: 손으로 짠 엑셀 근무표. 토요일 칸을 고치면(주황 1) 다음 날 칸이 깨진다(빨강 2). 색은 앱 근무표와 같다.
 type Shift = "오픈" | "미들" | "마감" | "휴";
 const SHIFT_CLASS: Record<Shift, string> = {
-  오픈: "bg-[#E5EDFF] text-[#1E4FD8]",
-  미들: "bg-[#DDF7E9] text-[#067647]",
-  마감: "bg-[#EEE9FF] text-[#5925DC]",
-  휴: "bg-[#FFEBDB] text-[#B93815]",
+  오픈: "bg-info-soft text-info",
+  미들: "bg-ok-soft text-ok",
+  마감: "bg-shift-4 text-shift-4-ink",
+  휴: "bg-warn-soft text-warn",
 };
 const SHEET_DAYS = ["2 월", "3 화", "4 수", "5 목", "6 금", "7 토", "8 일"];
 const SHEET_ROWS: { name: string; cells: Shift[] }[] = [
@@ -26,12 +26,12 @@ const SHEET_ROWS: { name: string; cells: Shift[] }[] = [
 ];
 // 고치는 칸(박민수 · 토)과 그 때문에 깨지는 칸(박민수 · 일)
 const FIX = { row: 1, day: 5 };
-const SHEET_CELL = "flex h-10 items-center justify-center border-r border-b border-[#DCDCD8] text-xs lg:h-11 lg:text-sm";
+const SHEET_CELL = "flex h-10 items-center justify-center border-r border-b border-line-strong text-xs lg:h-11 lg:text-sm";
 
 /** 번호 동그라미. 주황은 고친 곳, 빨강은 깨진 곳. */
 function Num({ n, className = "" }: { n: 1 | 2; className?: string }) {
   return (
-    <span className={`inline-flex size-[22px] items-center justify-center rounded-full font-mono text-xs font-medium ${n === 1 ? "bg-[#FF7A1A] text-[#2B1100]" : "bg-[#B42318] text-white"} ${className}`}>
+    <span className={`inline-flex size-[22px] items-center justify-center rounded-full font-mono text-xs font-medium ${n === 1 ? "bg-changed text-changed-ink" : "bg-error text-white"} ${className}`}>
       {n}
     </span>
   );
@@ -42,17 +42,17 @@ function HandSheet() {
     <div
       role="img"
       aria-label="손으로 짠 엑셀 근무표. 토요일 마감 칸을 채우자 다음 날 오픈 칸이 규칙에 어긋난다."
-      className="problem-sheet grid grid-cols-[72px_repeat(7,minmax(0,1fr))] border-t border-l border-[#DCDCD8] bg-white lg:grid-cols-[80px_repeat(7,minmax(0,1fr))]"
+      className="problem-sheet grid grid-cols-[72px_repeat(7,minmax(0,1fr))] border-t border-l border-line-strong bg-white lg:grid-cols-[80px_repeat(7,minmax(0,1fr))]"
     >
-      <span className={`${SHEET_CELL} h-8! justify-start truncate bg-[#F5F5F4] pl-2.5 font-mono text-[11px] text-[#6B6F78] lg:h-9! lg:text-xs`}>11월.xlsx</span>
+      <span className={`${SHEET_CELL} h-8! justify-start truncate bg-soft pl-2.5 font-mono text-[11px] text-muted lg:h-9! lg:text-xs`}>11월.xlsx</span>
       {SHEET_DAYS.map((d) => (
-        <span key={d} className={`${SHEET_CELL} h-8! bg-[#F5F5F4] font-mono text-[11px] text-[#6B6F78] lg:h-9! lg:text-xs`}>
+        <span key={d} className={`${SHEET_CELL} h-8! bg-soft font-mono text-[11px] text-muted lg:h-9! lg:text-xs`}>
           {d}
         </span>
       ))}
       {SHEET_ROWS.map((r, ri) => (
         <Fragment key={r.name}>
-          <span className={`${SHEET_CELL} justify-start pl-2.5 text-[#111214]`}>{r.name}</span>
+          <span className={`${SHEET_CELL} justify-start pl-2.5 text-ink`}>{r.name}</span>
           {r.cells.map((c, di) => {
             const fix = ri === FIX.row && di === FIX.day;
             const broken = ri === FIX.row && di === FIX.day + 1;
@@ -60,14 +60,14 @@ function HandSheet() {
               <span key={di} className={`relative ${SHEET_CELL} ${SHIFT_CLASS[c]}`}>
                 {c}
                 {fix && (
-                  <span className={`problem-fix absolute inset-0 flex items-center justify-center gap-1 shadow-[inset_0_0_0_3px_#FF7A1A] ${SHIFT_CLASS.마감}`}>
-                    <span className="text-[#8A93A6] line-through max-lg:hidden">휴</span>
+                  <span className={`problem-fix absolute inset-0 flex items-center justify-center gap-1 shadow-[inset_0_0_0_3px_var(--color-changed)] ${SHIFT_CLASS.마감}`}>
+                    <span className="text-disabled line-through max-lg:hidden">휴</span>
                     <span className="font-medium">마감</span>
                     <Num n={1} className="absolute -top-2.5 -right-2.5 ring-2 ring-white" />
                   </span>
                 )}
                 {broken && (
-                  <span className="problem-break absolute inset-0 shadow-[inset_0_0_0_3px_#B42318]">
+                  <span className="problem-break absolute inset-0 shadow-[inset_0_0_0_3px_var(--color-error)]">
                     <Num n={2} className="absolute -top-2.5 -right-2.5 ring-2 ring-white" />
                   </span>
                 )}
@@ -104,19 +104,19 @@ const CHAT: { who: "매니저" | "직원"; time: string; text: string; answer: s
 
 function ChatPanel() {
   return (
-    <div className="flex flex-col gap-5 rounded-xl bg-[#F5F5F4] p-5 lg:p-6">
+    <div className="flex flex-col gap-5 rounded-xl bg-soft p-5 lg:p-6">
       {CHAT.map((m) => (
         <div key={m.time} className="flex flex-col gap-2">
-          <span className="flex items-center gap-2 font-mono text-[11px] text-[#6B6F78]">
-            <span aria-hidden="true" className={`inline-flex size-6 items-center justify-center rounded-full font-sans text-[11px] font-semibold ${m.who === "매니저" ? "bg-[#C4247C] text-white" : "bg-[#FF7A1A] text-[#2B1100]"}`}>
+          <span className="flex items-center gap-2 font-mono text-[11px] text-muted">
+            <span aria-hidden="true" className={`inline-flex size-6 items-center justify-center rounded-full font-sans text-[11px] font-semibold ${m.who === "매니저" ? "bg-accent text-white" : "bg-changed text-changed-ink"}`}>
               {m.who[0]}
             </span>
             {m.who} · {m.time}
           </span>
-          <p className="self-start rounded-xl rounded-tl-[3px] border border-[#EDEDEA] bg-white px-3.5 py-2.5 text-[15px] leading-[1.55] text-[#111214]">{m.text}</p>
-          <div className="flex flex-col gap-1.5 rounded-lg bg-[#FDEAF4] px-3 py-2.5">
-            <span className="font-mono text-[11px] text-[#C4247C]">{PRODUCT_NAME}에서는</span>
-            <span className="text-sm leading-[22px] text-[#111214]">{m.answer}</span>
+          <p className="self-start rounded-xl rounded-tl-[3px] border border-line bg-white px-3.5 py-2.5 text-[15px] leading-[1.55] text-ink">{m.text}</p>
+          <div className="flex flex-col gap-1.5 rounded-lg bg-accent-soft px-3 py-2.5">
+            <span className="font-mono text-[11px] text-accent">{PRODUCT_NAME}에서는</span>
+            <span className="text-sm leading-[22px] text-ink">{m.answer}</span>
           </div>
         </div>
       ))}
@@ -139,9 +139,9 @@ function CalendarFragment() {
     <div className={`${ui.card} grid grid-cols-7 gap-1`}>
       {["월", "화", "수", "목", "금", "토", "일"].map((w, i) => (
         <div key={w} className="flex flex-col gap-px">
-          <span className="pb-1 text-center font-mono text-[11px] text-[#6B6F78]">{w}</span>
+          <span className="pb-1 text-center font-mono text-[11px] text-muted">{w}</span>
           {Array.from({ length: 10 }, (_, slot) => (
-            <span key={slot} className={`h-3 ${slot >= PAINTED[i][0] && slot < PAINTED[i][1] ? "bg-[#C4247C]" : "bg-[#F5F5F4]"}`} />
+            <span key={slot} className={`h-3 ${slot >= PAINTED[i][0] && slot < PAINTED[i][1] ? "bg-accent" : "bg-soft"}`} />
           ))}
         </div>
       ))}
@@ -154,7 +154,7 @@ function BarFragment() {
     <div className="flex flex-col gap-2.5">
       <div className={ui.bar}>
         <Mark size={18} />
-        <span className="min-w-0 flex-1 truncate text-[15px] text-[#111214]">평일 오픈 2명, 주말은 3명</span>
+        <span className="min-w-0 flex-1 truncate text-[15px] text-ink">평일 오픈 2명, 주말은 3명</span>
         <span className={ui.primaryBar}>규칙 만들기</span>
       </div>
       <div className="flex flex-wrap items-center gap-2">
@@ -167,10 +167,10 @@ function BarFragment() {
 }
 
 function SummaryFragment() {
-  const item = "flex flex-col gap-1 border-[#EDEDEA] px-5 py-3.5 max-lg:border-b max-lg:last:border-b-0 lg:border-r lg:last:border-r-0";
-  const label = "text-xs font-medium text-[#6B6F78]";
+  const item = "flex flex-col gap-1 border-line px-5 py-3.5 max-lg:border-b max-lg:last:border-b-0 lg:border-r lg:last:border-r-0";
+  const label = "text-xs font-medium text-muted";
   return (
-    <div className="flex flex-col rounded-lg border border-[#EDEDEA] bg-white lg:flex-row lg:items-stretch">
+    <div className="flex flex-col rounded-lg border border-line bg-white lg:flex-row lg:items-stretch">
       <div className={item}>
         <span className={label}>결과</span>
         <span className="flex h-7 items-center">
@@ -179,11 +179,11 @@ function SummaryFragment() {
       </div>
       <div className={item}>
         <span className={label}>희망 반영</span>
-        <span className={`${ui.bigNumber} text-[#111214]`}>9/9</span>
+        <span className={`${ui.bigNumber} text-ink`}>9/9</span>
       </div>
       <div className={item}>
         <span className={label}>못 지킨 가능하면 규칙</span>
-        <span className={`${ui.bigNumber} text-[#B93815]`}>0</span>
+        <span className={`${ui.bigNumber} text-warn`}>0</span>
       </div>
     </div>
   );
@@ -215,7 +215,7 @@ const STEPS = [
 export default function Home() {
   return (
     <div className="landing flex flex-1 flex-col">
-      <header className="sticky top-0 z-40 border-b border-[#EDEDEA] bg-white/85 backdrop-blur-xl">
+      <header className="sticky top-0 z-40 border-b border-line bg-page/85 backdrop-blur-xl">
         <div className={`${container} flex min-h-16 flex-wrap items-center justify-between gap-3 py-2`}>
           <Wordmark size="bar" href="/" />
           <nav aria-label="주요 메뉴" className="flex items-center gap-2 sm:gap-4">
@@ -230,10 +230,9 @@ export default function Home() {
         <section className="landing-hero">
           <div className={`${container} hero-heading`}>
             <h1>
-              Scheduling<span aria-hidden="true" className="hero-sticker calendar-sticker"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><rect x="3" y="5" width="18" height="16" rx="3" /><path d="M3 10h18M8 3v4M16 3v4" /></svg></span>{" "}
-              <span className="text-[#EE46BC]">AI</span><span aria-hidden="true" className="hero-sticker sparkle-sticker">✦</span>
+              Scheduling <span className="text-accent">AI</span>
             </h1>
-            <p className="mx-auto max-w-[640px] text-lg leading-relaxed text-[#4B4F57] sm:text-xl">직원은 링크로 가능 시간을 적고, 조건은 평소 말투로 적으세요. 근무표는 버튼 한 번에 나와요.</p>
+            <p className="mx-auto max-w-[640px] text-lg leading-relaxed text-body sm:text-xl">직원은 링크로 가능 시간을 적고, 조건은 평소 말투로 적으세요. 근무표는 버튼 한 번에 나와요.</p>
             <div className="mt-8 flex flex-wrap justify-center gap-2.5">
               <Link href="/app" className={ui.primaryXl}>내 매장으로 시작하기</Link>
               <Link href="/demo" className={ui.secondaryXl}>체험하기</Link>
@@ -252,7 +251,7 @@ export default function Home() {
             <div className="grid grid-cols-1 gap-10 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:items-start lg:gap-12">
               <div className="flex flex-col gap-4">
                 <HandSheet />
-                <p className="text-[15px] leading-[1.7] text-[#4B4F57]">
+                <p className="text-[15px] leading-[1.7] text-body">
                   <Num n={1} className="mr-1.5 align-[-5px]" />
                   토요일 마감이 모자라 박민수를 넣었더니
                   <Num n={2} className="mr-1.5 ml-2 align-[-5px]" />
@@ -272,10 +271,10 @@ export default function Home() {
             </SectionHead>
             <ol className="workflow-steps flex flex-col gap-6">
               {STEPS.map((s, i) => (
-                <li key={s.title} className="rounded-3xl bg-[#F5F5F4] p-5 lg:p-8 grid grid-cols-[56px_minmax(0,1fr)] items-start gap-x-4 gap-y-5 lg:grid-cols-[64px_minmax(0,5fr)_minmax(0,6fr)] lg:gap-x-8 lg:gap-y-0">
-                  <span className="flex size-12 items-center justify-center rounded-full bg-[#111214] font-mono text-lg font-semibold text-white">{i + 1}</span>
+                <li key={s.title} className="rounded-3xl bg-soft p-5 lg:p-8 grid grid-cols-[56px_minmax(0,1fr)] items-start gap-x-4 gap-y-5 lg:grid-cols-[64px_minmax(0,5fr)_minmax(0,6fr)] lg:gap-x-8 lg:gap-y-0">
+                  <span className="flex size-12 items-center justify-center rounded-full bg-ink font-mono text-lg font-semibold text-white">{i + 1}</span>
                   <div className="flex flex-col gap-2">
-                    <h3 className="text-[20px] font-semibold text-[#111214]">{s.title}</h3>
+                    <h3 className="text-[20px] font-semibold text-ink">{s.title}</h3>
                     <p className={body}>{s.body}</p>
                   </div>
                   <div className="col-span-2 lg:col-span-1">{s.fragment}</div>
@@ -292,8 +291,8 @@ export default function Home() {
             </SectionHead>
             <div className="grid grid-cols-1 gap-6 lg:grid-cols-3 lg:gap-8">
               {MORE_PAINS.map((p) => (
-                <div key={p.title} className="flex flex-col gap-2 border-l border-[#DCDCD8] pl-5">
-                  <h3 className="text-[15px] font-semibold text-[#111214]">{p.title}</h3>
+                <div key={p.title} className="flex flex-col gap-2 border-l border-line-strong pl-5">
+                  <h3 className="text-[15px] font-semibold text-ink">{p.title}</h3>
                   <p className={body}>{p.body}</p>
                 </div>
               ))}
@@ -301,25 +300,25 @@ export default function Home() {
           </div>
         </section>
 
-        <section className="landing-cta mx-4 my-6 rounded-[32px] bg-[#111214] py-16 lg:mx-auto lg:max-w-[1200px] lg:rounded-[40px] lg:py-28">
+        <section className="landing-cta mx-4 my-6 rounded-[32px] bg-ink py-16 lg:mx-auto lg:max-w-[1200px] lg:rounded-[40px] lg:py-28">
           <div className={`${container} flex flex-col gap-8 lg:flex-row lg:items-center lg:justify-between lg:gap-10`}>
             <div className="flex flex-col gap-3">
               <h2 className="text-[36px] leading-[1.15] font-bold tracking-[-0.04em] text-white lg:text-[56px]">
                 이번 주 근무표,
                 <br />지금 만들어 보세요
               </h2>
-              <p className="text-base text-[#EDEDEA]">Google 로그인으로 시작해요. 체험은 로그인 없이 할 수 있어요.</p>
+              <p className="text-base text-line">Google 로그인으로 시작해요. 체험은 로그인 없이 할 수 있어요.</p>
             </div>
             <div className="flex shrink-0 flex-wrap items-center gap-2">
               <Link
                 href="/app"
-                className="inline-flex h-12 items-center rounded-full border border-white bg-white px-[22px] text-[15px] font-semibold text-[#111214] transition-colors duration-[120ms] hover:bg-[#FDEAF4] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
+                className="inline-flex h-12 items-center rounded-full border border-white bg-white px-[22px] text-[15px] font-semibold text-ink transition-colors duration-[120ms] hover:bg-accent-soft focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
               >
                 내 매장으로 시작하기
               </Link>
               <Link
                 href="/demo"
-                className="inline-flex h-12 items-center rounded-full border border-white px-[22px] text-[15px] font-medium text-white transition-colors duration-[120ms] hover:bg-[#2C2F35] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
+                className="inline-flex h-12 items-center rounded-full border border-white px-[22px] text-[15px] font-medium text-white transition-colors duration-[120ms] hover:bg-accent-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
               >
                 체험하기
               </Link>

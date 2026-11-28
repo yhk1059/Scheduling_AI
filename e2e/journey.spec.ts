@@ -798,7 +798,7 @@ test("S12. 확정 → 확정 근무표 → 직원 링크 잠김", async ({ brows
   await expect(page.getByRole("main")).toContainText(`직원 12명 · 켜진 규칙 ${conditions}개 · 1주 단위`);
   const task = sectionWith(WEEK_NAME);
   await expect(task).toContainText("확정했어요 · 10/28 09:00");
-  await expect(task.getByRole("button", { name: "열기" })).toHaveClass(/bg-\[#F5F5F4\] text-\[#111214\]/);
+  await expect(task.getByRole("button", { name: "열기" })).toHaveClass(/bg-soft text-ink/);
   await expect(primaryButtons(page)).toHaveCount(1);
   await expect(primaryButtons(page)).toHaveText("11/9~11/15 근무표 만들기");
   await expect(page.getByText("확정한 근무표가 여기에 쌓여요.")).toBeVisible();

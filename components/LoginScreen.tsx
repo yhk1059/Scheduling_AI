@@ -17,14 +17,14 @@ export default function LoginScreen() {
     <div className="mx-auto grid min-h-[calc(100vh-108px)] w-full max-w-[1100px] grid-cols-1 items-center gap-10 py-10 lg:grid-cols-[1fr_440px] lg:gap-20">
       <div className="flex flex-col gap-5">
         <Wordmark size="hero" />
-        <p className="text-[36px] leading-[1.25] font-semibold tracking-[-0.02em] text-[#111214]">말로 짜는 근무표</p>
-        <p className="text-base leading-relaxed text-[#4B4F57]">
+        <p className="text-[36px] leading-[1.25] font-semibold tracking-[-0.02em] text-ink">말로 짜는 근무표</p>
+        <p className="text-base leading-relaxed text-body">
           직원 명단만 넣으면 첫 근무표를 시작할 수 있어요. 계정 하나로 매장 하나를 관리하고, 근무표는 저장돼서 다른 기기에서도 이어서 볼 수 있어요.
         </p>
-        <ol className="flex flex-col gap-3 border-t border-[#EDEDEA] pt-5">
+        <ol className="flex flex-col gap-3 border-t border-line pt-5">
           {STEPS.map((step, i) => (
-            <li key={step} className="flex items-center gap-3 text-sm text-[#4B4F57]">
-              <span className="font-mono font-semibold text-[#C4247C]">{i + 1}</span>
+            <li key={step} className="flex items-center gap-3 text-sm text-body">
+              <span className="font-mono font-semibold text-accent">{i + 1}</span>
               {step}
               {i === STEPS.length - 1 && (
                 <span aria-hidden="true" className="flex gap-0.5">
@@ -43,18 +43,18 @@ export default function LoginScreen() {
       <section className={`${ui.cardXl} flex flex-col gap-4 px-9 pt-9 pb-7`}>
         <div className="flex flex-col gap-1">
           <h1 className={ui.sectionTitle}>로그인</h1>
-          {!supabaseConfigured && <p className="text-sm leading-relaxed text-[#4B4F57]">로그인 설정이 필요해요</p>}
+          {!supabaseConfigured && <p className="text-sm leading-relaxed text-body">로그인 설정이 필요해요</p>}
         </div>
         {supabaseConfigured && <LoginButton className={`${ui.primaryXl} w-full justify-center`} />}
         {supabaseConfigured && (
-          <p className="text-xs leading-relaxed text-[#6B6F78]">
+          <p className="text-xs leading-relaxed text-muted">
             내 매장과 근무표는 서버에 저장되고, 언제든 직접 지울 수 있어요.
-            <PrivacyLink className="ml-1 rounded-sm whitespace-nowrap underline underline-offset-2 hover:text-[#111214]" />
+            <PrivacyLink className="ml-1 rounded-sm whitespace-nowrap underline underline-offset-2 hover:text-ink" />
           </p>
         )}
         {/* 로그인 전에 써 보고 싶은 사람을 위한 체험 경로. 체험은 저장하지 않는다 */}
-        <div className="flex flex-col gap-2 border-t border-[#EDEDEA] pt-4">
-          <p className="text-sm text-[#4B4F57]">로그인 없이 먼저 써 볼 수 있어요</p>
+        <div className="flex flex-col gap-2 border-t border-line pt-4">
+          <p className="text-sm text-body">로그인 없이 먼저 써 볼 수 있어요</p>
           <Link href="/demo" className={`${ui.secondaryXl} w-full justify-center`}>
             샘플 매장으로 체험하기
           </Link>

@@ -184,7 +184,7 @@ export function AccountBar() {
     ) : sync.status === "saving" ? (
       <span>저장 중…</span>
     ) : sync.status === "error" ? (
-      <span className="flex items-center gap-1 text-[#B42318]">
+      <span className="flex items-center gap-1 text-error">
         저장 실패
         <button type="button" onClick={() => void retrySave()} className={ui.textSm}>
           다시 시도
@@ -197,7 +197,7 @@ export function AccountBar() {
     );
 
   return (
-    <div className="flex items-center gap-3 text-xs text-[#6B6F78]">
+    <div className="flex items-center gap-3 text-xs text-muted">
       <span role="status">{status}</span>
       <div ref={menuRef} className="relative flex items-center">
         <button
@@ -207,11 +207,11 @@ export function AccountBar() {
           aria-haspopup="menu"
           aria-expanded={menuOpen}
           onClick={() => setMenuOpen((o) => !o)}
-          className="inline-flex h-8 items-center gap-2 rounded-md px-1.5 text-xs text-[#4B4F57] transition-colors duration-[120ms] hover:bg-[#F5F5F4] active:bg-[#EDEDEA] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#C4247C]"
+          className="inline-flex h-8 items-center gap-2 rounded-md px-1.5 text-xs text-body transition-colors duration-[120ms] hover:bg-soft active:bg-pressed focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
         >
           <span
             aria-hidden="true"
-            className="flex size-6 items-center justify-center rounded-full bg-[#FDEAF4] text-xs font-semibold text-[#C4247C]"
+            className="flex size-6 items-center justify-center rounded-full bg-accent-soft text-xs font-semibold text-accent"
           >
             {auth.email?.charAt(0).toUpperCase()}
           </span>
@@ -223,7 +223,7 @@ export function AccountBar() {
         {menuOpen && (
           <div
             role="menu"
-            className={`absolute top-full right-0 z-10 mt-1 flex min-w-[180px] flex-col rounded-lg border border-[#EDEDEA] bg-white p-1 ${ui.shadow}`}
+            className={`absolute top-full right-0 z-10 mt-1 flex min-w-[180px] flex-col rounded-lg border border-line bg-white p-1 ${ui.shadow}`}
           >
             <button type="button" role="menuitem" onClick={() => void logout()} className={`${ui.textSm} justify-start`}>
               로그아웃

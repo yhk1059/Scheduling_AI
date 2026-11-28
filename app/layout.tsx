@@ -33,7 +33,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
           href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css"
         />
       </head>
-      <body className="min-h-full flex flex-col bg-[#FFFFFF] font-sans text-[#111214]">
+      <body className="min-h-full flex flex-col bg-page font-sans text-ink">
         {children}
       </body>
     </html>

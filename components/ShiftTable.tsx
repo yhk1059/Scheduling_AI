@@ -37,10 +37,10 @@ export default function ShiftTable({ showTimeline = false }: { showTimeline?: bo
     <div className={showTimeline ? ui.workLayout : undefined}>
       <div className="flex min-w-0 flex-col gap-2">
         <p className={ui.help}>말로 &lsquo;피크 근무 11시~14시 추가&rsquo;라고 적어도 돼요.</p>
-        <div className="overflow-x-auto rounded-lg border border-[#EDEDEA] bg-white">
+        <div className="overflow-x-auto rounded-lg border border-line bg-white">
           <table className={`w-full border-collapse text-[13px] ${showTimeline ? "[&_input]:px-1.5 [&_input]:max-w-20 [&_input[type=time]]:max-w-none [&_td]:px-0.5 [&_th]:px-1 [&_th]:leading-tight" : ""}`}>
             <thead>
-              <tr className="border-b border-[#EDEDEA] text-left text-xs font-medium text-[#6B6F78]">
+              <tr className="border-b border-line text-left text-xs font-medium text-muted">
                 <th className="px-2 py-2 font-medium">약자</th>
                 <th className="px-2 py-2 font-medium">이름</th>
                 <th className="px-2 py-2 font-medium">시작 시각</th>
@@ -76,7 +76,7 @@ function ShiftTimeline({ shop, focusShift }: { shop: Shop; focusShift: (code: st
     return Math.max(0, (hour + minute / 60 - 6) / 18 * 100);
   };
   return (
-    <aside aria-label="하루 타임라인" className={`${ui.workAside} rounded-2xl bg-[#F5F5F4] px-4 py-4`}>
+    <aside aria-label="하루 타임라인" className={`${ui.workAside} rounded-2xl bg-soft px-4 py-4`}>
       <h3 className={ui.cardTitle}>하루 타임라인</h3>
       <p className={ui.help}>근무조마다 필요 인원</p>
       {shifts.length ? (
@@ -84,8 +84,8 @@ function ShiftTimeline({ shop, focusShift }: { shop: Shop; focusShift: (code: st
           <div aria-hidden="true" className="pointer-events-none absolute inset-x-2 inset-y-0 flex justify-between">
             {hours.map((hour) => (
               <div key={hour} className="relative w-0">
-                <span className="absolute -translate-x-1/2 font-mono text-[11px] text-[#4B4F57]">{String(hour).padStart(2, "0")}</span>
-                <span className="absolute inset-y-5 border-l border-dashed border-[#DCDCD8]" />
+                <span className="absolute -translate-x-1/2 font-mono text-[11px] text-body">{String(hour).padStart(2, "0")}</span>
+                <span className="absolute inset-y-5 border-l border-dashed border-line-strong" />
               </div>
             ))}
           </div>
@@ -105,12 +105,12 @@ function ShiftTimeline({ shop, focusShift }: { shop: Shop; focusShift: (code: st
                 <button
                   type="button"
                   onClick={() => focusShift(shift.code)}
-                  className="w-full rounded text-left focus-visible:outline-2 focus-visible:outline-[#C4247C]"
+                  className="w-full rounded text-left focus-visible:outline-2 focus-visible:outline-accent"
                 >
-                  <span className="block text-xs font-semibold text-[#111214] wrap-anywhere">{shift.code} {shift.name}</span>
+                  <span className="block text-xs font-semibold text-ink wrap-anywhere">{shift.code} {shift.name}</span>
                   {lines.map(([label, text]) => (
-                    <span key={label} className="mt-0.5 flex gap-2 text-xs text-[#111214]">
-                      <span className="shrink-0 text-[#6B6F78]">{label}</span>
+                    <span key={label} className="mt-0.5 flex gap-2 text-xs text-ink">
+                      <span className="shrink-0 text-muted">{label}</span>
                       <span>{text}</span>
                     </span>
                   ))}
@@ -119,7 +119,7 @@ function ShiftTimeline({ shop, focusShift }: { shop: Shop; focusShift: (code: st
                       <span className="block h-full bg-current opacity-80" />
                     </span>
                   </span>
-                  <span className="font-mono text-[11px] text-[#4B4F57]">{start}~{end}</span>
+                  <span className="font-mono text-[11px] text-body">{start}~{end}</span>
                 </button>
               </div>
             );
@@ -165,9 +165,9 @@ function ShiftRow({ shift, config, nameId, compact }: { shift: ShiftDef; config:
     setTimes(null);
   };
 
-  const muted = active ? "" : "text-[#6B6F78]";
+  const muted = active ? "" : "text-muted";
   return (
-    <tr className="border-b border-[#F5F5F4]">
+    <tr className="border-b border-soft">
       <td className={`px-2 py-1 font-mono font-semibold ${muted}`}>
         <span className="flex items-center gap-2">
           <span className={compact && active ? `rounded-md px-1.5 py-1 ${codeClass(shift.code, config)}` : undefined}>{shift.code}</span>
@@ -249,7 +249,7 @@ function ShiftRow({ shift, config, nameId, compact }: { shift: ShiftDef; config:
               type="button"
               disabled={partOff}
               onClick={() => setShiftActive(shift.code, true)}
-              className={`${ui.textSm} disabled:cursor-not-allowed disabled:text-[#9499A2] disabled:hover:bg-transparent`}
+              className={`${ui.textSm} disabled:cursor-not-allowed disabled:text-disabled disabled:hover:bg-transparent`}
             >
               다시 켜기
             </button>
@@ -324,9 +324,9 @@ function NewShiftRow({ shifts }: { shifts: ShiftDef[] }) {
   }
   const show = (msg: string | null) => (tried ? msg : null);
   const cls = (msg: string | null) => (show(msg) ? ui.cellErr : ui.cellOk);
-  const placeholder = "placeholder:font-sans placeholder:text-[#6B6F78]";
+  const placeholder = "placeholder:font-sans placeholder:text-muted";
   return (
-    <tr className="bg-[#F5F5F4] align-top">
+    <tr className="bg-soft align-top">
       <td className="px-1 py-1">
         <input
           ref={codeRef}

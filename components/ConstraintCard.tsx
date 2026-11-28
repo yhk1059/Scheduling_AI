@@ -109,7 +109,7 @@ function ExampleStrip({
   const marked = (id: string, d: number) => example.marks.some(([m, md]) => m === id && md === d);
   return (
     <div className="flex min-w-0 flex-col gap-1.5 overflow-x-auto">
-      <p className="text-xs font-semibold text-[#B42318]">{example.detail}</p>
+      <p className="text-xs font-semibold text-error">{example.detail}</p>
       <table className="border-separate border-spacing-x-0.5 border-spacing-y-0.5">
         <thead>
           <tr>
@@ -117,7 +117,7 @@ function ExampleStrip({
               직원
             </th>
             {example.days.map((d, i) => (
-              <th key={d} scope="col" className="w-6 text-center font-mono text-[11px] font-medium whitespace-nowrap text-[#6B6F78]">
+              <th key={d} scope="col" className="w-6 text-center font-mono text-[11px] font-medium whitespace-nowrap text-muted">
                 {i === 0 ? monthDay(range, d) : dayHeader(range, d)}
               </th>
             ))}
@@ -126,7 +126,7 @@ function ExampleStrip({
         <tbody>
           {example.employee_ids.map((id) => (
             <tr key={id}>
-              <th scope="row" className="max-w-[96px] truncate pr-1.5 text-left text-xs font-medium text-[#111214]">
+              <th scope="row" className="max-w-[96px] truncate pr-1.5 text-left text-xs font-medium text-ink">
                 {nameOf(id)}
               </th>
               {example.days.map((d, i) => {
@@ -140,7 +140,7 @@ function ExampleStrip({
                     className="p-0"
                   >
                     <span
-                      className={`${STRIP_CELL} ${codeClass(code, config)} ${bad ? "ring-1 ring-[#B42318]" : ""}`}
+                      className={`${STRIP_CELL} ${codeClass(code, config)} ${bad ? "ring-1 ring-error" : ""}`}
                     >
                       {cellText(code)}
                     </span>
@@ -189,7 +189,7 @@ const CARD = "flex flex-col gap-3.5 rounded-3xl border bg-white px-6 py-5";
 
 function Quote({ text, dim = false, compact = false }: { text: string; dim?: boolean; compact?: boolean }) {
   return (
-    <p className={`flex items-start gap-1.5 ${compact ? "text-sm" : "text-[15px]"} leading-5 ${dim ? "text-[#6B6F78]" : "text-[#111214]"}`}>
+    <p className={`flex items-start gap-1.5 ${compact ? "text-sm" : "text-[15px]"} leading-5 ${dim ? "text-muted" : "text-ink"}`}>
       <QuoteGlyph size={compact ? 16 : 20} />
       <span>{text}</span>
     </p>
@@ -198,10 +198,10 @@ function Quote({ text, dim = false, compact = false }: { text: string; dim?: boo
 
 function Reading({ sentence, dim = false, children }: { sentence: ReactNode; dim?: boolean; children?: ReactNode }) {
   return (
-    <div className="ml-2 flex flex-col gap-2.5 border-l-2 border-[#EDEDEA] pl-3.5">
+    <div className="ml-2 flex flex-col gap-2.5 border-l-2 border-line pl-3.5">
       <div className="flex flex-col gap-1">
         <span className={`${ui.eyebrow} text-[11px]!`}>이렇게 읽었어요</span>
-        <p className={`text-base font-semibold leading-snug tracking-[-0.01em] ${dim ? "text-[#6B6F78]" : "text-[#111214]"}`}>{sentence}</p>
+        <p className={`text-base font-semibold leading-snug tracking-[-0.01em] ${dim ? "text-muted" : "text-ink"}`}>{sentence}</p>
       </div>
       {children}
     </div>
@@ -214,7 +214,7 @@ function HardnessToggle({ value, disabled, onChange }: { value: Hardness; disabl
       role="group"
       aria-label="반드시/가능하면"
       title={disabled ? "휴가와 고정 근무는 항상 반드시예요" : undefined}
-      className="inline-flex overflow-hidden rounded-md border border-[#DCDCD8]"
+      className="inline-flex overflow-hidden rounded-md border border-line-strong"
     >
       {(["hard", "soft"] as const).map((h) => (
         <button
@@ -223,7 +223,7 @@ function HardnessToggle({ value, disabled, onChange }: { value: Hardness; disabl
           disabled={disabled}
           aria-pressed={value === h}
           onClick={() => onChange(h)}
-          className="h-7 bg-white px-3 text-xs font-medium text-[#6B6F78] disabled:cursor-not-allowed aria-pressed:bg-[#111214] aria-pressed:text-white"
+          className="h-7 bg-white px-3 text-xs font-medium text-muted disabled:cursor-not-allowed aria-pressed:bg-ink aria-pressed:text-white"
         >
           {hardnessLabel(h)}
         </button>
@@ -265,15 +265,15 @@ export function ShiftChangeCardView({ card }: { card: ShiftChangeCard }) {
   if (!config) return null;
   const store = useAppStore.getState();
   return (
-    <article className={`${CARD} border-[#DCDCD8]`}>
+    <article className={`${CARD} border-line-strong`}>
       <div className="flex items-center justify-between gap-3">
         <h3 className={ui.cardTitle}>근무조</h3>
-        <span className={`${ui.badge} bg-[#F5F5F4] text-[#4B4F57]`}>근무조</span>
+        <span className={`${ui.badge} bg-soft text-body`}>근무조</span>
       </div>
       {card.source_text && <Quote text={card.source_text} />}
       <Reading sentence={describeShiftChange(card.change, config)} />
       <div className="flex items-center justify-between gap-3">
-        <span className={`${ui.badge} bg-[#FFEBDB] text-[#B93815]`}>적용 대기</span>
+        <span className={`${ui.badge} bg-warn-soft text-warn`}>적용 대기</span>
         <div className="flex items-center gap-1">
           <button type="button" onClick={() => store.removeRule(card.id)} className={ui.danger}>
             삭제
@@ -379,12 +379,12 @@ export default function ConstraintCard({
   };
 
   return (
-    <article className={`${CARD} ${compact ? "px-4! py-3.5!" : ""} ${pending ? "border-transparent bg-[#FDEAF4]!" : "border-[#EDEDEA]"}`}>
+    <article className={`${CARD} ${compact ? "px-4! py-3.5!" : ""} ${pending ? "border-transparent bg-accent-soft!" : "border-line"}`}>
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h3 className={compact ? "text-sm font-semibold text-[#111214]" : ui.cardTitle}>{presetName(card)}</h3>
+        <h3 className={compact ? "text-sm font-semibold text-ink" : ui.cardTitle}>{presetName(card)}</h3>
         {/* 휴가 카드는 항상 반드시라 토글 대신 배지를 둔다 */}
         {isLeaveRule(card) ? (
-          <span className={`${ui.badge} bg-[#111214] text-white`}>반드시</span>
+          <span className={`${ui.badge} bg-ink text-white`}>반드시</span>
         ) : (
           <div className="flex items-center gap-2">
             {hardness === "soft" && card.type !== "fixed_assignment" && (
@@ -406,7 +406,7 @@ export default function ConstraintCard({
 
       <Reading sentence={<RuleText sentence={describeRule(card, config, employees, range)} />} dim={dim}>
         {draft && (
-          <div className="flex flex-col gap-2.5 rounded-sm border border-[#EDEDEA] px-2.5 py-2">
+          <div className="flex flex-col gap-2.5 rounded-sm border border-line px-2.5 py-2">
             <div className="flex flex-wrap items-end gap-3">
               {fields.map((f) => (
                 <FieldInput key={f.key} field={f} value={draft[f.key]} onChange={(v) => setDraft({ ...draft, [f.key]: v })} />
@@ -434,45 +434,45 @@ export default function ConstraintCard({
       </Reading>
 
       {orphan && (
-        <p className="flex items-center gap-1.5 text-xs font-medium text-[#B93815]">
+        <p className="flex items-center gap-1.5 text-xs font-medium text-warn">
           <WarningIcon />
           명단에 없는 직원을 가리켜요. 삭제하거나 명단을 고쳐 주세요.
         </p>
       )}
 
       {pending && conflict && conflictName && (
-        <p className="flex flex-wrap items-center gap-1.5 text-xs font-medium text-[#B93815]">
+        <p className="flex flex-wrap items-center gap-1.5 text-xs font-medium text-warn">
           <WarningIcon />
           기존 규칙 {conflictName}{josa(conflictName, "과", "와")} 함께 지킬 수 없어요
           <button type="button" onClick={() => store.removeRule(conflict.id)} className={ui.textSm}>
             기존 규칙 끄기
           </button>
-          <span className="font-normal text-[#6B6F78]">매장 조건에서 꺼져요</span>
+          <span className="font-normal text-muted">매장 조건에서 꺼져요</span>
         </p>
       )}
 
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2">
           {isDefault && (
-            <span title="매장마다 처음부터 있는 규칙이에요. 지울 수는 없고 끌 수 있어요" className={`${ui.badge} bg-[#F5F5F4] text-[#4B4F57]`}>
+            <span title="매장마다 처음부터 있는 규칙이에요. 지울 수는 없고 끌 수 있어요" className={`${ui.badge} bg-soft text-body`}>
               기본 규칙
             </span>
           )}
           {off ? (
-            <span className={`${ui.badge} bg-[#FFEBDB] text-[#B93815]`}>이번 근무표에서 꺼짐</span>
+            <span className={`${ui.badge} bg-warn-soft text-warn`}>이번 근무표에서 꺼짐</span>
           ) : shopOff ? (
             <>
-              <span className={`${ui.badge} bg-[#F5F5F4] text-[#6B6F78]`}>매장 조건에서 꺼짐</span>
+              <span className={`${ui.badge} bg-soft text-muted`}>매장 조건에서 꺼짐</span>
               {/* 매장 설정 탭에서는 그 화면이 곧 매장 설정이라 두지 않는다 */}
               {onToggleOff && <span className={ui.help}>매장 설정에서도 꺼졌어요. 다음 근무표에도 적용돼요</span>}
             </>
           ) : pending ? (
-            <span className={`${ui.badge} bg-[#FFEBDB] text-[#B93815]`}>적용 대기</span>
+            <span className={`${ui.badge} bg-warn-soft text-warn`}>적용 대기</span>
           ) : (
-            <span className={`${ui.badge} bg-[#DDF7E9] text-[#067647]`}>{appliedLabel}</span>
+            <span className={`${ui.badge} bg-ok-soft text-ok`}>{appliedLabel}</span>
           )}
           {pending && replaces && (
-            <span className="text-xs font-medium text-[#6B6F78]" title={`“${replaces.source_text}”`}>
+            <span className="text-xs font-medium text-muted" title={`“${replaces.source_text}”`}>
               기존 규칙 대체
             </span>
           )}
@@ -500,7 +500,7 @@ export default function ConstraintCard({
                 삭제
               </button>
               {withConfig && (
-                <span className="ml-2 text-xs font-medium text-[#6B6F78]">
+                <span className="ml-2 text-xs font-medium text-muted">
                   근무 코드 <span className="font-mono">{withConfig}</span> 추가가 함께 적용돼요
                 </span>
               )}

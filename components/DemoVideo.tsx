@@ -44,7 +44,7 @@ function DemoVideoDialog({ onClose }: { onClose: () => void }) {
 
   // body에 그린다. 상단 바의 backdrop-filter 안에서는 fixed가 화면 기준이 아니게 된다.
   return createPortal(
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#111214]/60 px-6">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/60 px-6">
       <div
         role="dialog"
         aria-modal="true"
@@ -60,7 +60,7 @@ function DemoVideoDialog({ onClose }: { onClose: () => void }) {
             닫기
           </button>
         </div>
-        <video src={DEMO_VIDEO} controls autoPlay playsInline aria-label="데모 영상" className="aspect-[16/10] w-full rounded-lg bg-[#111214]">
+        <video src={DEMO_VIDEO} controls autoPlay playsInline aria-label="데모 영상" className="aspect-[16/10] w-full rounded-lg bg-ink">
           이 브라우저에서는 영상을 재생할 수 없어요.
         </video>
       </div>

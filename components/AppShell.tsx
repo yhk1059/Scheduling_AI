@@ -80,7 +80,7 @@ export default function AppShell({ demo = false }: { demo?: boolean }) {
 
   return (
     <div data-app-shell className="flex flex-1 flex-col">
-      <header className="top-0 z-40 border-b sm:sticky border-[#EDEDEA] bg-white/85 backdrop-blur-md">
+      <header className="top-0 z-40 border-b sm:sticky border-line bg-page/85 backdrop-blur-md">
         <div className="mx-auto flex flex-wrap gap-3 py-3 min-h-16 max-w-[1200px] items-center justify-between px-4 sm:px-6">
           <div className="flex items-center gap-3">
             {/* 매장 준비를 건너뛰지 않게 그 화면에서는 앱 홈으로 보내지 않는다 */}
@@ -91,7 +91,7 @@ export default function AppShell({ demo = false }: { demo?: boolean }) {
                 type="button"
                 aria-label={`${PRODUCT_NAME} 홈`}
                 onClick={() => go({ screen: "home" })}
-                className="inline-flex rounded-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#C4247C]"
+                className="inline-flex rounded-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
               >
                 <Wordmark size="bar" />
               </button>
@@ -100,10 +100,10 @@ export default function AppShell({ demo = false }: { demo?: boolean }) {
             )}
             {started && (
               <>
-                <span aria-hidden="true" className="h-5 w-px bg-[#EDEDEA]" />
-                <span className="text-sm font-medium text-[#111214]">
+                <span aria-hidden="true" className="h-5 w-px bg-pressed" />
+                <span className="text-sm font-medium text-ink">
                   {shop.name || "이름 없는 매장"}
-                  <span className="text-[13px] font-normal text-[#6B6F78]"> · {unitShort(shop.unit)}</span>
+                  <span className="text-[13px] font-normal text-muted"> · {unitShort(shop.unit)}</span>
                 </span>
               </>
             )}
@@ -118,10 +118,10 @@ export default function AppShell({ demo = false }: { demo?: boolean }) {
                 type="button"
                 onClick={t.onClick}
                 aria-current={t.current ? "page" : undefined}
-                className={`h-9 rounded-full px-4 text-sm transition-colors duration-[120ms] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#C4247C] ${
+                className={`h-9 rounded-full px-4 text-sm transition-colors duration-[120ms] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent ${
                   t.current
-                    ? "bg-[#111214] font-semibold text-white"
-                    : "font-medium text-[#4B4F57] hover:bg-[#F5F5F4] hover:text-[#111214]"
+                    ? "bg-accent font-semibold text-white"
+                    : "font-medium text-body hover:bg-soft hover:text-ink"
                 }`}
               >
                 {t.label}
@@ -135,9 +135,9 @@ export default function AppShell({ demo = false }: { demo?: boolean }) {
         {demo && (
           <p
             role="status"
-            className="flex items-center gap-2.5 rounded-2xl bg-[#F5F5F4] px-5 py-3 text-sm text-[#111214]"
+            className="flex items-center gap-2.5 rounded-2xl bg-soft px-5 py-3 text-sm text-ink"
           >
-            <span aria-hidden="true" className="size-2 shrink-0 rounded-full bg-[#EE46BC]" />
+            <span aria-hidden="true" className="size-2 shrink-0 rounded-full bg-accent" />
             샘플 매장 한강 다이닝을 눌러 보고 있어요. 바꾼 내용은 저장되지 않고, 새로고침하면 처음으로 돌아가요.
           </p>
         )}
@@ -165,7 +165,7 @@ export default function AppShell({ demo = false }: { demo?: boolean }) {
         )}
 
         {loading ? (
-          <p role="status" className="text-sm text-[#4B4F57]">
+          <p role="status" className="text-sm text-body">
             불러오는 중…
           </p>
         ) : !demo && auth === null ? (

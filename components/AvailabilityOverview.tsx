@@ -56,9 +56,9 @@ export default function AvailabilityOverview({
             </ul>
             <table aria-label="직원별 가능 시간" className="w-full table-fixed border-collapse text-center">
               <thead>
-                <tr className="border-b border-[#EDEDEA] text-xs">
+                <tr className="border-b border-line text-xs">
                   <th scope="col" className="w-[24%] py-2 text-left">직원</th>
-                  {shown.map((d) => <th key={d.date} scope="col" className={`font-medium ${isWeekendDay(period, d.day, period.holidays) ? "text-[#C4247C]" : "text-[#4B4F57]"}`}>{label(d)}</th>)}
+                  {shown.map((d) => <th key={d.date} scope="col" className={`font-medium ${isWeekendDay(period, d.day, period.holidays) ? "text-accent" : "text-body"}`}>{label(d)}</th>)}
                 </tr>
               </thead>
               <tbody>
@@ -66,11 +66,11 @@ export default function AvailabilityOverview({
                   const row = rowById.get(n.id);
                   const active = n.id === selected?.id;
                   return (
-                    <tr key={n.id} onClick={() => setSelectedId(n.id)} className={`cursor-pointer border-b border-[#EDEDEA] hover:bg-[#F5F5F4] ${active ? "bg-[#FDEAF4]" : ""}`}>
+                    <tr key={n.id} onClick={() => setSelectedId(n.id)} className={`cursor-pointer border-b border-line hover:bg-soft ${active ? "bg-accent-soft" : ""}`}>
                       <th scope="row" className="py-1.5 text-left">
-                        <button type="button" aria-controls={detailId} aria-pressed={active} onClick={() => setSelectedId(n.id)} className="block w-full rounded px-1 py-1 text-left text-xs wrap-anywhere focus-visible:outline-2 focus-visible:outline-[#C4247C]">
+                        <button type="button" aria-controls={detailId} aria-pressed={active} onClick={() => setSelectedId(n.id)} className="block w-full rounded px-1 py-1 text-left text-xs wrap-anywhere focus-visible:outline-2 focus-visible:outline-accent">
                           {n.name}
-                          <span className="block text-[11px] font-normal text-[#6B6F78]">{row?.submitted_at ? n.tags.join(" · ") : "미제출"}</span>
+                          <span className="block text-[11px] font-normal text-muted">{row?.submitted_at ? n.tags.join(" · ") : "미제출"}</span>
                         </button>
                       </th>
                       {shown.map((d) => {
@@ -87,12 +87,12 @@ export default function AvailabilityOverview({
                               aria-expanded={open}
                               onClick={(e) => { e.stopPropagation(); setSelectedId(n.id); setOpenCell(open ? null : key); }}
                               onBlur={() => setOpenCell((c) => (c === key ? null : c))}
-                              className={`group relative flex h-8 w-full items-center justify-center gap-0.5 rounded-md px-0.5 focus-visible:outline-2 focus-visible:outline-[#C4247C] ${ok.length ? "hover:bg-[#EDEDEA]" : "border border-dashed border-[#DCDCD8]"}`}
+                              className={`group relative flex h-8 w-full items-center justify-center gap-0.5 rounded-md px-0.5 focus-visible:outline-2 focus-visible:outline-accent ${ok.length ? "hover:bg-pressed" : "border border-dashed border-line-strong"}`}
                             >
                               {ok.map((shift) => (
                                 <span key={shift.code} aria-hidden="true" className={`flex h-6 min-w-0 max-w-6 flex-1 items-center justify-center rounded font-mono text-[11px]! ${codeClass(shift.code, config)}`}>{shift.code}</span>
                               ))}
-                              <span aria-hidden="true" className={`pointer-events-none absolute bottom-full left-1/2 z-20 mb-1 -translate-x-1/2 whitespace-nowrap rounded-md bg-[#111214] px-2 py-1 font-mono text-[11px] text-white ${open ? "block" : "hidden group-hover:block"}`}>{time}</span>
+                              <span aria-hidden="true" className={`pointer-events-none absolute bottom-full left-1/2 z-20 mb-1 -translate-x-1/2 whitespace-nowrap rounded-md bg-ink px-2 py-1 font-mono text-[11px] text-white ${open ? "block" : "hidden group-hover:block"}`}>{time}</span>
                             </button>
                           </td>
                         );
@@ -114,9 +114,9 @@ export default function AvailabilityOverview({
             {selectedRow?.submitted_at ? (
               <dl>
                 {shown.map((d) => (
-                  <div key={d.date} className="flex items-baseline justify-between gap-2 border-b border-[#EDEDEA] py-1.5 text-sm last:border-b-0">
+                  <div key={d.date} className="flex items-baseline justify-between gap-2 border-b border-line py-1.5 text-sm last:border-b-0">
                     <dt className="shrink-0">{label(d)}</dt>
-                    <dd className="text-right text-[#4B4F57]">{(selectedRow.slots[d.date] ?? []).map(([start, end]) => `${start}~${end}`).join(" · ") || "가능 시간 없음"}</dd>
+                    <dd className="text-right text-body">{(selectedRow.slots[d.date] ?? []).map(([start, end]) => `${start}~${end}`).join(" · ") || "가능 시간 없음"}</dd>
                   </div>
                 ))}
               </dl>

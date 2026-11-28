@@ -19,7 +19,7 @@ export default function ShopSetup() {
     <div className="flex flex-col gap-5">
       <div className="flex flex-col gap-1">
         <h1 className={ui.pageTitle}>매장 준비</h1>
-        <p className="text-sm leading-relaxed text-[#4B4F57]">매장 이름과 명단만 있으면 첫 근무표를 시작할 수 있어요.</p>
+        <p className="text-sm leading-relaxed text-body">매장 이름과 명단만 있으면 첫 근무표를 시작할 수 있어요.</p>
       </div>
       <BasicSection />
       <RosterSection />

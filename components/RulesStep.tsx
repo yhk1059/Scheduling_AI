@@ -261,12 +261,12 @@ export default function RulesStep({
     <>
       <div className="flex flex-col gap-1">
         <p className={ui.cardTitle}>{copy.prompt}</p>
-        <p className="text-[13px] text-[#4B4F57]">
+        <p className="text-[13px] text-body">
           {demoShop ? "체험에서는 아래 예시 문장을 눌러 [규칙 만들기]를 해 보세요. 카드는 [적용]을 눌러야 반영돼요." : copy.description}
         </p>
       </div>
       <form
-        className={`${ui.bar} ${tooLong ? "border-[#B42318]!" : ""}`}
+        className={`${ui.bar} ${tooLong ? "border-error!" : ""}`}
         onSubmit={(e) => {
           e.preventDefault();
           if (!loading && !tooLong && text.trim() !== "") void run(text.trim());
@@ -299,7 +299,7 @@ export default function RulesStep({
         </div>
       )}
       {failure && (
-        <div role="alert" className="flex items-center gap-2 text-sm text-[#B42318]">
+        <div role="alert" className="flex items-center gap-2 text-sm text-error">
           {failure.message}
           <button type="button" disabled={loading} onClick={() => void run(failure.text)} className={ui.textSm}>
             다시 시도
@@ -309,13 +309,13 @@ export default function RulesStep({
       <div className="flex items-start justify-between gap-3">
         <div className="text-sm">
           {notice?.kind === "clarify" && (
-            <p className="text-[#111214]">
-              {notice.text} <span className="text-xs font-medium text-[#6B6F78]">내용을 보완해서 다시 입력해 주세요.</span>
+            <p className="text-ink">
+              {notice.text} <span className="text-xs font-medium text-muted">내용을 보완해서 다시 입력해 주세요.</span>
             </p>
           )}
-          {notice?.kind === "unsupported" && <p className="text-[#B93815]">{notice.text}</p>}
+          {notice?.kind === "unsupported" && <p className="text-warn">{notice.text}</p>}
         </div>
-        <span className={`shrink-0 font-mono text-xs ${tooLong ? "text-[#B42318]" : "text-[#9499A2]"}`}>
+        <span className={`shrink-0 font-mono text-xs ${tooLong ? "text-error" : "text-disabled"}`}>
           {text.length}/{MAX_TEXT_CHARS}
         </span>
       </div>
@@ -383,18 +383,18 @@ export default function RulesStep({
                 : describeShiftChange(cfg!.change, shop.config);
               const off = card && (card.enabled === false || stepPeriod?.disabledIds.includes(id));
               return (
-                <li key={id} className={grouped ? "border-l-2 border-[#F4C0D1] pl-2.5" : undefined}>
-                  {firstOfGroup && <p className="mb-1 truncate text-xs text-[#6B6F78]" title={quote!}>“{quote}”</p>}
+                <li key={id} className={grouped ? "border-l-2 border-accent-line pl-2.5" : undefined}>
+                  {firstOfGroup && <p className="mb-1 truncate text-xs text-muted" title={quote!}>“{quote}”</p>}
                   <button
                     type="button"
                     aria-controls={detailId}
                     aria-pressed={id === selected.id}
                     onClick={() => setSelectedId((cur) => (!wide && cur === id ? null : id))}
-                    className={`grid w-full min-w-0 grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2 rounded-xl border border-[#EDEDEA] px-2 py-2.5 text-left text-[13px] focus-visible:outline-2 focus-visible:outline-[#C4247C] aria-pressed:border-[#C4247C] aria-pressed:bg-[#FDEAF4] sm:px-3 ${group === 0 ? "bg-[#FFF6FA]" : "bg-white"}`}
+                    className={`grid w-full min-w-0 grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2 rounded-xl border border-line px-2 py-2.5 text-left text-[13px] focus-visible:outline-2 focus-visible:outline-accent aria-pressed:border-accent aria-pressed:bg-accent-soft sm:px-3 ${group === 0 ? "bg-accent-faint" : "bg-white"}`}
                   >
-                    <span className="max-w-24 truncate rounded-full bg-[#F5F5F4] px-2 py-0.5 text-[11px] font-semibold text-[#4B4F57] sm:max-w-32" title={name}>{name}</span>
-                    <span className="truncate font-medium text-[#111214]" title={reading}>{reading}</span>
-                    <span className={`${ui.badge} ${hardness === "hard" && !off ? "bg-[#111214] text-white" : ui.badgeTone.base}`}>
+                    <span className="max-w-24 truncate rounded-full bg-soft px-2 py-0.5 text-[11px] font-semibold text-body sm:max-w-32" title={name}>{name}</span>
+                    <span className="truncate font-medium text-ink" title={reading}>{reading}</span>
+                    <span className={`${ui.badge} ${hardness === "hard" && !off ? "bg-ink text-white" : ui.badgeTone.base}`}>
                       {off ? "꺼짐 · " : ""}{hardness ? hardnessLabel(hardness) : "설정"}
                     </span>
                   </button>
@@ -415,7 +415,7 @@ export default function RulesStep({
 
   const list =
     items.length === 0 ? (
-      copy.empty && <p className="text-sm text-[#6B6F78]">{copy.empty}</p>
+      copy.empty && <p className="text-sm text-muted">{copy.empty}</p>
     ) : (
       <div className="flex flex-col gap-3">
         {pendingCount >= 2 && (
@@ -485,7 +485,7 @@ function DemoInputNote() {
     <div className="flex items-start justify-between gap-3">
       <div className="flex flex-col gap-1">
         <p className={ui.cardTitle}>체험에서는 말로 적을 수 없어요</p>
-        <p className="text-[13px] text-[#4B4F57]">
+        <p className="text-[13px] text-body">
           카드를 누르면 이번 근무표에서 끄거나 숫자를 바꿀 수 있어요. 그다음 ③에서 근무표를 만들어 보세요. 내 매장에서는 문장을 적으면 카드가 돼요.
         </p>
         {error && (

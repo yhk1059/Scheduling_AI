@@ -38,7 +38,7 @@ export default function ShopSettings() {
     <div className="flex flex-col gap-5">
       <div className="flex flex-col gap-3">
         <h1 className={ui.pageTitle}>매장 설정</h1>
-        <div role="tablist" className="flex gap-5 border-b border-[#EDEDEA]">
+        <div role="tablist" className="flex gap-5 border-b border-line">
           {TABS.map((t) => (
             <button
               key={t.tab}
@@ -47,10 +47,10 @@ export default function ShopSettings() {
               onClick={() => go({ screen: "settings", tab: t.tab })}
               aria-selected={tab === t.tab}
               aria-current={tab === t.tab ? "page" : undefined}
-              className={`-mb-px h-11 border-b-2 px-1 text-sm transition-colors duration-[120ms] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#C4247C] ${
+              className={`-mb-px h-11 border-b-2 px-1 text-sm transition-colors duration-[120ms] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent ${
                 tab === t.tab
-                  ? "border-[#C4247C] font-semibold text-[#111214]"
-                  : "border-transparent font-medium text-[#4B4F57] hover:text-[#111214]"
+                  ? "border-accent font-semibold text-ink"
+                  : "border-transparent font-medium text-body hover:text-ink"
               }`}
             >
               {t.label}
@@ -87,12 +87,12 @@ function UnconvertedNotice() {
   const dismiss = useAppStore((s) => s.dismissUnconverted);
   if (items.length === 0) return null;
   return (
-    <section role="status" className="flex flex-col gap-2 rounded-2xl border border-[#FFD3B0] bg-[#FFEBDB] px-4 py-2.5 text-sm text-[#B93815]">
+    <section role="status" className="flex flex-col gap-2 rounded-2xl border border-warn-line bg-warn-soft px-4 py-2.5 text-sm text-warn">
       <p>옛 규칙 {items.length}개를 새 형식으로 옮기지 못했어요. 다시 입력해 주세요</p>
       <ul className="flex flex-col gap-1">
         {items.map((u, i) => (
           <li key={i} className="flex items-center justify-between gap-3">
-            <span className="text-[#111214]">“{u.source_text}”</span>
+            <span className="text-ink">“{u.source_text}”</span>
             <button type="button" onClick={() => dismiss(i)} className={ui.textSm}>
               지우기
             </button>
@@ -133,8 +133,8 @@ export function BasicSection() {
               return (
                 <label
                   key={unit}
-                  className={`relative flex w-32 cursor-pointer flex-col gap-0.5 rounded-2xl px-3.5 py-3 transition-shadow duration-[120ms] has-focus-visible:outline-2 has-focus-visible:outline-offset-2 has-focus-visible:outline-[#C4247C] ${
-                    on ? "bg-white shadow-[inset_0_0_0_2px_#111214]" : "bg-white shadow-[inset_0_0_0_1px_#DCDCD8] hover:bg-[#F5F5F4]"
+                  className={`relative flex w-32 cursor-pointer flex-col gap-0.5 rounded-2xl px-3.5 py-3 transition-shadow duration-[120ms] has-focus-visible:outline-2 has-focus-visible:outline-offset-2 has-focus-visible:outline-accent ${
+                    on ? "bg-white shadow-[inset_0_0_0_2px_var(--color-ink)]" : "bg-white shadow-[inset_0_0_0_1px_var(--color-line-strong)] hover:bg-soft"
                   }`}
                 >
                   <input
@@ -148,10 +148,10 @@ export function BasicSection() {
                     }}
                     className="sr-only"
                   />
-                  <span className="text-base font-bold text-[#111214]">{title}</span>
-                  <span className="text-xs text-[#6B6F78]">{sub}</span>
+                  <span className="text-base font-bold text-ink">{title}</span>
+                  <span className="text-xs text-muted">{sub}</span>
                   {on && (
-                    <span aria-hidden="true" className="absolute top-2.5 right-2.5 flex size-[18px] items-center justify-center rounded-full bg-[#111214] text-white">
+                    <span aria-hidden="true" className="absolute top-2.5 right-2.5 flex size-[18px] items-center justify-center rounded-full bg-accent text-white">
                       <svg viewBox="0 0 12 12" className="size-2.5" fill="none" stroke="currentColor" strokeWidth={2.2}>
                         <path d="M2.5 6.2 5 8.5l4.5-5" />
                       </svg>
@@ -190,20 +190,20 @@ export function RosterSection() {
         )}
       </div>
       {empty && (
-        <div className="flex flex-col items-center gap-2 rounded-2xl bg-[#F5F5F4] px-5 py-7 text-center">
-          <span aria-hidden="true" className="flex size-12 -rotate-6 items-center justify-center rounded-[14px] bg-[#E5EDFF] text-[#1E4FD8]">
+        <div className="flex flex-col items-center gap-2 rounded-2xl bg-soft px-5 py-7 text-center">
+          <span aria-hidden="true" className="flex size-12 -rotate-6 items-center justify-center rounded-[14px] bg-info-soft text-info">
             <svg viewBox="0 0 24 24" className="size-[22px]" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
               <circle cx="9" cy="8.5" r="3.5" />
               <path d="M3 20c.8-3.4 3.2-5.5 6-5.5s5.2 2.1 6 5.5M16 5.5a3.5 3.5 0 0 1 0 6.5M18 14.8c1.6.8 2.6 2.6 3 5.2" />
             </svg>
           </span>
-          <p className="text-[17px] font-bold text-[#111214]">아직 명단이 없어요</p>
-          <p className="text-sm text-[#4B4F57]">아래 줄에 이름을 적고 Enter를 누르면 한 명씩 더해져요. 이니셜도 돼요</p>
+          <p className="text-[17px] font-bold text-ink">아직 명단이 없어요</p>
+          <p className="text-sm text-body">아래 줄에 이름을 적고 Enter를 누르면 한 명씩 더해져요. 이니셜도 돼요</p>
         </div>
       )}
       <EmployeeTable employees={shop.employees} />
       {orphanCount > 0 && (
-        <p className="text-xs font-medium text-[#B93815]">
+        <p className="text-xs font-medium text-warn">
           명단에 없거나 근무표에서 뺀 직원을 가리키는 매장 조건이 {orphanCount}개 있어요. [매장 조건] 탭에서 확인해 주세요.
         </p>
       )}
@@ -230,7 +230,7 @@ export function CoverageSection({ collapsible = false }: { collapsible?: boolean
   return (
     <section className={`${ui.card} flex flex-col gap-3`}>
       <div className="flex items-center justify-between gap-3">
-        <p className="text-sm text-[#4B4F57]">필요 인원을 숫자로 넣을 수도 있어요.</p>
+        <p className="text-sm text-body">필요 인원을 숫자로 넣을 수도 있어요.</p>
         <button type="button" aria-expanded={open} onClick={() => setOpen((o) => !o)} className={ui.textSm}>
           {open ? "숫자 입력 접기" : "숫자로 입력하기"}
         </button>
@@ -254,10 +254,10 @@ function EmployeeTable({ employees }: { employees: ShopEmployee[] }) {
           <option key={t} value={t} />
         ))}
       </datalist>
-      <div className="overflow-x-auto rounded-lg border border-[#EDEDEA] bg-white">
+      <div className="overflow-x-auto rounded-lg border border-line bg-white">
         <table className="w-full border-collapse text-[13px]">
           <thead>
-            <tr className="border-b border-[#EDEDEA] text-left text-xs font-medium text-[#6B6F78]">
+            <tr className="border-b border-line text-left text-xs font-medium text-muted">
               <th className="w-10 px-2 py-2 font-mono font-medium">#</th>
               <th className="px-2 py-2 font-medium">이름</th>
               <th className="px-2 py-2 font-medium">파트·직급</th>
@@ -347,13 +347,13 @@ function TagInput({
     <div className="flex flex-col gap-0.5">
       <div className="flex flex-wrap items-center gap-1">
         {tags.map((t) => (
-          <span key={t} className="inline-flex h-7 items-center gap-1 rounded-full border border-[#DCDCD8] bg-white pr-1 pl-3 text-xs font-normal text-[#4B4F57]">
+          <span key={t} className="inline-flex h-7 items-center gap-1 rounded-full border border-line-strong bg-white pr-1 pl-3 text-xs font-normal text-body">
             {t}
             <button
               type="button"
               onClick={() => onRemove(t)}
               aria-label={`${label} ${t} 빼기`}
-              className="inline-flex size-5 items-center justify-center rounded-full text-[#6B6F78] hover:bg-[#F5F5F4] hover:text-[#111214] focus-visible:outline-2 focus-visible:outline-[#C4247C]"
+              className="inline-flex size-5 items-center justify-center rounded-full text-muted hover:bg-soft hover:text-ink focus-visible:outline-2 focus-visible:outline-accent"
             >
               <svg aria-hidden="true" viewBox="0 0 12 12" className="size-3" fill="none" stroke="currentColor" strokeWidth="1.6">
                 <path d="M3 3l6 6M9 3l-6 6" />
@@ -371,7 +371,7 @@ function TagInput({
             placeholder="예: 홀, 리더"
             aria-label={label}
             aria-invalid={msg !== null || undefined}
-            className={`${cellInput} w-24 placeholder:text-[#6B6F78] ${msg ? ui.cellErr : ui.cellOk}`}
+            className={`${cellInput} w-24 placeholder:text-muted ${msg ? ui.cellErr : ui.cellOk}`}
           />
         )}
       </div>
@@ -408,8 +408,8 @@ function EmployeeRow({ employee, index, employees }: { employee: ShopEmployee; i
   const row = index + 1;
   const err = ui.cellErr;
   return (
-    <tr className="border-b border-[#F5F5F4] last:border-b-0">
-      <td className="px-2 py-1 font-mono text-xs text-[#6B6F78]">{row}</td>
+    <tr className="border-b border-soft last:border-b-0">
+      <td className="px-2 py-1 font-mono text-xs text-muted">{row}</td>
       {employee.active ? (
         <>
           <td className="px-1 py-1">
@@ -436,12 +436,12 @@ function EmployeeRow({ employee, index, employees }: { employee: ShopEmployee; i
       ) : (
         <>
           <td className="px-2 py-1">
-            <span className="flex items-center gap-2 text-[#6B6F78]">
+            <span className="flex items-center gap-2 text-muted">
               {employee.name}
               <span className={`${ui.badge} ${ui.badgeTone.excluded}`}>제외</span>
             </span>
           </td>
-          <td className="px-2 py-1 text-[#6B6F78]">{employee.tags.join(", ")}</td>
+          <td className="px-2 py-1 text-muted">{employee.tags.join(", ")}</td>
         </>
       )}
       <td className="px-1 py-1">
@@ -500,8 +500,8 @@ function NewEmployeeRow({ employees }: { employees: ShopEmployee[] }) {
   const err = ui.cellErr;
   const showName = tried && nameMsg;
   return (
-    <tr className="bg-[#F5F5F4]">
-      <td className="px-2 py-1 font-mono text-xs text-[#6B6F78]">+</td>
+    <tr className="bg-soft">
+      <td className="px-2 py-1 font-mono text-xs text-muted">+</td>
       <td className="px-1 py-1">
         <input
           ref={nameRef}
@@ -511,7 +511,7 @@ function NewEmployeeRow({ employees }: { employees: ShopEmployee[] }) {
           placeholder="이름"
           aria-label="새 직원 이름"
           aria-invalid={showName ? true : undefined}
-          className={`${cellInput} w-48 placeholder:text-[#6B6F78] ${showName ? err : ui.cellOk}`}
+          className={`${cellInput} w-48 placeholder:text-muted ${showName ? err : ui.cellOk}`}
         />
         {showName && <p className={`${ui.error} mt-0.5`}>{nameMsg}</p>}
       </td>
@@ -573,7 +573,7 @@ function RowMenu({ name, onDelete }: { name: string; onDelete: () => void }) {
         </svg>
       </button>
       {open && (
-        <div role="menu" className={`absolute top-full right-0 z-10 mt-1 rounded-md border border-[#EDEDEA] bg-white p-1 ${ui.shadow}`}>
+        <div role="menu" className={`absolute top-full right-0 z-10 mt-1 rounded-md border border-line bg-white p-1 ${ui.shadow}`}>
           <button
             type="button"
             role="menuitem"

@@ -18,29 +18,29 @@ type Actor = "사람" | "AI" | "계산 엔진";
 
 /** 행위자 칩. 사람만 강조색 면: 결정하는 자리라는 뜻. */
 function ActorChip({ actor }: { actor: Actor }) {
-  return <span className={`${ui.badge} shrink-0 whitespace-nowrap ${actor === "사람" ? "bg-[#C4247C] text-white" : ui.badgeTone.draft}`}>{actor}</span>;
+  return <span className={`${ui.badge} shrink-0 whitespace-nowrap ${actor === "사람" ? "bg-accent text-white" : ui.badgeTone.draft}`}>{actor}</span>;
 }
 
 /** 앱의 근무표 없음 패널과 같은 순서: 검증된 제안 먼저, 이유는 [왜 만들 수 없나요?]를 펼친 모양으로 아래에. */
 function BlockedFragment() {
   return (
-    <div className="flex flex-col gap-3.5 rounded-2xl border border-[#FECDCA] bg-white px-[18px] py-4">
+    <div className="flex flex-col gap-3.5 rounded-2xl border border-error-line bg-white px-[18px] py-4">
       <div className="flex flex-wrap items-center gap-2">
         <span className={`${ui.badge} ${ui.badgeTone.none} whitespace-nowrap`}>근무표 없음</span>
-        <h3 className="text-[13px] font-semibold text-[#111214]">이 조건으로는 근무표를 만들 수 없어요</h3>
+        <h3 className="text-[13px] font-semibold text-ink">이 조건으로는 근무표를 만들 수 없어요</h3>
       </div>
       <div className="flex flex-col gap-1.5">
-        <h4 className="text-[13px] font-semibold text-[#111214]">이렇게 바꾸면 만들 수 있어요</h4>
+        <h4 className="text-[13px] font-semibold text-ink">이렇게 바꾸면 만들 수 있어요</h4>
         <div className={`${ui.card} flex flex-col gap-2.5`}>
           <div className="flex items-center justify-between gap-3">
-            <h5 className="text-[13px] font-semibold text-[#111214]">주말 마감 인원 줄이기</h5>
+            <h5 className="text-[13px] font-semibold text-ink">주말 마감 인원 줄이기</h5>
             <span className={`${ui.badge} ${ui.badgeTone.confirmed} shrink-0`}>검증됨</span>
           </div>
           <div className="flex flex-col gap-0.5">
-            <span className="text-sm font-medium text-[#111214]">주말 마감 최소 3 → 2</span>
-            <span className="text-xs text-[#6B6F78]">“주말 마감은 3명”</span>
+            <span className="text-sm font-medium text-ink">주말 마감 최소 3 → 2</span>
+            <span className="text-xs text-muted">“주말 마감은 3명”</span>
           </div>
-          <p className="text-xs text-[#6B6F78]">
+          <p className="text-xs text-muted">
             이렇게 바꾸면 근무표를 만들 수 있어요 · 희망 반영 <span className="font-mono">9/9</span>
           </p>
           <div className="flex justify-end gap-1">
@@ -49,8 +49,8 @@ function BlockedFragment() {
           </div>
         </div>
       </div>
-      <div className="border-t border-[#F5F5F4] pt-3">
-        <p className="text-[13px] font-semibold text-[#111214]">왜 만들 수 없나요?</p>
+      <div className="border-t border-soft pt-3">
+        <p className="text-[13px] font-semibold text-ink">왜 만들 수 없나요?</p>
         <p className={`mt-1.5 ${body}`}>토요일 마감에 들어올 수 있는 사람이 2명뿐인데, 주말 마감은 3명이 필요해요.</p>
       </div>
     </div>
@@ -124,7 +124,7 @@ function Bullets({ items }: { items: string[] }) {
   return (
     <ul className="flex max-w-[760px] flex-col gap-3">
       {items.map((t) => (
-        <li key={t} className={`border-l border-[#DCDCD8] pl-5 ${body}`}>
+        <li key={t} className={`border-l border-line-strong pl-5 ${body}`}>
           {t}
         </li>
       ))}
@@ -135,7 +135,7 @@ function Bullets({ items }: { items: string[] }) {
 export default function HowPage() {
   return (
     <div className="landing flex flex-1 flex-col">
-      <header className="sticky top-0 z-40 border-b border-[#EDEDEA] bg-white/85 backdrop-blur-xl">
+      <header className="sticky top-0 z-40 border-b border-line bg-page/85 backdrop-blur-xl">
         <div className={`${container} flex min-h-16 flex-wrap items-center justify-between gap-3 py-2`}>
           <Wordmark size="bar" href="/" />
           <nav aria-label="주요 메뉴" className="flex items-center gap-2 sm:gap-4">
@@ -161,8 +161,8 @@ export default function HowPage() {
             </SectionHead>
             <div className="grid grid-cols-1 gap-6 lg:grid-cols-3 lg:gap-8">
               {WHY.map((w) => (
-                <div key={w.title} className="flex flex-col gap-2 border-l border-[#DCDCD8] pl-5">
-                  <h3 className="text-[15px] font-semibold text-[#111214]">{w.title}</h3>
+                <div key={w.title} className="flex flex-col gap-2 border-l border-line-strong pl-5">
+                  <h3 className="text-[15px] font-semibold text-ink">{w.title}</h3>
                   <p className={body}>{w.body}</p>
                 </div>
               ))}
@@ -183,13 +183,13 @@ export default function HowPage() {
                     <div className="flex flex-wrap items-center gap-1.5">
                       {s.actors.map(([actor, verb], i) => (
                         <span key={i} className="flex items-center gap-1.5">
-                          {i > 0 && <span className="text-[13px] text-[#9499A2]">→</span>}
+                          {i > 0 && <span className="text-[13px] text-disabled">→</span>}
                           <ActorChip actor={actor} />
-                          <span className="text-[13px] text-[#4B4F57]">{verb}</span>
+                          <span className="text-[13px] text-body">{verb}</span>
                         </span>
                       ))}
                     </div>
-                    <h3 className="text-[20px] font-semibold text-[#111214]">{s.title}</h3>
+                    <h3 className="text-[20px] font-semibold text-ink">{s.title}</h3>
                     <p className={body}>{s.body}</p>
                   </div>
                 </div>
@@ -213,22 +213,22 @@ export default function HowPage() {
               번역 정확도와 솔버 성능을 따로 재요.
             </SectionHead>
             <div className="grid grid-cols-1 gap-6 lg:grid-cols-2 lg:gap-8">
-              <div className="flex flex-col gap-3 rounded-2xl border border-[#EDEDEA] bg-white p-6">
-                <span className="text-[13px] font-semibold text-[#111214]">말 → 규칙 번역</span>
-                <span className="font-mono text-[40px] leading-none font-semibold text-[#C4247C]">99.0%</span>
+              <div className="flex flex-col gap-3 rounded-2xl border border-line bg-white p-6">
+                <span className="text-[13px] font-semibold text-ink">말 → 규칙 번역</span>
+                <span className="font-mono text-[40px] leading-none font-semibold text-accent">99.0%</span>
                 <p className={body}>
                   매니저 말투 문장 102개를 의미 기준으로 판정했어요(무작위 근무표에서 위반이 같은지 비교). 실행할 때마다 96~99%가 나와요.
                 </p>
                 <p className={ui.help}>
                   문장을 직접 작성해서, 실제 매니저 말투로 잰 정확도는 아직 없어요 ·{" "}
-                  <a href={EVAL_URL} className="underline underline-offset-2 hover:text-[#111214]">
+                  <a href={EVAL_URL} className="underline underline-offset-2 hover:text-ink">
                     평가 자료 보기(GitHub)
                   </a>
                 </p>
               </div>
-              <div className="flex flex-col gap-3 rounded-2xl border border-[#EDEDEA] bg-white p-6">
-                <span className="text-[13px] font-semibold text-[#111214]">솔버 성능(최악 조건)</span>
-                <span className="font-mono text-[40px] leading-none font-semibold text-[#111214]">
+              <div className="flex flex-col gap-3 rounded-2xl border border-line bg-white p-6">
+                <span className="text-[13px] font-semibold text-ink">솔버 성능(최악 조건)</span>
+                <span className="font-mono text-[40px] leading-none font-semibold text-ink">
                   7.5<span className="text-[20px]">초</span>
                 </span>
                 <p className={body}>입력 상한을 꽉 채운 매장(직원 40명 × 31일, 근무 코드 8개, 규칙 74개)에서 최적해까지 걸린 시간이에요. 시간 예산은 10초예요.</p>

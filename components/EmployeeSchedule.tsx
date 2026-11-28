@@ -78,7 +78,7 @@ function ScheduleView({ schedule, name, onBack }: { schedule: ConfirmedSchedule;
           <h1 className={ui.pageTitle}>
             {schedule.shop_name} · {name}님의 근무표
           </h1>
-          <p className="flex flex-wrap items-center gap-x-3 text-sm text-[#6B6F78]">
+          <p className="flex flex-wrap items-center gap-x-3 text-sm text-muted">
             <span className="font-mono">{formatRange(range)}</span>
             <span>
               확정 <span className="font-mono">{shortTime(schedule.confirmed_at)}</span>
@@ -95,7 +95,7 @@ function ScheduleView({ schedule, name, onBack }: { schedule: ConfirmedSchedule;
         {days ? (
           weekPages(days).map((week) => <WeekCard key={week[0].date} name={name} week={week} shifts={schedule.shifts} config={config} />)
         ) : (
-          <p className="text-sm text-[#4B4F57]">이 근무표에는 {name}님의 근무가 없어요.</p>
+          <p className="text-sm text-body">이 근무표에는 {name}님의 근무가 없어요.</p>
         )}
       </section>
 
@@ -132,19 +132,19 @@ function WeekCard({ name, week, shifts, config }: { name: string; week: Employee
   const { workDays, hours } = employeeTotals(week, shifts);
   return (
     <div className={`${ui.card} flex flex-col gap-3`}>
-      <p className="text-[13px] font-medium text-[#4B4F57]">
+      <p className="text-[13px] font-medium text-body">
         근무 <span className="font-mono">{workDays}</span>일 · <span className="font-mono">{hours}</span>시간
       </p>
       <ul className="flex flex-col gap-1 sm:grid sm:grid-cols-7 sm:gap-2">
         {week.map((d) => {
           const [, month, dom] = d.date.split("-").map(Number);
           const holiday = d.weekend && d.weekday !== 0 && d.weekday !== 6;
-          const color = d.weekday === 0 || holiday ? "text-[#B42318]" : d.weekday === 6 ? "text-[#C4247C]" : "text-[#4B4F57]";
+          const color = d.weekday === 0 || holiday ? "text-error" : d.weekday === 6 ? "text-accent" : "text-body";
           const off = d.code === "" || d.code === OFF_CODE;
           return (
             <li
               key={d.date}
-              className={`flex items-center gap-3 rounded-md px-2 py-1.5 sm:flex-col sm:gap-1.5 sm:px-0 sm:py-2 ${d.weekend ? "bg-[#F5F5F4]" : ""}`}
+              className={`flex items-center gap-3 rounded-md px-2 py-1.5 sm:flex-col sm:gap-1.5 sm:px-0 sm:py-2 ${d.weekend ? "bg-soft" : ""}`}
             >
               <span className={`w-14 font-mono text-xs font-medium sm:w-auto ${color}`}>
                 {WEEKDAYS[d.weekday]} {month}/{dom}
@@ -156,7 +156,7 @@ function WeekCard({ name, week, shifts, config }: { name: string; week: Employee
               >
                 {cellText(d.code)}
               </span>
-              <span className={`text-xs sm:text-center ${off ? "text-[#6B6F78]" : "text-[#111214]"}`}>{d.label}</span>
+              <span className={`text-xs sm:text-center ${off ? "text-muted" : "text-ink"}`}>{d.label}</span>
             </li>
           );
         })}
