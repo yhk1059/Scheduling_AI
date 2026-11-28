@@ -120,33 +120,36 @@ button:not(:disabled) { cursor: pointer; }
 /* 앱 화면: 고정 헤더와 아래 단계 바가 키보드 포커스를 가리지 않게 스크롤 여백을 둔다 */
 html:has([data-app-shell]) { scroll-padding-top: 152px; scroll-padding-bottom: 104px; }
 .landing-hero { max-width: 1200px; margin: auto; border-inline: 1px solid #EDEDEA; }
-.hero-heading { isolation: isolate; position: relative; padding-top: 112px; padding-bottom: 64px; }
+.hero-heading { isolation: isolate; position: relative; padding-top: 112px; padding-bottom: 16px; text-align: center; }
 .hero-heading::before { content: ""; position: absolute; inset: 0; z-index: -1; background-image: radial-gradient(#DCDCD8 1px, transparent 1px); background-size: 28px 28px; mask-image: radial-gradient(ellipse at 50% 20%, #000, transparent 70%); }
-.hero-heading h1 { margin-bottom: 40px; font-size: clamp(52px, 7.4vw, 104px); font-weight: 700; letter-spacing: -.045em; line-height: 1.08; }
+.hero-heading h1 { margin-bottom: 24px; font-size: clamp(52px, 7.4vw, 104px); font-weight: 700; letter-spacing: -.045em; line-height: 1.08; }
 .hero-sticker { display: inline-flex; align-items: center; justify-content: center; width: .86em; height: .86em; margin: 0 .16em; vertical-align: -.1em; color: white; animation: sticker-bob 4.8s ease-in-out infinite; }
 .hero-sticker svg { width: 52%; height: 52%; }
 .calendar-sticker { background: #2F6BFF; border-radius: .26em; rotate: -8deg; }
 .sparkle-sticker { background: #EE46BC; border-radius: 50%; rotate: 8deg; animation-delay: -2.4s; font-size: .9em; }
-.hero-caption { position: relative; display: flex; align-items: center; justify-content: center; gap: 12px; border-block: 1px solid #EDEDEA; padding: 14px 20px; color: #6B6F78; font-size: 13px; }
-.hero-stage { position: relative; padding-top: 64px; padding-bottom: 88px; }
+.hero-stage { position: relative; padding-top: 56px; padding-bottom: 88px; }
 .hero-window { overflow: hidden; border: 1px solid #EDEDEA; border-radius: 18px; background: white; box-shadow: 0 24px 56px -24px rgb(17 18 20 / 22%), 0 1px 3px rgb(17 18 20 / 6%); }
-.hero-window-bar { height: 42px; display: flex; justify-content: space-between; align-items: center; padding-inline: 18px; border-bottom: 1px solid #EDEDEA; color: #6B6F78; font-size: 12px; }
-.hero-window-bar > :first-child { color: #DCDCD8; letter-spacing: 4px; }
+/* 제품 창 위쪽 탭. 선택된 탭만 흰 면과 위 검정 선으로 창 본문에 이어진다 */
+.hero-tabs { display: flex; gap: 4px; overflow-x: auto; padding: 8px 8px 0; background: #F5F5F4; border-bottom: 1px solid #EDEDEA; }
+.hero-tab { display: inline-flex; flex-shrink: 0; align-items: center; gap: 8px; height: 42px; margin-bottom: -1px; padding-inline: 16px; border: 1px solid transparent; border-bottom: 0; border-radius: 10px 10px 0 0; color: #6B6F78; font-size: 14px; font-weight: 500; white-space: nowrap; transition: color 120ms, background-color 120ms; }
+.hero-tab svg { width: 14px; height: 14px; }
+.hero-tab:hover { color: #111214; }
+.hero-tab[aria-selected="true"] { background: white; border-color: #EDEDEA; box-shadow: inset 0 2px 0 #111214; color: #111214; font-weight: 600; }
+.hero-tab:focus-visible { outline-offset: -2px; }
+.hero-panel { animation: hero-fade 200ms ease-out; }
 .hero-window .hero-seq { border: 0; border-radius: 0; background: white; }
 .hero-window .hero-seq > [inert] { display: grid; grid-template-columns: minmax(180px, 1fr) minmax(0, 3fr); align-items: start; }
 .hero-window .hero-seq > [inert] > :first-child { grid-column: 1 / -1; }
 .hero-window .hero-table { min-width: 0; }
-.hero-float { position: absolute; z-index: 2; display: inline-flex; align-items: center; gap: 8px; padding: 12px 18px; border-radius: 999px; font-size: 13px; font-weight: 600; box-shadow: 0 12px 32px -16px rgb(17 18 20 / 25%); }
-.hero-float-request { right: 8%; top: 42px; background: #FFEBDB; color: #B93815; rotate: 5deg; }
-.hero-float-result { right: 6%; bottom: 66px; background: white; border: 1px solid #EDEDEA; }
 @keyframes sticker-bob { 0%, 100% { translate: 0 0; } 50% { translate: 0 -6px; } }
 @media (max-width: 767px) {
-  .hero-heading { padding-top: 64px; padding-bottom: 40px; }
+  .hero-heading { padding-top: 64px; padding-bottom: 8px; }
   .hero-stage { padding-top: 40px; padding-bottom: 56px; }
   .hero-window .hero-seq > [inert] { display: flex; flex-direction: column; }
   .hero-window .hero-seq > [inert] > * { width: 100%; }
-  .hero-float-request { top: 20px; right: 24px; font-size: 11px; }
-  .hero-float-result { bottom: 34px; right: 24px; font-size: 11px; }
+  .hero-tabs { gap: 0; padding-inline: 4px; }
+  .hero-tab { padding-inline: 10px; font-size: 13px; }
+  .hero-tab svg { display: none; }
 }
 @media (prefers-reduced-motion: reduce) {
   .hero-sticker { animation: none; }

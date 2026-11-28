@@ -3,7 +3,7 @@ import { Fragment } from "react";
 import Link from "next/link";
 
 import DemoVideoButton from "@/components/DemoVideo";
-import HeroSequence, { ChangeFragment } from "@/components/HeroSequence";
+import { ChangeFragment, HeroShowcase } from "@/components/HeroSequence";
 import { LandingFooter, SectionHead, body, container, section } from "@/components/landing";
 import { ui } from "@/components/ui";
 import Wordmark, { Mark } from "@/components/Wordmark";
@@ -233,22 +233,14 @@ export default function Home() {
               Scheduling<span aria-hidden="true" className="hero-sticker calendar-sticker"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><rect x="3" y="5" width="18" height="16" rx="3" /><path d="M3 10h18M8 3v4M16 3v4" /></svg></span>{" "}
               <span className="text-[#EE46BC]">AI</span><span aria-hidden="true" className="hero-sticker sparkle-sticker">✦</span>
             </h1>
-            <div className="flex flex-wrap items-center justify-between gap-6">
-              <p className="text-lg leading-relaxed text-[#4B4F57] sm:text-xl">직원은 링크로 가능 시간을 적고, 조건은 평소 말투로 적으세요. 근무표는 버튼 한 번에 나와요.</p>
-              <div className="flex flex-wrap gap-2.5">
-                <Link href="/app" className={ui.primaryXl}>내 매장으로 시작하기</Link>
-                <Link href="/demo" className={ui.secondaryXl}>체험하기</Link>
-              </div>
+            <p className="mx-auto max-w-[640px] text-lg leading-relaxed text-[#4B4F57] sm:text-xl">직원은 링크로 가능 시간을 적고, 조건은 평소 말투로 적으세요. 근무표는 버튼 한 번에 나와요.</p>
+            <div className="mt-8 flex flex-wrap justify-center gap-2.5">
+              <Link href="/app" className={ui.primaryXl}>내 매장으로 시작하기</Link>
+              <Link href="/demo" className={ui.secondaryXl}>체험하기</Link>
             </div>
           </div>
-          <div className="hero-caption"><span className="rounded-full bg-[#111214] px-3 py-1 text-[11px] font-semibold text-white">실제 화면</span>말로 적은 규칙이 근무표가 되는 과정</div>
           <div className={`${container} hero-stage`}>
-            <span aria-hidden="true" className="hero-float hero-float-request">일요일은 휴무로 해 주세요</span>
-            <div className="hero-window">
-              <div className="hero-window-bar"><span aria-hidden="true">● ● ●</span><span>우리 매장 · 근무표 미리보기</span><span aria-hidden="true" /></div>
-              <HeroSequence />
-            </div>
-            <span aria-hidden="true" className="hero-float hero-float-result"><span className="size-2 rounded-full bg-[#12B76A]" />조건을 모두 지킨 근무표가 나와요</span>
+            <HeroShowcase />
           </div>
         </section>
 

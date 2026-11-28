@@ -465,7 +465,7 @@ relative w-[30px] h-7 rounded-lg inline-flex items-center justify-center font-mo
 
 ## 레이아웃
 - 전체 너비: 앱 `max-w-[1200px] mx-auto px-4 sm:px-6`, 랜딩 `max-w-[1200px] px-5 lg:px-14`
-- 정렬: 좌측 정렬 기본. 중앙 정렬 히어로 금지
+- 정렬: 좌측 정렬 기본. 랜딩 히어로의 제목·설명·CTA만 가운데 정렬한다(바로 아래 제품 창으로 시선을 모은다)
 - 간격: 카드 사이 `gap-5`~`gap-6`, 앱 화면 섹션 사이 `gap-6`, 카드 안 `gap-2.5`~`gap-3.5`
 - 묶음: 관련된 입력과 버튼은 같은 카드 안에 붙여 둔다. 서로 다른 일은 카드를 나눈다. 카드 안의 간격은 카드 사이 간격보다 항상 좁다
 - 위계: 화면마다 페이지 제목은 하나다. 화면을 위에서부터 읽으면 "지금 상태 → 할 일 → 결과" 순서가 되게 놓는다. 할 일 영역(강조 바탕 패널)은 한 화면에 하나다
@@ -474,7 +474,7 @@ relative w-[30px] h-7 rounded-lg inline-flex items-center justify-center font-mo
 - 근무표·통계 표는 `overflow-x-auto` 상자 안에 둔다. 표를 줄이거나 셀을 30px보다 작게 만들지 않는다
 - 랜딩 페이지
   - 상단 바: `sticky bg-white/85 backdrop-blur-xl border-b`, 워드마크 + 오른쪽 Text [사용 방법](`#how`) + Text [데모 영상](영상 대화상자) + Primary [로그인]
-  - 히어로: 위아래 배치. 점 배경 위에 큰 제목 "Scheduling AI" 한 줄(`clamp(52px, 7.4vw, 104px)`, "AI"는 `#EE46BC`, 줄 끝 달력·반짝이 스티커), 그 아래 설명(`text-lg sm:text-xl`)과 [내 매장으로 시작하기] PrimaryXl(`/app`) + [체험하기] SecondaryXl(`/demo`). 이어서 "실제 화면" 캡션 띠와, 창 프레임(`hero-window`, 그림자) 안의 "움직임" 시퀀스. 창 양옆에 말풍선 두 개가 떠 있다
+  - 히어로: 위아래 배치. 점 배경 위에 큰 제목 "Scheduling AI" 한 줄(`clamp(52px, 7.4vw, 104px)`, "AI"는 `#EE46BC`, 줄 끝 달력·반짝이 스티커), 그 아래 설명(`text-lg sm:text-xl`, `max-w-[640px]`)과 [내 매장으로 시작하기] PrimaryXl(`/app`) + [체험하기] SecondaryXl(`/demo`). 제목·설명·CTA는 가운데 정렬이다. 이어서 창 프레임(`hero-window`, 그림자) 위쪽에 탭 줄(`hero-tabs`, 회색 띠): [가능 시간 받기] [말로 근무표 만들기] [확정 후 바꾸기]. 선택된 탭은 흰 면 + 위 2px 검정 선으로 창 본문에 이어진다. 처음에는 [말로 근무표 만들기](움직임 시퀀스)가 열린다. 탭은 `role="tablist"`, 화살표·Home·End로 옮긴다. 장면은 모두 샘플 데이터의 정적 화면이다: 가능 시간 받기는 최지훈이 칠한 한 주 + 직원 링크 카드(제출 4/5명), 확정 후 바꾸기는 "최지훈 4~6일 병가" 입력 바 + 요청 카드 + 운영 중 근무표(지난 날짜 잠금, 바뀐 칸 주황 테두리). 모바일에서는 탭 아이콘을 숨긴다
   - 섹션: `py-16 lg:py-28 border-t border-[#EDEDEA]`, 아이브로우 "01 · 이런 적 있죠?" + 제목 `text-[32px] lg:text-[52px] font-bold` + 설명 16px(`max-w-[640px]`)
   - 01 이런 적 있죠?: 왼쪽은 손으로 짠 엑셀 근무표(고친 칸 주황 ①, 깨진 칸 빨강 ②)와 설명, 오른쪽은 회색 면 안의 매니저·직원 말풍선 3개(글자만, 실제 서비스 로고 없음). 말풍선마다 "스케줄링 AI에서는" 한 줄을 단다. 행위자 칩(AI·계산 엔진·사람)은 두지 않는다
   - 02 사용 방법: 세로 4줄의 회색 면(`rounded-3xl bg-[#F5F5F4]`, `lg:grid-cols-[64px_5fr_6fr]`), 검정 원 안의 번호(mono, `size-12 bg-[#111214] text-white`) + 제목 20px + 본문 + 오른쪽 화면 조각(가능 시간 캘린더, 입력 바, 요약 지표, 운영 중 변경)
